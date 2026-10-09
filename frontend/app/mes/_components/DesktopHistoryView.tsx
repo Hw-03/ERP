@@ -1,5 +1,6 @@
 "use client";
 import { useDesktopTabHome } from "./DesktopTabHome";
+import { useCurrentOperator } from "./login/useCurrentOperator";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -40,6 +41,8 @@ function getCurrentKstCalendarMonth(): SelectedHistoryMonth {
 
 export function DesktopHistoryView() {
   const queryClient = useQueryClient();
+  const operator = useCurrentOperator();
+  const employeeId = operator?.employee_id ?? "";
   const realtimeRevision = useRealtimeRevision();
   // 3차: 상단 KPI 박스는 표시 전용(클릭 필터 폐기). 필터는 "필터" 패널 단일.
   // scope/typeFilter/activeBucket·부서 전개 상태 없음 — 항상 "전체"로 시작.
@@ -53,14 +56,24 @@ export function DesktopHistoryView() {
   const deptParam = selectedDepts.join(",");
   const opParam = selectedOps.join(",");
   const [dateFilter, setDateFilter] = useState("MONTH");
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  // Reuse the same cached query on tab return without leaking another employee's search.
+  const cachedSearch = employeeId
+    ? queryClient.getQueryData<string>(queryKeys.transactions.searchState(employeeId)) ?? ""
+    : "";
+  const [searchState, setSearchState] = useState({ employeeId, value: cachedSearch });
+  const search = searchState.employeeId === employeeId ? searchState.value : cachedSearch;
+  const setSearch = useCallback((value: string) => {
+    setSearchState({ employeeId, value });
+    if (employeeId) queryClient.setQueryData(queryKeys.transactions.searchState(employeeId), value);
+  }, [employeeId, queryClient]);
+  const [debouncedState, setDebouncedState] = useState({ employeeId, value: search.trim() });
+  const debouncedSearch = debouncedState.employeeId === employeeId ? debouncedState.value : search.trim();
 
   // search debounce — 목록과 달력 fetch 가 같은 값을 공유.
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS);
+    const t = setTimeout(() => setDebouncedState({ employeeId, value: search.trim() }), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
-  }, [search]);
+  }, [employeeId, search]);
 
   // 필터 패널 "모델 구분" 칩 소스 — useModelsQuery 캐시에서 모델명만 추려 dedup.
   const availableModels = useMemo(

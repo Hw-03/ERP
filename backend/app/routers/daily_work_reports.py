@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy import case, or_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from app.database import get_db
 from app.models import DailyWorkReport, Employee, IoBatch, Item, TransactionLog, TransactionTypeEnum
@@ -323,6 +323,10 @@ def get_daily_work_activity(employee_id: uuid.UUID, work_date: date, db: Session
     start, end = _kst_day_bounds(work_date)
     rows = (
         db.query(TransactionLog, Item, IoBatch)
+        .options(
+            load_only(Item.item_name, Item.mes_code, Item.process_type_code, Item.unit, raiseload=True),
+            load_only(IoBatch.work_type, IoBatch.sub_type, IoBatch.requester_name, IoBatch.to_department, raiseload=True),
+        )
         .join(Item, TransactionLog.item_id == Item.item_id)
         .outerjoin(IoBatch, TransactionLog.operation_batch_id == IoBatch.batch_id)
         .filter(
@@ -343,7 +347,7 @@ def get_daily_work_activity(employee_id: uuid.UUID, work_date: date, db: Session
         [log for log, _, _ in rows],
     )
     operation_info = _operation_info_map(db, {log.operation_id for log, _, _ in rows if log.operation_id})
-    batch_info = _batch_name_map(db, {log.operation_batch_id for log, _, _ in rows if log.operation_batch_id})
+    batch_info = _batch_name_map(db, {log.operation_batch_id for log, _, _ in rows if log.operation_batch_id}, include_line_details=False)
     reference_info = _stock_request_info_map(db, {log.reference_no for log, _, _ in rows if log.reference_no})
     request_info = {log.log_id: reference_info.get(log.reference_no) or batch_info.get(log.operation_batch_id) for log, _, _ in rows}
     summary, details = _activity_summary(rows, inventory_effects, operation_info, request_info)

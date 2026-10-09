@@ -478,18 +478,9 @@ def _apply_common_filters(
 
 def _history_search_filter(search: Optional[str]) -> Optional[ColumnElement[bool]]:
     """목록·상세 작업명을 같은 모집단으로 검색하고 페이지 분할 전 적용한다."""
-    operation_label = (
-        select(InventoryOperation.display_label)
-        .where(InventoryOperation.operation_id == TransactionLog.operation_id)
-        .correlate(TransactionLog)
-        .scalar_subquery()
-    )
-    return build_normalized_search_filter(
+    common_filter = build_normalized_search_filter(
         search,
         _history_list_operation_label_expr(),
-        operation_label,
-        TransactionLog.item_snapshot["item_name"].as_string(),
-        TransactionLog.item_snapshot["mes_code"].as_string(),
         Item.item_name,
         Item.mes_code,
         TransactionLog.reference_no,
@@ -497,6 +488,27 @@ def _history_search_filter(search: Optional[str]) -> Optional[ColumnElement[bool
         TransactionLog.produced_by,
         TransactionLog.supplier_name_snapshot,
         IoBatch.requester_name,
+    )
+    if common_filter is None:
+        return None
+    operation_label = (
+        select(InventoryOperation.display_label)
+        .where(InventoryOperation.operation_id == TransactionLog.operation_id)
+        .correlate(TransactionLog)
+        .scalar_subquery()
+    )
+    snapshot_filter = build_normalized_search_filter(
+        search,
+        TransactionLog.item_snapshot["item_name"].as_string(),
+        TransactionLog.item_snapshot["mes_code"].as_string(),
+    )
+    # 과거 NULL 증거는 검색에 일치할 수 없으므로 문자열 정규화도 건너뛴다.
+    # CASE는 DB가 OR 조건 순서를 바꾸더라도 불필요한 식 평가를 막는다.
+    return or_(
+        common_filter,
+        case((TransactionLog.operation_id.is_not(None),
+              build_normalized_search_filter(search, operation_label)), else_=False),
+        case((TransactionLog.item_snapshot.is_not(None), snapshot_filter), else_=False),
     )
 
 
@@ -660,8 +672,60 @@ def _operation_info_map(
     }
 
 
+def _batch_line_display_types(
+    db: Session, batch_sub_types: dict[uuid.UUID, str | None],
+) -> dict[uuid.UUID, str | None]:
+    """선택된 배치의 전체 포함·제외 라인으로 기존 작업 표시 유형을 보존한다."""
+    if not batch_sub_types:
+        return {}
+    bundle_rows = (
+        db.query(
+            IoBundle.batch_id, IoBundle.bundle_id, IoBundle.source_kind, IoBundle.source_item_id,
+            IoLine.item_id, IoLine.included, IoLine.origin, IoLine.direction,
+            IoLine.from_bucket, IoLine.to_bucket, IoLine.exclusion_note,
+        )
+        .outerjoin(IoLine, IoLine.bundle_id == IoBundle.bundle_id)
+        .filter(IoBundle.batch_id.in_(batch_sub_types))
+        .all()
+    )
+    bundles_by_batch: dict[uuid.UUID, dict[uuid.UUID, dict]] = defaultdict(dict)
+    for row in bundle_rows:
+        bundle = bundles_by_batch[row.batch_id].setdefault(row.bundle_id, {
+            "source_kind": row.source_kind, "source_item_id": row.source_item_id, "lines": [],
+        })
+        if row.item_id is not None:
+            bundle["lines"].append(row)
+
+    def display_type(batch_id: uuid.UUID, sub_type: str | None) -> str | None:
+        bundles = list(bundles_by_batch.get(batch_id, {}).values())
+        if sub_type not in {"produce", "disassemble"}:
+            return None
+        manual_only = bool(bundles) and all(
+            bundle["source_kind"] == "manual"
+            and any(line.included for line in bundle["lines"])
+            and all(
+                line.origin == "manual" and line.direction == "in"
+                and line.from_bucket == "none" and line.to_bucket == "production"
+                for line in bundle["lines"] if line.included
+            )
+            for bundle in bundles
+        )
+        custom_adjustment = any(
+            bundle["source_kind"] == "bom_parent"
+            and any(
+                line.origin == "direct" and line.item_id == bundle["source_item_id"]
+                and not line.included and line.exclusion_note == "커스텀 BOM 상위 미반영"
+                for line in bundle["lines"]
+            )
+            for bundle in bundles
+        )
+        return "ADJUST" if manual_only or custom_adjustment else None
+
+    return {batch_id: display_type(batch_id, sub_type) for batch_id, sub_type in batch_sub_types.items()}
+
+
 def _batch_name_map(
-    db: Session, batch_ids: set
+    db: Session, batch_ids: set, *, include_line_details: bool = True,
 ) -> dict[uuid.UUID, _BatchInfo]:
     """operation_batch_id 집합 → _BatchInfo(이름+시각) 매핑.
 
@@ -712,48 +776,8 @@ def _batch_name_map(
             else:
                 sr_approver[sr_id] = None
                 sr_approved_at[sr_id] = None  # 즉시 처리 시 approved_at fallback은 호출부에서 log.created_at
-    bundle_rows = (
-        db.query(
-            IoBundle.batch_id, IoBundle.bundle_id, IoBundle.source_kind, IoBundle.source_item_id,
-            IoLine.item_id, IoLine.included, IoLine.origin, IoLine.direction,
-            IoLine.from_bucket, IoLine.to_bucket, IoLine.exclusion_note,
-        )
-        .outerjoin(IoLine, IoLine.bundle_id == IoBundle.bundle_id)
-        .filter(IoBundle.batch_id.in_(batch_ids))
-        .all()
-    )
-    bundles_by_batch: dict[uuid.UUID, dict[uuid.UUID, dict]] = defaultdict(dict)
-    for row in bundle_rows:
-        bundle = bundles_by_batch[row.batch_id].setdefault(row.bundle_id, {
-            "source_kind": row.source_kind, "source_item_id": row.source_item_id, "lines": [],
-        })
-        if row.item_id is not None:
-            bundle["lines"].append(row)
-
-    def display_type(batch_id: uuid.UUID, sub_type: str | None) -> str | None:
-        bundles = list(bundles_by_batch.get(batch_id, {}).values())
-        if sub_type not in {"produce", "disassemble"}:
-            return None
-        manual_only = bool(bundles) and all(
-            bundle["source_kind"] == "manual"
-            and any(line.included for line in bundle["lines"])
-            and all(
-                line.origin == "manual" and line.direction == "in"
-                and line.from_bucket == "none" and line.to_bucket == "production"
-                for line in bundle["lines"] if line.included
-            )
-            for bundle in bundles
-        )
-        custom_adjustment = any(
-            bundle["source_kind"] == "bom_parent"
-            and any(
-                line.origin == "direct" and line.item_id == bundle["source_item_id"]
-                and not line.included and line.exclusion_note == "커스텀 BOM 상위 미반영"
-                for line in bundle["lines"]
-            )
-            for bundle in bundles
-        )
-        return "ADJUST" if manual_only or custom_adjustment else None
+    display_types = (_batch_line_display_types(db, {b.batch_id: b.sub_type for b in batches})
+                     if include_line_details else {})
 
     for b in batches:
         approver = sr_approver.get(b.stock_request_id) if b.stock_request_id else None
@@ -767,7 +791,7 @@ def _batch_name_map(
             b.work_type,
             b.sub_type,
             b.to_department,
-            display_type(b.batch_id, b.sub_type),
+            display_types.get(b.batch_id),
         )
     return batch_map
 

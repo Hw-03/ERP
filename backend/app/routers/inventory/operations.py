@@ -178,6 +178,7 @@ def _operation_payload(
             db,
             item_ids,
             request_date_expr=_history_request_date_expr(),
+            target_log_ids={log.log_id for log in logs},
         )
     history_logs = _history_log_map(
         db,
@@ -326,19 +327,16 @@ def list_operations(
     if has_more and rows:
         last = rows[-1]
         next_cursor = f"{last.effective_at.isoformat()}|{last.operation_id}"
-    page_item_ids = {
-        item_id
-        for (item_id,) in (
-            db.query(TransactionLog.item_id)
-            .filter(TransactionLog.operation_id.in_([row.operation_id for row in rows]))
-            .distinct()
-            .all()
-        )
-    } if rows else set()
+    page_logs = (
+        db.query(TransactionLog.item_id, TransactionLog.log_id)
+        .filter(TransactionLog.operation_id.in_([row.operation_id for row in rows]))
+        .all()
+    ) if rows else []
     request_order_stock = load_request_order_stock(
         db,
-        page_item_ids,
+        {log.item_id for log in page_logs},
         request_date_expr=_history_request_date_expr(),
+        target_log_ids={log.log_id for log in page_logs},
     )
     return {
         "items": [
@@ -362,19 +360,16 @@ def get_operation(
     operation = db.get(InventoryOperation, operation_id)
     if operation is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "작업을 찾을 수 없습니다.")
-    item_ids = {
-        item_id
-        for (item_id,) in (
-            db.query(TransactionLog.item_id)
-            .filter(TransactionLog.operation_id == operation.operation_id)
-            .distinct()
-            .all()
-        )
-    }
+    operation_logs = (
+        db.query(TransactionLog.item_id, TransactionLog.log_id)
+        .filter(TransactionLog.operation_id == operation.operation_id)
+        .all()
+    )
     request_order_stock = load_request_order_stock(
         db,
-        item_ids,
+        {log.item_id for log in operation_logs},
         request_date_expr=_history_request_date_expr(),
+        target_log_ids={log.log_id for log in operation_logs},
     )
     return _operation_payload(
         db,

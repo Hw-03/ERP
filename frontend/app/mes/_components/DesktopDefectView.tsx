@@ -619,6 +619,7 @@ function DefectViewInner({
                 <DefectDepartmentList
                   emptyContent={<ReadEmpty hasSearch={!!search.trim()} hasFilters={locations.length > 0}
                     illustrated
+                    aboveFold
                     className="min-h-[260px] flex-1"
                     title={!search.trim() && locations.length === 0 ? "격리된 불량 재고가 없습니다." : undefined}
                     onReset={() => { setSearch(""); setScope("all"); resetCategoryFilters(); setKpiFilter(null); }} />}

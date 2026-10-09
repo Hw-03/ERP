@@ -222,9 +222,8 @@ vi.mock("../DesktopHistoryView", () => ({ DesktopHistoryView: () => {
 } }));
 
 it("keeps summary card details while the history screen is preparing", () => {
-  window.history.replaceState(null, "", "/mes?tab=history");
+  window.history.replaceState(null, "", "/mes?tab=dashboard");
   render(<Suspense fallback={<div>root loading</div>}><DesktopMesShell /></Suspense>);
-  fireEvent.click(screen.getByRole("button", { name: "dashboard", exact: true }));
   slowHistory.pending = true;
   try {
     fireEvent.click(screen.getByRole("button", { name: "history", exact: true }));
@@ -561,6 +560,16 @@ describe("DesktopMesShell tab transition", () => {
       slow.pending = false;
       resolve();
     }
+  });
+
+  it("받은 내역으로 돌아오면 전체 로딩 덮개를 다시 표시하지 않는다", async () => {
+    render(<DesktopMesShell />);
+    fireEvent.click(screen.getByRole("button", { name: "history", exact: true }));
+    await waitFor(() => expect(screen.queryByTestId("desktop-loading-cover")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "dailyReport", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "history", exact: true }));
+    expect(screen.getByText("history content")).toBeInTheDocument();
+    expect(screen.queryByTestId("desktop-loading-cover")).not.toBeInTheDocument();
   });
 
   it("does not restart the shared transition when the active tab is refreshed", () => {

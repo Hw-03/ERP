@@ -4640,7 +4640,7 @@ function ListColumn({ icon: Icon, title, subtitle, children, bodyDataTestId, act
 
 
 function EmptyState({ title, body, illustrated = false }: { title: string; body: string; illustrated?: boolean }) {
-  if (illustrated) return <IllustratedEmptyState illustrated title={title} description={body} />;
+  if (illustrated) return <IllustratedEmptyState illustrated aboveFold title={title} description={body} />;
   return (
     <div className="flex min-h-[136px] flex-col items-center justify-center rounded-[14px] border px-4 py-6 text-center" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
       <div className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>{title}</div>

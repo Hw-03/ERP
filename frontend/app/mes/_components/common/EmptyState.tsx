@@ -32,6 +32,7 @@ interface Props {
   comfortable?: boolean;
   prominent?: boolean;
   illustrated?: boolean;
+  aboveFold?: boolean;
 }
 
 function EmptyStateImpl({
@@ -45,6 +46,7 @@ function EmptyStateImpl({
   comfortable = false,
   prominent = false,
   illustrated = false,
+  aboveFold = false,
 }: Props) {
   const areaRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState("small");
@@ -64,7 +66,7 @@ function EmptyStateImpl({
 
   const content = (
     <>
-      {illustrated ? <Image src="/images/dexray/history-empty.webp" alt="" width={540} height={360} className="dexray-empty-mascot hidden object-contain lg:block" /> : icon && <div className={prominent ? "opacity-100" : "opacity-70"}>{icon}</div>}
+      {illustrated ? <Image src="/images/dexray/history-empty.webp" alt="" width={540} height={360} loading={aboveFold ? "eager" : "lazy"} className="dexray-empty-mascot hidden object-contain lg:block" /> : icon && <div className={prominent ? "opacity-100" : "opacity-70"}>{icon}</div>}
       <div className={`dexray-empty-title ${prominent ? "text-2xl" : compact ? "text-sm" : "text-base"} font-bold`} style={{ color: LEGACY_COLORS.text }}>
         {finalTitle}
       </div>

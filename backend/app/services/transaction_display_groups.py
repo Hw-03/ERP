@@ -97,14 +97,16 @@ def _find_defect_lifecycle_pairs(
     for index, parent in enumerate(chronological):
         if parent.transaction_type != TransactionTypeEnum.MARK_DEFECTIVE or parent.log_id in used:
             continue
-        child = next(
-            (
-                candidate
-                for candidate in chronological[index + 1 :]
-                if candidate.log_id not in used and _is_matching_defect_lifecycle(parent, candidate)
-            ),
-            None,
-        )
+        child = None
+        for candidate in chronological[index + 1 :]:
+            if candidate.log_id in used:
+                continue
+            # 안정된 시간순 정렬이므로 60초 뒤의 기록은 모두 연결 후보에서 제외된다.
+            if (candidate.created_at - parent.created_at).total_seconds() > 60:
+                break
+            if _is_matching_defect_lifecycle(parent, candidate):
+                child = candidate
+                break
         if child is not None:
             used.update({parent.log_id, child.log_id})
             pairs.append((parent, child))

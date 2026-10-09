@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import hashlib
+import sqlite3
+import uuid
 from collections import Counter, defaultdict
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Iterable, Optional
 
-from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy import String, cast, func, inspect, select
+from sqlalchemy.orm import InstrumentedAttribute, Session, load_only
 
 from app.models import (
     DefectInventoryMovement,
@@ -45,6 +47,7 @@ from app.schemas.inventory_integrity import (
     InventoryIntegrityResponse,
 )
 from app.services.inventory_integrity_engine import (
+    SAMPLE_LIMIT,
     IntegrityFinding,
     InventoryIntegritySnapshot,
     InventoryState,
@@ -118,6 +121,77 @@ def _issue(
     )
 
 
+def _bulk_integrity_values(
+    db: Session,
+    value_column: InstrumentedAttribute,
+    identifiers: Iterable[object],
+) -> dict[object, tuple[uuid.UUID, object]]:
+    """Batch canonical SQLite PK matches without adding ORM identity-map entries."""
+    dialect = db.get_bind().dialect
+    if dialect.name != "sqlite":
+        return {}
+    mapper = value_column.class_.__mapper__
+    primary_key = mapper.primary_key[0]
+    bind = primary_key.type.bind_processor(dialect)
+    candidates = {}
+    for identifier in identifiers:
+        if not isinstance(identifier, (str, uuid.UUID)):
+            continue
+        if mapper.identity_key_from_primary_key((identifier,)) in db.identity_map:
+            continue
+        bound = bind(identifier) if bind else identifier
+        try:
+            parsed = uuid.UUID(bound)
+        except (ValueError, TypeError, AttributeError):
+            continue
+        if bound != parsed.hex or (isinstance(identifier, str) and identifier not in {parsed.hex, str(parsed)}):
+            continue
+        candidates[identifier] = (bound, parsed)
+    if not candidates:
+        return {}
+    raw_connection = db.connection().connection.driver_connection
+    getlimit = getattr(raw_connection, "getlimit", None)
+    if getlimit is None:
+        return {}
+    size = min(500, getlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER))
+    if size < 1:
+        return {}
+    values = {}
+    keys = list(candidates)
+    for start in range(0, len(keys), size):
+        chunk = keys[start:start + size]
+        rows = dict(db.execute(select(cast(primary_key, String), value_column)
+                               .where(primary_key.in_(chunk))).all())
+        for identifier in chunk:
+            bound, parsed = candidates[identifier]
+            if bound in rows:
+                values[identifier] = (parsed, rows[bound])
+    return values
+
+
+def _integrity_value(
+    db: Session,
+    model: type,
+    value_name: str,
+    identifier: object,
+    values: dict[object, tuple[uuid.UUID, object]],
+) -> tuple[bool, object]:
+    """Use a proven SQL match; uncertain keys and modified ORM states keep get semantics."""
+    entry = values.get(identifier)
+    if entry is not None:
+        mapper = model.__mapper__
+        exact = db.identity_map.get(mapper.identity_key_from_primary_key((identifier,)))
+        cached = db.identity_map.get(mapper.identity_key_from_primary_key((entry[0],)))
+        if exact is None and cached is None:
+            return True, entry[1]
+        if exact is None and cached is not None:
+            state = inspect(cached)
+            if not state.expired and not state.modified and value_name not in state.unloaded:
+                return True, getattr(cached, value_name)
+    row = db.get(model, identifier)
+    return row is not None, getattr(row, value_name) if row is not None else None
+
+
 def _defect_stock_issues(db: Session) -> list[InventoryIntegrityIssue]:
     physical = {
         (str(item_id), str(department)): Decimal(str(quantity or 0))
@@ -174,11 +248,14 @@ def _defect_stock_issues(db: Session) -> list[InventoryIntegrityIssue]:
             .all()
         )
     }
+    remaining_values = _bulk_integrity_values(db, DefectQuarantineRecord.remaining_quantity, movement_totals)
     for record_id, movement_total in sorted(movement_totals.items()):
-        record = db.get(DefectQuarantineRecord, record_id)
-        if record is None:
+        found, remaining_value = _integrity_value(
+            db, DefectQuarantineRecord, "remaining_quantity", record_id, remaining_values,
+        )
+        if not found:
             continue
-        remaining = Decimal(str(record.remaining_quantity or 0))
+        remaining = Decimal(str(remaining_value or 0))
         if remaining == movement_total:
             continue
         issues.append(
@@ -655,16 +732,22 @@ def _duplicate_reversal_issues(db: Session) -> list[InventoryIntegrityIssue]:
 
 def _weekly_unclassified_issues(db: Session) -> list[InventoryIntegrityIssue]:
     start_at = cutover_at(db)
-    query = db.query(TransactionLog, Item).join(Item, Item.item_id == TransactionLog.item_id)
+    query = (
+        db.query(TransactionLog, Item)
+        .join(Item, Item.item_id == TransactionLog.item_id)
+        .filter(Item.process_type_code.in_(FINISHED_CODES))
+    )
     if start_at is not None:
         query = query.filter(TransactionLog.created_at >= start_at)
 
+    rows = query.all()
+    operation_kinds = _bulk_integrity_values(db, InventoryOperation.kind,
+                                            (log.operation_id for log, _item in rows if log.operation_id))
     issues: list[InventoryIntegrityIssue] = []
-    for log, item in query.all():
-        if item.process_type_code not in FINISHED_CODES:
-            continue
-        operation = db.get(InventoryOperation, log.operation_id) if log.operation_id else None
-        if operation is not None and operation.kind == InventoryOperationKindEnum.CANCELLATION:
+    for log, _item in rows:
+        _, kind = (_integrity_value(db, InventoryOperation, "kind", log.operation_id, operation_kinds)
+                   if log.operation_id else (False, None))
+        if kind == InventoryOperationKindEnum.CANCELLATION:
             continue
         if log.operation_id is None:
             if start_at is None:
@@ -719,13 +802,51 @@ def _setting_datetime(db: Session, key: str) -> Optional[datetime]:
 def _collect_integrity_snapshot(db: Session) -> InventoryIntegritySnapshot:
     """Friday 0033의 실제 행을 같은 읽기 트랜잭션에서 정규화한다."""
 
+    def evidence_rows(model: type, columns: tuple[InstrumentedAttribute, ...]) -> list:
+        """Avoid ORM hydration only when no existing session state needs its identity semantics."""
+        if any(isinstance(row, model) for collection in (
+            db.identity_map.values(), db.new, db.dirty, db.deleted,
+        ) for row in collection):
+            return db.query(model).options(load_only(*columns, raiseload=True)).all()
+        rows = db.query(*columns).all()
+        seen = set()
+        unique = []
+        for row in rows:
+            identity = model.__mapper__.identity_key_from_primary_key((row[0],))
+            if identity not in seen:
+                seen.add(identity)
+                unique.append(row)
+        return unique
+
     items = db.query(Item.item_id, Item.deleted_at).all()
-    inventories = db.query(Inventory).all()
+    # 소비 필드와 Enum·날짜·수량·JSON 검증 컬럼을 유지한다.
+    inventories = evidence_rows(Inventory, (
+        Inventory.inventory_id, Inventory.item_id, Inventory.quantity,
+        Inventory.warehouse_qty, Inventory.pending_quantity, Inventory.updated_at,
+    ))
     locations = db.query(InventoryLocation).all()
-    stock_requests = db.query(StockRequest).all()
-    stock_request_lines = db.query(StockRequestLine).all()
-    shipping_requests = db.query(ShippingRequest).all()
-    shipping_allocations = db.query(ShippingAllocation).all()
+    stock_requests = evidence_rows(StockRequest, (
+        StockRequest.request_id, StockRequest.request_code, StockRequest.request_type,
+        StockRequest.status, StockRequest.reserved_at, StockRequest.submitted_at,
+        StockRequest.approved_at, StockRequest.rejected_at, StockRequest.department_approved_at,
+        StockRequest.as_research_approved_at, StockRequest.cancelled_at, StockRequest.completed_at,
+        StockRequest.created_at, StockRequest.updated_at,
+    ))
+    stock_request_lines = evidence_rows(StockRequestLine, (
+        StockRequestLine.line_id, StockRequestLine.request_id, StockRequestLine.item_id,
+        StockRequestLine.quantity, StockRequestLine.from_bucket, StockRequestLine.from_department,
+        StockRequestLine.to_bucket, StockRequestLine.status, StockRequestLine.created_at,
+    ))
+    shipping_requests = evidence_rows(ShippingRequest, (
+        ShippingRequest.request_id, ShippingRequest.status, ShippingRequest.finalization_mode,
+        ShippingRequest.request_quantity, ShippingRequest.prepared_at, ShippingRequest.picked_up_at,
+        ShippingRequest.cancelled_at, ShippingRequest.created_at, ShippingRequest.updated_at,
+    ))
+    shipping_allocations = evidence_rows(ShippingAllocation, (
+        ShippingAllocation.allocation_id, ShippingAllocation.request_id, ShippingAllocation.item_id,
+        ShippingAllocation.quantity, ShippingAllocation.department, ShippingAllocation.status,
+        ShippingAllocation.created_at, ShippingAllocation.released_at, ShippingAllocation.consumed_at,
+    ))
     angle_ids = {str(row[0]) for row in db.query(WarehouseAngle.id).all()}
     boxes = [
         (str(box_id), str(angle_id))
@@ -744,10 +865,37 @@ def _collect_integrity_snapshot(db: Session) -> InventoryIntegritySnapshot:
     }
     box_items = db.query(WarehouseBoxItem).all()
     zone_items = db.query(WarehouseSpecialZoneItem).all()
-    operations = db.query(InventoryOperation).all()
-    transactions = db.query(TransactionLog).all()
-    operation_effects = db.query(InventoryOperationEffect).all()
-    defect_movements = db.query(DefectInventoryMovement).all()
+    operations = evidence_rows(InventoryOperation, (
+        InventoryOperation.operation_id, InventoryOperation.kind, InventoryOperation.status,
+        InventoryOperation.effective_at, InventoryOperation.contract_version,
+        InventoryOperation.reverses_operation_id, InventoryOperation.created_at,
+    ))
+    # 전체 거래 모집단은 유지하고 정합성 엔진이 소비하는 증거만 읽는다.
+    transaction_columns = TransactionLog.__table__.c
+    transactions = db.execute(select(
+        transaction_columns.log_id,
+        transaction_columns.item_id,
+        transaction_columns.operation_id,
+        transaction_columns.created_at,
+        transaction_columns.transaction_type,
+        transaction_columns.operation_role,
+        transaction_columns.quantity_change,
+        transaction_columns.reference_no,
+        transaction_columns.notes,
+        transaction_columns.inventory_effect,
+    )).all()
+    operation_effects = evidence_rows(InventoryOperationEffect, (
+        InventoryOperationEffect.effect_id, InventoryOperationEffect.operation_id,
+        InventoryOperationEffect.effect_kind, InventoryOperationEffect.subject_type,
+        InventoryOperationEffect.subject_id, InventoryOperationEffect.role,
+        InventoryOperationEffect.before_state, InventoryOperationEffect.after_state,
+        InventoryOperationEffect.created_at,
+    ))
+    defect_movements = evidence_rows(DefectInventoryMovement, (
+        DefectInventoryMovement.movement_id, DefectInventoryMovement.operation_id,
+        DefectInventoryMovement.quantity_delta, DefectInventoryMovement.effective_at,
+        DefectInventoryMovement.created_at,
+    ))
 
     placements = [
         *(
@@ -929,7 +1077,7 @@ def _collect_integrity_snapshot(db: Session) -> InventoryIntegritySnapshot:
     )
 
 
-def diagnose_inventory_integrity(db: Session) -> InventoryIntegrityResponse:
+def diagnose_inventory_integrity(db: Session, *, sample_limit: int | None = SAMPLE_LIMIT) -> InventoryIntegrityResponse:
     """모든 진단기를 읽기 전용으로 실행하고 안정적인 순서로 반환한다."""
     issues = [
         *_defect_stock_issues(db),
@@ -943,6 +1091,7 @@ def diagnose_inventory_integrity(db: Session) -> InventoryIntegrityResponse:
     evaluation = evaluate_inventory_integrity(
         _collect_integrity_snapshot(db),
         profile="friday-0033",
+        sample_limit=sample_limit,
         supplemental_findings=tuple(
             IntegrityFinding(
                 check_id=issue.category,

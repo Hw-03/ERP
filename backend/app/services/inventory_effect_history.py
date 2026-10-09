@@ -7,15 +7,26 @@ from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from itertools import groupby
+import json
+import sqlite3
 from typing import TypeAlias
 from uuid import UUID
 
+from sqlalchemy import LargeBinary, Text, and_, cast, func, literal_column, null, or_, select, type_coerce, union_all
+from sqlalchemy.exc import DataError, OperationalError
 from sqlalchemy.orm import Session
+from sqlalchemy.types import NullType
 
 from app.models import Inventory, InventoryLocation, TransactionLog, WarehouseBoxItem
+from app.services.sqlite_datetime_contract import canonical_datetime, supports_datetime_guard
 
 
 CellKey: TypeAlias = tuple[str, str | None, str | None]
+_HistoryRow: TypeAlias = tuple[object, object, object, object]
+_HISTORY_PACK_ROWS = 64
+_HISTORY_RAW_BYTES = 1024
+# Four escaped text fields plus the original scan ordinal and JSON punctuation.
+_HISTORY_PACK_BOUND = _HISTORY_PACK_ROWS * (_HISTORY_RAW_BYTES * 6 + 33) + _HISTORY_PACK_ROWS + 1
 
 
 @dataclass(frozen=True)
@@ -130,14 +141,115 @@ def reconstruct_effect_quantities(
     return result
 
 
+def _history_rows(
+    db: Session,
+    item_ids: Collection[UUID],
+    earliest_target_at: datetime,
+) -> list[_HistoryRow]:
+    """같은 조회의 원문을 작은 묶음으로 운반하고 원래 타입 처리·스캔 순서를 복원한다.
+
+    비정상 UUID 등 기존 타입 처리기가 원문을 반환하는 경우도 보존하므로
+    반환 필드는 object로 선언한다. 효과 JSON은 SQL에서 해석하지 않는다.
+    """
+    c = TransactionLog.__table__.c
+    columns = (c.log_id, c.item_id, c.created_at, c.inventory_effect)
+    predicate = (c.item_id.in_(item_ids), c.created_at >= earliest_target_at)
+    dialect = db.get_bind().dialect
+    if dialect.name == "sqlite":
+        if supports_datetime_guard(db):
+            guard = TransactionLog.__table__.alias("history_date_guard")
+            # Compiler-quoted UUID literals preserve the original SQLite bind budget.
+            guarded_items = literal_column(str(guard.c.item_id.in_(item_ids).compile(
+                dialect=dialect, compile_kwargs={"literal_binds": True},
+            )))
+            unsafe = select(literal_column("1")).select_from(guard).where(
+                guarded_items, canonical_datetime(guard.c.created_at).is_not(True),
+            ).exists()
+            predicate = (predicate[0], or_(predicate[1], unsafe))
+        else:
+            predicate = (predicate[0],)
+
+    def core_rows() -> list[_HistoryRow]:
+        """묶음 조회를 지원하지 않는 환경에는 기존 컬럼 처리를 그대로 적용한다."""
+        return [(row[0], row[1], row[2], row[3])
+                for row in db.execute(select(*columns).where(*predicate)).all()]
+
+    if dialect.name != "sqlite" or getattr(dialect, "_json_deserializer", None) is not None:
+        return core_rows()
+    if getattr(dialect.dbapi, "sqlite_version_info", (0,)) < (3, 25, 0):
+        return core_rows()
+    connection = db.connection().connection.driver_connection
+    getlimit = getattr(connection, "getlimit", None)
+    if (getlimit is None or getlimit(sqlite3.SQLITE_LIMIT_LENGTH) < _HISTORY_PACK_BOUND + 1024
+            or getlimit(sqlite3.SQLITE_LIMIT_FUNCTION_ARG) < 5):
+        return core_rows()
+
+    # Trusted literals add no binds beyond the original item IDs and date.
+    zero = literal_column("0")
+    raw_bytes = sum((func.coalesce(func.length(cast(column, LargeBinary)), zero)
+                     for column in columns), zero)
+    packable = and_(*(func.typeof(column) == literal_column("'text'") for column in columns),
+                   raw_bytes <= literal_column(str(_HISTORY_RAW_BYTES)))
+    rows = select(*columns, packable.label("packable"),
+                  func.row_number().over().label("scan_ordinal"))\
+        .where(*predicate).cte("history_rows")
+    eligible = select(*(rows.c[column.key] for column in columns), rows.c.scan_ordinal,
+                      func.row_number().over().label("chunk_ordinal"))\
+        .where(rows.c.packable).cte("packed_history")
+    block = (eligible.c.chunk_ordinal - literal_column("1")).self_group()\
+        .op("/")(literal_column(str(_HISTORY_PACK_ROWS)))
+    # Defer every row's processors until scan order is restored, including errors.
+    raw = select(*(type_coerce(rows.c[column.key], NullType()) for column in columns),
+                 type_coerce(null(), Text()).label("metadata"), rows.c.scan_ordinal)\
+        .where(~rows.c.packable)
+    packed = select(*(null() for _column in columns),
+                    func.json_group_array(func.json_array(
+                        *(eligible.c[column.key] for column in columns), eligible.c.scan_ordinal,
+                    )), zero).group_by(block)
+    try:
+        fetched = db.execute(union_all(raw, packed)).all()
+    except DataError as error:
+        # CTE bookkeeping can exceed a record limit that the original row fits.
+        if getattr(error.orig, "sqlite_errorcode", None) == sqlite3.SQLITE_TOOBIG:
+            return core_rows()
+        raise
+    except OperationalError as error:
+        message = str(error.orig).lower()
+        if "no such function: json_" in message or "no such function: row_number" in message:
+            return core_rows()
+        raise
+
+    raw_rows: list[tuple[int, _HistoryRow]] = []
+    for log_id, item_id, created_at, effect, metadata, ordinal in fetched:
+        if metadata is None:
+            raw_rows.append((ordinal, (log_id, item_id, created_at, effect)))
+        else:
+            raw_rows.extend((row[4], (row[0], row[1], row[2], row[3]))
+                            for row in json.loads(metadata))
+    raw_rows.sort(key=lambda row: row[0])
+    processors = [column.type.dialect_impl(dialect).result_processor(dialect, None)
+                  for column in columns]
+    restored: list[_HistoryRow] = []
+    for _ordinal, raw_row in raw_rows:
+        values = [processor(value) if processor else value
+                  for value, processor in zip(raw_row, processors, strict=True)]
+        restored.append((values[0], values[1], values[2], values[3]))
+    return restored
+
+
 def load_inventory_effect_quantities(
     db: Session,
     target_logs: Sequence[TransactionLog],
 ) -> dict[UUID, list[dict]]:
-    """일보 대상 품목의 현재 셀과 실제 원장을 한 번씩 읽어 전·후 수량을 만든다."""
+    """가장 오래된 대상 시각부터 현재까지 읽어 전·후 수량을 역산한다.
+
+    대상보다 오래된 거래는 최신 수량 역산에 영향을 주지 않는다. 경계 시각의
+    거래는 전부 포함해 같은 시각·같은 셀의 불명확한 순서를 그대로 보존한다.
+    """
     if not target_logs:
         return {}
     item_ids = {log.item_id for log in target_logs}
+    earliest_target_at = min(log.created_at for log in target_logs)
     current_by_item: dict[UUID, dict[CellKey, int]] = {
         item_id: {} for item_id in item_ids
     }
@@ -170,16 +282,7 @@ def load_inventory_effect_quantities(
         current_by_item[item_id][("warehouse_box", str(box_id), None)] = int(quantity or 0)
 
     histories: dict[UUID, list[EffectHistoryEntry]] = defaultdict(list)
-    for log_id, item_id, created_at, inventory_effect in (
-        db.query(
-            TransactionLog.log_id,
-            TransactionLog.item_id,
-            TransactionLog.created_at,
-            TransactionLog.inventory_effect,
-        )
-        .filter(TransactionLog.item_id.in_(item_ids))
-        .all()
-    ):
+    for log_id, item_id, created_at, inventory_effect in _history_rows(db, item_ids, earliest_target_at):
         histories[item_id].append(EffectHistoryEntry(
             log_id=log_id,
             item_id=item_id,

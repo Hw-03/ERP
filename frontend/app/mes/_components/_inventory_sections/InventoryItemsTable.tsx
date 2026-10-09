@@ -102,7 +102,7 @@ export function InventoryItemsTable({
             description={hasSearch || activeFilterCount > 0 || hasKpiFilter ? "검색어를 바꾸거나 필터를 초기화해 보세요." : "자재를 등록하면 이곳에서 확인할 수 있습니다."}
             prominent={!compact}
             className={compact ? undefined : "inventory-empty-content"}
-            icon={!compact ? <Image src="/images/dexray/history-empty.webp" alt="" width={540} height={360} className="inventory-empty-mascot object-contain" /> : undefined}
+            icon={!compact ? <Image src="/images/dexray/history-empty.webp" alt="" width={540} height={360} loading="eager" className="inventory-empty-mascot object-contain" /> : undefined}
           />
         </div>
       </div>

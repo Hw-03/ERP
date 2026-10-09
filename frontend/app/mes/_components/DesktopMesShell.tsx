@@ -138,8 +138,12 @@ function DesktopMesShellInner({
   })();
 
   const [activeTab, setActiveTab] = useState<DesktopTabId>(initialTab);
+  const historyMountedRef = useRef(initialTab === "history");
   const deferredTab = useDeferredValue(activeTab);
-  const contentTab = activeTab === "dashboard" || activeTab === "history" ? deferredTab : activeTab;
+  const contentTab = activeTab === "dashboard" || (activeTab === "history" && !historyMountedRef.current) ? deferredTab : activeTab;
+  useEffect(() => {
+    if (contentTab === "history") historyMountedRef.current = true;
+  }, [contentTab]);
   const [status, setStatus] = useState(DEFAULT_STATUS);
   const [statusNonce, setStatusNonce] = useState(0);
   const [refreshNonce, setRefreshNonce] = useState(0);

@@ -7,6 +7,7 @@ import { queryKeys } from "@/lib/queries/keys";
 import { DesktopHistoryView } from "../DesktopHistoryView";
 
 const testState = vi.hoisted(() => ({
+  employeeId: "employee-a",
   monthlyQuery: vi.fn(() => ({ data: {} })),
   historyResult: null as any,
   historyArgs: null as any,
@@ -23,6 +24,10 @@ const testState = vi.hoisted(() => ({
   nextMonth: null as null | (() => void),
   queryClient: null as QueryClient | null,
   realtimeRevision: null as number | null,
+}));
+
+vi.mock("../login/useCurrentOperator", () => ({
+  useCurrentOperator: () => ({ employee_id: testState.employeeId }),
 }));
 
 vi.mock("@tanstack/react-query", async () => {
@@ -88,8 +93,9 @@ vi.mock("../_history_sections/HistoryStatsBar", () => ({
   ),
 }));
 vi.mock("../_history_sections/HistoryFilterBar", () => ({
-  HistoryFilterBar: ({ setDateFilter, selectedMonth, onClearSelectedMonth, onToggleCalendar, calendarOpen }: any) => (
+  HistoryFilterBar: ({ search, setSearch, setDateFilter, selectedMonth, onClearSelectedMonth, onToggleCalendar, calendarOpen }: any) => (
     <>
+      <input aria-label="내역 검색" value={search} onChange={(event) => setSearch(event.target.value)} />
       <button type="button" onClick={() => setDateFilter("WEEK")}>기간 변경</button>
       <button type="button" onClick={onToggleCalendar}>달력 토글</button>
       <output data-testid="calendar-open">{calendarOpen ? "open" : "closed"}</output>
@@ -284,6 +290,7 @@ function expectDesktopSummaryRanges(dateFrom: string, dateTo: string): void {
 }
 
 beforeEach(() => {
+  testState.employeeId = "employee-a";
   testState.queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -310,6 +317,25 @@ beforeEach(() => {
 });
 
 describe("DesktopHistoryView history state", () => {
+  it("같은 직원의 탭 왕복은 검색과 조회키를 즉시 복원하고 다른 직원에게 노출하지 않는다", async () => {
+    const first = render(<DesktopHistoryView />);
+    fireEvent.change(screen.getByLabelText("내역 검색"), { target: { value: "원래 품목" } });
+    await waitFor(() => expect(testState.historyArgs.debouncedSearch).toBe("원래 품목"));
+    first.unmount();
+    const second = render(<DesktopHistoryView />);
+    expect(screen.getByLabelText("내역 검색")).toHaveValue("원래 품목");
+    expect(testState.historyArgs.debouncedSearch).toBe("원래 품목");
+    testState.employeeId = "employee-b";
+    second.rerender(<DesktopHistoryView />);
+    expect(screen.getByLabelText("내역 검색")).toHaveValue("");
+    expect(testState.historyArgs.debouncedSearch).toBe("");
+    second.unmount();
+    testState.employeeId = "employee-a";
+    render(<DesktopHistoryView />);
+    expect(screen.getByLabelText("내역 검색")).toHaveValue("원래 품목");
+    expect(testState.historyArgs.debouncedSearch).toBe("원래 품목");
+  });
+
   it.each([["operation", false], ["operation", true], ["op_batch", false]] as const)("제출 카드 선택은 표 행과 같고 뒤로가면 제출로 돌아간다 (%s, cancelled: %s)", (type, cancelled) => {
     const primary = makeLog({ log_id: "work-primary", operation_batch_id: null, operation_id: "work-op",
       operation_role: "PRIMARY", transaction_type: "MARK_DEFECTIVE", cancelled });

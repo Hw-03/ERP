@@ -84,6 +84,8 @@ jobs:
             tests/migrations/test_postgresql_schema_equivalence.py \
             tests/migrations/test_closure_postgresql_preservation.py \
             tests/concurrency/test_internal_use_batch_decision_concurrent.py::test_postgres_failed_last_approval_keeps_batch_lock_until_failed_commit \
+            tests/concurrency/test_display_group_snapshot_postgres.py \
+            tests/concurrency/test_request_order_stock_postgres.py \
             --junitxml=postgres-contract.xml
           python -c "import xml.etree.ElementTree as E; r=E.parse('postgres-contract.xml'); assert not r.findall('.//skipped'), 'Required PostgreSQL checks must execute'"
 
