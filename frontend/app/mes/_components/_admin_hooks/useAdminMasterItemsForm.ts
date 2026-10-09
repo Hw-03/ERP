@@ -90,6 +90,7 @@ export function itemToEditForm(item: Item): ItemEditForm {
 }
 
 type UpdateItemPayload = {
+  expected_mes_code?: string;
   item_name?: string;
   spec?: string;
   legacy_item_type?: string;
@@ -123,7 +124,7 @@ export type UseAdminMasterItemsFormState = {
   form: ItemEditForm;
   setForm: (updater: (prev: ItemEditForm) => ItemEditForm) => void;
   dirty: boolean;
-  save: () => Promise<void>;
+  save: (expectedCode?: string, onConflict?: () => void) => Promise<void>;
   saveField: (
     field: "item_name" | "spec" | "barcode" | "supplier" | "min_stock" | "unit" | "mes_code" | "process_type_code",
     value: string,
@@ -164,7 +165,7 @@ export function useAdminMasterItemsForm({
     setDirty(true);
   }
 
-  async function save(): Promise<void> {
+  async function save(expectedCode?: string, onConflict?: () => void): Promise<void> {
     if (!selectedItem) return;
     const stockPurchaseError = validateStockPurchaseValues(form);
     if (stockPurchaseError) {
@@ -176,6 +177,7 @@ export function useAdminMasterItemsForm({
       // mes_code 는 백엔드가 (model_symbol, process_type_code, serial_no) 에서 자동 부여.
       // 프론트에서 보내지 않음 — 사용자가 손으로 입력 못 함.
       const payload: UpdateItemPayload = {
+        expected_mes_code: expectedCode,
         item_name: form.item_name || undefined,
         legacy_item_type: form.legacy_item_type || undefined,
         supplier: form.supplier.trim() || null,
@@ -205,6 +207,7 @@ export function useAdminMasterItemsForm({
       onShowSave?.("저장됐습니다.");
     } catch (error) {
       onError(error instanceof Error ? error.message : "저장에 실패했습니다.");
+      if (error && typeof error === "object" && "status" in error && error.status === 409) onConflict?.();
     }
   }
 

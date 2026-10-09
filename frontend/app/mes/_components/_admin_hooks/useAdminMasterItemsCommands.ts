@@ -33,7 +33,7 @@ export type UseAdminMasterItemsCommandsState = {
   setAddMode: (v: boolean) => void;
   addForm: AddForm;
   setAddForm: (updater: (f: AddForm) => AddForm) => void;
-  add: () => void;
+  add: (expectedCode?: string, onConflict?: () => void) => void;
   reorder: (ordered: Item[]) => void;
   deleteItem: (itemId: string) => Promise<void>;
   restoreItem: (itemId: string) => Promise<void>;
@@ -53,7 +53,7 @@ export function useAdminMasterItemsCommands({
   const createMutation = useCreateItemMutation();
   const reorderMutation = useReorderItemsMutation();
 
-  async function _add(): Promise<void> {
+  async function _add(expectedCode?: string, onConflict?: () => void): Promise<void> {
     if (!addForm.item_name.trim()) {
       onError("품목명을 입력하세요.");
       return;
@@ -79,6 +79,7 @@ export function useAdminMasterItemsCommands({
         .map((r) => ({ department: r.department, quantity: Number(r.quantity) }));
       const totalQty = allLocs.reduce((s, r) => s + Number(r.quantity || 0), 0);
       const created = await createMutation.mutateAsync({
+        expected_mes_code: expectedCode,
         item_name: addForm.item_name.trim(),
         process_type_code: addForm.process_type_code || undefined,
         unit: addForm.unit || "EA",
@@ -105,6 +106,7 @@ export function useAdminMasterItemsCommands({
       onShowSave?.(`'${created.item_name}' 품목이 추가됐습니다.`);
     } catch (error) {
       onError(error instanceof Error ? error.message : "품목 추가에 실패했습니다.");
+      if (error && typeof error === "object" && "status" in error && error.status === 409) onConflict?.();
     }
   }
 
@@ -153,7 +155,7 @@ export function useAdminMasterItemsCommands({
     setAddMode,
     addForm,
     setAddForm,
-    add: () => void _add(),
+    add: (expectedCode, onConflict) => void _add(expectedCode, onConflict),
     reorder,
     deleteItem,
     restoreItem,

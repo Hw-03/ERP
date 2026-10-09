@@ -2,6 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
 import { AdminMasterItemsSection } from "../AdminMasterItemsSection";
+import { itemsApi } from "@/lib/api/items";
+
+vi.mock("@/lib/api/items", () => ({ itemsApi: {
+  getItemDeletionDependencies: vi.fn().mockResolvedValue({ item_id: "item-1", can_delete: true, dependencies: [] }),
+} }));
 
 const item = {
   item_id: "item-1",
@@ -71,9 +76,33 @@ afterEach(() => {
   context.addMode = false;
   context.addForm = {};
   context.canReorderItems = true;
+  vi.mocked(itemsApi.getItemDeletionDependencies).mockResolvedValue({ item_id: "item-1", can_delete: true, dependencies: [] });
 });
 
 describe("AdminMasterItemsSection", () => {
+  it("삭제 전에 모든 의존 이유를 표시하고 확인 버튼을 차단한다", async () => {
+    context.selectedItem = item;
+    vi.mocked(itemsApi.getItemDeletionDependencies).mockResolvedValue({ item_id: item.item_id, can_delete: false,
+      dependencies: [{ kind: "warehouse_inventory", label: "창고 재고", count: 1 },
+        { kind: "transaction", label: "입출고 거래", count: 2 }, { kind: "bom_child", label: "BOM 사용처", count: 3 }] });
+    render(<DirtyGuardProvider><AdminMasterItemsSection allBomRows={[]} /></DirtyGuardProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "삭제", exact: true }));
+    await waitFor(() => expect(screen.getByText("창고 재고 1건, 입출고 거래 2건, BOM 사용처 3건")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "삭제 확인", exact: true })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "삭제 확인", exact: true }));
+    expect(context.deleteItem).not.toHaveBeenCalled();
+  });
+
+  it("삭제 의존 조회 실패는 차단하고 재시도 성공 뒤에만 확인을 허용한다", async () => {
+    context.selectedItem = item;
+    vi.mocked(itemsApi.getItemDeletionDependencies).mockRejectedValueOnce(new Error("연결 데이터 조회 실패"));
+    render(<DirtyGuardProvider><AdminMasterItemsSection allBomRows={[]} /></DirtyGuardProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "삭제", exact: true }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("연결 데이터 조회 실패"));
+    expect(screen.getByRole("button", { name: "삭제 확인", exact: true })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도", exact: true }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "삭제 확인", exact: true })).toBeEnabled());
+  });
   it("[8.19-04] 1050개 visibleItems의 KPI·상태 합·목록·끝행이 같은 모집단을 사용한다", () => {
     context.visibleItems = Array.from({ length: 1050 }, (_, index) => ({
       ...item,
@@ -291,6 +320,7 @@ describe("AdminMasterItemsSection", () => {
     expect(within(tabActionsRow!).getByRole("button", { name: "삭제 확인" })).toBeInTheDocument();
 
     context.deleteItem.mockClear();
+    await waitFor(() => expect(within(tabActionsRow!).getByRole("button", { name: "삭제 확인" })).toBeEnabled());
     fireEvent.click(within(tabActionsRow!).getByRole("button", { name: "삭제 확인" }));
     expect(context.deleteItem).toHaveBeenCalledWith(item.item_id);
   });

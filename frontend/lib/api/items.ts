@@ -17,7 +17,19 @@ export interface ItemOrderEntry {
   display_order: number;
 }
 
+export interface ItemDeletionDependencies {
+  item_id: string;
+  can_delete: boolean;
+  dependencies: { kind: string; label: string; count: number }[];
+}
+
 export const itemsApi = {
+  getItemCodePreview: (params: { process_type_code: string; model_slots: number[]; item_id?: string }, signal?: AbortSignal) => {
+    const query = new URLSearchParams({ process_type_code: params.process_type_code });
+    params.model_slots.forEach((slot) => query.append("model_slots", String(slot)));
+    if (params.item_id) query.set("item_id", params.item_id);
+    return fetcher<{ mes_code: string }>(toApiUrl(`/api/items/code-preview?${query}`), signal);
+  },
   getItems: (
     params?: {
       process_type_code?: string;
@@ -45,6 +57,7 @@ export const itemsApi = {
     fetcher<Item>(toApiUrl(`/api/items/${itemId}`), opts?.signal),
 
   createItem: async (payload: {
+    expected_mes_code?: string;
     item_name: string;
     process_type_code?: string;
     unit?: string;
@@ -68,6 +81,7 @@ export const itemsApi = {
   updateItem: async (
     itemId: string,
     payload: {
+      expected_mes_code?: string;
       item_name?: string;
       process_type_code?: string;
       unit?: string;
@@ -98,6 +112,9 @@ export const itemsApi = {
 
   softDeleteItem: (itemId: string) =>
     patchJson<Item>(toApiUrl(`/api/items/${itemId}/soft-delete`), {}),
+
+  getItemDeletionDependencies: (itemId: string) =>
+    fetcher<ItemDeletionDependencies>(toApiUrl(`/api/items/${itemId}/deletion-dependencies`)),
 
   restoreItem: (itemId: string) =>
     patchJson<Item>(toApiUrl(`/api/items/${itemId}/restore`), {}),

@@ -37,7 +37,7 @@ function item(overrides: Partial<Item>): Item {
 }
 
 describe("useDesktopInventoryDerivations", () => {
-  it("PA/PF 품목은 KPI 숫자에서만 빼고 기존 요약 콜백과 KPI 선택 판별은 유지한다", async () => {
+  it("PA/PF 제외 기준이 KPI 숫자와 목록 선택 판별에 동일하게 적용된다", async () => {
     const normal = item({ item_id: "normal", quantity: 12 });
     const low = item({ item_id: "low", quantity: 5 });
     const zero = item({ item_id: "zero", quantity: 0 });
@@ -71,8 +71,14 @@ describe("useDesktopInventoryDerivations", () => {
       ["ZERO", 1],
     ]);
     await waitFor(() => expect(onSummaryChange).toHaveBeenLastCalledWith({ low: 2, zero: 1 }));
-    expect(matchesKpi(paNormal, "NORMAL")).toBe(true);
-    expect(matchesKpi(pfLow, "LOW")).toBe(true);
+    for (const key of ["ALL", "NORMAL", "LOW", "ZERO"] as const) {
+      expect(matchesKpi(paNormal, key)).toBe(false);
+      expect(matchesKpi(pfLow, key)).toBe(false);
+      expect(activeItems.filter((row) => matchesKpi(row, key))).toHaveLength(
+        result.current.kpiCards.find((card) => card.key === key)!.value,
+      );
+    }
+    expect(result.current.kpiCards[0].hint).toContain("PA·PF 제외");
 
     rerender({ scopedItems: [normal, paNormal, pfLow], selectedModels: ["DX3000"] });
 

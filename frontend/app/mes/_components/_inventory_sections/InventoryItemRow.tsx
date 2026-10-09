@@ -181,7 +181,7 @@ function InventoryItemRowImpl({ item, selected, detailOpen = true, onSelect, ima
               className="inline-block cursor-zoom-in rounded border transition-transform hover:scale-105"
               style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
             >
-              <Image src={`/images/items/${imageFilename}`} alt={item.item_name} width={48} height={48} unoptimized className="block rounded object-contain" />
+              <Image src={`/images/items/${imageFilename}`} alt={item.item_name} width={48} height={48} unoptimized className="block h-12 w-12 rounded object-contain" />
             </button>
             <ImageLightbox open={lightboxOpen} src={`/images/items/${imageFilename}`} alt={item.item_name} onClose={() => setLightboxOpen(false)} />
           </>

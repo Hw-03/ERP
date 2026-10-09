@@ -10,6 +10,7 @@ const FALLBACK_INTERVAL_MS = 1_000;
 const REVISION_BATCH_WINDOW_MS = 250;
 
 const OPERATIONAL_QUERY_ROOTS = [
+  queryKeys.models.all,
   queryKeys.items.all,
   queryKeys.inventory.all,
   queryKeys.transactions.all,

@@ -59,4 +59,7 @@ export const catalogApi = {
 
   updateBOM: (bomId: string, payload: { quantity?: number; unit?: string }) =>
     patchJson<BOMEntry>(toApiUrl(`/api/bom/${bomId}`), payload),
+
+  replaceBOM: (parentId: string, payload: { expected_rows: BOMEntry[]; rows: Pick<BOMEntry, "child_item_id" | "quantity" | "unit" | "notes">[] }) =>
+    putJson<BOMEntry[]>(toApiUrl(`/api/bom/${parentId}`), payload),
 };

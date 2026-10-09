@@ -28,6 +28,21 @@ function baseForm(overrides: Partial<ItemFormData> = {}): ItemFormData {
 }
 
 describe("ItemFormFields", () => {
+  it("카테고리를 바꿔도 물음표 대신 서버가 확인한 저장 예정 코드를 표시한다", () => {
+    render(<ItemFormFields form={baseForm({ mes_code: "3-TR-0007", process_type_code: "HR", model_slots: [1] })}
+      setForm={vi.fn()} showMesCode codePreview={{ status: "ready", code: "3-HR-0020", retry: vi.fn() }} />);
+    expect(screen.getByText("3-HR-0020")).toHaveAttribute("aria-readonly", "true");
+    expect(screen.queryByText(/\?\?\?\?/)).not.toBeInTheDocument();
+  });
+
+  it("코드 조회 실패는 저장 예정 코드로 오인되지 않고 다시 확인할 수 있다", () => {
+    const retry = vi.fn();
+    render(<ItemFormFields form={baseForm({ model_slots: [1] })} setForm={vi.fn()} showMesCode
+      codePreview={{ status: "error", retry }} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("품목 코드를 확인하지 못했습니다.");
+    fireEvent.click(screen.getByRole("button", { name: "코드 다시 확인", exact: true }));
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
   it("기본 정보 필드를 업무 입력 순서로 렌더링한다", () => {
     render(
       <ItemFormFields

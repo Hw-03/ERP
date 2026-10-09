@@ -2,13 +2,14 @@
 
 from datetime import UTC, datetime, timedelta
 import csv
+import json
 from io import StringIO
 import uuid
 from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func
+from sqlalchemy import func, or_, update
 from sqlalchemy.orm import Query as SAQuery, Session
 
 from app.database import get_db
@@ -17,7 +18,8 @@ from app.models import (
     BOM, DefectQuarantineRecord, DepartmentEnum, Employee, Inventory, InventoryLocation,
     InventoryOperation, InventoryOperationKindEnum, InventoryOperationRoleEnum,
     InventoryOperationStatusEnum, Item, LocationStatusEnum, TransactionLog,
-    TransactionTypeEnum,
+    ShippingRequest, ShippingRequestBomLine, ShippingRequestCompanionLine,
+    StockRequestLine, TransactionTypeEnum,
 )
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
@@ -44,6 +46,7 @@ from app.models import ProductSymbol
 from app.services import audit
 from app.services import inventory as inventory_svc
 from app.services import stock_availability, stock_math
+from app.services.bom_configuration import configuration_errors
 from app.services.audit_actor_session import get_verified_audit_actor_code
 from app.services.item_display_order import insert_item_at_process_end
 from app.services._tx import commit_and_refresh
@@ -53,6 +56,18 @@ from app.services.reorder import reorder_by_display_order
 from app.repositories import item_repository, inventory_repository
 
 router = APIRouter()
+
+
+def _lock_reviewed_code_write(db: Session) -> None:
+    """Serialize SQLite code allocation without changing existing item metadata."""
+    anchor = db.query(Item.item_id).order_by(Item.item_id).limit(1).scalar()
+    db.execute(update(Item).where(Item.item_id == anchor).values(updated_at=Item.updated_at))
+
+
+def _check_reviewed_code(expected: Optional[str], actual: str) -> None:
+    """Require a fresh employee review when another write changed the prospective code."""
+    if expected is not None and expected != actual:
+        raise http_error(409, ErrorCode.CONFLICT, "품목 코드가 변경됐습니다. 새 미리보기를 확인하고 다시 저장하세요.")
 
 
 def _item_model_slots(mes_code: str | None) -> list[int]:
@@ -231,6 +246,23 @@ def _to_item_with_inventory(
     )
 
 
+@router.get("/code-preview", response_model=dict[str, str])
+def preview_item_code(
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    process_type_code: str = Query(..., min_length=2, max_length=2),
+    model_slots: List[int] = Query(..., min_length=1),
+    item_id: Optional[uuid.UUID] = Query(None),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """Read the exact prospective code; preview never allocates or reserves a serial."""
+    model_symbol = _validated_model_symbol(db, model_slots)
+    item = item_repository.get(db, item_id) if item_id else None
+    if item_id and not item:
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
+    serial = item.serial_no if item and item.process_type_code == process_type_code else next_serial_no(model_symbol, process_type_code, db)
+    return {"mes_code": make_mes_code(model_symbol, process_type_code, serial)}
+
+
 @router.post("", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
 def create_item(
     payload: ItemCreate,
@@ -273,7 +305,10 @@ def create_item(
             f"같은 카테고리에 이미 '{payload.item_name}' 품목이 있습니다.",
         )
 
+    if payload.expected_mes_code is not None:
+        _lock_reviewed_code_write(db)
     serial = next_serial_no(model_sym, pt, db)
+    _check_reviewed_code(payload.expected_mes_code, make_mes_code(model_sym, pt, serial))
 
     # 신규 항목은 공정 코드 그룹의 끝에 삽입한다. sort_order NULL 이 SQLite 맨앞으로 정렬되는 것을 막는다.
     item = Item(
@@ -673,7 +708,16 @@ def update_item(
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
+    if payload.expected_mes_code is not None:
+        _lock_reviewed_code_write(db)
+        target_pt = payload.process_type_code if payload.process_type_code is not None else item.process_type_code
+        target_model = _validated_model_symbol(db, payload.model_slots) if payload.model_slots is not None else item.model_symbol
+        target_serial = item.serial_no if target_pt == item.process_type_code else next_serial_no(target_model, target_pt, db)
+        _check_reviewed_code(payload.expected_mes_code, make_mes_code(target_model, target_pt, target_serial))
+
     changed: list[str] = []
+    identity_before = {"item_name": item.item_name, "mes_code": item.mes_code,
+                       "process_type_code": item.process_type_code, "unit": item.unit}
     # process_type/model/option 변경 감지 — mes_code 자동 재계산용.
     # 일반 필드(item_name·unit 등)는 코드와 무관하므로 그대로 setattr.
     for field in (
@@ -764,13 +808,19 @@ def update_item(
     item.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
     if changed:
+        identity_after = {"item_name": item.item_name,
+                          "mes_code": make_mes_code(item.model_symbol, item.process_type_code, item.serial_no),
+                          "process_type_code": item.process_type_code, "unit": item.unit}
+        identity_change = "" if identity_after == identity_before else "; 품목 변경 " + json.dumps(
+            {"before": identity_before, "after": identity_after}, ensure_ascii=False,
+        )
         audit.record(
             db,
             request=request,
             action="item.update",
             target_type="item",
             target_id=str(item.item_id),
-            payload_summary=f"{item.item_name}: {', '.join(changed)}",
+            payload_summary=f"{item.item_name}: {', '.join(changed)}{identity_change}",
         )
 
     commit_and_refresh(db, item)
@@ -840,6 +890,12 @@ def update_bom_unmatched_status(
     return _to_item_with_inventory(db, item, inventory)
 
 
+def _bom_completion_errors(db: Session, parent_id: uuid.UUID) -> list[str]:
+    """Report every invalid direct row before publishing a completed composition."""
+    rows = db.query(BOM).filter(BOM.parent_item_id == parent_id).all()
+    return configuration_errors(db, parent_id, rows, require_rows=True)
+
+
 @router.patch("/{item_id}/bom-completion", response_model=ItemResponse)
 def update_bom_completion(
     item_id: uuid.UUID,
@@ -849,9 +905,14 @@ def update_bom_completion(
     db: Session = Depends(get_db),
 ):
     """BOM 완료 상태 토글 — 사용자가 명시적으로 누를 때만 set/clear."""
+    db.execute(update(Item).where(Item.item_id == item_id).values(updated_at=Item.updated_at))
+    db.expire_all()
     item = item_repository.get(db, item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
+
+    if payload.completed and (errors := _bom_completion_errors(db, item_id)):
+        raise http_error(422, ErrorCode.UNPROCESSABLE, "\n".join(errors), errors=errors)
 
     item.bom_completed_at = datetime.now(UTC).replace(tzinfo=None) if payload.completed else None
     item.updated_at = datetime.now(UTC).replace(tzinfo=None)
@@ -869,6 +930,49 @@ def update_bom_completion(
     return item
 
 
+def _item_deletion_dependencies(db: Session, item_id: uuid.UUID) -> list[dict]:
+    """Report every source-defined link before deletion, including exhausted historical origins."""
+    inventory = db.query(Inventory).filter(Inventory.item_id == item_id)
+    locations = db.query(InventoryLocation).filter(InventoryLocation.item_id == item_id)
+    shipping_ids = {
+        request_id for (request_id,) in db.query(ShippingRequest.request_id).filter(or_(
+            ShippingRequest.base_pf_item_id == item_id, ShippingRequest.final_pa_item_id == item_id,
+            ShippingRequest.final_pf_item_id == item_id, ShippingRequest.reuse_pf_item_id == item_id,
+        ))
+    }
+    for model, linked_item in ((ShippingRequestBomLine, ShippingRequestBomLine.child_item_id),
+                               (ShippingRequestCompanionLine, ShippingRequestCompanionLine.item_id)):
+        shipping_ids.update(request_id for (request_id,) in db.query(model.request_id).filter(linked_item == item_id))
+    counts = [
+        ("warehouse_inventory", "창고 재고", inventory.filter(Inventory.warehouse_qty > 0).count()),
+        ("normal_inventory", "정상 재고", locations.filter(InventoryLocation.status == LocationStatusEnum.PRODUCTION, InventoryLocation.quantity > 0).count()),
+        ("defective_inventory", "불량 재고", locations.filter(InventoryLocation.status == LocationStatusEnum.DEFECTIVE, InventoryLocation.quantity > 0).count()),
+        ("inventory", "집계 재고", inventory.filter(Inventory.quantity > 0).count()),
+        ("warehouse_reservation", "창고 예약", inventory.filter(Inventory.pending_quantity > 0).count()),
+        ("location_reservation", "부서 예약", locations.filter(InventoryLocation.pending_quantity > 0).count()),
+        ("bom_parent", "BOM 하위 구성", db.query(BOM).filter(BOM.parent_item_id == item_id).count()),
+        ("bom_child", "BOM 사용처", db.query(BOM).filter(BOM.child_item_id == item_id).count()),
+        ("stock_request", "입출고 요청", db.query(StockRequestLine.request_id).filter(StockRequestLine.item_id == item_id).distinct().count()),
+        ("shipping", "출하 기록", len(shipping_ids)),
+        ("quarantine_record", "격리 원건", db.query(DefectQuarantineRecord).filter(DefectQuarantineRecord.item_id == item_id).count()),
+        ("transaction", "입출고 거래", db.query(TransactionLog).filter(TransactionLog.item_id == item_id).count()),
+    ]
+    return [{"kind": kind, "label": label, "count": count} for kind, label, count in counts if count]
+
+
+@router.get("/{item_id}/deletion-dependencies")
+def get_item_deletion_dependencies(
+    item_id: uuid.UUID,
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    db: Session = Depends(get_db),
+) -> dict:
+    """Let the confirmation UI inspect all blockers without attempting a write."""
+    if not item_repository.get(db, item_id):
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
+    dependencies = _item_deletion_dependencies(db, item_id)
+    return {"item_id": str(item_id), "can_delete": not dependencies, "dependencies": dependencies}
+
+
 @router.patch("/{item_id}/soft-delete", response_model=ItemResponse)
 def soft_delete_item(
     item_id: uuid.UUID,
@@ -876,16 +980,17 @@ def soft_delete_item(
     _admin: Annotated[None, Depends(require_admin_pin)],
     db: Session = Depends(get_db),
 ):
-    """품목 소프트 삭제 — deleted_at 세팅 + BOM 연결 제거. 입출고 내역은 보존."""
+    """연결 사실이 없는 품목만 삭제 표시하며 기존 삭제품목의 복구는 별도 유지한다."""
     item = item_repository.get(db, item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
     if item.deleted_at is not None:
         raise http_error(409, ErrorCode.CONFLICT, "이미 삭제된 품목입니다.")
-
-    db.query(BOM).filter(
-        (BOM.parent_item_id == item_id) | (BOM.child_item_id == item_id)
-    ).delete(synchronize_session=False)
+    dependencies = _item_deletion_dependencies(db, item_id)
+    if dependencies:
+        reasons = ", ".join(f"{entry['label']} {entry['count']}건" for entry in dependencies)
+        raise http_error(409, ErrorCode.CONFLICT, f"연결 데이터가 있어 품목을 삭제할 수 없습니다: {reasons}",
+                         dependencies=dependencies)
 
     item.deleted_at = datetime.now(UTC).replace(tzinfo=None)
     item.updated_at = datetime.now(UTC).replace(tzinfo=None)

@@ -14,7 +14,7 @@ export function EditItemForm({
   selectedItem: Item;
   stockPurchaseOnly?: boolean;
 }) {
-  const { editForm, setEditForm, productModels } = useAdminMasterItemsContext();
+  const { editForm, setEditForm, productModels, editCodePreview } = useAdminMasterItemsContext();
 
   function handleSetForm(updater: (f: ItemFormData) => ItemFormData) {
     setEditForm((f: ItemEditForm) => {
@@ -37,6 +37,7 @@ export function EditItemForm({
           form={editForm as unknown as ItemFormData & { mes_code: string }}
           setForm={handleSetForm}
           showMesCode
+          codePreview={editCodePreview}
           productModels={productModels}
         />
       )}

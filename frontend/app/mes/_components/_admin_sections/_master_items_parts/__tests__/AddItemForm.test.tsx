@@ -28,6 +28,7 @@ vi.mock("../../AdminMasterItemsContext", () => ({
     setAddForm,
     addItem: vi.fn(),
     productModels: [],
+    addCodePreview: { status: "ready", code: "3-TR-0020", retry: vi.fn() },
   }),
 }));
 
@@ -36,6 +37,11 @@ vi.mock("../../../DepartmentsContext", () => ({
 }));
 
 describe("AddItemForm", () => {
+  it("새 품목 생성 전에 서버가 확인한 정확한 코드 미리보기를 표시한다", () => {
+    render(<AddItemForm />);
+    expect(screen.getByText("3-TR-0020")).toHaveAttribute("aria-readonly", "true");
+    expect(screen.getByRole("button", { name: "추가", exact: true })).toBeEnabled();
+  });
   it("does not render a duplicate heading or the obsolete item-code hint", () => {
     render(<AddItemForm />);
 
