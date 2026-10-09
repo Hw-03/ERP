@@ -174,6 +174,7 @@ export function NotificationPanel({
         ) : (
           items.map((n) => {
             const tone = TONE[n.type] ?? LEGACY_COLORS.blue;
+            const retired = n.type === "approval_request" && n.is_read && !n.target_tab && !n.target_section;
             return (
               <div
                 key={n.notification_id}
@@ -182,9 +183,10 @@ export function NotificationPanel({
               >
                 <div
                   role="button"
-                  tabIndex={0}
-                  onClick={() => onItemClick(n)}
-                  onKeyDown={(e) => e.key === "Enter" && onItemClick(n)}
+                  aria-disabled={retired || undefined}
+                  tabIndex={retired ? -1 : 0}
+                  onClick={() => { if (!retired) onItemClick(n); }}
+                  onKeyDown={(e) => { if (!retired && e.key === "Enter") onItemClick(n); }}
                   className="flex flex-1 cursor-pointer flex-col gap-0.5 px-3 py-2 text-left"
                 >
                   <div className="flex items-center gap-2">

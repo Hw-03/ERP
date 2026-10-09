@@ -196,6 +196,14 @@ function deferred<T>() {
 }
 
 describe("MobileShell layout", () => {
+  it("없는 주소 본문은 직원 메뉴와 기존 탭을 유지하고 정상 주소로 복귀한다", () => {
+    const onRecoveryNavigate = vi.fn();
+    render(<MobileShell recoveryContent={<h2>페이지를 찾을 수 없습니다</h2>} onRecoveryNavigate={onRecoveryNavigate} />);
+    expect(screen.getByRole("heading", { name: "페이지를 찾을 수 없습니다" })).toBeInTheDocument();
+    expect(screen.queryByText("dashboard screen")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "입출고", exact: true }));
+    expect(onRecoveryNavigate).toHaveBeenCalledWith("?tab=warehouse");
+  });
   it("일보 헤더 복귀는 저장 성공을 기다리고 실패하면 현재 화면을 유지한다", async () => {
     window.history.replaceState({}, "", "/mes?tab=dailyReport");
     const saving = deferred<void>();

@@ -4,7 +4,7 @@ import { loginAsOperator } from "./_helpers";
 async function openSettings(page: Page, employeeCode?: string) {
   await page.setViewportSize({ width: 1440, height: 900 });
   const employee = await loginAsOperator(page, employeeCode ? { code: employeeCode } : { role: "warehouse" });
-  const response = await page.request.put(`/api/employees/${employee.employee_id}/appearance`, { data: { theme: "light", sidebar_mode: "hover" } });
+  const response = await page.request.put(`/api/employees/${employee.employee_id}/appearance`, { headers: { "X-MES-Employee-Code": employee.employee_code }, data: { theme: "light", sidebar_mode: "hover" } });
   expect(response.ok()).toBeTruthy();
   await page.goto("/mes?tab=settings");
   await expect(page.getByRole("button", { name: "라이트 테마", exact: true })).toHaveAttribute("aria-pressed", "true");

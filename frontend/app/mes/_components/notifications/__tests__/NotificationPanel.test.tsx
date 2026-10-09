@@ -32,6 +32,17 @@ function makeNotification(overrides: Partial<AppNotification> = {}): AppNotifica
 }
 
 describe("NotificationPanel", () => {
+  it("전환되어 주소가 제거된 읽은 결재 알림은 클릭과 Enter를 막고 기록은 표시한다", () => {
+    const onItemClick = vi.fn();
+    render(<NotificationPanel items={[makeNotification({ is_read: true, title: "전환된 AS 요청" })]} unread={0} {...emptyHandlers} onItemClick={onItemClick} />);
+    const retired = screen.getByRole("button", { name: /전환된 AS 요청/ });
+    expect(retired).toHaveAttribute("aria-disabled", "true");
+    expect(retired).toHaveAttribute("tabindex", "-1");
+    fireEvent.click(retired);
+    fireEvent.keyDown(retired, { key: "Enter" });
+    expect(onItemClick).not.toHaveBeenCalled();
+    expect(screen.getByText("전환된 AS 요청")).toBeVisible();
+  });
   it("모바일은 기존 배치에서 보완 본문을 표시한다", () => {
     render(<NotificationPanel mobilePresentation items={[makeNotification({ body: "Kim · manual_adjustment · SR-OLD", display_body: "Kim · 수동 조정 · 게터 2개" })]} unread={1} {...emptyHandlers} />);
     expect(screen.getByText("Kim · 수동 조정 · 게터 2개")).toBeInTheDocument();

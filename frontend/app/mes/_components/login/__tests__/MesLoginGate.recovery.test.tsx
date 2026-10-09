@@ -28,6 +28,7 @@ vi.mock("../useCurrentOperator", () => ({
   clearCurrentOperator: state.clearCurrentOperator,
   getStoredBootId: state.getStoredBootId,
   readCurrentOperator: state.readCurrentOperator,
+  updateCurrentOperatorIdentity: vi.fn(),
 }));
 vi.mock("../OperatorLoginCard", () => ({ OperatorLoginCard: () => <div>Login form</div> }));
 

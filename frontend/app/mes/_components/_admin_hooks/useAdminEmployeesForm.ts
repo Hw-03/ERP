@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DepartmentRole, Employee, WarehouseRole } from "@/lib/api";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "../_admin_sections/adminShared";
 import { normalizeEmployeePosition } from "../_admin_sections/_employee_parts/employeeRoleLabels";
@@ -58,6 +58,7 @@ export function useAdminEmployeesForm(employees: Employee[]) {
   const [empAddMode, setEmpAddMode] = useState(false);
   const [empAddForm, setEmpAddForm] = useState<EmployeeAddForm>(EMPTY_EMPLOYEE_FORM);
   const [editForm, setEditForm] = useState<EmployeeEditForm>(EMPTY_EDIT_FORM);
+  const previousSelection = useRef<Employee | null>(null);
 
   // 외부 employees 변경 시 selectedEmployee 동기화
   useEffect(() => {
@@ -70,6 +71,11 @@ export function useAdminEmployeesForm(employees: Employee[]) {
 
   // 직원 선택 시 editForm 채우기
   useEffect(() => {
+    const previous = previousSelection.current;
+    previousSelection.current = selectedEmployee;
+    // PIN 등 읽기 전용 정보만 바뀌면 미저장 직원 편집을 보존한다.
+    if (previous && selectedEmployee && previous.employee_id === selectedEmployee.employee_id
+      && JSON.stringify(toEditForm(previous)) === JSON.stringify(toEditForm(selectedEmployee))) return;
     if (selectedEmployee) {
       setEditForm(toEditForm(selectedEmployee));
     } else {

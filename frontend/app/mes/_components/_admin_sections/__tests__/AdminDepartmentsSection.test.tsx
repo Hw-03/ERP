@@ -2,8 +2,9 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
 import { AdminDepartmentsSection } from "../AdminDepartmentsSection";
+import type { DepartmentMaster } from "@/lib/api";
 
-const assembly = { id: 1, name: "조립", display_order: 1, is_active: true, color_hex: "#2f74e7" };
+const assembly: DepartmentMaster = { id: 1, name: "조립", display_order: 1, is_active: true, color_hex: "#2f74e7" };
 
 const context = {
   departments: [assembly],
@@ -31,6 +32,29 @@ vi.mock("../../DepartmentsContext", () => ({
 }));
 
 describe("AdminDepartmentsSection", () => {
+  it("부서 행에는 표시명을 쓰고 직원 집계는 영구 위치키를 사용한다", () => {
+    context.departments = [{ ...assembly, display_name: "조립팀" }];
+    const { container } = render(<DirtyGuardProvider>
+      <AdminDepartmentsSection employees={[{ employee_id: "one", employee_code: "E01", name: "조립 직원", department: "조립", is_active: true } as any]}
+        items={[]} adminPin="0000" setDepartments={vi.fn()} onStatusChange={vi.fn()} onError={vi.fn()} />
+    </DirtyGuardProvider>);
+    const row = container.querySelector("[data-admin-department-row='1']")!;
+    expect(row).toHaveTextContent("조립팀");
+    expect(row).toHaveTextContent("1명");
+  });
+
+  it("부서 코드로 검색하고 검색 해제하면 전체 모집단으로 돌아온다", () => {
+    const { container } = render(<DirtyGuardProvider>
+      <AdminDepartmentsSection employees={[]} items={[]} adminPin="0000" setDepartments={vi.fn()} onStatusChange={vi.fn()} onError={vi.fn()} />
+    </DirtyGuardProvider>);
+    fireEvent.change(screen.getByPlaceholderText("부서명 검색"), { target: { value: "DPT-01" } });
+    expect(container.querySelector("[data-admin-department-row='1']")).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("부서명 검색"), { target: { value: "no-match" } });
+    expect(container.querySelector("[data-admin-department-row]")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("부서명 검색"), { target: { value: "" } });
+    expect(container.querySelectorAll("[data-admin-department-row]")).toHaveLength(context.departments.length);
+  });
+
   it("uses fixed list and status widths so full department statuses fit", () => {
     const { container } = render(
       <DirtyGuardProvider>

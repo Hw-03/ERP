@@ -15,7 +15,7 @@ export interface LoginEmployeesResult {
 /**
  * OperatorLoginCard 의 active employees fetch 훅.
  *
- * Round-8 (R8-5) 추출. mount 시 1회 fetch — 로그인 화면 진입 시.
+ * 로그인 진입·다시 포커스할 때 현재 활성 직원 후보를 조회한다.
  * 활성 직원 목록만 필요 (activeOnly: true).
  */
 export function useLoginEmployees(): LoginEmployeesResult {
@@ -23,6 +23,18 @@ export function useLoginEmployees(): LoginEmployeesResult {
   const [status, setStatus] = useState<LoginEmployeesStatus>("loading");
   const [attempt, setAttempt] = useState(0);
   const retry = useCallback(() => setAttempt((value) => value + 1), []);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") retry();
+    };
+    window.addEventListener("focus", retry);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", retry);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [retry]);
 
   useEffect(() => {
     const controller = new AbortController();

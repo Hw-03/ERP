@@ -19,6 +19,7 @@ export type NotificationFilter = "all" | "unread";
 export interface NotificationDialogProps {
   items: AppNotification[];
   unread: number;
+  unreadKnown?: boolean;
   filter: NotificationFilter;
   onFilterChange: (filter: NotificationFilter) => void;
   onClose: () => void;
@@ -53,7 +54,7 @@ const ICONS: Record<string, typeof Bell> = {
 
 /** Desktop notification history with a persistent header, scrollable list, and settings footer. */
 export function NotificationDialog({
-  items, unread, filter, onFilterChange, onClose, onItemClick, onMarkAll,
+  items, unread, unreadKnown = true, filter, onFilterChange, onClose, onItemClick, onMarkAll,
   onDeleteItem, onDeleteRead, loginPopupEnabled,
   loginPopupUpdating = false, onToggleLoginPopup, loading = false, error = null,
   hasData = items.length > 0 || (!loading && !error),
@@ -132,7 +133,7 @@ export function NotificationDialog({
             <Bell className="h-5 w-5" />
           </span>
           <h2 id={titleId} className="min-w-0 flex-1 text-xl font-bold" style={{ color: LEGACY_COLORS.text }}>알림</h2>
-          <p className="text-right text-sm" style={{ color: LEGACY_COLORS.muted2 }}>읽지 않은 알림 {unread}건</p>
+          {unreadKnown && <p className="text-right text-sm" style={{ color: LEGACY_COLORS.muted2 }}>읽지 않은 알림 {unread}건</p>}
           <button ref={closeRef} type="button" onClick={onClose} aria-label="알림 닫기"
             className="no-btn-inset flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2"
             style={{ color: LEGACY_COLORS.muted2 }}><X className="h-5 w-5" /></button>
@@ -173,9 +174,10 @@ export function NotificationDialog({
                 const tone = TONES[notification.type] ?? LEGACY_COLORS.blue;
                 const Icon = ICONS[notification.type] ?? Bell;
                 const presentation = getNotificationPresentation(notification);
+                const retired = notification.type === "approval_request" && notification.is_read && !notification.target_tab && !notification.target_section;
                 return <div key={notification.notification_id} className="flex items-center rounded-[16px] border"
                   style={{ borderColor: LEGACY_COLORS.border, background: notification.is_read ? LEGACY_COLORS.s1 : tint(tone, 10) }}>
-                  <button type="button" onClick={() => onItemClick(notification)} disabled={actionsPending}
+                  <button type="button" onClick={() => onItemClick(notification)} disabled={actionsPending || retired}
                     className="no-btn-inset flex min-w-0 flex-1 items-center gap-3 rounded-[16px] px-3 py-3 text-left transition active:scale-[0.98] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2">
                     <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]" style={{ color: tone, background: tint(tone, 14) }} aria-hidden="true">
                       <Icon className="h-5 w-5" />

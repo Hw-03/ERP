@@ -208,6 +208,7 @@ export function NotificationBell({
         <NotificationDialog
           items={selectedQuery.data?.items ?? []}
           unread={unread}
+          unreadKnown={countData !== undefined}
           filter={filter}
           onFilterChange={setFilter}
           onClose={() => setOpen(false)}

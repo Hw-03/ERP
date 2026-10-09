@@ -127,15 +127,18 @@ async function seed() {
   // produce 는 자식 자재를 부서(조립) PRODUCTION 재고에서 소비한다(창고 아님).
   // 창고 재고만으로는 "재고 부족" → 제출 불가 → 자식 일부를 조립 부서 생산재고로 이동.
   // API 가 없어 서비스(transfer_to_production)를 직접 호출. 코드는 ASCII 만(argv 인코딩 회피).
+  // 현행 작업·역작업 계약은 원장 활성 이후 경로다. 합성 시드 이후부터 명시 활성화한다.
+  const inventoryOperationCutoverAt = new Date().toISOString();
   const seedPy = [
     "from decimal import Decimal",
     "from app.database import SessionLocal",
-    "from app.models import Item, DepartmentEnum",
+    "from app.models import Item, DepartmentEnum, SystemSetting",
     "from app.services.inv_transfer import transfer_to_production",
     "db = SessionLocal()",
     "try:",
     "    child = db.query(Item).filter(Item.process_type_code=='TR').first()",
     "    transfer_to_production(db, child.item_id, Decimal('50'), DepartmentEnum.TUBE)",
+    `    db.add(SystemSetting(setting_key='inventory_operation_cutover_at', setting_value=${JSON.stringify(inventoryOperationCutoverAt)}))`,
     "    db.commit()",
     "finally:",
     "    db.close()",
@@ -152,7 +155,7 @@ async function seed() {
   fs.writeFileSync(
     SEED_FILE,
     JSON.stringify(
-      { rawItem, parentItem, warehouseEmployee, departmentEmployee, plainEmployee },
+      { rawItem, parentItem, warehouseEmployee, departmentEmployee, plainEmployee, inventoryOperationCutoverAt },
       null,
       2,
     ),

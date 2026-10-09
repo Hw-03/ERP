@@ -134,6 +134,15 @@ describe("OperatorLoginCard", () => {
     });
   });
 
+  it("shows the inactive employee error distinctly from an incorrect PIN", async () => {
+    state.verifyEmployeePin.mockRejectedValue(new ApiError("비활성 직원입니다.", 403));
+    render(<OperatorLoginCard onLogin={() => {}} />);
+    await act(async () => { await submitLogin(); });
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("비활성 직원"));
+    expect(screen.getByRole("alert")).not.toHaveTextContent("PIN 번호가 올바르지 않습니다.");
+    expect(state.setCurrentOperator).not.toHaveBeenCalled();
+  });
+
   it("marks the login notification popup pending when the login response has the setting enabled", async () => {
     state.verifyEmployeePin.mockResolvedValue(makeEmployee({ login_notification_popup_enabled: true }));
 

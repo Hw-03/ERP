@@ -1,6 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DeptDetailView } from "../_department_parts/DeptDetailView";
+import { api } from "@/lib/api";
 
 vi.mock("@/lib/api", () => ({
   api: { updateDepartment: vi.fn() },
@@ -15,6 +16,24 @@ vi.mock("@/lib/ui/ConfirmModal", () => ({
 }));
 
 describe("DeptDetailView", () => {
+  it("표시명을 편집하며 위치키를 저장 요청에 보내지 않는다", async () => {
+    const dept = { id: 1, name: "튜브", display_name: "튜브팀", display_order: 1, is_active: true, color_hex: "#2f74e7" };
+    vi.mocked(api.updateDepartment).mockResolvedValue({ ...dept, display_name: "튜브 새 표시명" });
+    let save: (() => void) | null = null;
+    const onStatusChange = vi.fn();
+    render(<DeptDetailView dept={dept} adminPin="0000" empCount={1} itemCount={1} deptEmployees={[]}
+      onSetDepartments={vi.fn()} setSelectedDept={vi.fn()} onStatusChange={onStatusChange}
+      onError={vi.fn()} onToggleActive={vi.fn()} onRequestDelete={vi.fn()}
+      onSaveRef={(fn) => { save = fn; }} />);
+    expect(screen.getByRole("textbox", { name: "부서명" })).toHaveValue("튜브팀");
+    fireEvent.change(screen.getByRole("textbox", { name: "부서명" }), { target: { value: "튜브 새 표시명" } });
+    act(() => { save?.(); });
+    await waitFor(() => expect(api.updateDepartment).toHaveBeenCalledWith(1, {
+      display_name: "튜브 새 표시명", color_hex: "#2f74e7", pin: "0000",
+    }));
+    expect(onStatusChange).toHaveBeenCalledWith("'튜브 새 표시명' 부서 정보를 저장했습니다.");
+  });
+
   it("starts the palette closed and exposes it through an accessible button", () => {
     render(
       <DeptDetailView

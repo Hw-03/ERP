@@ -8,6 +8,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
+from fastapi import Request
 
 from app.models import (
     BoxSizeEnum,
@@ -587,10 +588,11 @@ def test_internal_use_waits_for_all_decisions_then_executes_approved_lines_atomi
     assert line_outcomes[department_item.item_id] == ("department", final_decision)
 
 
+@pytest.mark.parametrize("process_code", ["AR", "AA"])
 def test_internal_use_ar_aa_falls_back_to_department_when_no_active_special_approver(
-    db_session, make_item, make_location
+    db_session, client, make_item, make_location, process_code: str,
 ):
-    item = make_item(name="특수 승인자 없음", process_type_code="AR", warehouse_qty=Decimal("0"))
+    item = make_item(name="특수 승인자 없음", process_type_code=process_code, warehouse_qty=Decimal("0"))
     make_location(
         item.item_id,
         department=DepartmentEnum.ASSEMBLY,
@@ -602,6 +604,11 @@ def test_internal_use_ar_aa_falls_back_to_department_when_no_active_special_appr
         department=DepartmentEnum.AS,
         warehouse_role="none",
     )
+    approvers = [_make_requester(db_session, warehouse_role="none", department_role=role) for role in ("primary", "deputy")]
+    _make_requester(db_session, warehouse_role="primary")
+    _make_requester(db_session, warehouse_role="none")
+    inactive = _make_requester(db_session, warehouse_role="none", as_research_approver=True)
+    inactive.is_active = False
     payload = _internal_use_payload(requester, [item])
     _use_department_source(payload, DepartmentEnum.ASSEMBLY.value)
 
@@ -614,6 +621,14 @@ def test_internal_use_ar_aa_falls_back_to_department_when_no_active_special_appr
     assert request.requires_department_approval is True
     assert request.requires_as_research_approval is False
     assert request.approval_department == requester.department
+    notes = db_session.query(Notification).filter_by(related_request_id=request.request_id, type="approval_request").all()
+    assert {note.recipient_employee_id for note in notes} == {actor.employee_id for actor in approvers}
+    assert len(notes) == 2
+    assert {note.target_section for note in notes} == {"dept-queue"}
+    for actor in approvers:
+        queue = client.get("/api/stock-requests/department-queue", params={"actor_employee_id": str(actor.employee_id)})
+        assert queue.status_code == 200, queue.text
+        assert [row["request_id"] for row in queue.json()] == [str(request.request_id)]
 
 
 def test_internal_use_department_group_targets_batch_department_for_queue_notification_and_approval(
@@ -1230,6 +1245,21 @@ def test_disabling_last_special_approver_reclassifies_only_undecided_requests(
         warehouse_role="none",
         department_role="primary",
     )
+    deputy = _make_requester(db_session, warehouse_role="none", department_role="deputy")
+    _make_requester(db_session, warehouse_role="none")
+    inactive = _make_requester(db_session, warehouse_role="none", department_role="primary")
+    inactive.is_active = False
+    completed_payload = _internal_use_payload(requester, [special_item])
+    _use_department_source(completed_payload, DepartmentEnum.ASSEMBLY.value)
+    completed_work = actions.submit(db_session, completed_payload)
+    completed = db_session.query(StockRequest).filter_by(operation_batch_id=completed_work["batch"]["batch_id"]).one()
+    completed_reply = client.post(f"/api/stock-requests/{completed.request_id}/as-research-approve",
+                                 json={"actor_employee_id": str(special_approver.employee_id), "pin": "0000"})
+    assert completed_reply.status_code == 200, completed_reply.text
+    assert completed.status == StockRequestStatusEnum.COMPLETED
+    request_table = StockRequest.__table__
+    completed_before = db_session.execute(request_table.select().where(request_table.c.request_id == completed.request_id)).one()
+    logs_before = list(db_session.execute(TransactionLog.__table__.select()).all())
     payload = _internal_use_payload(requester, [special_item, warehouse_item])
     special_line = payload.bundles[0].lines[0]
     special_line.from_bucket = "production"
@@ -1240,6 +1270,15 @@ def test_disabling_last_special_approver_reclassifies_only_undecided_requests(
         for row in db_session.query(StockRequest).filter_by(operation_batch_id=submitted["batch"]["batch_id"]).all()
         if row.requires_as_research_approval
     )
+
+    old_note = db_session.query(Notification).filter_by(
+        recipient_employee_id=special_approver.employee_id,
+        related_request_id=special_request.request_id, target_section="as-research-queue",
+    ).one()
+    old_id, old_created_at, old_title = old_note.notification_id, old_note.created_at, old_note.title
+    db_session.commit()
+    from tests.test_io_expectation_closure import _cells
+    pending_before = _cells(db_session)
 
     response = client.put(
         f"/api/employees/{special_approver.employee_id}",
@@ -1252,11 +1291,79 @@ def test_disabling_last_special_approver_reclassifies_only_undecided_requests(
     assert special_request.requires_as_research_approval is False
     assert special_request.requires_department_approval is True
     assert special_request.approval_department == DepartmentEnum.AS.value
-    assert db_session.query(Notification).filter_by(
-        recipient_employee_id=department_approver.employee_id,
-        related_request_id=special_request.request_id,
-        target_section="dept-queue",
-    ).count() == 1
+    assert _cells(db_session) == pending_before
+    assert db_session.execute(request_table.select().where(request_table.c.request_id == completed.request_id)).one() == completed_before
+    assert list(db_session.execute(TransactionLog.__table__.select()).all()) == logs_before
+    old_note = db_session.get(Notification, old_id)
+    assert old_note is not None
+    assert old_note.is_read is True
+    assert old_note.target_tab is None
+    assert old_note.target_section is None
+    assert (old_note.created_at, old_note.title, old_note.related_request_id) == (old_created_at, old_title, special_request.request_id)
+    notes = db_session.query(Notification).filter_by(related_request_id=special_request.request_id, target_section="dept-queue").all()
+    assert {note.recipient_employee_id for note in notes} == {department_approver.employee_id, deputy.employee_id}
+    assert len(notes) == 2
+    for actor in (department_approver, deputy):
+        queue = client.get("/api/stock-requests/department-queue", params={"actor_employee_id": str(actor.employee_id)})
+        assert [row["request_id"] for row in queue.json()] == [str(special_request.request_id)]
+    reenabled = client.put(f"/api/employees/{special_approver.employee_id}", headers={"X-Admin-Pin": "0000"},
+                          json={"as_research_approver": True})
+    assert reenabled.status_code == 200, reenabled.text
+    assert client.get("/api/stock-requests/as-research-queue", params={"actor_employee_id": str(special_approver.employee_id)}).json() == []
+    assert special_request.requires_as_research_approval is False
+    assert special_request.requires_department_approval is True
+    assert _cells(db_session) == pending_before
+    assert db_session.execute(request_table.select().where(request_table.c.request_id == completed.request_id)).one() == completed_before
+    obsolete_action = client.post(f"/api/stock-requests/{special_request.request_id}/as-research-approve",
+                                  json={"actor_employee_id": str(special_approver.employee_id), "pin": "0000"})
+    assert obsolete_action.status_code == 422, obsolete_action.text
+    assert _cells(db_session) == pending_before
+
+
+def test_special_fallback_failure_rolls_back_role_route_notes_and_all_stock(
+    db_session, client, make_item, make_location, monkeypatch,
+):
+    """A late notification error must roll back the same employee-edit transaction."""
+    from app import database
+    from app.main import app
+    from app.services import notifications
+    item = make_item(name="fallback rollback", process_type_code="AR")
+    make_location(item.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("5"))
+    requester = _make_requester(db_session, department=DepartmentEnum.AS, warehouse_role="none")
+    approver = _make_requester(db_session, warehouse_role="none", as_research_approver=True)
+    _make_requester(db_session, warehouse_role="none", department_role="primary")
+    payload = _internal_use_payload(requester, [item])
+    _use_department_source(payload, DepartmentEnum.ASSEMBLY.value)
+    actions.submit(db_session, payload)
+    approver_id = approver.employee_id
+    db_session.commit()
+    tables = [model.__table__ for model in (
+        Employee, StockRequest, Inventory, InventoryLocation, Notification, IoBatch, IoLine, TransactionLog,
+    )]
+    before = {table.name: list(db_session.execute(table.select()).all()) for table in tables}
+    notify = notifications.notify_request_arrived
+
+    def fail_after_new_notification(session, request):
+        notify(session, request)
+        session.flush()
+        raise RuntimeError("late fallback notification failure")
+
+    monkeypatch.setattr(notifications, "notify_request_arrived", fail_after_new_notification)
+    previous_override = app.dependency_overrides[database.get_db]
+    monkeypatch.setattr(database, "SessionLocal", lambda: db_session)
+
+    def production_boundary(request: Request):
+        yield from database.get_db(request)
+
+    app.dependency_overrides[database.get_db] = production_boundary
+    try:
+        with pytest.raises(RuntimeError, match="late fallback notification failure"):
+            client.put(f"/api/employees/{approver_id}", headers={"X-Admin-Pin": "0000"},
+                       json={"as_research_approver": False})
+    finally:
+        app.dependency_overrides[database.get_db] = previous_override
+    db_session.expire_all()
+    assert {table.name: list(db_session.execute(table.select()).all()) for table in tables} == before
 
 
 @pytest.mark.parametrize(

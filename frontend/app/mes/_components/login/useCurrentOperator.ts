@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useState } from "react";
+import type { Employee } from "@/lib/api/types/employees";
 import type { Department, DepartmentRole, WarehouseRole } from "@/lib/api";
 import { sendClientEvent } from "@/lib/client-events";
 import { clearAuditSession, startAuditSession } from "@/lib/activity-audit-context";
@@ -130,6 +131,27 @@ export function updateCurrentOperatorPreferences(patch: {
   const operator = readOperator();
   if (!operator || (expectedEmployeeId && operator.employee_id !== expectedEmployeeId)) return;
   window.sessionStorage.setItem(OPERATOR_KEY, JSON.stringify({ ...operator, ...patch }));
+  window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));
+}
+
+/** Refresh identity and access without restarting login audit or overwriting appearance drafts. */
+export function updateCurrentOperatorIdentity(employee: Employee, expectedEmployeeId: string): void {
+  const operator = readOperator();
+  if (!operator || operator.employee_id !== expectedEmployeeId || employee.employee_id !== expectedEmployeeId) return;
+  const next: Operator = {
+    ...operator,
+    name: employee.name ?? operator.name,
+    role: employee.role ?? operator.role,
+    department: employee.department ?? operator.department,
+    employee_code: employee.employee_code ?? operator.employee_code,
+    warehouse_role: employee.warehouse_role ?? operator.warehouse_role,
+    department_role: employee.department_role ?? operator.department_role,
+    as_research_approver: employee.as_research_approver ?? operator.as_research_approver,
+    assigned_model_slots: employee.assigned_model_slots ?? operator.assigned_model_slots,
+    io_enabled: employee.io_enabled ?? operator.io_enabled,
+    hidden_sidebar_tabs: employee.hidden_sidebar_tabs ?? operator.hidden_sidebar_tabs,
+  };
+  window.sessionStorage.setItem(OPERATOR_KEY, JSON.stringify(next));
   window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));
 }
 

@@ -100,7 +100,7 @@ export function EmployeeDetailGrid({
               onChange={(v) => setForm((f) => ({ ...f, department: v }))}
               options={departments
                 .filter((d) => d.is_active)
-                .map((d) => ({ value: d.name, label: d.name }))}
+                .map((d) => ({ value: d.name, label: d.display_name ?? d.name }))}
             />
           </FieldRow>
           <FieldRow label="연락처" htmlFor="emp-edit-phone">

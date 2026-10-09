@@ -10,7 +10,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.database import get_db
-from app.models import DailyWorkReport, Employee, EmployeeAssignedModel, ProductSymbol, StockRequest
+from app.models import (
+    DailyWorkReport, Employee, EmployeeAssignedModel, ProductSymbol, ShippingRequest,
+    ShippingRequestStatusEnum, StockRequest, StockRequestStatusEnum,
+)
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     EmployeeAppearanceResponse,
@@ -26,6 +29,7 @@ from app.schemas import (
     PinVerifyRequest,
 )
 from app.dependencies.admin import require_admin_pin
+from app.dependencies.employee_actor import require_current_employee_actor
 from app.routers.settings import require_admin
 from app.services import rate_limit
 from app.services.audit_actor_session import set_audit_actor_cookie
@@ -35,6 +39,13 @@ from app.services._tx import commit_and_refresh, commit_only
 from app._actor import set_actor
 
 router = APIRouter()
+
+
+def _require_personal_setting_owner(request: Request, db: Session, employee_id: uuid.UUID) -> None:
+    """Keep personal writes scoped to the current tab actor, including legacy routes."""
+    actor = require_current_employee_actor(request, db)
+    if actor is None or actor.employee_id != employee_id:
+        raise http_error(403, ErrorCode.FORBIDDEN, "본인 설정만 변경할 수 있습니다.")
 
 SIDEBAR_TAB_IDS: tuple[str, ...] = (
     "dashboard",
@@ -284,19 +295,15 @@ def create_employee(
             "department_role 은 none/primary/deputy 중 하나여야 합니다.",
         )
 
-    hidden_tabs = _validate_hidden_sidebar_tabs(payload.hidden_sidebar_tabs)
     hidden_tabs_provided = _payload_has_field(payload, "hidden_sidebar_tabs")
+    hidden_tabs = _validate_hidden_sidebar_tabs(
+        payload.hidden_sidebar_tabs if hidden_tabs_provided else ["admin"]
+    )
     io_enabled = payload.io_enabled if payload.io_enabled is not None else True
     if hidden_tabs_provided:
         io_enabled = _io_enabled_from_hidden_tabs(hidden_tabs)
     elif not io_enabled:
         hidden_tabs = _hide_io_related_tabs(hidden_tabs)
-    _ensure_admin_tab_access_remains(
-        db,
-        employee_id=None,
-        hidden_sidebar_tabs=hidden_tabs,
-        is_active=bool(payload.is_active),
-    )
     if bool(payload.is_active) and bool(payload.as_research_approver):
         from app.services.internal_use_approval import lock_approver_roster
 
@@ -349,6 +356,7 @@ def update_employee(
     candidate_hidden_tabs = _parse_hidden_sidebar_tabs(
         getattr(employee, "hidden_sidebar_tabs", "")
     )
+    had_admin_access = _is_active_value(employee.is_active) and "admin" not in candidate_hidden_tabs
     candidate_io_enabled = bool(getattr(employee, "io_enabled", True))
     hidden_tabs_provided = _payload_has_field(payload, "hidden_sidebar_tabs")
     if hidden_tabs_provided:
@@ -368,12 +376,13 @@ def update_employee(
         if payload.is_active is not None
         else _is_active_value(employee.is_active)
     )
-    _ensure_admin_tab_access_remains(
-        db,
-        employee_id=employee.employee_id,
-        hidden_sidebar_tabs=candidate_hidden_tabs,
-        is_active=candidate_is_active,
-    )
+    if had_admin_access:
+        _ensure_admin_tab_access_remains(
+            db,
+            employee_id=employee.employee_id,
+            hidden_sidebar_tabs=candidate_hidden_tabs,
+            is_active=candidate_is_active,
+        )
     if payload.as_research_approver is not None or payload.is_active is not None:
         from app.services.internal_use_approval import lock_and_refresh_employee
 
@@ -460,6 +469,14 @@ def update_employee(
             payload_summary=f"{employee.name}: {', '.join(changed)}",
         )
 
+    if {"warehouse_role", "department_role", "as_research_approver", "department", "is_active"}.intersection(changed):
+        from app.services.notifications import remove_obsolete_employee_approval_notifications
+
+        try:
+            remove_obsolete_employee_approval_notifications(db, employee)
+        except Exception:
+            db.rollback()
+            raise
     commit_and_refresh(db, employee)
     return _to_response(employee, _assigned_slots_for(db, employee.employee_id))
 
@@ -477,6 +494,21 @@ def delete_employee(
     from app.services.internal_use_approval import lock_and_refresh_employee
 
     employee = lock_and_refresh_employee(db, employee.employee_id)
+
+    pending_requests = db.query(StockRequest).filter(
+        StockRequest.requester_employee_id == employee_id,
+        StockRequest.status.in_([
+            StockRequestStatusEnum.DRAFT, StockRequestStatusEnum.SUBMITTED,
+            StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.FAILED_APPROVAL,
+        ]),
+    ).count()
+    pending_shipping = db.query(ShippingRequest).filter(
+        ShippingRequest.prepared_by_employee_id == employee_id,
+        ShippingRequest.status.in_([ShippingRequestStatusEnum.PREPARING, ShippingRequestStatusEnum.PREPARED]),
+    ).count()
+    if pending_requests or pending_shipping:
+        raise http_error(409, ErrorCode.CONFLICT, "진행 중인 업무를 먼저 완료하거나 취소한 뒤 직원을 삭제하세요.",
+                         pending_requests=pending_requests, pending_shipping=pending_shipping)
 
     has_requests = db.query(StockRequest).filter(
         StockRequest.requester_employee_id == employee_id
@@ -630,6 +662,7 @@ def reset_employee_pin(
 def update_employee_login_notification_popup(
     employee_id: uuid.UUID,
     payload: EmployeeLoginNotificationPopupUpdate,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """직원 로그인 알림 팝업 설정 저장."""
@@ -637,6 +670,7 @@ def update_employee_login_notification_popup(
     if not employee:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
 
+    _require_personal_setting_owner(request, db, employee_id)
     employee.login_notification_popup_enabled = payload.login_notification_popup_enabled
     employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
     commit_and_refresh(db, employee)
@@ -659,12 +693,13 @@ def get_employee_appearance(
 
 @router.put("/{employee_id}/appearance", response_model=EmployeeAppearanceResponse)
 def update_employee_appearance(
-    employee_id: uuid.UUID, payload: EmployeeAppearanceUpdate, db: Session = Depends(get_db),
+    employee_id: uuid.UUID, payload: EmployeeAppearanceUpdate, request: Request, db: Session = Depends(get_db),
 ) -> EmployeeAppearanceResponse:
     """Commit both preferences together under the existing personal-setting policy."""
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    _require_personal_setting_owner(request, db, employee_id)
     employee.theme = payload.theme
     employee.sidebar_mode = payload.sidebar_mode
     # Include an unchanged field too: a concurrent writer must never split the pair.
@@ -679,6 +714,7 @@ def update_employee_appearance(
 def update_employee_theme(
     employee_id: uuid.UUID,
     payload: EmployeeThemeUpdate,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """직원 테마 설정 저장 (light | dark | null)."""
@@ -689,6 +725,7 @@ def update_employee_theme(
     if not employee:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
 
+    _require_personal_setting_owner(request, db, employee_id)
     employee.theme = payload.theme
     employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
     commit_only(db)
@@ -699,6 +736,7 @@ def update_employee_theme(
 def update_employee_sidebar_mode(
     employee_id: uuid.UUID,
     payload: EmployeeSidebarModeUpdate,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """직원별 데스크톱 사이드바 동작 모드를 저장한다."""
@@ -713,6 +751,7 @@ def update_employee_sidebar_mode(
     if not employee:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
 
+    _require_personal_setting_owner(request, db, employee_id)
     employee.sidebar_mode = payload.sidebar_mode
     employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
     commit_only(db)

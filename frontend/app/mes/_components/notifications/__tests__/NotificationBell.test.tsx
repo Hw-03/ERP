@@ -335,4 +335,28 @@ describe("NotificationBell", () => {
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
     expect(state.refetch).toHaveBeenCalledOnce();
   });
+
+  it.each(["loading", "error"] as const)("does not report an unknown initial %s count as zero and preserves known counts", (phase) => {
+    state.queryHasData = false;
+    state.queryLoading = phase === "loading";
+    state.queryError = phase === "error" ? new Error("offline") : null;
+    const { rerender } = render(<NotificationBell loginDialogEnabled={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "알림" }));
+    expect(screen.queryByText("읽지 않은 알림 0건")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "모두 읽음" })).toBeDisabled();
+
+    state.queryHasData = true;
+    state.queryLoading = false;
+    state.queryError = null;
+    state.notifications = { items: [], unread_count: 0 };
+    rerender(<NotificationBell loginDialogEnabled={false} />);
+    expect(screen.getByText("읽지 않은 알림 0건")).toBeInTheDocument();
+
+    state.notifications = { items: [notification()], unread_count: 1 };
+    state.queryError = new Error("refresh failed");
+    rerender(<NotificationBell loginDialogEnabled={false} />);
+    expect(screen.getByText("읽지 않은 알림 1건")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "알림 1건" })).toBeInTheDocument();
+    expect(screen.queryByText("읽지 않은 알림 0건")).not.toBeInTheDocument();
+  });
 });

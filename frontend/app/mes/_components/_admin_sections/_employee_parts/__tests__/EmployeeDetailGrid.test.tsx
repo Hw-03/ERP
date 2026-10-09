@@ -41,6 +41,19 @@ const departments: DepartmentMaster[] = [
 ];
 
 describe("EmployeeDetailGrid", () => {
+  it("부서 표시명을 보여주고 선택 값은 기존 위치키로 보존한다", () => {
+    const setForm = vi.fn();
+    render(<EmployeeDetailGrid employee={employee} form={form} setForm={setForm}
+      departments={[{ ...departments[0], display_name: "조립팀" }]}
+      productModels={[]} onRequestPinReset={vi.fn()} onToggle={vi.fn()} onRequestDelete={vi.fn()} />);
+    const field = screen.getByText("부서").parentElement!;
+    const select = within(field).getByRole("combobox");
+    expect(select).toHaveTextContent("조립팀");
+    fireEvent.click(select);
+    fireEvent.mouseDown(screen.getByRole("option", { name: "조립팀", exact: true }));
+    expect(setForm.mock.calls[0][0](form).department).toBe("조립");
+  });
+
   it("직원 편집 화면은 등급 control 없이 창고·부서 정·부와 AS·연구 역할을 독립적으로 유지한다", () => {
     const selectedForm: EmployeeEditForm = {
       ...form,

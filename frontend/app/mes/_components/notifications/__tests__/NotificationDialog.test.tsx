@@ -24,6 +24,24 @@ function props(overrides: Record<string, unknown> = {}) {
 afterEach(() => { document.body.style.overflow = ""; });
 
 describe("NotificationDialog", () => {
+  it("전환되어 주소가 제거된 읽은 결재 알림은 클릭을 막고 기록과 삭제는 유지한다", () => {
+    const p = props({ items: [notification({ is_read: true, related_request_id: "fallback-request" })], unread: 0 });
+    render(<NotificationDialog {...p} />);
+    const row = screen.getByRole("button", { name: /새 결재 요청/ });
+    expect(row).toBeDisabled();
+    expect(screen.getByText("볼트 · 총 3개")).toBeInTheDocument();
+    fireEvent.click(row);
+    fireEvent.keyDown(row, { key: "Enter" });
+    expect(p.onItemClick).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "알림 삭제" })).toBeEnabled();
+  });
+
+  it("미읽음 필터 조회 중에도 이미 받은 전체 수량은 유지한다", () => {
+    render(<NotificationDialog {...props({ items: [], unread: 1, unreadKnown: true, filter: "unread", loading: true, hasData: false })} />);
+    expect(screen.getByText("읽지 않은 알림 1건")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "알림 목록 불러오는 중" })).toBeInTheDocument();
+  });
+
   it("body 포털과 고정 대화상자를 쓰고 내부 클릭은 닫지 않는다", () => {
     const p = props();
     const { container } = render(<NotificationDialog {...p} />);

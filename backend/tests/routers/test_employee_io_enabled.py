@@ -455,15 +455,18 @@ def test_migration_preserves_existing_employee_login_popup_setting(
     assert bool(saved.login_notification_popup_enabled) is False
 
 
-def test_create_employee_defaults_hidden_sidebar_tabs_empty(db_session, client):
-    """New employees can see every sidebar tab unless explicitly restricted."""
+def test_create_employee_defaults_hidden_sidebar_tabs_admin(db_session, client):
+    """Omitted menu settings hide admin without granting approval roles."""
     resp = client.post(
         "/api/employees",
         headers=ADMIN_HEADERS,
         json=_emp_payload(name="Default tabs"),
     )
     assert resp.status_code == 201, resp.text
-    assert resp.json()["hidden_sidebar_tabs"] == []
+    assert resp.json()["hidden_sidebar_tabs"] == ["admin"]
+    assert resp.json()["warehouse_role"] == "none"
+    assert resp.json()["department_role"] == "none"
+    assert resp.json()["as_research_approver"] is False
 
 
 def test_update_employee_hidden_sidebar_tabs_round_trips(db_session, client):
@@ -500,7 +503,7 @@ def test_create_employee_io_enabled_false_hides_io_related_tabs(db_session, clie
     )
     assert resp.status_code == 201, resp.text
     assert resp.json()["io_enabled"] is False
-    assert resp.json()["hidden_sidebar_tabs"] == ["warehouse", "defect"]
+    assert resp.json()["hidden_sidebar_tabs"] == ["admin", "warehouse", "defect"]
 
 
 def test_hidden_sidebar_tabs_couple_warehouse_and_defect(db_session, client):
@@ -576,6 +579,7 @@ def test_employee_hidden_sidebar_tabs_reject_hiding_every_tab(db_session, client
         "warehouseMap",
         "defect",
         "history",
+        "dailyReport",
         "weekly",
         "admin",
     ]
@@ -592,7 +596,7 @@ def test_update_employee_rejects_hiding_last_admin_tab_access(db_session, client
     create_resp = client.post(
         "/api/employees",
         headers=ADMIN_HEADERS,
-        json=_emp_payload(name="Only admin tab access"),
+        json=_emp_payload(name="Only admin tab access", hidden_sidebar_tabs=[]),
     )
     assert create_resp.status_code == 201, create_resp.text
     emp_id = create_resp.json()["employee_id"]
@@ -647,6 +651,7 @@ def test_employee_login_notification_popup_can_update_without_admin_pin(db_sessi
 
     update_resp = client.put(
         f"/api/employees/{emp_id}/login-popup",
+        headers={"X-MES-Employee-Code": create_resp.json()["employee_code"]},
         json={"login_notification_popup_enabled": True},
     )
 

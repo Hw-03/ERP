@@ -9,7 +9,7 @@ import { warehouseMapApi } from "@/lib/api/warehouse-map";
 import { formatKstDate } from "@/lib/mes/date";
 import { queryKeys } from "@/lib/queries/keys";
 import { OperatorLoginCard } from "./OperatorLoginCard";
-import { clearCurrentOperator, getStoredBootId, readCurrentOperator } from "./useCurrentOperator";
+import { clearCurrentOperator, getStoredBootId, readCurrentOperator, updateCurrentOperatorIdentity } from "./useCurrentOperator";
 import { runLoginReadWithRetry, validateActiveEmployees, validateAppSession } from "./loginReadRetry";
 import { useIdleOperatorConfirmation } from "./useIdleOperatorConfirmation";
 import { OperatorConfirmationDialog } from "./OperatorConfirmationDialog";
@@ -52,6 +52,8 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
   // 항목 5-2 — 모바일(<1024px)만 인트로 시작 스케일을 작게(작게→크게 반전). 데스크톱은 현행 유지.
   const [isNarrow, setIsNarrow] = useState(false);
   const [recoveryAttempt, setRecoveryAttempt] = useState(0);
+  const [refreshFailed, setRefreshFailed] = useState(false);
+  const refreshOperatorRef = useRef<(() => Promise<void>) | null>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const idleConfirmation = useIdleOperatorConfirmation(phase === "authed");
 
@@ -126,8 +128,9 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
           { stage: "active_employees", signal: controller.signal, validate: validateActiveEmployees },
         );
         if (cancelled) return;
-        const stillActive = list.some((e) => e.employee_id === stored.employee_id);
-        if (stillActive) {
+        const employee = list.find((e) => e.employee_id === stored.employee_id);
+        if (employee) {
+          updateCurrentOperatorIdentity(employee, stored.employee_id);
           setPhase("authed");
         } else {
           clearCurrentOperator();
@@ -144,6 +147,53 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
       controller.abort();
     };
   }, [queryClient, recoveryAttempt]);
+
+  useEffect(() => {
+    if (phase !== "authed") return;
+    let sequence = 0;
+    let controller: AbortController | null = null;
+    const refresh = async (): Promise<void> => {
+      const operator = readCurrentOperator();
+      if (!operator) return;
+      const auditSession = sessionStorage.getItem("dexcowin_mes_audit_session");
+      const requestSequence = ++sequence;
+      controller?.abort();
+      const requestController = new AbortController();
+      controller = requestController;
+      const stillCurrent = () => !requestController.signal.aborted
+        && requestSequence === sequence
+        && readCurrentOperator()?.employee_id === operator.employee_id
+        && sessionStorage.getItem("dexcowin_mes_audit_session") === auditSession;
+      try {
+        const session = await runLoginReadWithRetry((signal) => api.getAppSession(signal),
+          { stage: "app_session", signal: requestController.signal, validate: validateAppSession });
+        const employees = await runLoginReadWithRetry((signal) => api.getEmployees({ activeOnly: true }, signal),
+          { stage: "active_employees", signal: requestController.signal, validate: validateActiveEmployees });
+        if (!stillCurrent()) return;
+        const employee = employees.find((current) => current.employee_id === operator.employee_id);
+        if (!employee || getStoredBootId() !== session.boot_id) {
+          clearCurrentOperator();
+          setPhase("form");
+          return;
+        }
+        updateCurrentOperatorIdentity(employee, operator.employee_id);
+        setRefreshFailed(false);
+      } catch {
+        if (stillCurrent()) setRefreshFailed(true);
+      }
+    };
+    const onFocus = () => { void refresh(); };
+    const onVisible = () => { if (document.visibilityState === "visible") void refresh(); };
+    refreshOperatorRef.current = refresh;
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      controller?.abort();
+      refreshOperatorRef.current = null;
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [phase]);
 
   // 인트로 단계 진입 → 로고 축소 → 카드 등장 (≤ 1.5s 절제된 시퀀스)
   useEffect(() => {
@@ -177,6 +227,10 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
   // 로그인 완료 → 메인 화면
   if (phase === "authed") return <>
     {children}
+    {refreshFailed && <div role="alert" className="fixed left-1/2 top-4 z-[100] -translate-x-1/2 rounded-xl border bg-[var(--c-s1)] p-3">
+      직원 정보를 확인하지 못했습니다.
+      <button type="button" onClick={() => void refreshOperatorRef.current?.()}>직원 정보 다시 확인</button>
+    </div>}
     {idleConfirmation.operator && <OperatorConfirmationDialog
       operator={idleConfirmation.operator}
       dialogRef={idleConfirmation.dialogRef}

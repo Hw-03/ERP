@@ -7,6 +7,9 @@ const createMutateAsync = vi.fn();
 const updateMutateAsync = vi.fn();
 const deleteMutateAsync = vi.fn();
 const resetPinMutateAsync = vi.fn();
+const { getEmployees } = vi.hoisted(() => ({ getEmployees: vi.fn() }));
+
+vi.mock("@/lib/api", () => ({ api: { getEmployees } }));
 
 vi.mock("@/lib/queries/useEmployeesQuery", () => ({
   useCreateEmployeeMutation: () => ({ mutateAsync: createMutateAsync }),
@@ -54,6 +57,7 @@ describe("useAdminEmployeesCommands", () => {
     updateMutateAsync.mockReset();
     deleteMutateAsync.mockReset();
     resetPinMutateAsync.mockReset();
+    getEmployees.mockReset();
   });
 
   it("add — 이름 비어있으면 onError + null 반환", async () => {
@@ -78,6 +82,7 @@ describe("useAdminEmployeesCommands", () => {
       ret = await result.current.add(addInput());
     });
     expect(ret).toEqual(created);
+    expect(createMutateAsync.mock.calls[0][0]).not.toHaveProperty("hidden_sidebar_tabs");
     expect(args.setEmployees).toHaveBeenCalled();
     expect(args.onStatusChange).toHaveBeenCalled();
   });
@@ -131,5 +136,34 @@ describe("useAdminEmployeesCommands", () => {
     });
     expect(ret).toBe(false);
     expect(resetPinMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("resetPin — 서버의 기본 PIN·초기화 시각을 대상 직원 상세에 반영한다", async () => {
+    const before = { ...E("1"), pin_is_default: false, pin_last_changed: "2026-01-01T00:00:00Z" };
+    const other = E("2");
+    const refreshed = { ...before, pin_is_default: true, pin_last_changed: "2026-10-07T01:00:00Z" };
+    resetPinMutateAsync.mockResolvedValue(undefined);
+    getEmployees.mockResolvedValue([refreshed, { ...other, name: "외부 변경" }]);
+    const args = baseArgs();
+    const { result } = renderHook(() => useAdminEmployeesCommands(args), { wrapper });
+    let success: boolean | undefined;
+    await act(async () => { success = await result.current.resetPin(before, "0000"); });
+    expect(success).toBe(true);
+    expect(getEmployees).toHaveBeenCalledWith({ activeOnly: false });
+    const update = args.setEmployees.mock.calls[0][0];
+    expect(update([before, other])).toEqual([refreshed, other]);
+  });
+
+  it("resetPin — 초기화 성공 뒤 조회 실패를 초기화 실패로 보고하지 않는다", async () => {
+    resetPinMutateAsync.mockResolvedValue(undefined);
+    getEmployees.mockRejectedValue(new Error("조회 불가"));
+    const args = baseArgs();
+    const { result } = renderHook(() => useAdminEmployeesCommands(args), { wrapper });
+    let success: boolean | undefined;
+    await act(async () => { success = await result.current.resetPin(E("1"), "0000"); });
+    expect(success).toBe(true);
+    expect(args.onError).toHaveBeenCalledWith("PIN은 초기화했지만 직원 정보를 다시 불러오지 못했습니다.");
+    expect(args.setEmployees).not.toHaveBeenCalled();
+    expect(resetPinMutateAsync).toHaveBeenCalledTimes(1);
   });
 });

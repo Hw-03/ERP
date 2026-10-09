@@ -7,6 +7,28 @@ afterEach(() => {
 });
 
 describe("activity audit context", () => {
+  it("오래된 비UUID 단말만 복구하고 기존 감사 세션을 보존한다", async () => {
+    window.localStorage.setItem("dexcowin_mes_audit_terminal", "legacy-terminal-2025");
+    window.sessionStorage.setItem("dexcowin_mes_audit_session", "existing-audit-session");
+    window.sessionStorage.setItem("dexcowin_mes_operator", '{"employee_id":"unchanged-employee"}');
+    const audit = await import("../activity-audit-context");
+    const terminal = audit.getAuditTerminalId();
+    expect(terminal).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    expect(audit.getAuditTerminalId()).toBe(terminal);
+    expect(audit.getAuditRequestHeaders()["X-MES-Terminal-Id"]).toBe(terminal);
+    expect(audit.getAuditRequestHeaders()["X-MES-Audit-Session"]).toBe("existing-audit-session");
+    expect(window.sessionStorage.getItem("dexcowin_mes_operator")).toBe('{"employee_id":"unchanged-employee"}');
+  });
+
+  it("이미 등록 가능한 유효UUID 단말은 대소문자를 포함해 그대로 유지한다", async () => {
+    const terminal = "12345678-ABCD-4000-8000-123456789ABC";
+    window.localStorage.setItem("dexcowin_mes_audit_terminal", terminal);
+    const audit = await import("../activity-audit-context");
+    expect(audit.getAuditTerminalId()).toBe(terminal);
+    expect(audit.getAuditRequestHeaders()["X-MES-Terminal-Id"]).toBe(terminal);
+    expect(window.localStorage.getItem("dexcowin_mes_audit_terminal")).toBe(terminal);
+  });
+
   it("keeps one browser session and terminal identifier while attaching the current screen", async () => {
     const audit = await import("../activity-audit-context");
 

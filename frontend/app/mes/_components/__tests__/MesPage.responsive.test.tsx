@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useEffect } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -7,35 +7,49 @@ import MesPage from "../../page";
 const shellState = vi.hoisted(() => ({
   desktopFlush: vi.fn<() => Promise<void | boolean>>(),
   mobileFlush: vi.fn<() => Promise<void | boolean>>(),
+  push: vi.fn(),
+}));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => window.location.pathname,
+  useRouter: () => ({ push: shellState.push }),
 }));
 
 vi.mock("../mobile/MobileShell", () => ({
   MobileShell: ({
     onBeforeViewportSwitchChange,
+    recoveryContent,
+    onRecoveryNavigate,
   }: {
     onBeforeViewportSwitchChange?: (handler: (() => Promise<void>) | null) => void;
+    recoveryContent?: React.ReactNode;
+    onRecoveryNavigate?: (query: string) => void;
   }) => {
     useEffect(() => {
       onBeforeViewportSwitchChange?.(shellState.mobileFlush);
       return () => onBeforeViewportSwitchChange?.(null);
     }, [onBeforeViewportSwitchChange]);
 
-    return <div data-testid="mobile-shell" />;
+    return <div data-testid="mobile-shell">{recoveryContent}{onRecoveryNavigate && <button onClick={() => onRecoveryNavigate("?tab=history")}>Recovery menu</button>}</div>;
   },
 }));
 
 vi.mock("../DesktopMesShell", () => ({
   DesktopMesShell: ({
     onBeforeViewportSwitchChange,
+    recoveryContent,
+    onRecoveryNavigate,
   }: {
     onBeforeViewportSwitchChange?: (handler: (() => Promise<void>) | null) => void;
+    recoveryContent?: React.ReactNode;
+    onRecoveryNavigate?: (query: string) => void;
   }) => {
     useEffect(() => {
       onBeforeViewportSwitchChange?.(shellState.desktopFlush);
       return () => onBeforeViewportSwitchChange?.(null);
     }, [onBeforeViewportSwitchChange]);
 
-    return <div data-testid="desktop-shell" />;
+    return <div data-testid="desktop-shell">{recoveryContent}{onRecoveryNavigate && <button onClick={() => onRecoveryNavigate("?tab=history")}>Recovery menu</button>}</div>;
   },
 }));
 
@@ -79,6 +93,7 @@ describe("MesPage responsive shell", () => {
     window.history.replaceState({}, "", "/mes");
     shellState.desktopFlush.mockReset();
     shellState.mobileFlush.mockReset();
+    shellState.push.mockReset();
     shellState.desktopFlush.mockResolvedValue(undefined);
     shellState.mobileFlush.mockResolvedValue(undefined);
     Object.defineProperty(window, "matchMedia", {
@@ -108,6 +123,23 @@ describe("MesPage responsive shell", () => {
 
     expect(screen.getByTestId("desktop-shell")).toBeInTheDocument();
     expect(screen.queryByTestId("mobile-shell")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "페이지를 찾을 수 없습니다" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Recovery menu" })).not.toBeInTheDocument();
+  });
+
+  it.each([true, false])("keeps missing-route recovery and menu navigation in the shared page (desktop=%s)", (desktop) => {
+    desktopMatches = desktop;
+    window.history.replaceState({}, "", "/mes/missing?tab=history");
+    render(<MesPage />);
+    expect(screen.getByTestId(desktop ? "desktop-shell" : "mobile-shell")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "페이지를 찾을 수 없습니다" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "대시보드로" })).toHaveAttribute("href", "/mes?tab=dashboard");
+    fireEvent.click(screen.getByRole("button", { name: "Recovery menu" }));
+    expect(shellState.push).toHaveBeenCalledWith("/mes?tab=history");
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    fireEvent.click(screen.getByRole("button", { name: "뒤로가기" }));
+    expect(back).toHaveBeenCalledOnce();
+    back.mockRestore();
   });
 
   it("mounts only the mobile shell on mobile viewports", () => {

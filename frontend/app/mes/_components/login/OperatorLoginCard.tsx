@@ -75,7 +75,9 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
 
   const pinErrorMessage = (failure: unknown): string => {
     if (failure instanceof ApiError) {
-      if (failure.status === 403) return "PIN 번호가 올바르지 않습니다.";
+      if (failure.status === 403) return failure.message.includes("비활성")
+        ? "비활성 직원은 로그인할 수 없습니다."
+        : "PIN 번호가 올바르지 않습니다.";
       if (failure.status === 429) return "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.";
       if (failure.status >= 500) return "서버 연결을 확인하지 못했습니다. 다시 시도해 주세요.";
       return failure.message || "로그인을 확인하지 못했습니다. 다시 시도해 주세요.";

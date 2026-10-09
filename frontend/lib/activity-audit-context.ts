@@ -96,6 +96,10 @@ export function getAuditEventContext(): Record<string, string> {
 
 export function getAuditTerminalId(): string | null {
   if (typeof window === "undefined") return null;
+  const existing = window.localStorage.getItem(AUDIT_TERMINAL_STORAGE_KEY)?.trim();
+  if (existing && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(existing)) {
+    window.localStorage.removeItem(AUDIT_TERMINAL_STORAGE_KEY);
+  }
   return readOrCreate(window.localStorage, AUDIT_TERMINAL_STORAGE_KEY);
 }
 import { getClientEventSource } from "./operator-log-context";

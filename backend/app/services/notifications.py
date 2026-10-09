@@ -166,14 +166,12 @@ def mark_approval_request_notifications_read(
     return int(query.update({Notification.is_read: True}, synchronize_session="fetch"))
 
 
-def notify_request_arrived(db: Session, request: StockRequest) -> None:
-    """결재 요청 도착 → 승인 담당자(들) 에게 알림. 요청자 본인은 제외.
-
-    호출 안전 — 결재 대기 상태가 아니거나(자가승인 즉시완료 등) 이미 승인된
-    단계면 아무 것도 하지 않는다. create/submit/io 경로에서 무조건 호출해도 됨.
-    """
+def _approval_recipients_and_section(
+    db: Session, request: StockRequest,
+) -> tuple[Iterable[Employee], str] | None:
+    """Use the same current approval policy when creating and pruning notes."""
     if request.status not in _PENDING_STATUSES:
-        return
+        return None
 
     recipients: Iterable[Employee]
     if (
@@ -200,7 +198,51 @@ def notify_request_arrived(db: Session, request: StockRequest) -> None:
         )
         target_section = "dept-queue"
     else:
+        return None
+
+    return recipients, target_section
+
+
+def remove_obsolete_employee_approval_notifications(db: Session, employee: Employee) -> int:
+    """Drop only this employee's approval links that no longer match a live role."""
+    db.flush()
+    notes = db.query(Notification).filter(
+        Notification.recipient_employee_id == employee.employee_id,
+        Notification.type == NotificationTypeEnum.APPROVAL_REQUEST.value,
+    ).all()
+    eligibility: dict[uuid.UUID | None, tuple[set[uuid.UUID], str] | None] = {}
+    removed = 0
+    for note in notes:
+        if note.is_read and note.target_tab is None and note.target_section is None:
+            # Fallback keeps the old decision notice as non-actionable history.
+            continue
+        if note.related_request_id not in eligibility:
+            request = db.get(StockRequest, note.related_request_id) if note.related_request_id else None
+            current = _approval_recipients_and_section(db, request) if request else None
+            eligibility[note.related_request_id] = (
+                ({recipient.employee_id for recipient in current[0]}, current[1]) if current else None
+            )
+        allowed = eligibility[note.related_request_id]
+        if allowed is None or employee.employee_id not in allowed[0] or note.target_section != allowed[1]:
+            db.delete(note)
+            removed += 1
+    return removed
+
+
+def remove_cancelled_request_approval_notifications(db: Session, request_id: uuid.UUID) -> int:
+    """Remove every recipient's obsolete approval link in the cancellation transaction."""
+    return int(db.query(Notification).filter(
+        Notification.related_request_id == request_id,
+        Notification.type == NotificationTypeEnum.APPROVAL_REQUEST.value,
+    ).delete(synchronize_session="fetch"))
+
+
+def notify_request_arrived(db: Session, request: StockRequest) -> None:
+    """결재 대기 단계의 현재 담당자에게만 요청자 본인을 제외하고 알린다."""
+    current = _approval_recipients_and_section(db, request)
+    if current is None:
         return
+    recipients, target_section = current
 
     body = _summary(request)
     for emp in recipients:

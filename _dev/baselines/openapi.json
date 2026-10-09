@@ -3247,6 +3247,17 @@
             ],
             "title": "Color Hex"
           },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
           "display_order": {
             "title": "Display Order",
             "type": "integer"
@@ -3291,6 +3302,19 @@
               }
             ],
             "title": "Color Hex"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
           },
           "display_order": {
             "anyOf": [
@@ -22428,7 +22452,7 @@
         ]
       },
       "put": {
-        "description": "직원의 품목 표시 순서 전체 교체.\n\n기존 행 전부 삭제 후 bulk insert (upsert 효과).\n존재하지 않는 item_id는 조용히 skip.",
+        "description": "직원의 품목 표시 순서 전체 교체.\n\n기존 행 전부 삭제 후 bulk insert (upsert 효과).\n존재하지 않거나 삭제된 item_id는 조용히 skip.",
         "operationId": "put_my_order_api_items_my_order_put",
         "requestBody": {
           "content": {

@@ -60,7 +60,7 @@ export function EmployeeAddInline({ form, setForm, departments, productModels, o
             onChange={(v) => setForm((f) => ({ ...f, department: v }))}
             options={departments
               .filter((d) => d.is_active)
-              .map((d) => ({ value: d.name, label: d.name }))}
+              .map((d) => ({ value: d.name, label: d.display_name ?? d.name }))}
           />
         </FieldRow>
         <FieldRow label="창고 결재 역할">
@@ -120,6 +120,7 @@ export function EmployeeAddInline({ form, setForm, departments, productModels, o
         }}
       >
         직원 코드는 등록 시 자동으로 부여됩니다. (관리자 모드 외부에 노출되지 않음)
+        <p className="mt-1">새 직원은 관리자 메뉴가 기본 숨김이며, 등록 후 메뉴 표시에서 변경할 수 있습니다.</p>
       </div>
       <button
         type="submit"

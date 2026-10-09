@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   BarChart2,
@@ -156,14 +156,20 @@ function NavButton({
 
 export function MobileShell({
   onBeforeViewportSwitchChange,
+  recoveryContent,
+  onRecoveryNavigate,
 }: {
   onBeforeViewportSwitchChange?: (handler: (() => Promise<void | boolean>) | null) => void;
+  recoveryContent?: ReactNode;
+  onRecoveryNavigate?: (query: string) => void;
 }) {
-  return <DirtyGuardProvider><MobileShellInner onBeforeViewportSwitchChange={onBeforeViewportSwitchChange} /></DirtyGuardProvider>;
+  return <DirtyGuardProvider><MobileShellInner onBeforeViewportSwitchChange={onBeforeViewportSwitchChange} recoveryContent={recoveryContent} onRecoveryNavigate={onRecoveryNavigate} /></DirtyGuardProvider>;
 }
 
-function MobileShellInner({ onBeforeViewportSwitchChange }: {
+function MobileShellInner({ onBeforeViewportSwitchChange, recoveryContent, onRecoveryNavigate }: {
   onBeforeViewportSwitchChange?: (handler: (() => Promise<void | boolean>) | null) => void;
+  recoveryContent?: ReactNode;
+  onRecoveryNavigate?: (query: string) => void;
 }) {
   const confirmNavigation = useConfirmNavigation();
   const beforeShippingViewportSwitch = useBeforeViewportSwitch();
@@ -242,6 +248,14 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
   const handleStatusChange = useCallback((_msg: string) => {}, []);
 
   const commitMobileTab = useCallback((target: MobileTabId, entry: "general" | "target" = "general", replace = false, targetEntry?: MobileTargetEntry) => {
+    if (recoveryContent) {
+      const params = new URLSearchParams({ tab: target });
+      const notification = targetEntry?.notification;
+      if (notification?.section) params.set("section", notification.section);
+      if (target === "warehouse" && notification?.relatedRequestId) params.set("stockRequestId", notification.relatedRequestId);
+      onRecoveryNavigate?.(`?${params}`);
+      return;
+    }
     if (activeTab === "warehouse") warehouseEndEditingRef.current?.();
     if (entry === "general") {
       if (target === "warehouse") {
@@ -270,7 +284,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
     setActiveTab(target);
     activeLocationRef.current = window.location.href;
     activeHistoryIndexRef.current = Number(historyState.mobileShippingIndex);
-  }, [activeTab]);
+  }, [activeTab, recoveryContent, onRecoveryNavigate]);
 
   /** 명시적인 과거 진입 정보는 이력 이동에서만 복원한다. */
   const acceptHistoryTab = useCallback((target: MobileTabId): void => {
@@ -495,6 +509,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
   }, [activeIndex, visibleTabs.length]);
 
   const content = useMemo(() => {
+    if (recoveryContent) return recoveryContent;
     const key = `${activeTab}-${refreshNonce}`;
     if (!canOpenMobileTab(activeTab)) return null;
     if (activeTab === "dashboard") {
@@ -578,6 +593,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
     }
     return null;
   }, [
+    recoveryContent,
     activeTab,
     acceptHistoryTab,
     refreshNonce,
