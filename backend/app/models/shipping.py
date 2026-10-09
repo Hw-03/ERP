@@ -72,6 +72,7 @@ class ShippingRequest(Base):
     reuse_pf_item_id = Column(UUIDString, ForeignKey("items.item_id", ondelete="SET NULL"), nullable=True, index=True)
     request_quantity = Column(IntQuantity, nullable=False, default=1, server_default="1")
     requested_by_name = Column(String(100), nullable=True)
+    submission_payload_hash = Column(String(64), nullable=True)
     custom_pa_name = Column(String(200), nullable=True)
     custom_pf_name = Column(String(200), nullable=True)
     notes = Column(Text, nullable=True)

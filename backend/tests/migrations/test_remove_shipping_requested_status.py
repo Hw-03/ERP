@@ -27,7 +27,7 @@ MIGRATION_PATH = (
 )
 PREVIOUS_REVISION = "20260820_0023"
 MIGRATION_REVISION = "20260821_0024"
-HEAD_REVISION = "20261008_0041"
+HEAD_REVISION = "20261008_0044"
 
 
 def _config(path: Path) -> Config:
@@ -372,34 +372,71 @@ def test_postgresql_online_branch_uses_the_complete_enum_replacement_sequence(
     not os.getenv("TEST_POSTGRES_URL"),
     reason="TEST_POSTGRES_URL이 설정된 전용 PostgreSQL에서만 실행",
 )
-def test_postgresql_online_upgrade_has_only_supported_shipping_status_labels() -> None:
-    engine = sa.create_engine(os.environ["TEST_POSTGRES_URL"])
-    try:
-        with engine.connect() as connection:
-            transaction = connection.begin()
-            try:
-                config = Config(str(ALEMBIC_INI))
-                config.set_main_option("sqlalchemy.url", os.environ["TEST_POSTGRES_URL"])
-                config.attributes["connection"] = connection
-                command.upgrade(config, "head")
-                labels = connection.execute(
-                    sa.text(
-                        "SELECT enumlabel FROM pg_enum "
-                        "JOIN pg_type ON pg_type.oid = pg_enum.enumtypid "
-                        "WHERE pg_type.typname = 'shipping_request_status_enum' "
-                        "ORDER BY enumsortorder"
-                    )
-                ).scalars().all()
-                assert labels == [
-                    "PREPARING",
-                    "PREPARED",
-                    "PICKED_UP",
-                    "CANCELLED",
-                ]
-            finally:
-                transaction.rollback()
-    finally:
-        engine.dispose()
+@pytest.mark.parametrize("unexpected_dependency", [None, "table", "view"])
+def test_postgresql_enum_repair_allows_index_but_rejects_other_columns(
+    unexpected_dependency: str | None,
+    postgres_migration_schema_connection: tuple[sa.Connection, str],
+) -> None:
+    """Indexes are rebuilt with status; other table/view columns remain protected."""
+    connection, _schema = postgres_migration_schema_connection
+    connection.execute(sa.text(
+        "CREATE TYPE shipping_request_status_enum AS ENUM "
+        "('REQUESTED', 'PREPARING', 'PREPARED', 'PICKED_UP', 'CANCELLED')"
+    ))
+    connection.execute(sa.text(
+        "CREATE TABLE shipping_requests (request_id INTEGER PRIMARY KEY, "
+        "status shipping_request_status_enum NOT NULL DEFAULT 'REQUESTED')"
+    ))
+    connection.execute(sa.text("CREATE INDEX ix_status ON shipping_requests (status)"))
+    connection.execute(sa.text(
+        "INSERT INTO shipping_requests VALUES (1, 'REQUESTED'), (2, 'PREPARED')"
+    ))
+    if unexpected_dependency == "table":
+        connection.execute(sa.text(
+            "CREATE TABLE external_status (status shipping_request_status_enum)"
+        ))
+    elif unexpected_dependency == "view":
+        connection.execute(sa.text(
+            "CREATE VIEW external_status AS SELECT status FROM shipping_requests"
+        ))
+    statements = _load_migration()._postgresql_enum_replacement_statements()
+    if unexpected_dependency is not None:
+        with pytest.raises(sa.exc.InternalError, match="unexpected columns.*external_status"):
+            connection.execute(sa.text(statements[0]))
+        return
+    for statement in statements:
+        connection.execute(sa.text(statement))
+    assert connection.execute(sa.text(
+        "SELECT request_id, status::text FROM shipping_requests ORDER BY request_id"
+    )).all() == [(1, "PREPARING"), (2, "PREPARED")]
+    connection.execute(sa.text("INSERT INTO shipping_requests (request_id) VALUES (3)"))
+    assert connection.scalar(sa.text(
+        "SELECT status::text FROM shipping_requests WHERE request_id = 3"
+    )) == "PREPARING"
+    assert {index["name"] for index in sa.inspect(connection).get_indexes("shipping_requests")} == {"ix_status"}
+
+
+@pytest.mark.skipif(
+    not os.getenv("TEST_POSTGRES_URL"),
+    reason="TEST_POSTGRES_URL이 설정된 전용 PostgreSQL에서만 실행",
+)
+def test_postgresql_online_upgrade_has_only_supported_shipping_status_labels(
+    postgres_migration_schema_connection: tuple[sa.Connection, str],
+) -> None:
+    """Verify the native enum in this test's schema after a fresh committed head."""
+    connection, _schema = postgres_migration_schema_connection
+    config = Config(str(ALEMBIC_INI))
+    config.set_main_option("sqlalchemy.url", os.environ["TEST_POSTGRES_URL"])
+    config.attributes["connection"] = connection
+    command.upgrade(config, "head")
+    labels = connection.execute(sa.text(
+        "SELECT enumlabel FROM pg_enum "
+        "JOIN pg_type ON pg_type.oid = pg_enum.enumtypid "
+        "JOIN pg_namespace ON pg_namespace.oid = pg_type.typnamespace "
+        "WHERE pg_type.typname = 'shipping_request_status_enum' "
+        "AND pg_namespace.nspname = current_schema() ORDER BY enumsortorder"
+    )).scalars().all()
+    assert labels == ["PREPARING", "PREPARED", "PICKED_UP", "CANCELLED"]
 
 
 def test_sqlite_offline_migration_fails_before_emitting_partial_upgrade() -> None:

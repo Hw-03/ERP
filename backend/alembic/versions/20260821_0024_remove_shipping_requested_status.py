@@ -171,6 +171,7 @@ def _postgresql_enum_replacement_statements() -> tuple[str, ...]:
               ON type_namespace.oid = status_type.typnamespace
             WHERE status_type.typname = 'shipping_request_status_enum'
               AND type_namespace.nspname = current_schema()
+              AND relation.relkind NOT IN ('i', 'I')
               AND attribute.attnum > 0
               AND NOT attribute.attisdropped
               AND NOT (

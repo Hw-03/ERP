@@ -11,6 +11,7 @@ import pytest
 import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 
 from app.models import Base
 from app.models.defect_reason_category import (
@@ -23,7 +24,7 @@ from bootstrap.legacy_profiles import sqlite_business_data_fingerprint
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-REVISION = "20261008_0041"
+REVISION = "20261007_0040"
 PREVIOUS_REVISION = "20261007_0039"
 DEFAULT_NAMES = (
     "외관 불량", "치수 불량", "기능 불량", "검사 통과", "누유", "이물질", "고압",
@@ -130,7 +131,7 @@ def test_head_adds_master_nullable_indexes_and_matches_model_metadata(tmp_path: 
             assert any(index["column_names"] == ["submission_id"] for index in inspector.get_indexes(table))
             assert not any(fk["constrained_columns"] == ["submission_id"] for fk in inspector.get_foreign_keys(table))
         with engine.connect() as connection:
-            assert connection.scalar(sa.text("SELECT version_num FROM alembic_version")) == REVISION
+            assert connection.scalar(sa.text("SELECT version_num FROM alembic_version")) == ScriptDirectory.from_config(_config(path)).get_current_head()
             assert schema_differences(connection) == ()
         metadata_engine = sa.create_engine("sqlite:///:memory:")
         try:

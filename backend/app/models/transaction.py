@@ -15,8 +15,12 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    event,
     func,
+    select,
 )
+from sqlalchemy.engine import Connection
+from sqlalchemy.orm import Mapper
 from sqlalchemy.orm import relationship
 
 from app.models.base import Base, IntQuantity, UUIDString
@@ -135,6 +139,7 @@ class TransactionLog(Base):
         index=True,
     )
     supplier_name_snapshot = Column(String(100), nullable=True)
+    item_snapshot = Column(JSON, nullable=True)
     cancelled = Column(Boolean, nullable=False, default=False, server_default="0")
     cancel_reason = Column(Text, nullable=True)
     cancelled_by = Column(
@@ -170,6 +175,18 @@ class TransactionLog(Base):
         Index("ix_tx_shipping_request", "shipping_request_id", "created_at"),
         Index("ix_tx_operation_created", "operation_id", "created_at"),
     )
+
+
+@event.listens_for(TransactionLog, "before_insert")
+def _capture_item_identity(mapper: Mapper, connection: Connection, log: TransactionLog) -> None:
+    """Capture only new ORM writes; existing NULL records retain unknown historical identity."""
+    if log.item_snapshot is not None:
+        return
+    from app.models.item import Item
+    row = connection.execute(select(Item.item_name, Item.mes_code, Item.process_type_code, Item.unit)
+                             .where(Item.item_id == log.item_id)).mappings().first()
+    if row is not None:
+        log.item_snapshot = dict(row)
 
 
 class TransactionEditLog(Base):

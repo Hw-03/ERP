@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+import io
+import os
 from pathlib import Path
 
+import pytest
 from alembic import command
 from alembic.config import Config
 import sqlalchemy as sa
 
+from app.models.inventory_operation import InventoryOperationRoleEnum
+
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
-HEAD_REVISION = "20261008_0041"
+HEAD_REVISION = "20261008_0044"
 
 
 def _config(database_path: Path) -> Config:
@@ -19,6 +24,55 @@ def _config(database_path: Path) -> Config:
     config.set_main_option("script_location", str(BACKEND_DIR / "alembic"))
     config.set_main_option("sqlalchemy.url", f"sqlite:///{database_path.as_posix()}")
     return config
+
+
+def test_postgresql_operation_role_offline_creates_enum_before_column() -> None:
+    """Standalone enum column additions need native CREATE TYPE in generated SQL."""
+    output = io.StringIO()
+    config = Config(str(ALEMBIC_INI), output_buffer=output)
+    config.set_main_option("sqlalchemy.url", "postgresql://migration:unused@localhost/isolated")
+    command.upgrade(config, "20260825_0028:20260826_0029", sql=True)
+    sql = output.getvalue().lower()
+    assert sql.index("create type inventory_operation_role_enum") < sql.index(
+        "add column operation_role inventory_operation_role_enum"
+    )
+
+
+@pytest.mark.skipif(not os.getenv("TEST_POSTGRES_URL"), reason="Requires isolated TEST_POSTGRES_URL")
+@pytest.mark.parametrize("enum_exists", [False, True])
+def test_postgresql_operation_role_upgrade_creates_or_reuses_enum(
+    enum_exists: bool,
+    postgres_migration_schema_connection: tuple[sa.Connection, str],
+) -> None:
+    """Preserve a legacy transaction while creating or reusing the native role type."""
+    connection, _schema = postgres_migration_schema_connection
+    config = Config(str(ALEMBIC_INI))
+    config.set_main_option("sqlalchemy.url", os.environ["TEST_POSTGRES_URL"])
+    config.attributes["connection"] = connection
+    command.upgrade(config, "20260825_0028")
+    if enum_exists:
+        sa.Enum(InventoryOperationRoleEnum, name="inventory_operation_role_enum").create(connection)
+    connection.execute(sa.text(
+        "INSERT INTO process_types (code, prefix, suffix, stage_order) VALUES ('F', 'F', 'F', 1)"
+    ))
+    connection.execute(sa.text(
+        "INSERT INTO items (item_id, item_name, unit, model_symbol, process_type_code, serial_no) "
+        "VALUES ('item', 'migration item', 'EA', 'T', 'F', 1)"
+    ))
+    connection.execute(sa.text(
+        "INSERT INTO transaction_logs (log_id, item_id, transaction_type, quantity_change) "
+        "VALUES ('log', 'item', 'UNMARK_DEFECTIVE', 0)"
+    ))
+    old_values = sa.text("SELECT log_id, item_id, transaction_type::text, quantity_change, created_at FROM transaction_logs")
+    before = connection.execute(old_values).all()
+    command.upgrade(config, "20260826_0029")
+    assert connection.execute(old_values).all() == before
+    assert connection.scalar(sa.text("SELECT operation_role FROM transaction_logs")) is None
+    connection.execute(sa.text("UPDATE transaction_logs SET operation_role = 'PRIMARY'"))
+    assert connection.scalar(sa.text("SELECT operation_role::text FROM transaction_logs")) == "PRIMARY"
+    columns = {c["name"]: c for c in sa.inspect(connection).get_columns("transaction_logs")}
+    assert columns["operation_role"]["nullable"] is True
+    assert columns["operation_role"]["type"].enums == [role.value for role in InventoryOperationRoleEnum]
 
 
 def test_inventory_operation_migration_adds_append_only_ledger_contract(tmp_path: Path) -> None:

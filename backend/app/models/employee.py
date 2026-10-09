@@ -30,6 +30,7 @@ class Department(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(50), unique=True, nullable=False)
+    display_name = Column(String(50), nullable=True)
     display_order = Column(Integer, nullable=False, default=0)
     is_active = Column(Boolean, nullable=False, default=True)
     color_hex = Column(String(7), nullable=True)

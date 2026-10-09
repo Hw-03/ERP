@@ -114,7 +114,7 @@ def test_empty_sqlite_upgrade_creates_current_schema_and_is_rerunnable(tmp_path)
         with engine.connect() as connection:
             assert connection.scalar(
                 sa.text("SELECT version_num FROM alembic_version")
-            ) == "20261008_0041"
+            ) == "20261008_0044"
             location_columns = {
                 column["name"]: column
                 for column in inspector.get_columns("inventory_locations")
@@ -455,26 +455,63 @@ def test_postgresql_offline_upgrade_compiles_without_sqlite_functions():
     assert "printf" not in sql
     assert "pragma" not in sql
     assert "now()" in sql or "current_timestamp" in sql
+    drop_default = sql.index("alter column finalization_mode drop default")
+    convert_type = sql.index("alter column finalization_mode type shipping_finalization_mode_enum")
+    restore_default = sql.index("alter column finalization_mode set default 'keep_base'::shipping_finalization_mode_enum")
+    assert drop_default < convert_type < restore_default
 
 
 @pytest.mark.skipif(
     not os.getenv("TEST_POSTGRES_URL"),
     reason="TEST_POSTGRES_URL이 설정된 전용 PostgreSQL에서만 실행",
 )
-def test_postgresql_upgrade_opt_in_uses_outer_rollback():
-    engine = sa.create_engine(os.environ["TEST_POSTGRES_URL"])
-    try:
-        with engine.connect() as connection:
-            transaction = connection.begin()
-            try:
-                config = _config(os.environ["TEST_POSTGRES_URL"])
-                config.attributes["connection"] = connection
-                command.upgrade(config, "head")
-                assert "alembic_version" in sa.inspect(connection).get_table_names()
-            finally:
-                transaction.rollback()
-    finally:
-        engine.dispose()
+def test_postgresql_candidate_repair_preserves_values_and_insert_default(
+    postgres_migration_schema_connection: tuple[sa.Connection, str],
+) -> None:
+    """Repair the actual 0014 VARCHAR default without losing values or insert behavior."""
+    connection, _schema = postgres_migration_schema_connection
+    connection.execute(sa.text("CREATE TABLE items (item_id VARCHAR(32) PRIMARY KEY)"))
+    connection.execute(sa.text("CREATE TABLE shipping_requests (request_id VARCHAR(32) PRIMARY KEY)"))
+    config = _config(os.environ["TEST_POSTGRES_URL"])
+    config.attributes["connection"] = connection
+    command.stamp(config, "20260804_0013")
+    command.upgrade(config, "20260807_0014")
+    connection.execute(sa.text(
+        "INSERT INTO shipping_requests (request_id, finalization_mode) VALUES "
+        "('keep', 'KEEP_BASE'), ('reuse', 'REUSE_CANDIDATE'), ('new', 'CREATE_NEW')"
+    ))
+    before = connection.execute(sa.text(
+        "SELECT request_id, finalization_mode FROM shipping_requests ORDER BY request_id"
+    )).all()
+    command.upgrade(config, "20260807_0016")
+    after = connection.execute(sa.text(
+        "SELECT request_id, finalization_mode::text FROM shipping_requests ORDER BY request_id"
+    )).all()
+    assert after == before
+    connection.execute(sa.text("INSERT INTO shipping_requests (request_id) VALUES ('default')"))
+    assert connection.scalar(sa.text(
+        "SELECT finalization_mode::text FROM shipping_requests WHERE request_id = 'default'"
+    )) == "KEEP_BASE"
+    column = next(c for c in sa.inspect(connection).get_columns("shipping_requests")
+                  if c["name"] == "finalization_mode")
+    assert isinstance(column["type"], sa.Enum)
+    assert column["nullable"] is False
+    assert column["default"] == "'KEEP_BASE'::shipping_finalization_mode_enum"
+
+
+@pytest.mark.skipif(
+    not os.getenv("TEST_POSTGRES_URL"),
+    reason="TEST_POSTGRES_URL이 설정된 전용 PostgreSQL에서만 실행",
+)
+def test_postgresql_upgrade_opt_in_uses_private_schema_cleanup(
+    postgres_migration_schema_connection: tuple[sa.Connection, str],
+) -> None:
+    """Fresh head includes enum autocommit; the fixture owns exact schema cleanup."""
+    connection, schema = postgres_migration_schema_connection
+    config = _config(os.environ["TEST_POSTGRES_URL"])
+    config.attributes["connection"] = connection
+    command.upgrade(config, "head")
+    assert "alembic_version" in sa.inspect(connection).get_table_names(schema=schema)
 
 
 def test_baseline_revision_is_static_and_downgrade_is_fail_closed(tmp_path):

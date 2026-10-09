@@ -470,6 +470,8 @@ def _alter_transaction_logs() -> None:
         "REWORK_CHILD_SCRAP",
         name="inventory_operation_role_enum",
     )
+    if context.get_context().dialect.name == "postgresql":
+        role_enum.create(op.get_bind(), checkfirst=not context.is_offline_mode())
     if context.is_offline_mode():
         with op.batch_alter_table("transaction_logs") as batch_op:
             batch_op.add_column(sa.Column("operation_id", sa.String(length=32), nullable=True))
