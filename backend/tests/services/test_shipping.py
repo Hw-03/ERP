@@ -54,6 +54,24 @@ def _location_qty(db_session, item, dept):
     return int(loc.quantity or 0) if loc else 0
 
 
+def test_prepare_shortage_matches_final_pf_and_companion_reservations(db_session, make_item, make_bom, make_location):
+    af = make_item(process_type_code="AF")
+    pa = make_item(process_type_code="PA")
+    pf = make_item(process_type_code="PF")
+    companion = make_item(process_type_code="PR")
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    make_location(pf.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("20"))
+    req = shipping_svc.create_request(db_session, {
+        "base_pf_item_id": pf.item_id, "request_quantity": 27,
+        "companion_lines": [{"item_id": companion.item_id, "quantity": 3, "unit": "EA"}],
+    })
+    shortages = {row["item_id"]: row for row in shipping_svc.prepare_stock_shortages(db_session, req)}
+    assert set(shortages) == {pf.item_id, companion.item_id}
+    assert shortages[pf.item_id]["shortage_quantity"] == 7
+    assert shortages[companion.item_id]["shortage_quantity"] == 3
+
+
 def test_pickup_consumption_prelocks_sorted_unique_inventories(
     db_session, monkeypatch
 ):
@@ -941,6 +959,7 @@ def test_shipping_bom_stock_exempt_child_is_skipped_in_prepare_and_component_cha
         {"base_pf_item_id": base_pf.item_id, "requested_by_name": "shipping-user"},
     )
     stocked_items = {
+        request.final_pf_item_id: request.final_pf_item,
         request.final_pa_item_id: request.final_pa_item,
         **{
             line.child_item_id: line.child_item
@@ -1101,10 +1120,10 @@ def test_component_change_mechanically_compares_nested_same_stage_items(
     assert lines_by_item_id[extra_part.item_id]["total_delta"] == 1
 
 
-def test_shipping_prepare_keeps_custom_flagged_bom_line_in_shortage_check(
+def test_shipping_prepare_shortage_excludes_custom_bom_already_in_finished_pf(
     db_session, make_item, make_bom, make_location
 ):
-    """사용자가 추가한 CUSTOM 구성품은 품목 면제 설정과 무관하게 재고를 확인한다."""
+    """완제품 예약 안내는 이미 구성된 CUSTOM BOM을 중복 소비 대상으로 보지 않는다."""
     default_component = make_item(name="출하 기본 구성품", process_type_code="AF")
     custom_component = make_item(name="출하 수동 구성품", process_type_code="PR")
     base_pa = make_item(name="출하 기본 PA", process_type_code="PA")
@@ -1134,8 +1153,8 @@ def test_shipping_prepare_keeps_custom_flagged_bom_line_in_shortage_check(
 
     custom_line = next(line for line in request.bom_lines if line.child_item_id == custom_component.item_id)
     assert custom_line.origin == "CUSTOM"
-    custom_shortage = next(row for row in shortages if row["item_id"] == custom_component.item_id)
-    assert custom_shortage["shortage_quantity"] == 1
+    assert [row["item_id"] for row in shortages] == [request.final_pf_item_id]
+    assert shortages[0]["shortage_quantity"] == 1
 
 
 def test_independent_component_change_rejects_invalid_pairs_and_shortages(

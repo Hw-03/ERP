@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
 import json
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -64,6 +65,7 @@ _COMPONENT_CHANGE_DEPARTMENTS = {
 }
 _KST = timezone(timedelta(hours=9))
 _LATEST_REVISION_UNSET = object()
+_SUBMISSION_NAMESPACE = uuid.UUID("86abf9fa-3f1d-43d0-a801-72975e3bc17f")
 
 
 def _line_payload(lines: list[ShippingBomLineInput] | None) -> list[dict] | None:
@@ -334,7 +336,8 @@ def _load_component_change_actor(http_request: Request, db: Session) -> Employee
     return requester
 
 
-def _load_shipping_actor(http_request: Request, db: Session) -> Employee:
+def _load_shipping_actor(http_request: Request, db: Session = Depends(get_db)) -> Employee:
+    """출하 탭을 사용할 수 있는 현재 활성 작업자만 서버 접근을 허용한다."""
     employee_code = get_actor_emp(http_request)
     if employee_code == "-":
         raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, "작업자 사번 헤더가 필요합니다.")
@@ -343,6 +346,8 @@ def _load_shipping_actor(http_request: Request, db: Session) -> Employee:
         raise http_error(status.HTTP_404_NOT_FOUND, ErrorCode.NOT_FOUND, "작업자 직원을 찾을 수 없습니다.")
     if not bool(actor.is_active):
         raise http_error(status.HTTP_403_FORBIDDEN, ErrorCode.FORBIDDEN, "비활성 직원은 출하 요청을 수정할 수 없습니다.")
+    if "shipping" in {tab.strip() for tab in (actor.hidden_sidebar_tabs or "").split(",")}:
+        raise http_error(status.HTTP_403_FORBIDDEN, ErrorCode.FORBIDDEN, "출하 탭 접근 권한이 없습니다.")
     set_actor(http_request, actor)
     return actor
 
@@ -399,7 +404,7 @@ def component_change_independent(
     except ValueError as exc:
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.STOCK_SHORTAGE, str(exc))
 
-@router.get("/requests", response_model=list[ShippingRequestResponse])
+@router.get("/requests", response_model=list[ShippingRequestResponse], dependencies=[Depends(_load_shipping_actor)])
 def list_requests(
     status_filter: Optional[ShippingRequestStatusEnum] = Query(None, alias="status"),
     db: Session = Depends(get_db),
@@ -414,7 +419,7 @@ def list_requests(
     return [_to_response(db, row, latest_revisions.get(row.request_id)) for row in rows]
 
 
-@router.get("/requests/{request_id}", response_model=ShippingRequestResponse)
+@router.get("/requests/{request_id}", response_model=ShippingRequestResponse, dependencies=[Depends(_load_shipping_actor)])
 def get_request(request_id: uuid.UUID, db: Session = Depends(get_db)):
     try:
         req = shipping_svc.get_request(db, request_id)
@@ -426,8 +431,19 @@ def get_request(request_id: uuid.UUID, db: Session = Depends(get_db)):
 @router.post("/requests", response_model=ShippingRequestResponse, status_code=status.HTTP_201_CREATED)
 def create_request(
     payload: ShippingRequestCreate,
+    http_request: Request,
     db: Session = Depends(get_db),
 ):
+    actor = _load_shipping_actor(http_request, db)
+    request_id = None
+    submission_payload_hash = None
+    if payload.client_request_id is not None:
+        request_id = uuid.uuid5(_SUBMISSION_NAMESPACE, f"{actor.employee_id}:{payload.client_request_id}")
+        submission = payload.model_dump(mode="json", exclude={"client_request_id", "requested_by_name"})
+        submission["invoice_number"] = shipping_svc._normalize_invoice_number(payload.invoice_number)
+        submission_payload_hash = hashlib.sha256(
+            json.dumps(submission, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        ).hexdigest()
     req = _action_or_422(
         db,
         shipping_actions_svc.create_request,
@@ -435,7 +451,7 @@ def create_request(
             "base_pf_item_id": payload.base_pf_item_id,
             "finalization_mode": payload.finalization_mode,
             "reuse_pf_item_id": payload.reuse_pf_item_id,
-            "requested_by_name": payload.requested_by_name,
+            "requested_by_name": actor.name,
             "request_quantity": payload.request_quantity,
             "custom_pa_name": payload.custom_pa_name,
             "custom_pf_name": payload.custom_pf_name,
@@ -444,6 +460,8 @@ def create_request(
             "bom_lines": _line_payload(payload.bom_lines),
             "companion_lines": _companion_payload(payload.companion_lines),
         },
+        request_id=request_id,
+        submission_payload_hash=submission_payload_hash,
     )
     return _to_response(db, req)
 
@@ -490,7 +508,7 @@ def update_invoice(
     return _to_response(db, req)
 
 
-@router.get("/requests/{request_id}/revisions", response_model=list[ShippingRequestRevisionResponse])
+@router.get("/requests/{request_id}/revisions", response_model=list[ShippingRequestRevisionResponse], dependencies=[Depends(_load_shipping_actor)])
 def list_revisions(request_id: uuid.UUID, db: Session = Depends(get_db)):
     _action_or_422(db, shipping_svc._get_request, request_id)
     rows = (
@@ -501,20 +519,20 @@ def list_revisions(request_id: uuid.UUID, db: Session = Depends(get_db)):
     )
     return [_revision_response(row) for row in rows]
 
-@router.patch("/requests/{request_id}/checklist", response_model=ShippingRequestResponse)
+@router.patch("/requests/{request_id}/checklist", response_model=ShippingRequestResponse, dependencies=[Depends(_load_shipping_actor)])
 def update_checklist(request_id: uuid.UUID, payload: ShippingChecklistUpdate, db: Session = Depends(get_db)):
     checks = {line.item_id: line.checked for line in payload.checks}
     req = _action_or_422(db, shipping_actions_svc.update_checklist, request_id, checks)
     return _to_response(db, req)
 
 
-@router.post("/requests/{request_id}/checklist/clear", response_model=ShippingRequestResponse)
+@router.post("/requests/{request_id}/checklist/clear", response_model=ShippingRequestResponse, dependencies=[Depends(_load_shipping_actor)])
 def clear_checklist(request_id: uuid.UUID, db: Session = Depends(get_db)):
     req = _action_or_422(db, shipping_actions_svc.clear_checklist, request_id)
     return _to_response(db, req)
 
 
-@router.get("/requests/{request_id}/component-change-preview", response_model=ShippingComponentChangePreviewResponse)
+@router.get("/requests/{request_id}/component-change-preview", response_model=ShippingComponentChangePreviewResponse, dependencies=[Depends(_load_shipping_actor)])
 def component_change_preview(
     request_id: uuid.UUID,
     requester_employee_id: uuid.UUID = Query(...),
@@ -530,7 +548,7 @@ def component_change_preview(
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, str(exc))
 
 
-@router.post("/requests/{request_id}/component-change", response_model=ShippingRequestResponse)
+@router.post("/requests/{request_id}/component-change", response_model=ShippingRequestResponse, dependencies=[Depends(_load_shipping_actor)])
 def component_change(
     request_id: uuid.UUID,
     payload: ShippingComponentChangeExecuteRequest,
@@ -657,7 +675,7 @@ def _kst_month_bounds_utc(year: int, month: int | None) -> tuple[datetime, datet
     )
 
 
-@router.get("/history/months", response_model=list[ShippingHistoryMonthResponse])
+@router.get("/history/months", response_model=list[ShippingHistoryMonthResponse], dependencies=[Depends(_load_shipping_actor)])
 def history_months(
     status_filter: ShippingRequestStatusEnum | None = Query(None, alias="status"),
     year: int | None = Query(None, ge=2020, le=2100),
@@ -692,7 +710,7 @@ def history_months(
     ]
 
 
-@router.get("/history", response_model=ShippingHistoryPageResponse)
+@router.get("/history", response_model=ShippingHistoryPageResponse, dependencies=[Depends(_load_shipping_actor)])
 def history(
     status_filter: ShippingRequestStatusEnum | None = Query(None, alias="status"),
     year: int | None = Query(None, ge=2020, le=2100),
@@ -747,7 +765,7 @@ def history(
     )
 
 
-@router.post("/bom-match", response_model=ShippingBomMatchResponse)
+@router.post("/bom-match", response_model=ShippingBomMatchResponse, dependencies=[Depends(_load_shipping_actor)])
 def bom_match(payload: ShippingBomMatchRequest, db: Session = Depends(get_db)):
     try:
         return shipping_svc.match_bom(

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Check, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { api, type Item, type ShippingBomMatchResponse, type ShippingFinalizationMode, type ShippingRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { makeClientRequestId } from "@/lib/uuid";
 import {
   buildShippingPayload, isValidPositiveInt, lineKey, requestBomLines,
   requestCompanionDraft, sortShippingDraftLines, validateShippingFinalization,
@@ -105,6 +106,7 @@ export function MobileShippingRequestWizard({ operator, request, step, onStepCha
   const [addQuery, setAddQuery] = useState("");
   const [match, setMatch] = useState<{ signature: string; result: ShippingBomMatchResponse } | null>(null);
   const requestIdRef = useRef(request?.request_id ?? null);
+  const createKeyRef = useRef<string | null>(null);
   const referenceQuantitiesRef = useRef(new Map(request?.bom_lines.map((line) => [line.line_id, line.quantity]) ?? []));
   const generationRef = useRef(0);
   const matchGenerationRef = useRef(0);
@@ -120,6 +122,7 @@ export function MobileShippingRequestWizard({ operator, request, step, onStepCha
     const nextId = request?.request_id ?? null;
     if (requestIdRef.current === nextId) return;
     requestIdRef.current = nextId;
+    createKeyRef.current = null;
     referenceQuantitiesRef.current = new Map(request?.bom_lines.map((line) => [line.line_id, line.quantity]) ?? []);
     generationRef.current += 1;
     matchGenerationRef.current += 1;
@@ -305,7 +308,10 @@ export function MobileShippingRequestWizard({ operator, request, step, onStepCha
       const finalPayload = { ...payload, finalization_mode: check.mode, reuse_pf_item_id: check.mode === "REUSE_CANDIDATE" ? draft.reusePfItemId : null };
       const saved = requestIdRef.current
         ? await api.updateShippingRequest(requestIdRef.current, finalPayload)
-        : await api.createShippingRequest({ base_pf_item_id: draft.basePfId, ...finalPayload });
+        : await api.createShippingRequest({
+          base_pf_item_id: draft.basePfId, ...finalPayload,
+          client_request_id: createKeyRef.current ??= makeClientRequestId(),
+        });
       if (!mountedRef.current || generation !== generationRef.current || expectedSignature !== currentSignatureRef.current) return;
       requestIdRef.current = saved.request_id;
       setBaseline(signature({ ...draft, finalizationMode: check.mode, reusePfItemId: check.mode === "REUSE_CANDIDATE" ? draft.reusePfItemId : null }));

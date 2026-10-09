@@ -41,6 +41,7 @@ from app.services import inventory as inventory_svc
 from app.services import shipping_workflow_operations as workflow_ops
 from app.services.bom import bom_child_item_ordering
 from app.services.bom_stock_policy import should_skip_bom_inventory
+from app.services.department_work_policy import validate_active_department_cells
 from app.services.inv_calc import _sync_total
 from app.services.item_write_validation import validate_active_items
 from app.utils.mes_code import make_mes_code, next_serial_no
@@ -91,13 +92,20 @@ def _require_active_items(db: Session, item_ids: Iterable[uuid.UUID]) -> None:
 
 
 def _validate_request_items(db: Session, req: ShippingRequest) -> None:
-    """재고 미반영 BOM을 제외한 현재 요청의 모든 작업 품목을 먼저 확인한다."""
+    """신규 작업의 품목과 실제 예약·출고 부서를 확인하며 취소에서는 호출하지 않는다."""
     ids = {req.base_pf_item_id, req.final_pa_item_id, req.final_pf_item_id}
     ids.update(line.item_id for line in req.companion_lines)
     ids.update(line.child_item_id for line in req.bom_lines if line.included and not should_skip_bom_inventory(
         line.child_item, bom_generated=line.origin == "DEFAULT",
     ))
     _require_active_items(db, (item_id for item_id in ids if item_id is not None))
+    try:
+        validate_active_department_cells(db, [
+            ("production", DepartmentEnum.SHIPPING),
+            *(("production", inventory_svc.department_for_item(line.item)) for line in req.companion_lines),
+        ])
+    except ValueError as exc:
+        raise ShippingError(str(exc)) from exc
 
 
 def _record_event(db: Session, req: ShippingRequest, event_type: str, message: str | None = None) -> None:
@@ -205,7 +213,7 @@ def _revision_snapshot(req: ShippingRequest) -> dict:
                 "included": bool(line.included),
                 "origin": line.origin,
             }
-            for line in req.bom_lines
+            for line in sorted(req.bom_lines, key=lambda line: (line.parent_stage, str(line.child_item_id)))
         ],
         "companion_lines": [
             {
@@ -215,7 +223,7 @@ def _revision_snapshot(req: ShippingRequest) -> dict:
                 "quantity": int(line.quantity),
                 "unit": line.unit,
             }
-            for line in req.companion_lines
+            for line in sorted(req.companion_lines, key=lambda line: str(line.item_id))
         ],
     }
 
@@ -284,12 +292,13 @@ def _direct_children(db: Session, parent_item_id: uuid.UUID) -> list[tuple[uuid.
     return [(row.child_item_id, int(row.quantity or 0), row.unit or "EA") for row in rows]
 
 
-def _signature(rows: Iterable[tuple[uuid.UUID, int]]) -> tuple[tuple[str, int], ...]:
-    return tuple(sorted((str(item_id), int(qty)) for item_id, qty in rows))
+def _signature(rows: Iterable[tuple[uuid.UUID, int, str]]) -> tuple[tuple[str, int, str], ...]:
+    """Equal quantities in different BOM units must not reuse the same final item."""
+    return tuple(sorted((str(item_id), int(qty), unit or "EA") for item_id, qty, unit in rows))
 
 
-def _item_signature(db: Session, item_id: uuid.UUID) -> tuple[tuple[str, int], ...]:
-    return _signature((child_id, qty) for child_id, qty, _ in _direct_children(db, item_id))
+def _item_signature(db: Session, item_id: uuid.UUID) -> tuple[tuple[str, int, str], ...]:
+    return _signature(_direct_children(db, item_id))
 
 
 def _request_stage_lines(
@@ -305,15 +314,15 @@ def _request_stage_lines(
     ]
 
 
-def _request_stage_signature(req: ShippingRequest, stage: str) -> tuple[tuple[str, int], ...]:
-    return _signature((line.child_item_id, line.quantity) for line in _request_stage_lines(req, stage))
+def _request_stage_signature(req: ShippingRequest, stage: str) -> tuple[tuple[str, int, str], ...]:
+    return _signature((line.child_item_id, line.quantity, line.unit) for line in _request_stage_lines(req, stage))
 
 
 def _find_item_by_signature(
     db: Session,
     *,
     process_type_code: str,
-    signature: tuple[tuple[str, int], ...],
+    signature: tuple[tuple[str, int, str], ...],
 ) -> Item | None:
     candidates = (
         db.query(Item)
@@ -354,10 +363,10 @@ def _matching_pf_candidates(db: Session, normalized: list[dict]) -> list[dict]:
         for child_id, item in child_items.items()
         if item.process_type_code == "PA" and item.deleted_at is None
     }
-    pa_children: dict[uuid.UUID, list[tuple[uuid.UUID, int]]] = {item_id: [] for item_id in pa_ids}
+    pa_children: dict[uuid.UUID, list[tuple[uuid.UUID, int, str]]] = {item_id: [] for item_id in pa_ids}
     if pa_ids:
         for row in db.query(BOM).filter(BOM.parent_item_id.in_(pa_ids)).all():
-            pa_children[row.parent_item_id].append((row.child_item_id, int(row.quantity or 0)))
+            pa_children[row.parent_item_id].append((row.child_item_id, int(row.quantity or 0), row.unit or "EA"))
 
     normalized_item_ids = {line["child_item_id"] for line in normalized if line.get("included", True)}
     normalized_items = {
@@ -365,24 +374,24 @@ def _matching_pf_candidates(db: Session, normalized: list[dict]) -> list[dict]:
         for item in db.query(Item).filter(Item.item_id.in_(normalized_item_ids)).all()
     }
 
-    def expected_pf_signature(final_pa_id: uuid.UUID) -> tuple[tuple[str, int], ...]:
-        rows: list[tuple[uuid.UUID, int]] = []
+    def expected_pf_signature(final_pa_id: uuid.UUID) -> tuple[tuple[str, int, str], ...]:
+        rows: list[tuple[uuid.UUID, int, str]] = []
         replaced = False
         for line in normalized:
             if line["parent_stage"] != "PF" or not bool(line.get("included", True)):
                 continue
             child_id = line["child_item_id"]
             if normalized_items[child_id].process_type_code == "PA" and not replaced:
-                rows.append((final_pa_id, int(line["quantity"])))
+                rows.append((final_pa_id, int(line["quantity"]), line.get("unit") or "EA"))
                 replaced = True
             else:
-                rows.append((child_id, int(line["quantity"])))
+                rows.append((child_id, int(line["quantity"]), line.get("unit") or "EA"))
         if not replaced:
-            rows.insert(0, (final_pa_id, 1))
+            rows.insert(0, (final_pa_id, 1, "EA"))
         return _signature(rows)
 
     for pf in pf_items:
-        pf_signature = _signature((child_id, quantity) for child_id, quantity, _unit in pf_children[pf.item_id])
+        pf_signature = _signature(pf_children[pf.item_id])
         for pa_id, _quantity, _unit in pf_children[pf.item_id]:
             pa = child_items.get(pa_id)
             if pa is None or pa.process_type_code != "PA" or pa.deleted_at is not None:
@@ -542,13 +551,22 @@ def _sync_checklist(db: Session, req: ShippingRequest) -> None:
     db.flush()
 
 
-def create_request(db: Session, payload: dict) -> ShippingRequest:
+def create_request(
+    db: Session,
+    payload: dict,
+    *,
+    request_id: uuid.UUID | None = None,
+    submission_payload_hash: str | None = None,
+) -> ShippingRequest:
+    """요청과 최초 제출 지문을 같은 트랜잭션에 생성한다."""
     invoice_number = _normalize_invoice_number(payload.get("invoice_number"))
     base_pf = _get_item(db, payload["base_pf_item_id"])
     _require_active_items(db, [base_pf.item_id])
     if base_pf.process_type_code != "PF":
         raise ShippingError("기준 품목은 PF여야 합니다.")
     req = ShippingRequest(
+        request_id=request_id,
+        submission_payload_hash=submission_payload_hash,
         status=ShippingRequestStatusEnum.PREPARING,
         base_pf_item_id=base_pf.item_id,
         request_quantity=_payload_request_quantity(payload),
@@ -588,8 +606,6 @@ def update_request(
     before = _revision_snapshot(req)
     if "request_quantity" in payload:
         req.request_quantity = _payload_request_quantity(payload)
-    if "requested_by_name" in payload:
-        req.requested_by_name = payload.get("requested_by_name")
     if "custom_pa_name" in payload:
         req.custom_pa_name = payload.get("custom_pa_name")
     if "custom_pf_name" in payload:
@@ -822,9 +838,9 @@ def _pf_lines_with_final_pa(req: ShippingRequest, final_pa: Item) -> list[tuple[
     return out
 
 
-def _stage_signature_from_lines(lines: list[dict], stage: str) -> tuple[tuple[str, int], ...]:
+def _stage_signature_from_lines(lines: list[dict], stage: str) -> tuple[tuple[str, int, str], ...]:
     return _signature(
-        (line["child_item_id"], line["quantity"])
+        (line["child_item_id"], line["quantity"], line.get("unit") or "EA")
         for line in lines
         if line["parent_stage"] == stage and bool(line.get("included", True))
     )
@@ -856,7 +872,7 @@ def match_bom(db: Session, bom_lines: list[dict], base_pf_item_id: uuid.UUID) ->
     pa = _find_item_by_signature(db, process_type_code="PA", signature=pa_sig)
     pf = None
     if pa is not None:
-        pf_sig = _signature((child_id, qty) for child_id, qty, _ in _pf_lines_with_final_pa_from_lines(db, normalized, pa))
+        pf_sig = _signature(_pf_lines_with_final_pa_from_lines(db, normalized, pa))
         pf = _find_item_by_signature(db, process_type_code="PF", signature=pf_sig)
     preview_pa_mes_code = None if base_pf_matches else make_mes_code(
         base_pf.model_symbol,
@@ -1037,7 +1053,7 @@ def prepare_stock_shortages(db: Session, req: ShippingRequest) -> list[dict]:
         return []
     try:
         request_qty = _request_quantity(req)
-        final_pa, _final_pf = _require_final_items(db, req)
+        _final_pa, final_pf = _require_final_items(db, req)
     except ShippingError:
         return []
 
@@ -1052,16 +1068,9 @@ def prepare_stock_shortages(db: Session, req: ShippingRequest) -> list[dict]:
         else:
             checks_by_item[item.item_id] = (item, existing[1] + required, phase)
 
-    add_check(final_pa, request_qty)
-    for line in req.bom_lines:
-        if not line.included or line.child_item_id == final_pa.item_id:
-            continue
-        if should_skip_bom_inventory(
-            line.child_item,
-            bom_generated=line.origin == "DEFAULT",
-        ):
-            continue
-        add_check(line.child_item, int(line.quantity or 0) * request_qty)
+    # Preparation reserves existing finished PF and companions. Its shortage
+    # preview must use the same cells rather than consuming their BOM again.
+    add_check(final_pf, request_qty)
     for line in req.companion_lines:
         qty = int(line.quantity or 0)
         add_check(line.item, qty)

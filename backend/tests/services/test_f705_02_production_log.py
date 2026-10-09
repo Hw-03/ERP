@@ -8,9 +8,43 @@ from decimal import Decimal
 from io import BytesIO
 
 from openpyxl import load_workbook
+import pytest
 
 from app.models import ProductSymbol, ShippingRequest, TransactionLog, TransactionTypeEnum
 from app.services.f705_02_production_log import collect_daily_quantities, render_workbook
+
+
+@pytest.mark.parametrize("process", ["HF", "PF"])
+def test_collect_daily_quantities_uses_kst_year_and_day_boundaries(db_session, make_item, process):
+    db_session.add(ProductSymbol(slot=8, symbol="8", model_name="SOLO"))
+    item = make_item(process_type_code=process, model_symbol="8")
+    request = _add_shipping_request(db_session, item) if process == "PF" else None
+    boundaries = [
+        (datetime(2025, 12, 31, 14, 59, 59), 11),
+        (datetime(2025, 12, 31, 15, 0), 2),
+        (datetime(2026, 1, 1, 14, 59, 59), 3),
+        (datetime(2026, 1, 1, 15, 0), 5),
+        (datetime(2026, 12, 31, 14, 59, 59), 7),
+        (datetime(2026, 12, 31, 15, 0), 13),
+    ]
+    for occurred_at, quantity in boundaries:
+        if process == "PF":
+            _add_pickup_log(db_session, request=request, item=item, quantity=quantity, occurred_at=occurred_at)
+        else:
+            _add_log(db_session, item, quantity=quantity, occurred_at=occurred_at)
+    db_session.commit()
+    quantities = collect_daily_quantities(db_session, 2026)
+    assert quantities == {
+        date(2026, 1, 1): {(process, "SOLO"): 5},
+        date(2026, 1, 2): {(process, "SOLO"): 5},
+        date(2026, 12, 31): {(process, "SOLO"): 7},
+    }
+    workbook = load_workbook(BytesIO(render_workbook(2026, quantities)), data_only=True)
+    row = 7 if process == "HF" else 31
+    assert workbook.worksheets[0].cell(row, 4).value == 5
+    assert workbook.worksheets[0].cell(row, 5).value == 5
+    assert workbook.worksheets[0].cell(row, 35).value == 10
+    assert workbook.worksheets[11].cell(row, 34).value == 7
 
 
 def _add_log(

@@ -8,7 +8,7 @@ import type {
   ShippingRequestUpdatePayload,
 } from "@/lib/api";
 
-export type DraftLine = ShippingBomLineInput & { key: string; included: boolean; origin: "DEFAULT" | "CUSTOM" };
+export type DraftLine = ShippingBomLineInput & { key: string; included: boolean; origin: "DEFAULT" | "CUSTOM"; initialQuantity?: number };
 export type CompanionDraftLine = { key: string; item_id: string; quantity: number; unit: string };
 
 export interface ShippingPayloadInput {

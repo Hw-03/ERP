@@ -23,6 +23,7 @@ export interface ShippingCompanionLineInput {
 
 export interface ShippingRequestCreatePayload {
   base_pf_item_id: string;
+  client_request_id?: string;
   finalization_mode?: ShippingFinalizationMode;
   reuse_pf_item_id?: string | null;
   invoice_number?: string | null;

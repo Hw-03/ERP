@@ -69,6 +69,7 @@ export interface WeeklyReportResponse {
   report_status?: "legacy" | "transition" | "verified" | "failed";
   transition_notice?: string | null;
   validation?: WeeklyReportValidation;
+  aggregation_scope?: Record<string, string>;
 }
 
 export interface WeeklyActivityEvidence {

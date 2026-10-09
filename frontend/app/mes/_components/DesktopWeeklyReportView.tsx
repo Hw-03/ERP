@@ -122,6 +122,29 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
       {error && (
         <div className="weekly-error">{error}</div>
       )}
+      {data && !error && (
+        <div className="flex shrink-0 flex-wrap items-start gap-x-4 gap-y-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+          <span data-testid="weekly-production-total">공정 생산 합계 {totalProduceQty.toLocaleString()}개</span>
+          <span data-testid="weekly-stock-total">
+            {stockBasis === "normal" ? "전체 정상재고" : "전체 재고"} {(data.summary?.total_current_qty ?? 0).toLocaleString()}개
+          </span>
+          <details data-testid="weekly-aggregation-guide" className="max-h-36 w-full overflow-y-auto">
+            <summary className="cursor-pointer">집계·검산 기준</summary>
+            <div className="space-y-1 py-2 leading-5">
+              <p>집계 기간은 KST 월요일 00:00 포함, 다음 월요일 00:00 제외입니다.</p>
+              <p>{data.aggregation_scope?.inventory ?? "전체 합계는 주간보고 대상 공정의 완료품과 해당 주차의 예외 품목을 합산합니다. 모든 원자재·중간공정 재고의 합계는 아닙니다."}</p>
+              <p>{data.aggregation_scope?.production_matrix ?? "모델별 집계는 TF~AF 생산과 PF 출하 픽업 완료를 구분합니다. 공용·모델 미등록 품목은 모델별 집계에서 제외됩니다."}</p>
+              {stockBasis === "normal" ? <>
+                <p>{data.validation?.message ?? "재고 경계와 활동 원장 검산 완료"}</p>
+                <p>전주 정상재고 + 생산 + 입고 − 출고 − 불량 = 현재 정상재고로 순변화를 검산합니다.</p>
+                <p>불량 격리는 불량, 복귀는 입고입니다. 정상재고를 줄이는 폐기는 불량이며, 이미 격리된 재고의 폐기는 정상재고 순변화 0입니다.</p>
+                <p>{data.aggregation_scope?.verified_rework ?? "재작업 정상 부모는 불량, 정상 자식은 입고입니다. 불량·폐기 자식은 입고와 불량 두 열에 함께 표시하여 정상재고 순변화 0을 보존합니다."}</p>
+                {data.aggregation_scope?.verified_cancellation && <p>{data.aggregation_scope.verified_cancellation}</p>}
+              </> : <p>기존 기준·검산 전 자료입니다. 격리·복귀·폐기·재작업도 전체 순변화에 포함되므로 생산·입고·출고 열만 더한 값과 다를 수 있습니다.</p>}
+            </div>
+          </details>
+        </div>
+      )}
 
       {/* 빈 주차에도 생산 표와 같은 공간을 확보한다. */}
       {(() => {
@@ -136,7 +159,7 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
             </div>
           );
         }
-        if (!hasOverallProduction) {
+        if (!hasOverallProduction && !hasModelProduction) {
           return (
             <div data-testid="weekly-production-card" className="weekly-card weekly-production weekly-production-placeholder" style={productionCardStyle}>
               <div className="weekly-production-head">

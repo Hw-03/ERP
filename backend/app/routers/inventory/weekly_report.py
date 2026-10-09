@@ -326,7 +326,7 @@ def _resolve_model(model_symbol: str | None, symbol_map: dict[str, str]) -> str 
 
 
 def _current_week_bounds() -> tuple[date, date]:
-    today = date.today()
+    today = _today_kst()
     mon = today - timedelta(days=today.weekday())
     sun = mon + timedelta(days=6)
     return mon, sun
@@ -363,8 +363,8 @@ def get_weekly_report(
         week_end=week_end,
     )
     if snapshot_context is None:
-        dt_start = datetime.combine(week_start, time.min)
-        dt_end = datetime.combine(week_end, time.max)
+        dt_start = _kst_date_start_utc(week_start)
+        dt_end = _kst_date_start_utc(week_end + timedelta(days=1))
         rows: list[object] = (
             db.query(Item, Inventory)
             .outerjoin(Inventory, Item.item_id == Inventory.item_id)
@@ -428,12 +428,10 @@ def get_weekly_report(
     tx_filters = [
         TransactionLog.item_id.in_(item_ids),
         TransactionLog.created_at >= dt_start,
+        TransactionLog.created_at < dt_end,
     ]
-    if snapshot_context is None:
-        tx_filters.append(TransactionLog.created_at <= dt_end)
-    else:
+    if snapshot_context is not None:
         tx_filters.extend([
-            TransactionLog.created_at < dt_end,
             or_(
                 TransactionLog.cancelled.is_(False),
                 TransactionLog.cancelled_at.is_(None),
@@ -602,6 +600,7 @@ def get_weekly_report(
             TransactionLog.shipping_phase != _COMPONENT_CHANGE_PHASE,
         ),
         TransactionLog.created_at >= dt_start,
+        TransactionLog.created_at < dt_end,
     ]
     if snapshot_context is None:
         production_filters.append(
@@ -611,11 +610,9 @@ def get_weekly_report(
                 include_ceramic_tube_housing=include_ceramic_tube_housing,
             )
         )
-        production_filters.append(TransactionLog.created_at <= dt_end)
     else:
         production_filters.extend([
             TransactionLog.item_id.in_(item_ids),
-            TransactionLog.created_at < dt_end,
             or_(
                 TransactionLog.cancelled.is_(False),
                 TransactionLog.cancelled_at.is_(None),

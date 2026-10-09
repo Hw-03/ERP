@@ -10136,6 +10136,18 @@
             ],
             "title": "Bom Lines"
           },
+          "client_request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
+          },
           "companion_lines": {
             "anyOf": [
               {
@@ -14266,6 +14278,13 @@
       },
       "WeeklyReportResponse": {
         "properties": {
+          "aggregation_scope": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Aggregation Scope",
+            "type": "object"
+          },
           "basis_version": {
             "default": 1,
             "title": "Basis Version",

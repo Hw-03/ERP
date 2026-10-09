@@ -39,6 +39,33 @@ function mount(req = request()) {
 beforeEach(() => vi.clearAllMocks());
 
 describe("MobileShippingDetail", () => {
+  it("8.12-07 prepares the final PF while identifying the distinct base PF and companions", () => {
+    mount(request({ companion_lines: [{ line_id: "comp-1", item_id: "box", item_name: "박스", mes_code: "BOX-1", process_type_code: "PR", quantity: 2, unit: "EA" }] }));
+    fireEvent.change(screen.getByRole("textbox", { name: "시리얼 번호" }), { target: { value: "SN-1" } });
+    fireEvent.click(screen.getByRole("button", { name: "준비 완료", exact: true }));
+    const dialog = screen.getByRole("dialog", { name: "준비 완료 확인" });
+    expect(dialog).toHaveTextContent("실제 준비품 · 최종 PF · PF-2");
+    expect(dialog).toHaveTextContent("기준 PF · 기준 PF · PF-1");
+    expect(dialog).toHaveTextContent("3대");
+    expect(dialog).toHaveTextContent("동반 박스 · BOX-1");
+    expect(dialog).toHaveTextContent("2EA");
+    expect(api.prepareShippingComplete).not.toHaveBeenCalled();
+  });
+
+  it("8.12-13 요청자와 픽업·취소 처리자를 각 원장 필드로 구분한다", () => {
+    mount(request({ status: "PICKED_UP", requested_by_name: "요청 담당자", transactions: [{
+      log_id: "actual-pickup", item_id: "pf-2", item_name: "최종 PF", mes_code: "PF-2", item_process_type_code: "PF",
+      transaction_type: "SHIP", quantity_change: -3, quantity_before: 3, quantity_after: 0,
+      warehouse_qty_before: 0, warehouse_qty_after: 0, reference_no: "SHIP-req-1", produced_by: "픽업 담당자",
+      notes: null, shipping_phase: "PICKUP", created_at: "2026-10-07T00:00:00Z", cancelled: false,
+      cancel_reason: null, cancelled_at: null, inventory_effect: [],
+    }] }));
+    expect(screen.getByText("요청 담당자")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /메모·이력/ }));
+    expect(screen.getByTestId("shipping-transaction-actor-actual-pickup")).toHaveTextContent("처리자 픽업 담당자");
+    expect(screen.getByTestId("shipping-transaction-actor-actual-pickup")).not.toHaveTextContent("요청 담당자");
+  });
+
   it("shows a compact status header and keeps extended item details collapsed", () => {
     mount();
     expect(screen.getByRole("heading", { name: "출하 상세" })).toBeInTheDocument();

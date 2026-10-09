@@ -1031,6 +1031,7 @@ def test_closed_snapshot_week_uses_boundaries_and_excludes_cancelled_flow(client
     assert resp.status_code == 200
     body = resp.json()
     assert set(body) == {
+        "aggregation_scope",
         "week_start",
         "week_end",
         "groups",

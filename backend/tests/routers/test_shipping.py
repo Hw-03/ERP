@@ -9,14 +9,277 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.models import (
+    Department,
     DepartmentEnum,
     Employee,
     InventoryOperation,
+    Item,
     ShippingRequest,
     ShippingRequestStatusEnum,
     SystemSetting,
     TransactionLog,
 )
+
+
+@pytest.fixture
+def shipping_creation_payload(db_session, make_item, make_bom):
+    af = make_item(process_type_code="AF")
+    pa = make_item(process_type_code="PA")
+    pf = make_item(process_type_code="PF")
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    db_session.commit()
+    return {"base_pf_item_id": str(pf.item_id)}
+
+
+@pytest.mark.parametrize("quantity", [0, -1])
+def test_shipping_create_rejects_nonpositive_quantity_without_writing(client, db_session, shipping_creation_payload, quantity):
+    before = db_session.query(ShippingRequest).count()
+    response = client.post("/api/shipping/requests", json={**shipping_creation_payload, "request_quantity": quantity})
+    assert response.status_code == 422
+    assert any(error["loc"][-1] == "request_quantity" for error in response.json()["detail"])
+    assert db_session.query(ShippingRequest).count() == before
+
+
+@pytest.mark.parametrize("unavailable", ["deleted", "not_pf"])
+def test_shipping_create_rejects_unavailable_selected_pf_without_writing(client, db_session, shipping_creation_payload, unavailable):
+    """A catalog choice cannot bypass current item validation at submission."""
+    pf = db_session.get(Item, uuid.UUID(shipping_creation_payload["base_pf_item_id"]))
+    if unavailable == "deleted":
+        pf.deleted_at = datetime.now()
+    else:
+        pf.process_type_code = "PA"
+    db_session.commit()
+    before = db_session.query(ShippingRequest).count()
+    response = client.post("/api/shipping/requests", json=shipping_creation_payload)
+    assert response.status_code == 422, response.text
+    assert response.json()["detail"]["code"] == "BUSINESS_RULE"
+    assert db_session.query(ShippingRequest).count() == before
+
+
+def test_shipping_create_uses_actor_and_preserves_requester_on_edit(client, db_session, shipping_creation_payload):
+    created = client.post("/api/shipping/requests", json={
+        **shipping_creation_payload, "requested_by_name": "Forged requester",
+    })
+    assert created.status_code == 201, created.text
+    assert created.json()["requested_by_name"] == "출하 테스트 작업자"
+    request_id = created.json()["request_id"]
+    edited = client.patch(f"/api/shipping/requests/{request_id}", json={"requested_by_name": "Other person"})
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["requested_by_name"] == "출하 테스트 작업자"
+    assert db_session.get(ShippingRequest, uuid.UUID(request_id)).requested_by_name == "출하 테스트 작업자"
+
+
+@pytest.mark.parametrize("actor_kind,expected_status", [("missing", 400), ("unknown", 404), ("inactive", 403), ("hidden", 403)])
+def test_shipping_create_rejects_disallowed_actor_without_writes(client, db_session, shipping_creation_payload, actor_kind, expected_status):
+    actor = db_session.query(Employee).filter_by(employee_code="shipping-test-actor").one()
+    if actor_kind == "missing":
+        client.headers.pop("X-MES-Employee-Code")
+    elif actor_kind == "unknown":
+        client.headers["X-MES-Employee-Code"] = "no-such-employee"
+    elif actor_kind == "inactive":
+        actor.is_active = False
+    else:
+        actor.hidden_sidebar_tabs = "weekly, shipping,admin"
+    db_session.commit()
+    response = client.post("/api/shipping/requests", json=shipping_creation_payload)
+    assert response.status_code == expected_status, response.text
+    assert db_session.query(ShippingRequest).count() == 0
+    assert db_session.query(TransactionLog).count() == 0
+
+
+def test_shipping_edit_cannot_reassign_original_requester(client, shipping_creation_payload):
+    created = client.post("/api/shipping/requests", json={**shipping_creation_payload, "requested_by_name": "Original"})
+    assert created.status_code == 201, created.text
+    edited = client.patch(f"/api/shipping/requests/{created.json()['request_id']}", json={"requested_by_name": "Forged"})
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["requested_by_name"] == created.json()["requested_by_name"]
+
+
+def test_shipping_reordered_identical_lines_do_not_create_revision(client, shipping_creation_payload, make_item):
+    companions = [make_item(process_type_code="PR"), make_item(process_type_code="PR")]
+    created = client.post("/api/shipping/requests", json={
+        **shipping_creation_payload,
+        "companion_lines": [{"item_id": str(item.item_id), "quantity": 1, "unit": "EA"} for item in companions],
+    })
+    assert created.status_code == 201, created.text
+    row = created.json()
+    edited = client.patch(f"/api/shipping/requests/{row['request_id']}", json={
+        "bom_lines": list(reversed(row["bom_lines"])),
+        "companion_lines": list(reversed(row["companion_lines"])),
+    })
+    assert edited.status_code == 200, edited.text
+    revisions = client.get(f"/api/shipping/requests/{row['request_id']}/revisions")
+    assert revisions.status_code == 200
+    assert revisions.json() == []
+
+
+@pytest.mark.parametrize("command", ["create", "update", "prepare-complete", "pickup-complete"])
+def test_shipping_inactive_department_rejects_new_work_without_changes(client, db_session, shipping_creation_payload, command):
+    row = None
+    if command != "create":
+        response = client.post("/api/shipping/requests", json={**shipping_creation_payload, "invoice_number": "DEPARTMENT"})
+        assert response.status_code == 201
+        row = db_session.get(ShippingRequest, uuid.UUID(response.json()["request_id"]))
+        if command == "pickup-complete":
+            row.status = ShippingRequestStatusEnum.PREPARED
+    department = db_session.query(Department).filter_by(name=DepartmentEnum.SHIPPING.value).one_or_none()
+    if department is None:
+        department = Department(name=DepartmentEnum.SHIPPING.value, display_order=0)
+        db_session.add(department)
+    department.is_active = False
+    db_session.commit()
+    prior_status = row.status if row else None
+    prior_events = len(row.events) if row else 0
+    if command == "create":
+        response = client.post("/api/shipping/requests", json=shipping_creation_payload)
+    elif command == "update":
+        response = client.patch(f"/api/shipping/requests/{row.request_id}", json={"notes": "must not write"})
+    else:
+        response = client.post(f"/api/shipping/requests/{row.request_id}/{command}", json={"serial_numbers": "SN"})
+    assert response.status_code == 422, response.text
+    assert "사용 중지된 부서" in response.text
+    assert db_session.query(ShippingRequest).count() == (1 if row else 0)
+    assert db_session.query(TransactionLog).count() == 0
+    if row:
+        db_session.refresh(row)
+        assert row.status == prior_status
+        assert row.notes is None
+        assert len(row.events) == prior_events
+
+
+@pytest.mark.parametrize("command,status_before,status_after", [
+    ("prepare-cancel", ShippingRequestStatusEnum.PREPARED, "PREPARING"),
+    ("pickup-cancel", ShippingRequestStatusEnum.PICKED_UP, "PREPARED"),
+])
+def test_shipping_inactive_department_keeps_historical_cancel_available(client, db_session, shipping_creation_payload, make_location, command, status_before, status_after):
+    response = client.post("/api/shipping/requests", json={**shipping_creation_payload, "invoice_number": "CANCEL-DEPT"})
+    assert response.status_code == 201
+    row = db_session.get(ShippingRequest, uuid.UUID(response.json()["request_id"]))
+    make_location(row.final_pf_item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("10"))
+    db_session.commit()
+    prepared = client.post(f"/api/shipping/requests/{row.request_id}/prepare-complete", json={"serial_numbers": "SN"})
+    assert prepared.status_code == 200, prepared.text
+    if status_before == ShippingRequestStatusEnum.PICKED_UP:
+        picked = client.post(f"/api/shipping/requests/{row.request_id}/pickup-complete")
+        assert picked.status_code == 200, picked.text
+    department = db_session.query(Department).filter_by(name=DepartmentEnum.SHIPPING.value).one_or_none()
+    if department is None:
+        department = Department(name=DepartmentEnum.SHIPPING.value, display_order=0)
+        db_session.add(department)
+    department.is_active = False
+    db_session.commit()
+    response = client.post(f"/api/shipping/requests/{row.request_id}/{command}", json={"reason": "historical recovery"})
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == status_after
+
+
+@pytest.mark.parametrize("action", ["prepare-complete", "pickup-complete"])
+def test_shipping_hidden_tab_rejects_state_changes(client, db_session, make_item, action):
+    pf = make_item(process_type_code="PF")
+    request = ShippingRequest(base_pf_item_id=pf.item_id, final_pf_item_id=pf.item_id,
+                              status=ShippingRequestStatusEnum.PREPARING, invoice_number="guard")
+    db_session.add(request)
+    actor = db_session.query(Employee).filter_by(employee_code="shipping-test-actor").one()
+    actor.hidden_sidebar_tabs = "shipping"
+    db_session.commit()
+    response = client.post(f"/api/shipping/requests/{request.request_id}/{action}", json={"serial_numbers": "SN"})
+    assert response.status_code == 403, response.text
+    db_session.refresh(request)
+    assert request.status == ShippingRequestStatusEnum.PREPARING
+    assert db_session.query(TransactionLog).count() == 0
+    assert len(request.events) == 0
+
+
+def test_shipping_create_retries_same_key_once_and_scopes_key_to_actor(client, db_session, shipping_creation_payload):
+    payload = {**shipping_creation_payload, "client_request_id": str(uuid.uuid4())}
+    first = client.post("/api/shipping/requests", json=payload)
+    assert first.status_code == 201, first.text
+    second = client.post("/api/shipping/requests", json=payload)
+    assert second.status_code == 201, second.text
+    assert second.json()["request_id"] == first.json()["request_id"]
+    assert second.json()["notes"] is None
+    assert db_session.query(ShippingRequest).count() == 1
+    assert len(second.json()["events"]) == 1
+    conflict = client.post("/api/shipping/requests", json={**payload, "notes": "different submission"})
+    assert conflict.status_code == 409, conflict.text
+    other = _employee(db_session, code="other-create-actor", name="Other employee")
+    db_session.commit()
+    client.headers["X-MES-Employee-Code"] = other.employee_code
+    third = client.post("/api/shipping/requests", json=payload)
+    assert third.status_code == 201, third.text
+    assert third.json()["request_id"] != first.json()["request_id"]
+    assert third.json()["requested_by_name"] == other.name
+    assert db_session.query(ShippingRequest).count() == 2
+
+
+def test_shipping_retry_uses_original_digest_after_edit_and_actor_rename(client, db_session, shipping_creation_payload):
+    payload = {**shipping_creation_payload, "client_request_id": str(uuid.uuid4()), "invoice_number": "  inv  "}
+    first = client.post("/api/shipping/requests", json=payload)
+    assert first.status_code == 201, first.text
+    request_id = first.json()["request_id"]
+    edited = client.patch(f"/api/shipping/requests/{request_id}", json={"notes": "edited after creation"})
+    assert edited.status_code == 200, edited.text
+    actor = db_session.query(Employee).filter_by(employee_code="shipping-test-actor").one()
+    actor.name = "Renamed employee"
+    db_session.commit()
+    retried = client.post("/api/shipping/requests", json={**payload, "invoice_number": "INV", "request_quantity": 1, "notes": None, "requested_by_name": "Ignored spoof"})
+    assert retried.status_code == 201, retried.text
+    assert retried.json()["request_id"] == request_id
+    assert retried.json()["notes"] == "edited after creation"
+    assert retried.json()["requested_by_name"] == first.json()["requested_by_name"]
+    assert db_session.query(ShippingRequest).count() == 1
+    assert "submission_payload_hash" not in retried.json()
+
+
+def test_shipping_retry_recovers_from_primary_key_race(client, db_session, shipping_creation_payload, monkeypatch):
+    """Force a stale pre-insert read, then let the actual unique PK reject the loser."""
+    payload = {**shipping_creation_payload, "client_request_id": str(uuid.uuid4())}
+    first = client.post("/api/shipping/requests", json=payload)
+    assert first.status_code == 201, first.text
+    original_get = db_session.get
+    missed = False
+
+    def stale_get(entity, ident, *args, **kwargs):
+        nonlocal missed
+        if entity is ShippingRequest and not missed:
+            missed = True
+            return None
+        return original_get(entity, ident, *args, **kwargs)
+
+    monkeypatch.setattr(db_session, "get", stale_get)
+    retry = client.post("/api/shipping/requests", json=payload)
+    assert missed
+    assert retry.status_code == 201, retry.text
+    assert retry.json()["request_id"] == first.json()["request_id"]
+    assert db_session.query(ShippingRequest).count() == 1
+    assert len(retry.json()["events"]) == 1
+
+
+@pytest.mark.parametrize("key", ["", "not-a-uuid"])
+def test_shipping_create_rejects_invalid_retry_key(client, db_session, shipping_creation_payload, key):
+    response = client.post("/api/shipping/requests", json={**shipping_creation_payload, "client_request_id": key})
+    assert response.status_code == 422
+    assert db_session.query(ShippingRequest).count() == 0
+
+
+@pytest.mark.parametrize("method,path,body", [
+    ("GET", "/requests", None),
+    ("GET", "/requests/{id}", None),
+    ("GET", "/requests/{id}/revisions", None),
+    ("GET", "/history", None),
+    ("GET", "/history/months", None),
+    ("PATCH", "/requests/{id}/checklist", {"checks": []}),
+    ("POST", "/requests/{id}/checklist/clear", {}),
+])
+def test_shipping_hidden_tab_rejects_request_reads_and_checklist(client, db_session, shipping_creation_payload, method, path, body):
+    created = client.post("/api/shipping/requests", json=shipping_creation_payload)
+    assert created.status_code == 201, created.text
+    actor = db_session.query(Employee).filter_by(employee_code="shipping-test-actor").one()
+    actor.hidden_sidebar_tabs = "shipping"
+    db_session.commit()
+    response = client.request(method, "/api/shipping" + path.format(id=created.json()["request_id"]), json=body)
+    assert response.status_code == 403, response.text
 
 
 def _line(item, qty=1, stage="PA", *, included=True, origin="CUSTOM"):
@@ -445,7 +708,7 @@ def test_shipping_request_component_change_returns_404_for_unknown_header_employ
     assert response.status_code == 404, response.text
     assert response.json()["detail"] == {
         "code": "NOT_FOUND",
-        "message": "작업자(직원)를 찾을 수 없습니다.",
+        "message": "작업자 직원을 찾을 수 없습니다.",
     }
 
 
@@ -475,7 +738,7 @@ def test_shipping_request_component_change_returns_403_for_inactive_header_emplo
     assert response.status_code == 403, response.text
     assert response.json()["detail"] == {
         "code": "FORBIDDEN",
-        "message": "비활성 직원은 품목 전환을 실행할 수 없습니다.",
+        "message": "비활성 직원은 출하 요청을 수정할 수 없습니다.",
     }
 
 
@@ -1635,10 +1898,9 @@ def test_shipping_preparing_response_includes_stock_shortages(client, db_session
     )
     assert create.status_code == 201, create.text
     shortages = create.json()["stock_shortages"]
-    assert {line["item_name"] for line in shortages} == {"Short PA", "AF Main", "Companion Box"}
+    assert {line["item_name"] for line in shortages} == {"Base PF", "Companion Box"}
     assert {line["item_name"]: line["shortage_quantity"] for line in shortages} == {
-        "Short PA": 1,
-        "AF Main": 1,
+        "Base PF": 1,
         "Companion Box": 2,
     }
     assert all(line["phase"] == "PREPARE" for line in shortages)
@@ -1743,26 +2005,31 @@ def test_shipping_invoice_revision_and_cancel_are_attributed_and_retained(client
     assert sum(row["count"] for row in months.json()) == 2
 
 
-def test_shipping_actor_header_rejects_missing_unknown_and_inactive(client, db_session, make_item, make_bom):
+@pytest.mark.parametrize(("suffix", "field"), [("", "notes"), ("/invoice", "invoice_number")])
+def test_shipping_actor_header_rejects_missing_unknown_and_inactive(client, db_session, make_item, make_bom, suffix, field):
     af = make_item(name="Actor AF", process_type_code="AF", model_symbol="4", serial_no=1)
     pa = make_item(name="Actor PA", process_type_code="PA", model_symbol="4", serial_no=2)
     pf = make_item(name="Actor PF", process_type_code="PF", model_symbol="4", serial_no=3)
     make_bom(pa.item_id, af.item_id, Decimal("1"))
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
     db_session.commit()
-    client.headers.pop("X-MES-Employee-Code")
     created = client.post(
         "/api/shipping/requests",
         json={"base_pf_item_id": str(pf.item_id), "invoice_number": "ACTOR-HEADER"},
     )
     assert created.status_code == 201, created.text
-    path = f"/api/shipping/requests/{created.json()['request_id']}"
+    detail_path = f"/api/shipping/requests/{created.json()['request_id']}"
+    before = client.get(detail_path).json()
+    before_revisions = client.get(f"{detail_path}/revisions").json()
+    valid_actor_headers = {"X-MES-Employee-Code": client.headers["X-MES-Employee-Code"]}
+    path = detail_path + suffix
 
-    assert client.patch(path, json={"notes": "missing"}).status_code == 400
+    client.headers.pop("X-MES-Employee-Code")
+    assert client.patch(path, json={field: "missing"}).status_code == 400
     assert client.patch(
         path,
         headers={"X-MES-Employee-Code": "unknown-actor"},
-        json={"notes": "unknown"},
+        json={field: "unknown"},
     ).status_code == 404
     inactive = _employee(
         db_session,
@@ -1774,8 +2041,10 @@ def test_shipping_actor_header_rejects_missing_unknown_and_inactive(client, db_s
     assert client.patch(
         path,
         headers={"X-MES-Employee-Code": inactive.employee_code},
-        json={"notes": "inactive"},
+        json={field: "inactive"},
     ).status_code == 403
+    assert client.get(detail_path, headers=valid_actor_headers).json() == before
+    assert client.get(f"{detail_path}/revisions", headers=valid_actor_headers).json() == before_revisions
 
 
 def test_shipping_history_uses_kst_month_boundaries(client, db_session, make_item, make_bom):
