@@ -22,11 +22,25 @@ python .agents/skills/mes-browser-regression/scripts/qa_session.py start --run-i
 
 브라우저 검증은 순차 실행이 기본이다. 같은 호스트의 다른 포트는 쿠키를 공유하므로, 두 QA 환경을 병렬 확인할 때 두 번째 환경은 다른 포트와 `--frontend-host localhost`를 사용한다(첫 환경은 기본 `127.0.0.1`). 원본 브라우저가 같은 호스트를 사용하고 있다면 QA와 함께 로그인하지 않는다. QA 백엔드 재시작 후에는 다시 로그인해 서명 쿠키를 갱신한다.
 
+전체 기대값 실행에 Vitest가 포함되면 공용 `frontend/vitest.setup.ts`가 미등록 요청을 오류로 처리하고 `frontend/lib/__tests__/msw/server.ts`가 감사 POST를 모의 응답하는지 먼저 확인한다. `frontend/lib/__tests__/msw-network-safety.test.tsx`의 감사·미등록 상대 주소·보호 포트·외부 주소·업무 fixture 검사를 실제 실행한다. jsdom의 상대 주소는 localhost:3000으로 해석될 수 있으므로 개발 서버가 켜져 있다는 이유로 미등록 요청 bypass를 허용하지 않는다. 테스트 실패를 실제 서버 응답으로 보완하지 않는다. 이 검사는 테스트의 모의 전송 경계를 확인하는 것이며 실제 브라우저의 QA 주소·서버 소유권 검사를 대신하지 않는다.
+
+테스트 실행 중 원본 보호 자료의 변화가 발견되면 해당 실행의 보호 판정을 실패로 유지한다. 소유 프로세스·요청 경로·기존 외부 작업을 구분해 조사하고, 원본 DB 복원이나 감사 행 삭제로 실패 근거를 지우지 않는다. 원본 조사가 필요하면 안정된 파일 사본을 만들고 사본만 읽으며, 실행 완료·자료 보존·원인 확정 여부를 각각 기록한다.
+
 ## 브라우저와 판정
 
 사용 가능한 브라우저 도구의 문서를 먼저 읽는다. `session.json`의 frontend URL에서 `/mes`를 열고 QA-ADMIN 계정의 로컬 기본 비밀번호 `0000`으로 로그인한다. 실제 UI 클릭·입력·저장·재열기를 수행한다. API·DB 확인은 보조 근거이며 UI 조작의 대체가 아니다.
 
 [시나리오](references/scenarios.md)에서 이번 변경에 해당하는 부분만 선택한다. 테스트 fixture는 QA 환경에만 만든다. 관련 자동 테스트 결과와 UI 관찰을 혼합하지 않는다.
+
+전체 기대값 마무리 또는 ID별 반복 실행은 [원장 실행과 추가 시나리오](references/expectation-closure.md)를 따른다. 자동 실행은 전용 Playwright DB·포트를 쓰며 수동 QA 세션과 구분한다. 현재 소스에 대한 실행 근거를 검증한 뒤에만 원장에 반영한다.
+
+격리 공동복구의 실제 기동 검사는 `scripts/recovery_readiness_probe.py`의 `bounded_readiness()` 문맥 안에서 기존 `recovery_rehearsal` lifecycle을 실행할 수 있다. 이 보조 도구는 고정한 원형 harness를 확인하고 준비 조회의 성공 판정 기한 90초를 유지한다. 요청 제한과 재시도 대기를 남은 시간으로 제한하며 본문 수신 뒤 기한을 검사해 늦은 200 응답도 거부한다. urllib의 제한은 개별 소켓 동작에 적용되므로 고정 JSON을 반환하는 로컬 건강 조회에 사용한다. 서버 로그의 200, 클라이언트의 수신 성공, 실제 복구 완료를 각각 기록한다. 요청 제한보다 느린 준비 조회를 반복하면 이전 조회와 겹칠 수 있으므로 원인을 확인하고 실패 근거를 보존한다. 제품의 성능 상한을 이 도구의 준비 대기 시간으로 대체하지 않는다. 원형의 경로·소유권·설치/복구 함수와 상태·조회 판정은 유지한다. 실패한 실행의 admission이나 결과를 삭제해 같은 회차를 재사용하지 않는다.
+
+보조 도구를 사용하기 전 다음 순수 검사를 실행한다. 가짜 시간과 응답만 사용하며 실제 서버·DB·Node를 기동하지 않는다. 원형 소스 해시는 Git 체크아웃의 CRLF→LF만 정규화하고 다른 내용 변경은 거부한다. LF/CRLF 수용과 실제 내용 변경 거부를 모두 검증한다. 실제 설치/복구 실행은 승인된 격리 manifest·DB·포트·프로세스 소유권을 별도로 확인한 뒤 수행한다.
+
+```powershell
+python -m pytest .agents/skills/mes-browser-regression/scripts/test_recovery_readiness_probe.py --confcutdir=.agents/skills/mes-browser-regression/scripts -q
+```
 
 확정 기대값은 후속 원장 `docs/superpowers/specs/2026-10-07-mes-expectations.json`의 개별 검증 조건으로 확인한다. 연결 도구의 결과는 테스트 존재·검증 조건 연결 상태이며 실행 PASS가 아니다. 원본 사용자 보류를 승인으로 바꾸지 않는다. 신규 정책 시나리오를 검수할 때는 아래 참조의 정상 경로와 실패 경로를 각각 기록한다.
 

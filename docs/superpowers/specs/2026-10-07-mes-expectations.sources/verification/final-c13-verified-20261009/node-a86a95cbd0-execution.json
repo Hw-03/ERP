@@ -1,0 +1,659 @@
+{
+  "schemaVersion": 2,
+  "runId": "final-c13-verified-20261009",
+  "runner": "node",
+  "head": "2d79cd2848900fb66f99443af411fcec347877cd",
+  "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+  "root": "C:/Users/user/.codex/worktrees/mes-expectation-closure/ERP",
+  "startedAt": "2026-10-09T19:22:24.334+09:00",
+  "endedAt": "2026-10-09T19:22:24.598+09:00",
+  "argv": [
+    "C:\\ERP\\_attic\\runtime\\tools\\node-v20.20.2-win-x64\\node.exe",
+    "--test",
+    "--test-reporter=junit",
+    "--test-reporter-destination=C:\\Users\\user\\.codex\\worktrees\\mes-expectation-closure\\ERP\\_attic\\runtime\\mes-expectations\\final-c13-verified-20261009\\node-a86a95cbd0.xml",
+    "scripts/dev/normalize-mes-expectations.test.mjs"
+  ],
+  "cwd": ".",
+  "exitCode": 0,
+  "snapshot": {
+    "selectors": [
+      ".nvmrc",
+      "scripts/",
+      "scripts/dev/mes-expectation-evidence.mjs",
+      "scripts/dev/normalize-mes-expectations.mjs",
+      "scripts/dev/normalize-mes-expectations.test.mjs",
+      "scripts/dev/run-mes-expectations.mjs"
+    ],
+    "files": [
+      {
+        "path": ".nvmrc",
+        "sha256": "5378796307535df3ec8d8b15a2e2dc5641419c3d3060cfe32238c0fa973f7aa3"
+      },
+      {
+        "path": "scripts/dev/analyze-frontend-crash-dump.ps1",
+        "sha256": "523008ebfb714d43fa26e5d601afaf6c17955b2a3dcbdcb9b058ffd38b772a3a"
+      },
+      {
+        "path": "scripts/dev/auto-sync-to-employee.ps1",
+        "sha256": "f24dd28e612e213d8556c810afde79495d6e105c0e09e20a700f66605d5652b5"
+      },
+      {
+        "path": "scripts/dev/backfill_audit_csv.py",
+        "sha256": "5d88eced271e17aa266edebe83c3928420e89142f80770a0e7897ad08a78a3de"
+      },
+      {
+        "path": "scripts/dev/check-frontend-runtime.ps1",
+        "sha256": "eec9e18dbd454e01439ba0d69c45bb54fd155989f97d09277ff4b333aba07ade"
+      },
+      {
+        "path": "scripts/dev/check-mes-regression-contract-mapping.mjs",
+        "sha256": "5fd9820c18d1184a5ae094388eb24e6e5b92a3f2d255913d34e42e8fecb807d3"
+      },
+      {
+        "path": "scripts/dev/check-mes-regression-contract-mapping.test.mjs",
+        "sha256": "21242af3b42fe399009ab6e192a8cc820288f73a970b9a2ade9343934a6bb015"
+      },
+      {
+        "path": "scripts/dev/check_markdown_links.py",
+        "sha256": "7f65bfbb6ac688757fc20ca9633033b9b3be2d094cffe6090e643391045a4765"
+      },
+      {
+        "path": "scripts/dev/checked-command.ps1",
+        "sha256": "abe88ea4e4107b38a580572b86ec9a2b28e9e00af3c7fe00fbd8611dd47b0b53"
+      },
+      {
+        "path": "scripts/dev/disable-frontend-crash-dumps.ps1",
+        "sha256": "36ddc44052432263eb5b2fa52c64b2ddf01182bed765941f4d7eaa2a56df600d"
+      },
+      {
+        "path": "scripts/dev/e2e-exclusive-bind-probe.ps1",
+        "sha256": "e765e275287119a35c83d526d16e835a0ad0259df7a58c8d1773260b929e936d"
+      },
+      {
+        "path": "scripts/dev/enable-frontend-crash-dumps.ps1",
+        "sha256": "1ee82392a7d00084d090993f81db563e21b80c1ea66e2866116cfd4481d1e8ec"
+      },
+      {
+        "path": "scripts/dev/ensure-schema-ready.ps1",
+        "sha256": "0e4df3cd30e0a8d73eecb45d2b26a1310b282984895ded6b3e9f83f8c02e672c"
+      },
+      {
+        "path": "scripts/dev/fix_serial_conflicts.py",
+        "sha256": "b6c3281ae4abb346ff2c0aece8795d910e5a7862b10f098ea2ac1fbd8cf3f620"
+      },
+      {
+        "path": "scripts/dev/generate-mes-pc-audit.mjs",
+        "sha256": "bb1815f6e260a036b6879681e679e0820cf0c74d94ffd07be69dcc3c96c99d34"
+      },
+      {
+        "path": "scripts/dev/generate-mes-pc-audit.test.mjs",
+        "sha256": "3a66411f662d7fa65bc9e7355ef565db4f034dfb9d3a0c39d0652bd5d491dae9"
+      },
+      {
+        "path": "scripts/dev/generate-mes-pc-review.mjs",
+        "sha256": "aacf1829c28a38a1e05754618fd6796bd817cfd642f8d7991de6b61948a2d42f"
+      },
+      {
+        "path": "scripts/dev/generate-mes-pc-review.test.mjs",
+        "sha256": "781e8fecc489f5b8c134fb4fb97df602d87bea3e7d090b9e44d927733ef0bc73"
+      },
+      {
+        "path": "scripts/dev/generate-mes-regression-review.mjs",
+        "sha256": "9fd3f8357a2c47c2d201f7039faf20285bd129a05b1c16ac6b43bf98ba071fc6"
+      },
+      {
+        "path": "scripts/dev/generate-mes-regression-review.test.mjs",
+        "sha256": "bf1397ae364b4fc1f1d615dfa2adb1d422e48eb023b4196b275b58c3af992df8"
+      },
+      {
+        "path": "scripts/dev/get-frontend-stop-attribution.ps1",
+        "sha256": "de268748dba5232862bb4501a50af4d56d08310abf6743b196f103416cdae0f1"
+      },
+      {
+        "path": "scripts/dev/install-sysmon-dev-frontend-monitor.ps1",
+        "sha256": "ebda9f111384556639ebff6cd3d938cbbb74ea9f32de4b031d21e4e165f0efe0"
+      },
+      {
+        "path": "scripts/dev/kwon_match_apply.py",
+        "sha256": "7c03d894b6fa72d57a3355b4c800e3ccf8694ff72a582ebcedee5e9aae8c11cd"
+      },
+      {
+        "path": "scripts/dev/mes-expectation-evidence.mjs",
+        "sha256": "979b9d06c61f160bfc84e2e156cbba14c6f7fd3d7380e324b1ba2dd79b9ce66c"
+      },
+      {
+        "path": "scripts/dev/mes-expectation-evidence.test.mjs",
+        "sha256": "f56c8ba54e1d6e087fbcded47952dad00c6d7a809f89edb32e172fc1ec59ea01"
+      },
+      {
+        "path": "scripts/dev/mes-expectation-vitest-reporter.mjs",
+        "sha256": "5ef5b5d079838ca68df7141e8b8831ecd7a4c04a04ff188e6a53925d6b834b4c"
+      },
+      {
+        "path": "scripts/dev/mes_expectation_junit.py",
+        "sha256": "a6051f22656a50d593423f92146bd5d0ddf23ea6d77db1202d8d9b73405b1d5f"
+      },
+      {
+        "path": "scripts/dev/mes_expectation_pytest.py",
+        "sha256": "5388b1076e7e225fe04855de32d869873b246d8052100112cc5f8309d194d4f1"
+      },
+      {
+        "path": "scripts/dev/normalize-mes-expectations.mjs",
+        "sha256": "e05fa10e7011356c90e9dc1f7776557e7b352746356e8ad41a6b14509f2f7459"
+      },
+      {
+        "path": "scripts/dev/normalize-mes-expectations.test.mjs",
+        "sha256": "4afb6e3ff992c4961d46f8e4302571ff6fb9eea1b311631f08a34bd90402d0e4"
+      },
+      {
+        "path": "scripts/dev/open-watch.ps1",
+        "sha256": "8d399f213725db73559248dfc68e1a1b55598cf1a30c7dd433e12620dcb74379"
+      },
+      {
+        "path": "scripts/dev/register-runtime-tasks.ps1",
+        "sha256": "161785f4d997e5e656158a1fb8a2a3bdd6927b139842e876d1a1e04234f655b3"
+      },
+      {
+        "path": "scripts/dev/register_blue_items.py",
+        "sha256": "7352dcce236e69d35eb9a89c31d60292cd98a9f994e493a077766b43d1e1b3bf"
+      },
+      {
+        "path": "scripts/dev/renumber_gap_item_codes.py",
+        "sha256": "34284f96ed9ac9ffb37502baff966fbd70f039edc8b494ad1d8734ac45a7ac90"
+      },
+      {
+        "path": "scripts/dev/replenish_department_safety_stock.py",
+        "sha256": "1a4d23cf22da3405fc1645fccc323f9ab6b5f4b2938d6843c096bb1fc37065ff"
+      },
+      {
+        "path": "scripts/dev/resolve-server-profile.ps1",
+        "sha256": "ca94defa166393c82e5675de1c8515eee8f88b379149afdd6b815579000f9dad"
+      },
+      {
+        "path": "scripts/dev/restore_item_codes_from_backup.py",
+        "sha256": "a7fab670a50862278d69ee7511ae4eb7c108a0aead8ab3f3b85be1f550a3ea8c"
+      },
+      {
+        "path": "scripts/dev/run-mes-expectations.mjs",
+        "sha256": "7add97135bbf09ed5f5a420317d2a789f0bb9645d27a72654795f077843315ec"
+      },
+      {
+        "path": "scripts/dev/run-mes-expectations.test.mjs",
+        "sha256": "7204fc5d5d57ce761bc78530f9ea07549e327797cd1c7ffa12c4f8f126d60d34"
+      },
+      {
+        "path": "scripts/dev/runtime-control.ps1",
+        "sha256": "9b9695d2a5bb277e21d883380392180d3c9481ea24f0d9439df09dde2a0f0394"
+      },
+      {
+        "path": "scripts/dev/runtime-paths.ps1",
+        "sha256": "4c220f80e06fe11efbacb02c2b8d3c27ba5d9d097d6181eecb2a2d0d9c95b465"
+      },
+      {
+        "path": "scripts/dev/runtime-task-control.ps1",
+        "sha256": "0e1be8a180e2f0aa04b67dceaeeeaec2c872e9d3275adf7f8b6e1836efa26ee2"
+      },
+      {
+        "path": "scripts/dev/runtime-task-host.vbs",
+        "sha256": "3ff1fb8ab354864f1d7b53f64f7dd858ae7db0b7482a702d2eb805654626b6c3"
+      },
+      {
+        "path": "scripts/dev/seed_history_showcase.py",
+        "sha256": "e2a593cc89b0de242079d0f379221c9abe475abc361d3306f3b4480f33f39238"
+      },
+      {
+        "path": "scripts/dev/service_supervisor.py",
+        "sha256": "77747587cca2c9dbcf7eb2b4c9dd20c1b47218675296f38cdfb1e5719a26e427"
+      },
+      {
+        "path": "scripts/dev/setup-node20.ps1",
+        "sha256": "5355f6e0d13b3b283ff1ac4cab45d7ec3e6b54054cf9ae12c907a7ec5376ac35"
+      },
+      {
+        "path": "scripts/dev/start-backend.ps1",
+        "sha256": "a74e7323a8053a5b0205382cc2987aa20de2712ac4f191e90189f4bb8fc0abc5"
+      },
+      {
+        "path": "scripts/dev/start-frontend.ps1",
+        "sha256": "a63cbd7dc1b241eb676d7ae1058b87f19d260b3b38d3055d709a424519639faa"
+      },
+      {
+        "path": "scripts/dev/status-servers.ps1",
+        "sha256": "bfa4f60ac81e5a82cfffe92f0e19fb0cd502b52ac33cdf0acabced0cb64e6ab2"
+      },
+      {
+        "path": "scripts/dev/stop-backend.ps1",
+        "sha256": "a8b8c7e48627c5dd6e8691a052e40f193966888bfba3629b9ba14b5d79b2edf7"
+      },
+      {
+        "path": "scripts/dev/stop-frontend.ps1",
+        "sha256": "645fa3fe9d0390f69bb27be512665eb8aae5eb9ee5c166af3944c279d2545c72"
+      },
+      {
+        "path": "scripts/dev/stop-servers.ps1",
+        "sha256": "a3ca2eb4436c5b4d15131a374a405ed003660f9bfafc8283517ba7a3fe0bbcce"
+      },
+      {
+        "path": "scripts/dev/sync-employee-environments.ps1",
+        "sha256": "d3c4ae1c4ca2663883a86217cc8476518d44898021ec789809dcbe30383ddfba"
+      },
+      {
+        "path": "scripts/dev/sync-from-employee-data.ps1",
+        "sha256": "f5207d4f6af34ad4db5ca1b79f0d0b44d81d464cc091c2f0ad83c6e6d581cf92"
+      },
+      {
+        "path": "scripts/dev/sync-to-employee.ps1",
+        "sha256": "15767f925345b7bc9808b2bfca69eee868cd322e66260ad5136c4f0d99a21cd1"
+      },
+      {
+        "path": "scripts/dev/sysmon-dev-frontend.xml",
+        "sha256": "54114fb5289224dc86e0df25916e00690a018d60d253302845439571193b80b7"
+      },
+      {
+        "path": "scripts/dev/tests/checked-command.ps1",
+        "sha256": "0476eb5ba79413d9f3cee1887f465ea7b36902eaaed85d7e2f6df3f2f7a55968"
+      },
+      {
+        "path": "scripts/dev/tests/frontend-node-runtime.ps1",
+        "sha256": "1bc2165198b3e86b9abda246ba7d9b2aef5d59de624028adb62ff4954787d87d"
+      },
+      {
+        "path": "scripts/dev/tests/runtime-control-batch-files.ps1",
+        "sha256": "53f0e90e5b7a9a8b7df7edcbb651bac3d60889cc69024a1498cec61f83a7e7e0"
+      },
+      {
+        "path": "scripts/dev/tests/runtime-control-crash-loop.ps1",
+        "sha256": "b2ef8fe7a7f8456e512368ed8ebe17d12603a2c4f3a9ab01d058cfab80be299c"
+      },
+      {
+        "path": "scripts/dev/tests/runtime-paths.ps1",
+        "sha256": "ab08111737bd3980653fad08fb6521006f7d5647c03c065d2d3fb5cbbda60d27"
+      },
+      {
+        "path": "scripts/dev/tests/runtime-state-timestamps.ps1",
+        "sha256": "1c220c1c72e65d9e5a18d8dda1dacacfa272c2f1084d1339adeb642ce3e94892"
+      },
+      {
+        "path": "scripts/dev/tests/runtime-task-control.ps1",
+        "sha256": "efcdc06bf518aadd1ee348547262909d8bbc852d0bf161e651bb4603dce76e52"
+      },
+      {
+        "path": "scripts/dev/tests/schema-readiness-adapter.ps1",
+        "sha256": "a6e4e236dae5bfae810099be415a2ec5757373753d5add5872c3441893d6bb2c"
+      },
+      {
+        "path": "scripts/dev/tests/start-backend-no-powershell-wrapper.ps1",
+        "sha256": "18539bafef7c51cc7eea782030799de5b5c29e0001b17cf9c611dca7e7afad26"
+      },
+      {
+        "path": "scripts/dev/tests/test_check_markdown_links.py",
+        "sha256": "e1ec4a8d7ab2df87555f373fabd4ae1971c276de3598dbef5a50cda967c22d30"
+      },
+      {
+        "path": "scripts/dev/tests/test_frontend_crash_dumps.py",
+        "sha256": "e1d80dce1445044343426e45e3d88045fbec9105260a048bff080b7ec6d79898"
+      },
+      {
+        "path": "scripts/dev/tests/test_service_supervisor.py",
+        "sha256": "778c0ef1db74d008bcd3679a2437d270eca0e2020330ac8cd7c62c157b177d31"
+      },
+      {
+        "path": "scripts/dev/tests/test_sysmon_dev_frontend_monitor.py",
+        "sha256": "134e5f59098f5bafd487b92a453839c1262593be4dc18b160523a83eaddef80b"
+      },
+      {
+        "path": "scripts/dev/tests/test_verify_local_docs_scope.py",
+        "sha256": "17eb913691f88621ba29714331cf8b7bfa83d994bfb8aa265486374d7f25049b"
+      },
+      {
+        "path": "scripts/dev/tests/test_watch_service_signal_monitor.py",
+        "sha256": "0fd009cf78deb861278da1871bbcf9dee07cd93338ad751ca267057a6f5380d4"
+      },
+      {
+        "path": "scripts/dev/uninstall-sysmon-dev-frontend-monitor.ps1",
+        "sha256": "f1ebd3c34a0cf444d3d54abab0842744ddffd12404ccbe5229b85140c5414c8c"
+      },
+      {
+        "path": "scripts/dev/update_excel_blue_after_db.py",
+        "sha256": "396e3d7a2e111b79eb992d111af2eba1f0b168dd8bac0274e3d240bae0052c8d"
+      },
+      {
+        "path": "scripts/dev/verification_policy.py",
+        "sha256": "0deadf8b17d735d80b984f95382471746e027ee76dd29682c460b708d69c65df"
+      },
+      {
+        "path": "scripts/dev/verify-runtime-tasks.ps1",
+        "sha256": "d83d572fd345c1d392a6d1eb61730db467dbcb3b126507a3cd4fa0fbb0524621"
+      },
+      {
+        "path": "scripts/dev/verify_e2e.ps1",
+        "sha256": "2fe089b1630348f84f1d89692dba995e170ae4dd5ebbf5240175db754692c767"
+      },
+      {
+        "path": "scripts/dev/verify_local.ps1",
+        "sha256": "13cbd078f9273fc4f36194b53e4c613159c6385c1a94a148b2f328ef317f649f"
+      },
+      {
+        "path": "scripts/dev/watch-servers.ps1",
+        "sha256": "33b2bdaaf14145971949a18bc5d3552196f0e191ead67229f4fd7fc633106088"
+      },
+      {
+        "path": "scripts/dev/watch-service.ps1",
+        "sha256": "77e62d10ebeaac1fd50de143f3c8f4e6445b8677ed9d4b90e7772766c624aa14"
+      },
+      {
+        "path": "scripts/ops/_verify_backup.py",
+        "sha256": "a0e87166d10c2d48d490672a8371daba379778b67a02108eef7b617805253683"
+      },
+      {
+        "path": "scripts/ops/backup_db.bat",
+        "sha256": "e077580b4a453425146571ae99e3cea511169f0274bba638ff4784cf08e0ab98"
+      },
+      {
+        "path": "scripts/ops/backup_db.py",
+        "sha256": "6ade796d46475deb71c4c79ce897ed9dba0bf0425d20e91a14ae81dbaa038c79"
+      },
+      {
+        "path": "scripts/ops/backup_manifest.py",
+        "sha256": "988be08e448e10c489959b1cf484af92012852b94da0230e21d0d9b21e00fdc2"
+      },
+      {
+        "path": "scripts/ops/backup_retention.py",
+        "sha256": "c1c0eee9534de400ba929079388365006dff6589652b1aa1f564510be00334c0"
+      },
+      {
+        "path": "scripts/ops/backup_to_nas.bat",
+        "sha256": "42afdb9bfbceda3e14339b31cbd9696f2749328f5d8b7dda2cc96e6d96fe3e33"
+      },
+      {
+        "path": "scripts/ops/backup_to_nas.py",
+        "sha256": "357e65cc4fb306f362591de45c9b76e6b38f727e86cfa1900c2c129c095682c4"
+      },
+      {
+        "path": "scripts/ops/benchmark_mes_reads.py",
+        "sha256": "b3378b0de08f5eab7f8ee5a9f96ea014c6664b766810d6eaa4b47c2ee8c1f9f4"
+      },
+      {
+        "path": "scripts/ops/build_legacy_db_candidate.py",
+        "sha256": "f7bf20f0b58eea2e20d3dcf306b2ac3794a8801b6d09fce47fa4f3310955e5b2"
+      },
+      {
+        "path": "scripts/ops/check_inventory_integrity.py",
+        "sha256": "b388985aa52b24ea4a61f95ecfa6d39ff0355ddd06ce3439ca05e8d24643c61f"
+      },
+      {
+        "path": "scripts/ops/cleanup_backups.bat",
+        "sha256": "3d4f85ebd3095c791d9849fff469464f37e0a98b85de9c34f7ab41ea2bd1ecd2"
+      },
+      {
+        "path": "scripts/ops/cleanup_backups.py",
+        "sha256": "373b55dfe77d9d6711d8b34cc0b5a1c4a106df8786ba5c8b6cf244e3badb8251"
+      },
+      {
+        "path": "scripts/ops/development_schema_prepare.py",
+        "sha256": "16f9ac1bf744159ef92a9ab333976f04c0e09165b524420d8f92f6d4d192f7a6"
+      },
+      {
+        "path": "scripts/ops/durable_file.py",
+        "sha256": "3dd83601732a944551cb472401a8076a8587d2d612c967e15b8d5663f1a7620c"
+      },
+      {
+        "path": "scripts/ops/employee_frontend_release.py",
+        "sha256": "45601daa8c5787941ed018c72592019235f7a6e82fa2191383c5602a74fd30c4"
+      },
+      {
+        "path": "scripts/ops/employee_release_recovery.py",
+        "sha256": "4be25050467d58fbfd7b808efea7ab33d8d8b898e39fdba058ccbb991775283a"
+      },
+      {
+        "path": "scripts/ops/employee_schema_preflight.py",
+        "sha256": "f22b777ad05216a5722ce35ad37af9845ed93482acfccd332d51159451e15993"
+      },
+      {
+        "path": "scripts/ops/finalize_inventory_master.py",
+        "sha256": "38e3cfef0fa7ba4d2ea57ce1f30b9f404c105897d9c67c60953ac692ba50ae1f"
+      },
+      {
+        "path": "scripts/ops/friday_profile_cutover.py",
+        "sha256": "6eaf755122f4a7a88f82c81ebe5ddb7a10f1ed50ca36ac35ec3e71f9cd8b3273"
+      },
+      {
+        "path": "scripts/ops/healthcheck.bat",
+        "sha256": "858643b8abc0bfc48f002a757ad6e3cbdfaa6e6c41a7e9026431574ada8061c3"
+      },
+      {
+        "path": "scripts/ops/inventory_cutover.py",
+        "sha256": "2c714bc0dd660be68bbdb60b6e15223d0504bff0bcde7d1596f2721adf922093"
+      },
+      {
+        "path": "scripts/ops/inventory_operation_admin.py",
+        "sha256": "a7bebd530872346c249d052576fb08135c22b8f89a83c77a78b3935764e1e26e"
+      },
+      {
+        "path": "scripts/ops/load_test_30_users.py",
+        "sha256": "eec4e256208883929899519a90b7c1fab8b9c3eb33f1605883f3ba71c6bb2911"
+      },
+      {
+        "path": "scripts/ops/maintenance_backup.py",
+        "sha256": "4e0662f91ec04c85891ade26c2c33d7b644c8425dc0d4fe65a54f4d23e9a7b17"
+      },
+      {
+        "path": "scripts/ops/operational_readiness.bat",
+        "sha256": "fe0a8b95385015f86637a4292fb55f597cd8e44c2a27a1a24fcd0161fa75a938"
+      },
+      {
+        "path": "scripts/ops/operational_readiness.py",
+        "sha256": "076da0b4332c8c86a82aecf3a0794851064b5c1e59e15914cac575bed51755e5"
+      },
+      {
+        "path": "scripts/ops/preflight_30_users.py",
+        "sha256": "a0cd84c500d2303661f4a993f750e11f1a6deee5d08020b494e3a5a6d500bcc3"
+      },
+      {
+        "path": "scripts/ops/profile_warehouse_r1.py",
+        "sha256": "acd535fc21a054b3a04b594bcee8939a90ac2284586add7d9042524f4c888ec9"
+      },
+      {
+        "path": "scripts/ops/project_legacy_effects.py",
+        "sha256": "ad9e64ee8699c80d28c2abaa589d6b337306b68cdb4986e143e34922c4b51feb"
+      },
+      {
+        "path": "scripts/ops/reconcile_inventory.bat",
+        "sha256": "7d85064425b2c9cea66c4628e22fb74d8d28ef4400af279a83b40bf4babdf6b3"
+      },
+      {
+        "path": "scripts/ops/recovery_owner.py",
+        "sha256": "b885fb608cb3e8785c43067fbe30a74b1f8ac8003b7bc9399dd0ed50c05b0713"
+      },
+      {
+        "path": "scripts/ops/register-weekly-inventory-snapshot.ps1",
+        "sha256": "2783df3cdfb9ee9cb492347865051de4a30743e5a345c265c5d156f158f6e34e"
+      },
+      {
+        "path": "scripts/ops/restore_db.bat",
+        "sha256": "3e59c7c4a439221b1c02562174f0117112a697a423bcc7818be85d34321d29a7"
+      },
+      {
+        "path": "scripts/ops/restore_db.py",
+        "sha256": "aa68a20d04091d5642d2a0d3e988fe9ef893573c9d8ecc6128036c6f2c0f9be8"
+      },
+      {
+        "path": "scripts/ops/sync_department_inventory.py",
+        "sha256": "9a93bacb7975c73fe1f27da01de9ce91f6e048bbd6762ad0385948df84d7c6ee"
+      },
+      {
+        "path": "scripts/ops/sync_warehouse_inventory.py",
+        "sha256": "89e444d98f8ad59cffa23a29eb15210ba32f8932bed9cac8c82cf885ae2fc499"
+      },
+      {
+        "path": "scripts/ops/tests/test_legacy_db_candidate.py",
+        "sha256": "0902cb0ff0c077882c5c6824caef688a3468f5fe5a56498e9ecb5b3942a12c2e"
+      },
+      {
+        "path": "scripts/ops/tests/test_legacy_effect_projection.py",
+        "sha256": "c2d10de88c4890d9dad6ba2cb0407f1b5b835c5f0c40b3b3670b1c7224c60909"
+      },
+      {
+        "path": "scripts/ops/verify_backup.bat",
+        "sha256": "22f6d9f7e831be4bc6621ee9de6be9028a5ea034a493981a301548602d952016"
+      },
+      {
+        "path": "scripts/ops/verify_inventory_snapshot.py",
+        "sha256": "d08ff8a765f8fe1f0e086bb2a88e43200584226cf315f849e30c26b5864b1e47"
+      },
+      {
+        "path": "scripts/runtime_paths.py",
+        "sha256": "ed9cee5d4c3cd13b6c81fb6dbdd0e5dd023409a16854f4d8697e9480350c1459"
+      }
+    ],
+    "sha256": "b5ce5760cb1c4b607ec43840d6d47dc4400f94390578c71919b67bcbb64567ac"
+  },
+  "raw": {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/node-a86a95cbd0.xml",
+    "sha256": "efb12d449f76f2fe962d13c77316bfc77969af6ad0f2ba61a727996ab22b411b"
+  },
+  "environment": {
+    "kind": "unit",
+    "versions": {
+      "node": "v20.20.2",
+      "python": "Python 3.12.0"
+    }
+  },
+  "conditions": [
+    {
+      "caseId": "PC-DELTA-TEST-01",
+      "conditionId": "real-assertion-link",
+      "fingerprint": "b9c5292eafba5dd964e660d867d2619d8d378078350c7627899aabd9cd143393",
+      "targets": [
+        {
+          "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+          "selector": "실제 selector의 assertion 조각과 파일 SHA를 연결한다",
+          "instances": [
+            "실제 selector의 assertion 조각과 파일 SHA를 연결한다"
+          ]
+        },
+        {
+          "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+          "selector": "누락 selector·주석뿐인 ID/assertion·다른 테스트의 assertion·변경된 SHA를 탐지한다",
+          "instances": [
+            "누락 selector·주석뿐인 ID/assertion·다른 테스트의 assertion·변경된 SHA를 탐지한다"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-TEST-01",
+      "conditionId": "individual-condition-proof",
+      "fingerprint": "1e9b94d63dbda05253a1c1c30bf2bc64072786090d3dcc16622fd09f63dda34f",
+      "targets": [
+        {
+          "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+          "selector": "개별 조건 일부만 실행한 경우 케이스 전체 PASS를 만들지 않는다",
+          "instances": [
+            "개별 조건 일부만 실행한 경우 케이스 전체 PASS를 만들지 않는다"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-TEST-01",
+      "conditionId": "historical-review-separate",
+      "fingerprint": "78e0eb6d7ca432a01d6a9de49ea66bf050bdbf3ae39eee9722b28f7ff4809cc4",
+      "targets": [
+        {
+          "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+          "selector": "원장 ID·기대·피드백·과거 관찰을 보존하고 분모를 원장에서 산출한다",
+          "instances": [
+            "원장 ID·기대·피드백·과거 관찰을 보존하고 분모를 원장에서 산출한다"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-TEST-02",
+      "conditionId": "dynamic-denominators",
+      "fingerprint": "e30c4883efd06b39340e0e8e6f2e30c2238b74cf7b560a6e2a11c00cab88c4c4",
+      "targets": [
+        {
+          "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+          "selector": "원장 ID·기대·피드백·과거 관찰을 보존하고 분모를 원장에서 산출한다",
+          "instances": [
+            "원장 ID·기대·피드백·과거 관찰을 보존하고 분모를 원장에서 산출한다"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-TEST-02",
+      "conditionId": "link-execution-distinct",
+      "fingerprint": "0c7ade014549c5a516fc30e98c05ceccf7a8b5318798ebf06930559da9334e7d",
+      "targets": [
+        {
+          "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+          "selector": "실제 selector의 assertion 조각과 파일 SHA를 연결한다",
+          "instances": [
+            "실제 selector의 assertion 조각과 파일 SHA를 연결한다"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-TEST-02",
+      "conditionId": "missing-duplicate-detected",
+      "fingerprint": "e4df3db8b467d43474d3632f239943cc96c66b0a9c87792ce8f40ba164812b2b",
+      "targets": [
+        {
+          "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+          "selector": "알 수 없는 ID·중복 원장·중복 정책·누락 조건을 거부한다",
+          "instances": [
+            "알 수 없는 ID·중복 원장·중복 정책·누락 조건을 거부한다"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-TEST-03",
+      "conditionId": "filter-selects-intended",
+      "fingerprint": "53548bd0fb4b6ec42364763b33427e27716596dc37f6674952754beaf372aec1",
+      "targets": [
+        {
+          "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+          "selector": "smoke·P0·ID 필터가 실제 selector만 선택하고 알 수 없는 ID·미연결 조건은 거부한다",
+          "instances": [
+            "smoke·P0·ID 필터가 실제 selector만 선택하고 알 수 없는 ID·미연결 조건은 거부한다"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-TEST-03",
+      "conditionId": "selected-run-not-global-pass",
+      "fingerprint": "a5518bd5dceac6bc714c6e372de963927ac905c8c042fdb3749546e7375c2bc4",
+      "targets": [
+        {
+          "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+          "selector": "개별 조건 일부만 실행한 경우 케이스 전체 PASS를 만들지 않는다",
+          "instances": [
+            "개별 조건 일부만 실행한 경우 케이스 전체 PASS를 만들지 않는다"
+          ]
+        },
+        {
+          "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+          "selector": "smoke·P0·ID 필터가 실제 selector만 선택하고 알 수 없는 ID·미연결 조건은 거부한다",
+          "instances": [
+            "smoke·P0·ID 필터가 실제 selector만 선택하고 알 수 없는 ID·미연결 조건은 거부한다"
+          ]
+        }
+      ]
+    }
+  ],
+  "runReceipt": {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/run-receipt.json",
+    "sha256": "eb29d9cec9993911cb55d3682b199b2961fd5ef866e6e7e50d905f7a92e264dc",
+    "originalExecution": {
+      "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/original-node-a86a95cbd0-execution.json",
+      "sha256": "0355c0d6d22c64110f40471a4c4706607ee43c810bd3ee609874fa99c3c02395"
+    }
+  }
+}

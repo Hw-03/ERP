@@ -85,8 +85,8 @@ async function seed() {
   // e2e 전제(원자재 입고=창고역할 전용, 결재 승인자 필요)를 위해 역할을 부여한다.
   const emps: any[] = await getJson(`${BACKEND_URL}/api/employees?active_only=true`);
   const byCode = (code: string) => emps.find((e) => e.employee_code === code);
-  const whBase = byCode("E22") ?? emps[0]; // 이필욱 — 창고 결재자 + 원자재 입고 작업자
-  const deptBase = byCode("E04") ?? emps[1] ?? emps[0]; // 김건호 — 부서 결재자
+  const whBase = byCode("E22") ?? emps[0]; // 창고 결재자 + 원자재 입고 작업자
+  const deptBase = byCode("E04") ?? emps[1] ?? emps[0]; // 부서 결재자
   const plainBase = byCode("E01") ?? emps.find((e) => e.employee_id !== whBase.employee_id); // 일반 작업자(제출자)
 
   const warehouseEmployee = await putJson(`${BACKEND_URL}/api/employees/${whBase.employee_id}`, {
@@ -189,6 +189,18 @@ export default async function globalSetup() {
     throw new Error(`bootstrap 실패(code ${boot.status})\n${boot.stdout}\n${boot.stderr}`);
   }
 
+  // Bootstrap reference names must never enter committed QA screenshots.
+  const anonymized = spawnSync("python", [path.join(HERE, "_qa_employee_names.py")], {
+    cwd: BACKEND_DIR,
+    env: { ...process.env, DATABASE_URL },
+    encoding: "utf-8",
+    windowsHide: true,
+  });
+  if (anonymized.status !== 0) {
+    throw new Error(`QA 직원 이름 변환 실패(code ${anonymized.status})\n${anonymized.stdout}\n${anonymized.stderr}`);
+  }
+  console.log(`[e2e:setup] QA 직원 표시 이름 변환: ${anonymized.stdout.trim()}`);
+
   // 3) 전용 백엔드 기동(포트 8021, --reload 없음 → 단일 프로세스)
   const backend = spawn(
     "python",
@@ -208,5 +220,20 @@ export default async function globalSetup() {
 
   // 4) 시드
   await seed();
+  if (process.env.MES_EXPECTATION_ENVIRONMENT) {
+    const session = await getJson(`${BACKEND_URL}/api/app-session`);
+    const metadata = spawnSync(process.execPath, [
+      path.join(REPO_ROOT, "scripts/dev/run-mes-expectations.mjs"),
+      "--record-browser-environment",
+      JSON.stringify({
+      root: REPO_ROOT,
+      database: E2E_DB,
+      seedFile: SEED_FILE,
+      bootId: session.boot_id,
+      output: process.env.MES_EXPECTATION_ENVIRONMENT,
+      }),
+    ], { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true });
+    if (metadata.status !== 0) throw new Error(`E2E evidence environment failed: ${metadata.stderr || metadata.stdout}`);
+  }
   console.log("[e2e:setup] 완료");
 }

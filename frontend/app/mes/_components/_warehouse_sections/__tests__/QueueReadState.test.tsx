@@ -21,7 +21,7 @@ vi.mock("@/lib/queries/useStockRequestsQuery", () => ({
   useRevertToDraftMutation: () => ({ mutate: vi.fn() }),
 }));
 
-describe.each([WarehouseQueuePanel, DepartmentQueuePanel, AsResearchQueuePanel, MyRequestsPanel])("queue read state", (Panel) => {
+describe.each([["warehouse", WarehouseQueuePanel], ["department", DepartmentQueuePanel], ["as-research", AsResearchQueuePanel], ["my-requests", MyRequestsPanel]] as const)("queue read state %s", (_label, Panel) => {
   beforeEach(() => { query.data = []; query.isLoading = false; query.error = new Error("조회 실패"); query.refetch.mockClear(); });
   it("keeps a full work area while the initial list is loading", () => {
     query.data = undefined;

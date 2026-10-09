@@ -48,6 +48,7 @@ DEXCOWIN — 정밀 X-Ray 장비 제조사. 제조 흐름은 부서 계열과 R/
 - 생산(produce) 시 BOM 자식들이 자동 차감(BACKFLUSH)
 - 분해(disassemble) 시 BOM 자식들이 자동 회수
 - where-used 역추적 가능 (`/api/bom/where-used/{item_id}`)
+- 관리자 BOM 편집은 추가·수량 수정·삭제를 초안으로 모은 뒤 **구성 저장**으로 함께 반영한다. 전체 오류를 검사하고, 편집 시작 이후 구성이 바뀌었으면 충돌로 거부한다. 완료 BOM은 해제 전까지 UI와 API 모두 수정할 수 없으며, 저장·완료·해제의 감사 이력을 보존한다.
 
 ## 입출고 (Io) — V2
 

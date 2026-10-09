@@ -1,7 +1,7 @@
 import { test, expect, changeEmployee, loginUi } from "./_common-expectations";
 import { spawnSync } from "child_process";
 import { randomUUID } from "crypto";
-import type { APIRequestContext, Page } from "@playwright/test";
+import type { APIRequestContext, Page, Route } from "@playwright/test";
 import type { Employee } from "../../lib/api/types/employees";
 import type { WeeklyReportResponse } from "../../lib/api/types/weekly";
 import { fixturePython } from "./_admin-export-expectations";
@@ -259,12 +259,37 @@ test("8.21-02/03/04/05 주입 숫자는 실제 공정카드·품목 열·모델0
 
 test("8.21-06/07/10 실제 서버 집계 범위와 검산·분류 안내가 화면에 표시된다", async ({ page, actors }, info) => {
   await loginUi(page, actors.requester);
-  const loaded = page.waitForResponse((response) => response.url().includes("/inventory/weekly-report?") && response.ok());
+  const weeklyRoute = "**/api/inventory/weekly-report?**";
+  let observedData: WeeklyReportResponse | undefined;
+  let observedStatus: number | undefined;
+  let observedWeek: { week_start: string | null; week_end: string | null } | undefined;
+  const captureWeekly = async (route: Route) => {
+    const request = route.request();
+    // A late dashboard prefetch is not the report consumed by the new document.
+    if (new URL(request.frame().url()).searchParams.get("tab") !== "weekly") {
+      await route.continue();
+      return;
+    }
+    const url = new URL(request.url());
+    const response = await route.fetch();
+    observedStatus = response.status();
+    observedWeek = { week_start: url.searchParams.get("week_start"), week_end: url.searchParams.get("week_end") };
+    try {
+      if (response.ok()) observedData = await response.json() as WeeklyReportResponse;
+    } finally {
+      await route.fulfill({ response });
+    }
+  };
+  await page.route(weeklyRoute, captureWeekly);
   await page.goto("/mes?tab=weekly");
-  const data: WeeklyReportResponse = await (await loaded).json();
-  expect(data.report_status).not.toBe("failed");
   const guide = page.getByTestId("weekly-aggregation-guide");
   await expect(guide).toBeVisible();
+  await page.unrouteAll({ behavior: "wait" });
+  expect(observedStatus).toBe(200);
+  expect(observedData).toBeDefined();
+  const data = observedData!;
+  expect(observedWeek).toEqual({ week_start: data.week_start, week_end: data.week_end });
+  expect(data.report_status).not.toBe("failed");
   await guide.getByText("집계·검산 기준", { exact: true }).click();
   for (const key of ["inventory", "production_matrix"]) {
     expect(data.aggregation_scope?.[key]).toBeTruthy();

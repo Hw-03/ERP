@@ -4,6 +4,8 @@
 
 > **품질 감사/worktree 안전 범위:** 이 문서의 실행·중지·백업·직원 동기화·배포·작업 등록 절차는 운영자 또는 통합 checkout용이다. 격리된 코드 품질 작업에서는 해당 명령을 실행하거나 development/employee URL·port·DB를 조회하지 않는다. 정적 검증은 [`verify_local.ps1`](../../scripts/dev/verify_local.ps1)의 plan/gate 계약을 따르고, 브라우저 회귀 실행이 별도로 승인된 때만 [합성 DB E2E 격리 계약](../../frontend/tests/e2e/README.md)을 따른다. 과거 실환경 관찰은 현재 상태로 재확인하지 않는다.
 
+> **2026-10-08 작업본 상태:** 정식 성능·전체 백엔드·정식 기대값·실제 공동복구·CI는 아직 완료 전이며 직원 환경 배포는 실행하지 않았다. 아래는 승인된 배포 시 따를 절차이고 이번 작업의 실행 완료 기록이 아니다. 현재 근거와 미완료 범위는 [최종 검증 결과](../../docs/superpowers/specs/2026-10-08-mes-safe-closure-results.md)를 따른다.
+
 ## 표준 실행 경로
 
 ### 직원 등급 제거 마이그레이션
@@ -11,6 +13,8 @@
 `20261007_0039`는 직원 테이블의 `level`만 제거한다. 직원 ID·PIN·별도 결재 역할·화면 설정·담당 연결은 유지하고 등급을 역할로 변환하지 않는다. 기존 코드와 DB를 함께 보존한 백업을 준비하고, 먼저 복제본에서 보존 검사를 통과시킨 뒤 명시적으로 마이그레이션한다. 서버 시작은 마이그레이션을 실행하지 않는다.
 
 SQLite는 3.35 이상에서 테이블 재생성 없이 컬럼을 삭제한다. PostgreSQL은 컬럼과 다른 소비자가 없는 enum을 제거한다. 제거한 등급은 복원할 수 없으므로 revision downgrade 대신 제거 전 DB 백업과 그때의 코드를 함께 복원한다. 직원→개발 동기화 보존 검사도 직원 테이블을 제외하지 않고 `level`을 제외한 컬럼·행·연결의 동일성을 검사한다.
+
+이번 작업본의 최종 revision은 `20261008_0044`다. 이 revision은 `20261007_0043`과 main의 `20261008_0041` 두 가지를 연결하며 자체 데이터 변경은 없다. 기존 0040의 submission·reason 백필과 main의 suppliers.scope warehouse 추가는 해당 부모 migration의 동작으로 구분한다. 0044도 downgrade 대신 그 배포에 보존한 DB·코드·Node·프론트 묶음을 함께 복원한다. [실제 merge revision](../../backend/alembic/versions/20261008_0044_merge_closure_supplier_scopes.py).
 
 - **표준은 `start.bat`**. 컨테이너 정의는 루트가 아닌 `docker/docker-compose.yml`에 있으며, 정규 운영 경로는 아니다.
 - `start.bat`와 운영 batch는 `scripts/dev/resolve-server-profile.ps1`로 현재 checkout의 profile을 결정한다. `C:\ERP`와 그 `.worktrees` 하위는 development (백엔드 8011 / 프론트엔드 3001), `C:\ERP-dev`는 employee (백엔드 8010 / 프론트엔드 3000)다.
@@ -108,6 +112,8 @@ scripts\ops\cleanup_backups.bat 20     rem 정식 백업 최신 20개 유지
 
 운영 중에는 절대 DB 파일을 수동으로 덮어쓰지 말고, 반드시 다음 절차를 따른다.
 
+아래 DB 단독 복구는 현재 코드와 호환되는 백업을 대상으로 한다. 스키마 변경이 포함된 직원 배포 실패는 아래 명령으로 DB만 되돌리지 않고 [일반 배포의 공동복구](#일반-배포의-공동복구)를 따른다.
+
 1. **백엔드·프론트 정지** — 루트에서 `stop.bat` 실행
 2. 복구 명령 실행 (백업 파일명만 인자로 전달):
    ```bat
@@ -128,17 +134,41 @@ scripts\ops\cleanup_backups.bat 20     rem 정식 백업 최신 20개 유지
 
 `scripts/dev/sync-to-employee.ps1`은 다음 순서를 고정한다.
 
-1. KST·Python·주간 재고 스냅샷 실행 파일 사전검사 후 접속자 활동과 스키마 변경 가드
+담당자는 실행 전에 직원의 쓰기 중지와 진행 중 작업 종료를 먼저 확인한다. 순서는 **쓰기 중지 확인 → 서비스 정지·백업 검증 → 이전 코드·Node·프론트 보존 → 명시 마이그레이션 → 사후 확인·배포 확정 → 업무 재개 안내**다. 아래 배포 스크립트의 쓰기 잠금이 직원의 중지 확인을 대신하지 않는다.
+
+1. KST·Python·Node·주간 스냅샷·런타임 예약 작업 사전검사, 접속자 활동·스키마 변경 가드, 별도 디렉터리에서 프론트 운영 빌드 준비
 2. 백엔드·프론트 정지 명령의 종료 코드와 8010/3000 포트 해제를 확인
 3. `C:\ERP-dev\_attic\runtime\backups\sqlite`에 `sqlite3.backup` 백업 생성·검증(최신 10개 유지)
-4. 코드 동기화 후 `bootstrap_db.py --migrate`로 Alembic upgrade 또는 승인된 레거시 기준선 등록
-5. 실제 직원 DB의 SQLite/필수 테이블 검증과 재고 무결성 검증
+4. 이전 코드·프론트·Node를 보존하고 준비 빌드와 새 코드를 설치한 뒤, 백업·이전 묶음·새 코드 해시가 연결된 공동복구 admission을 고정한다. 이후 `bootstrap_db.py --migrate`로 Alembic upgrade 또는 승인된 레거시 기준선 등록
+5. `bootstrap_db.py --check`로 Alembic head/필수 구조를 읽기 전용 확인하고 실제 직원 DB의 SQLite·재고 무결성 검증
 6. 취소 원장 정합성 읽기 전용 진단
 7. 진단 통과 시 취소 원장은 즉시, 새 주간보고 기준은 다음 KST 월요일 00:00부터 활성화
 8. `DEXCOWIN MES Weekly Inventory Snapshot`을 직원 경로 기준으로 등록·갱신하고 월요일 00:00, 지연 실행, 중복 방지, 10분 제한을 재검증
-9. 서버 시작과 백엔드·프론트 헬스체크
+9. 직원 DB 쓰기 잠금 아래 서버 시작·백엔드와 프론트 헬스체크·배포 확정을 완료한 뒤 잠금 해제
 
-백업 실패 시 아직 코드가 바뀌지 않은 기존 서버를 재기동하고 배포를 중단한다. 마이그레이션, 사후 검증, 취소 원장 진단 또는 활성화가 실패하면 서버와 DB를 자동 복원하지 않고 기존 설정을 유지한다. 주간 스냅샷 예약 작업 등록·검증만 실패하면 직원 서비스를 다시 기동하되 동기화는 실패로 종료한다. 콘솔에는 검증된 `STRUCTURAL_ONLY` 백업 절대 경로와 `restore_db.py --sqlite ... --target ... --structural-rollback` 수동 명령을 출력한다.
+백업 실패 시 아직 코드가 바뀌지 않은 기존 서버를 재기동하고 배포를 중단한다. 마이그레이션, 사후 검증, 취소 원장 진단, 주간 스냅샷 예약 작업 등록 또는 활성화가 실패하면 직원 서비스를 정지 상태로 유지한다. 콘솔에는 검증된 `STRUCTURAL_ONLY` 백업과 해당 배포에 보존한 `employee_release_recovery.py recover` 명령·admission SHA256을 출력한다. 이 배포 실패는 DB·코드·프론트·Node를 같은 이전 묶음으로 복구한다. DB만 덮어써 서로 다른 버전을 조합하지 않는다.
+
+배포 전 담당자는 직원에게 입출고·승인·취소를 중단하도록 알리고 진행 중 작업이 끝났는지 확인한다. 동기화 완료와 배포 기록의 `CONFIRMED`, 상태·읽기 전용 조회 확인 후 업무 재개를 안내한다. 서비스 시작 중에도 쓰기를 막는 잠금은 이 절차의 보조 장치이며 직원의 작업 중지 확인을 대신하지 않는다.
+
+### 일반 배포의 공동복구
+
+배포 전에 **그 배포·복구에 사용할 Python 실행 파일**의 격리 모드도 확인한다. 보존 validator는 같은 `sys.executable`에 `-I -B`를 사용하므로 일반 실행에서만 보이는 사용자 site-packages가 대신해 주지 않는다. 해당 실행 파일로 아래 검사를 통과하고, `backend/requirements.txt`의 의존성을 충족하는지 확인한다. 실패하면 쓰기 중지·설치·마이그레이션에 진입하지 않고 실행 환경부터 바로잡는다. 이 검사를 위해 전역 Python을 임의로 교체하거나 validator의 격리 옵션을 제거하지 않는다.
+
+Windows venv의 `Scripts/python.exe`는 다른 Python 프로세스를 시작하는 실행기일 수 있다. 패키지 검사 성공과 프로세스 소유권 검증은 별개다. 사용할 실행 파일로 시작한 자식의 실제 PID·출생 시각·실행 이미지를 부모가 보유한 프로세스 핸들과 대조한다.
+
+```powershell
+& '<배포에 사용할 python.exe 절대 경로>' -I -B -c "import pydantic, pydantic_core; from importlib.metadata import version; from pydantic import TypeAdapter; from fastapi import FastAPI; assert pydantic.__version__ == version('pydantic'); assert pydantic_core.__version__ == version('pydantic_core'); assert TypeAdapter(int).validate_python('1') == 1; assert isinstance(FastAPI().openapi(), dict); print(pydantic.__version__, pydantic.__file__, pydantic_core.__version__, pydantic_core.__file__)"
+```
+
+실패 콘솔이 안내한 **해당 배포의 보존 실행기 경로**, `--record`, `--employee-root`, `--admission-sha256`을 그대로 사용한다. 복구는 대상·백업·실행기·이전 코드·프론트·Node의 해시를 확인하고 서비스를 정지시킨 뒤 경쟁 DB 쓰기를 막아 이전 묶음을 복원한다. 이미 확정한 배포, 잘못된 대상, 변조된 자료 또는 다른 복구 작업자의 동시 실행은 거부한다.
+
+강제 종료나 복구 오류가 있었다면 생성된 `recovery.json`과 실패 자료를 보존한다. 재실행에는 `--resume --recovery-sha256`이 필요하다. 정상 오류 출력에는 재개 명령이 포함된다. 강제 종료로 출력이 없으면 이전 복구 프로세스가 종료됐는지 확인한 뒤 해당 배포 record 옆 `recovery.json`을 `Get-FileHash -LiteralPath '<recovery.json 절대 경로>' -Algorithm SHA256`으로 읽어 얻은 해시를 명시한다. 소유권이 불확실하거나 영수증이 없으면 추정값으로 재개하지 않는다. 현재 자료가 영수증과 다르면 자동 재개하지 않으며 원인을 먼저 확인한다. Node 파일을 비롯한 보존 자료를 임의로 다시 설치하거나 수정해 해시 검사를 우회하지 않는다.
+
+복구 명령의 완료는 서비스 재시작까지 포함하지 않는다. 이전 DB와 코드·프론트·Node 묶음의 복원 결과를 확인하고, 기존 표준 기동·readiness·조회 검사를 통과한 뒤 담당자가 업무 재개를 안내한다. 업무 재개 뒤 새로 쌓인 거래를 이전 백업으로 덮는 복구는 이 절차의 적용 대상이 아니며 별도 데이터 대조가 필요하다.
+
+격리 검증은 `backend/tests/ops/recovery_rehearsal.py --artifacts <고정된 자료 영수증>`과 `--hard-exit`으로 설치 실패·강제 종료·명시 재개·실제 프로세스 기동을 각각 검사한다. 운영 경로 제한은 그대로 두고 테스트 전용 수명 관리 어댑터만 사용한다. 운영 빌드의 정확 복원과 QA 주소로 만든 production 빌드의 실제 기동 결과는 별도로 기록한다. 이 검증 성공이 직원 서버 배포를 의미하지 않는다.
+
+격리 리허설은 직접 시작한 프로세스의 PID와 실제 listener PID가 일치해야 한다. health·조회 응답 성공만으로 소유권 검사 통과를 판단하지 않는다. 불일치하면 실행을 중단하고 PID·출생 시각·부모 관계·실행 이미지 근거를 보존한다. 발견한 listener를 자동으로 소유 프로세스로 채택하거나 검사 기준을 완화하지 않는다.
 
 주중 동기화가 끝난 주간보고에는 아래 안내가 표시되고, 새 7열 검산 기준은 다음 KST 월요일부터 공개된다.
 

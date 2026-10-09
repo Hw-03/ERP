@@ -1,4 +1,5 @@
 import { setupServer } from "msw/node";
+import { http, HttpResponse } from "msw";
 import { modelsHandlers } from "./handlers/models";
 import { departmentsHandlers } from "./handlers/departments";
 import { employeesHandlers } from "./handlers/employees";
@@ -12,6 +13,7 @@ import { productionHandlers } from "./handlers/production";
 import { adminHandlers } from "./handlers/admin";
 
 export const server = setupServer(
+  http.post("*/api/client-events", () => new HttpResponse(null, { status: 204 })),
   ...modelsHandlers,
   ...departmentsHandlers,
   ...employeesHandlers,

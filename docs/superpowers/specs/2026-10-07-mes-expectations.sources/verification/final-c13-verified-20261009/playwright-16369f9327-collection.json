@@ -1,0 +1,5679 @@
+{
+  "config": {
+    "configFile": "C:\\Users\\user\\.codex\\worktrees\\mes-expectation-closure\\ERP\\frontend\\playwright.config.ts",
+    "rootDir": "C:/Users/user/.codex/worktrees/mes-expectation-closure/ERP/frontend/tests/e2e",
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": "C:\\Users\\user\\.codex\\worktrees\\mes-expectation-closure\\ERP\\frontend\\tests\\e2e\\global-setup.ts",
+    "globalTeardown": "C:\\Users\\user\\.codex\\worktrees\\mes-expectation-closure\\ERP\\frontend\\tests\\e2e\\global-teardown.ts",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {},
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/user/.codex/worktrees/mes-expectation-closure/ERP/frontend/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "C:/Users/user/.codex/worktrees/mes-expectation-closure/ERP/frontend/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": {
+      "current": 1,
+      "total": 1
+    },
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.60.0",
+    "workers": 1,
+    "webServer": {
+      "command": "npx next dev -p 3100",
+      "url": "http://localhost:3100",
+      "reuseExistingServer": false,
+      "timeout": 120000,
+      "env": {
+        "BACKEND_INTERNAL_URL": "http://127.0.0.1:8021"
+      }
+    }
+  },
+  "suites": [
+    {
+      "title": "admin-bom-status.spec.ts",
+      "file": "admin-bom-status.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "PC-DELTA-BOMUNMATCHED-01 실제 상태 저장·재진입·분류복원과 저장실패 이전 선택을 보존한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "6a87bca77841826d23d8-a217b1e45ed5645251c4",
+          "file": "admin-bom-status.spec.ts",
+          "line": 26,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "admin-consumer-chain.spec.ts",
+      "file": "admin-consumer-chain.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코드·모델 연결 수에 같은 기준",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "4887bbd255a8b7ece069-f4e4dee5deb22c46103f",
+          "file": "admin-consumer-chain.spec.ts",
+          "line": 30,
+          "column": 5
+        },
+        {
+          "title": "PC-DELTA-SUPPLIER-01 실제 업체 생성·정렬·이름수정·숨김·복원은 후보와 당시 내역을 구분",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "4887bbd255a8b7ece069-c84a5c65c2829929a31c",
+          "file": "admin-consumer-chain.spec.ts",
+          "line": 81,
+          "column": 5
+        },
+        {
+          "title": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "4887bbd255a8b7ece069-06eb2d3198b0f64b482d",
+          "file": "admin-consumer-chain.spec.ts",
+          "line": 137,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "admin-expectations.spec.ts",
+      "file": "admin-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "관리자 원자 기대의 실제 화면 회귀",
+          "file": "admin-expectations.spec.ts",
+          "line": 48,
+          "column": 6,
+          "specs": [
+            {
+              "title": "8.19-14 부서 이름·코드 검색과 상태 필터 해제는 같은 전체 모집단",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "1c143aea17e743aa0576-d9352dbede6042fc5fdb",
+              "file": "admin-expectations.spec.ts",
+              "line": 50,
+              "column": 7
+            },
+            {
+              "title": "8.19-15 표시명 저장·재진입은 위치키와 전체 재고·이력·직원 연결을 보존",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "1c143aea17e743aa0576-1e8baf8d29ff346924df",
+              "file": "admin-expectations.spec.ts",
+              "line": 73,
+              "column": 7
+            },
+            {
+              "title": "8.19-08 8.19-09 8.19-10 직원 이름·독립 역할 저장과 재진입",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "1c143aea17e743aa0576-61575620f2bd3df08b62",
+              "file": "admin-expectations.spec.ts",
+              "line": 102,
+              "column": 7
+            },
+            {
+              "title": "8.19-12 직원 삭제는 대기 업무 안내와 함께 차단하고 요청·예약·현재직원을 보존",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "1c143aea17e743aa0576-e63e7632c1a1d943eadc",
+              "file": "admin-expectations.spec.ts",
+              "line": 128,
+              "column": 7
+            },
+            {
+              "title": "PC-DELTA-ADMIN-03 구매 기준 실패 보존·재시도·재진입과 다른 품목/재고 무변경",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "1c143aea17e743aa0576-94fbd3ab0b837af72843",
+              "file": "admin-expectations.spec.ts",
+              "line": 158,
+              "column": 7
+            },
+            {
+              "title": "8.19-02 8.19-03 PC-DELTA-CACHE02 다른 탭 모델명 변경과 통신 차단 후 온라인 복귀",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "1c143aea17e743aa0576-4cb807274c3b22049e3b",
+              "file": "admin-expectations.spec.ts",
+              "line": 211,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "admin-export-expectations.spec.ts",
+      "file": "admin-export-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "관리자 내보내기·진단의 최종 파일과 읽기 전용 계약",
+          "file": "admin-export-expectations.spec.ts",
+          "line": 67,
+          "column": 6,
+          "specs": [
+            {
+              "title": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "eb5aa5f26240385186a5-d86d0149d0392ee66370",
+              "file": "admin-export-expectations.spec.ts",
+              "line": 69,
+              "column": 3
+            },
+            {
+              "title": "8.19-21 KST 오늘 양쪽 자정 CSV·Excel 최종파일과 업무DB 불변",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "eb5aa5f26240385186a5-9cc021174a30f964c5b1",
+              "file": "admin-export-expectations.spec.ts",
+              "line": 115,
+              "column": 3
+            },
+            {
+              "title": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "eb5aa5f26240385186a5-4065feee619e0870d50b",
+              "file": "admin-export-expectations.spec.ts",
+              "line": 134,
+              "column": 3
+            },
+            {
+              "title": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "eb5aa5f26240385186a5-58ae02480b6dc184c3d6",
+              "file": "admin-export-expectations.spec.ts",
+              "line": 155,
+              "column": 3
+            },
+            {
+              "title": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "eb5aa5f26240385186a5-7ff5d59ed5028e9bf66e",
+              "file": "admin-export-expectations.spec.ts",
+              "line": 190,
+              "column": 3
+            },
+            {
+              "title": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "eb5aa5f26240385186a5-fb6850d2a98eca875665",
+              "file": "admin-export-expectations.spec.ts",
+              "line": 227,
+              "column": 3
+            },
+            {
+              "title": "PC-DELTA-ADMINAUDIT-01 주입 서버오류는 등록·다운로드 성공을 표시하지 않음",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "eb5aa5f26240385186a5-8dc2ec63d32c0ba76bc5",
+              "file": "admin-export-expectations.spec.ts",
+              "line": 268,
+              "column": 3
+            },
+            {
+              "title": "PC-DELTA-ADMINAUDIT-01 실제 오래된단말 형식 자동복구는 직원·감사세션을 보존",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "eb5aa5f26240385186a5-a0c93904f989bf444442",
+              "file": "admin-export-expectations.spec.ts",
+              "line": 282,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "admin-item-code-preview.spec.ts",
+      "file": "admin-item-code-preview.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "8.19-05 실제 모델·카테고리 변경의 정확한 미리보기와 저장 코드가 같다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a5cc68686737d25c0b06-092484ef3d74b6769611",
+          "file": "admin-item-code-preview.spec.ts",
+          "line": 17,
+          "column": 5
+        },
+        {
+          "title": "8.19-05 미리보기 조회 실패는 생성하지 않고 입력을 보존해 재조회 뒤 정확히 저장",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a5cc68686737d25c0b06-c6e413d15624bf9b6769",
+          "file": "admin-item-code-preview.spec.ts",
+          "line": 58,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "admin-item-flags.spec.ts",
+      "file": "admin-item-flags.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "8.19-06 관리자 영업 확인 ON/OFF는 실제 출하 2·5단계의 표시를 바꾼다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "20da831d515d77bd435f-6d35efe177ca729f64cf",
+          "file": "admin-item-flags.spec.ts",
+          "line": 49,
+          "column": 5
+        },
+        {
+          "title": "8.19-06 관리자 BOM 미반영 ON/OFF는 실제 자동 생산의 자식 표시와 소비 수량을 바꾼다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "20da831d515d77bd435f-85c2eb8675def584066b",
+          "file": "admin-item-flags.spec.ts",
+          "line": 76,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "admin-master-expectations.spec.ts",
+      "file": "admin-master-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "G01 실제 PIN 로그인 세션과 직원 CSV에는 등급이 없다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e73e09b1fe427880e30b-b2c59b91c187faf2fd9f",
+          "file": "admin-master-expectations.spec.ts",
+          "line": 35,
+          "column": 5
+        },
+        {
+          "title": "8.19-07 실제 이름·분류 변경은 당시 품목·현재 연결과 삭제 전체 의존 안내를 보존",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e73e09b1fe427880e30b-7e7aa9e9ca77361cd579",
+          "file": "admin-master-expectations.spec.ts",
+          "line": 54,
+          "column": 5
+        },
+        {
+          "title": "8.19-12 퇴직 직원의 실제 완료 요청과 내역 처리자는 삭제 뒤에도 남는다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e73e09b1fe427880e30b-fc459105b3e597b3c9ec",
+          "file": "admin-master-expectations.spec.ts",
+          "line": 97,
+          "column": 5
+        },
+        {
+          "title": "8.19-16 부서 영구 삭제 차단은 서버의 모든 의존 사유를 화면에 표시하고 기록을 보존",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e73e09b1fe427880e30b-b45ce76cfb11dfcad422",
+          "file": "admin-master-expectations.spec.ts",
+          "line": 128,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "admin-master-live.spec.ts",
+      "file": "admin-master-live.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "PC-DELTA-ADMIN-01 품목 수정은 다른 직원의 열린 입출고 후보에 새 이름·코드를 반영한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "c63550b12a4a3d573c90-d668fd1d514b706743cf",
+          "file": "admin-master-live.spec.ts",
+          "line": 24,
+          "column": 5
+        },
+        {
+          "title": "PC-DELTA-ADMIN-01 부서 표시명 수정은 다른 열린 직원 후보를 갱신하고 미저장 이름을 보존한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "c63550b12a4a3d573c90-d977c4ab131d1326d72b",
+          "file": "admin-master-live.spec.ts",
+          "line": 70,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "admin-ui-extra-expectations.spec.ts",
+      "file": "admin-ui-extra-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "8.19-26 관리자 PIN 길이·확인 불일치 차단과 실제 저장 중 중복 제출 방지",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d0d5315df30f349c8c93-dd0d1b31809691a93483",
+          "file": "admin-ui-extra-expectations.spec.ts",
+          "line": 58,
+          "column": 5
+        },
+        {
+          "title": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d0d5315df30f349c8c93-5aa0631499640d82acd3",
+          "file": "admin-ui-extra-expectations.spec.ts",
+          "line": 97,
+          "column": 5
+        },
+        {
+          "title": "8.19-14 상태 필터의 실제 빈 결과는 정상 안내이며 해제하면 전체 부서 복원",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d0d5315df30f349c8c93-bae2834c456e519ef25a",
+          "file": "admin-ui-extra-expectations.spec.ts",
+          "line": 126,
+          "column": 5
+        },
+        {
+          "title": "8.19-10 관리자 표시탭 저장 뒤 새 로그인 메뉴와 직접 URL 접근이 일치",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d0d5315df30f349c8c93-4ba678af1bebf3755b64",
+          "file": "admin-ui-extra-expectations.spec.ts",
+          "line": 145,
+          "column": 5
+        },
+        {
+          "title": "8.19-08 이미 열린 로그인 후보는 실제 직원 이름 변경·비활성화를 갱신",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d0d5315df30f349c8c93-fa2ed1312de1d67d7cd8",
+          "file": "admin-ui-extra-expectations.spec.ts",
+          "line": 168,
+          "column": 5
+        },
+        {
+          "title": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d0d5315df30f349c8c93-b632b497e1dad3b0a437",
+          "file": "admin-ui-extra-expectations.spec.ts",
+          "line": 199,
+          "column": 5
+        },
+        {
+          "title": "8.19-13 실제 담당 모델 순서 저장·재진입·새 로그인은 조립 업무 후보에 같은 우선순위",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d0d5315df30f349c8c93-e9ec9dcc6bb9dd2321b9",
+          "file": "admin-ui-extra-expectations.spec.ts",
+          "line": 277,
+          "column": 5
+        },
+        {
+          "title": "PC-DELTA-IOORDER-01 실제 드래그 저장·재진입·새로고침·초기화는 다른 직원 탭 순서를 보존",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d0d5315df30f349c8c93-93464b78c052731399ba",
+          "file": "admin-ui-extra-expectations.spec.ts",
+          "line": 316,
+          "column": 5
+        },
+        {
+          "title": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d0d5315df30f349c8c93-4105a310160799404223",
+          "file": "admin-ui-extra-expectations.spec.ts",
+          "line": 373,
+          "column": 5
+        },
+        {
+          "title": "8.19-11 지정 직원 PIN 초기화 상세·시각·감사 변경자·이전PIN 거부를 실제 확인",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d0d5315df30f349c8c93-e2c4c1cf7030a86b0376",
+          "file": "admin-ui-extra-expectations.spec.ts",
+          "line": 419,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "admin-ui-lifecycle-expectations.spec.ts",
+      "file": "admin-ui-lifecycle-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "8.19-09 실제 창고 정 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "bf7e31ed336604d8d0f3-ca4cac6471a1d8379c45",
+          "file": "admin-ui-lifecycle-expectations.spec.ts",
+          "line": 44,
+          "column": 7
+        },
+        {
+          "title": "8.19-09 실제 창고 부 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "bf7e31ed336604d8d0f3-3587f7ec97150b85ca97",
+          "file": "admin-ui-lifecycle-expectations.spec.ts",
+          "line": 44,
+          "column": 7
+        },
+        {
+          "title": "8.19-08 실제 직원 추가는 이미 열린 로그인 후보·목록에 새 식별정보를 반영",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "bf7e31ed336604d8d0f3-f4b00e3e0986f2c546ac",
+          "file": "admin-ui-lifecycle-expectations.spec.ts",
+          "line": 111,
+          "column": 5
+        },
+        {
+          "title": "8.19-13 저장된 담당 모델 순서는 실제 불량 격리 후보에서도 유지",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "bf7e31ed336604d8d0f3-1b20b645ceaf619b77c8",
+          "file": "admin-ui-lifecycle-expectations.spec.ts",
+          "line": 164,
+          "column": 5
+        },
+        {
+          "title": "8.19-15 표시명 변경 후 같은 부서ID의 직원·공정품목 연결수와 재고 위치를 보존",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "bf7e31ed336604d8d0f3-95aa152bc13126bea98b",
+          "file": "admin-ui-lifecycle-expectations.spec.ts",
+          "line": 189,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "bom-expectations.spec.ts",
+      "file": "bom-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "BOM 8.19-19 여러 오류·실패 초안을 유지하고 전체 구성을 한 요청으로 저장",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2a922b53510a75249adf-97a09df34c3c2717964e",
+          "file": "bom-expectations.spec.ts",
+          "line": 54,
+          "column": 5
+        },
+        {
+          "title": "BOM 8.19-17/18/19 두 탭 충돌·완료 잠금·해제 실패 재시도·전체 변경 이력 보존",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2a922b53510a75249adf-e98ee657aa833a3095d3",
+          "file": "bom-expectations.spec.ts",
+          "line": 88,
+          "column": 5
+        },
+        {
+          "title": "BOM 8.19-17 부서 상태별 모집단·완료 구성·사용처 건수와 편집 필터 복원",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2a922b53510a75249adf-790b4fe69224897e4a2f",
+          "file": "bom-expectations.spec.ts",
+          "line": 146,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "capacity-readstates.spec.ts",
+      "file": "capacity-readstates.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "STATE01 dashboard 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1931981560c0ad6c017f-2d7da804dc69398df01e",
+          "file": "capacity-readstates.spec.ts",
+          "line": 72,
+          "column": 7
+        },
+        {
+          "title": "STATE01 warehouse 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1931981560c0ad6c017f-d299b4aae764295c0d2c",
+          "file": "capacity-readstates.spec.ts",
+          "line": 72,
+          "column": 7
+        },
+        {
+          "title": "STATE01 shipping 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1931981560c0ad6c017f-2efd78b2399b19e3b577",
+          "file": "capacity-readstates.spec.ts",
+          "line": 72,
+          "column": 7
+        },
+        {
+          "title": "STATE01 defect 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1931981560c0ad6c017f-813adbd0069bf3c26cc8",
+          "file": "capacity-readstates.spec.ts",
+          "line": 72,
+          "column": 7
+        },
+        {
+          "title": "STATE01 history 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1931981560c0ad6c017f-a94a4bb3ea34f9f0cedd",
+          "file": "capacity-readstates.spec.ts",
+          "line": 72,
+          "column": 7
+        },
+        {
+          "title": "STATE01 admin 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1931981560c0ad6c017f-e0f547bc64c92f2add28",
+          "file": "capacity-readstates.spec.ts",
+          "line": 72,
+          "column": 7
+        },
+        {
+          "title": "STATE01 warehouse 실제 품목선택 검색0은 빈 요청 목록과 별도 안내",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1931981560c0ad6c017f-a349990e798ff7c23a26",
+          "file": "capacity-readstates.spec.ts",
+          "line": 104,
+          "column": 5
+        },
+        {
+          "title": "STATE01 reports 실제 빈 작성자와 최초 로딩·실패·PC 재시도를 구별",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1931981560c0ad6c017f-a082a14d5b4525003062",
+          "file": "capacity-readstates.spec.ts",
+          "line": 120,
+          "column": 5
+        },
+        {
+          "title": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1931981560c0ad6c017f-c829b089c5344f09acb2",
+          "file": "capacity-readstates.spec.ts",
+          "line": 148,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "common-expectations.spec.ts",
+      "file": "common-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "AUTH01 실제 PIN 오류·로그인·저장·새로고침",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-f3aaf7ebe074490d3126",
+          "file": "common-expectations.spec.ts",
+          "line": 47,
+          "column": 5
+        },
+        {
+          "title": "AUTH01 선택 뒤 실제 비활성은 PIN 오류와 구분",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-f89a8a599d524d356731",
+          "file": "common-expectations.spec.ts",
+          "line": 65,
+          "column": 5
+        },
+        {
+          "title": "AUTH01 없는 직원·횟수제한 UI는 주입 응답을 별도로 표시",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-56429fcc3b3c3ffdf013",
+          "file": "common-expectations.spec.ts",
+          "line": 76,
+          "column": 5
+        },
+        {
+          "title": "AUTH02 SESSION01 취소·현재탭 로그아웃·다른 실제탭 유지",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-2f1896ff9ca0164a7c9a",
+          "file": "common-expectations.spec.ts",
+          "line": 92,
+          "column": 5
+        },
+        {
+          "title": "AUTH03 PIN 검증·성공 뒤 이전PIN 거부와 새PIN UI 로그인",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-5acd455bb564648670a1",
+          "file": "common-expectations.spec.ts",
+          "line": 112,
+          "column": 5
+        },
+        {
+          "title": "ADMINSESSION01 UI 해제 뒤 reload·새탭은 PIN잠금 유지",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-2c3c1475c1851bbd3401",
+          "file": "common-expectations.spec.ts",
+          "line": 145,
+          "column": 5
+        },
+        {
+          "title": "SHELL01 숨김 탭 URL·Back·알림 링크는 접근을 우회하지 않음",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-30039b9fd8f120ef9173",
+          "file": "common-expectations.spec.ts",
+          "line": 163,
+          "column": 5
+        },
+        {
+          "title": "SHELL02 warehouse 실제 초안 메뉴·같은메뉴·계속·폐기·내부Back 보존",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-2120f0a536c6dbbcd197",
+          "file": "common-expectations.spec.ts",
+          "line": 222,
+          "column": 5
+        },
+        {
+          "title": "SHELL02 shipping 실제 초안 메뉴·Back·같은메뉴·계속·폐기",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-f96eba7318eed638ca87",
+          "file": "common-expectations.spec.ts",
+          "line": 232,
+          "column": 5
+        },
+        {
+          "title": "SHELL02 warehouse 실제 history 이탈 Back은 확인·계속초안·버리기를 보장",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-4e727a08b2a0f285b15f",
+          "file": "common-expectations.spec.ts",
+          "line": 243,
+          "column": 5
+        },
+        {
+          "title": "SHELL03 깨끗한 동기화·작성중 확인·계속보존·폐기갱신",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-f03aa219fda805ee4445",
+          "file": "common-expectations.spec.ts",
+          "line": 265,
+          "column": 5
+        },
+        {
+          "title": "SHELL04 CtrlS는 저장 동작 차단하고 일반s는 실제검색 입력",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-10bebc8a50c496d807ee",
+          "file": "common-expectations.spec.ts",
+          "line": 293,
+          "column": 5
+        },
+        {
+          "title": "SETTINGS01 취소는 설정을 적용하지 않고 실패는 쌍 모두 보존",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-7ae2152996f7742c13a5",
+          "file": "common-expectations.spec.ts",
+          "line": 305,
+          "column": 5
+        },
+        {
+          "title": "SETTINGS02 G10 같은직원 두탭 자동반영·초안PIN·역할audit보존",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-41f4b2cc168577323714",
+          "file": "common-expectations.spec.ts",
+          "line": 324,
+          "column": 5
+        },
+        {
+          "title": "G10 같은context 다른직원 두탭 저장실패·성공 격리",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-24e863c92dd8620d4ff8",
+          "file": "common-expectations.spec.ts",
+          "line": 363,
+          "column": 5
+        },
+        {
+          "title": "SETTINGS04 본인팝업 실패복원·성공저장·다음실제로그인",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-3ffff0df2e060a651ac0",
+          "file": "common-expectations.spec.ts",
+          "line": 386,
+          "column": 5
+        },
+        {
+          "title": "SETTINGS04 SETTINGS05 타대상 실API 거부·현재UI와 상대설정보존",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-c97ad5954d5da9b9a0d4",
+          "file": "common-expectations.spec.ts",
+          "line": 405,
+          "column": 5
+        },
+        {
+          "title": "SHELL02 일보 자동저장은 이탈전 완료를 기다리고 실패는 입력유지",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-9af2599eaf5fd5ef00cf",
+          "file": "common-expectations.spec.ts",
+          "line": 419,
+          "column": 5
+        },
+        {
+          "title": "NOTIFY01 클릭한 실제요청만 읽음·정확한탭섹션요청·실패재시도",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-ad7064eb8b093017d109",
+          "file": "common-expectations.spec.ts",
+          "line": 450,
+          "column": 5
+        },
+        {
+          "title": "NOTIFY02 실제승인 뒤 다른결재자 배지·승인함 자동갱신·요청자결과보존",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-2d92ee25a48f3a566a22",
+          "file": "common-expectations.spec.ts",
+          "line": 477,
+          "column": 5
+        },
+        {
+          "title": "NOTIFY03 실제화면 초기로딩·조회오류·빈목록·재시도최신복구 구분",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-3683d92df67db4d49292",
+          "file": "common-expectations.spec.ts",
+          "line": 505,
+          "column": 5
+        },
+        {
+          "title": "NOTIFY03 기존미읽음은 조회실패로0확정되지 않고 재시도복구",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-202a3a48ef483c04bae4",
+          "file": "common-expectations.spec.ts",
+          "line": 534,
+          "column": 5
+        },
+        {
+          "title": "NOTIFY04 본인만변경·반복읽음정리·없는알림404직원오류",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-0385804720e3c8525c94",
+          "file": "common-expectations.spec.ts",
+          "line": 555,
+          "column": 5
+        },
+        {
+          "title": "NOTIFY05 실제권한회수 알림정리·기존링크차단·다른결재자처리가능",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-8852151283727786f25b",
+          "file": "common-expectations.spec.ts",
+          "line": 587,
+          "column": 5
+        },
+        {
+          "title": "NOTIFY06 실제취소는 모든결재자 알림·옛승인함링크를 정리",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-629352219627367a35a3",
+          "file": "common-expectations.spec.ts",
+          "line": 611,
+          "column": 5
+        },
+        {
+          "title": "SESSION01 NOTIFY05 실제 queue 창고역할회수 focus는 요청화면 복구",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-a49cc8c1290576854d7a",
+          "file": "common-expectations.spec.ts",
+          "line": 655,
+          "column": 5
+        },
+        {
+          "title": "SESSION01 NOTIFY05 실제 dept-queue 부서역할회수 focus는 요청화면 복구",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-58ce0ddf3de03f7e37a1",
+          "file": "common-expectations.spec.ts",
+          "line": 661,
+          "column": 5
+        },
+        {
+          "title": "SESSION01 NOTIFY05 실제 as-research-queue 연구역할회수 focus는 요청화면 복구",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-82226c3debe9700207d0",
+          "file": "common-expectations.spec.ts",
+          "line": 667,
+          "column": 5
+        },
+        {
+          "title": "SESSION01 두실제탭 비활성 focus는 로그인·다음쓰기403",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-d3e792289d90c33d809a",
+          "file": "common-expectations.spec.ts",
+          "line": 674,
+          "column": 5
+        },
+        {
+          "title": "ROUTE01 실제Next404 직원·메뉴·Back·대시보드·audit유지",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-8ff0e7452c5b177c66e6",
+          "file": "common-expectations.spec.ts",
+          "line": 687,
+          "column": 5
+        },
+        {
+          "title": "CONSOLE01 상위탭·상세·알림modal 순회 실제코드오류·overlay·무한로딩없음",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a444ddcdea094821ccf8-a5438028f6ad5c81f452",
+          "file": "common-expectations.spec.ts",
+          "line": 712,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "defect-action-boundaries.spec.ts",
+      "file": "defect-action-boundaries.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "8.18-05 PC 창고 불량은 복귀·폐기·반품이고 조립 반품과 B급·구형 추가처리는 없다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1e69dd68ae1f48b61caf-9320487bd4e8ac84cf2f",
+          "file": "defect-action-boundaries.spec.ts",
+          "line": 8,
+          "column": 7
+        },
+        {
+          "title": "8.18-05 PC 튜브 TR 반품은 실제 원건의 업체 범위와 격리 수량을 보존한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1e69dd68ae1f48b61caf-625ce773493efbca425e",
+          "file": "defect-action-boundaries.spec.ts",
+          "line": 70,
+          "column": 9
+        },
+        {
+          "title": "8.18-05 PC 튜브 TA 반품은 실제 원건의 업체 범위와 격리 수량을 보존한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1e69dd68ae1f48b61caf-a40f4689e2e742f2ab75",
+          "file": "defect-action-boundaries.spec.ts",
+          "line": 70,
+          "column": 9
+        },
+        {
+          "title": "8.18-05 모바일 창고 불량은 복귀·폐기·반품이고 조립 반품과 B급·구형 추가처리는 없다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1e69dd68ae1f48b61caf-4b434e1efc6ba71ef5de",
+          "file": "defect-action-boundaries.spec.ts",
+          "line": 8,
+          "column": 7
+        },
+        {
+          "title": "8.18-05 모바일 튜브 TR 반품은 실제 원건의 업체 범위와 격리 수량을 보존한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1e69dd68ae1f48b61caf-8a718541aab01b8e5f15",
+          "file": "defect-action-boundaries.spec.ts",
+          "line": 70,
+          "column": 9
+        },
+        {
+          "title": "8.18-05 모바일 튜브 TA 반품은 실제 원건의 업체 범위와 격리 수량을 보존한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1e69dd68ae1f48b61caf-434a7de29cea36b613e4",
+          "file": "defect-action-boundaries.spec.ts",
+          "line": 70,
+          "column": 9
+        }
+      ]
+    },
+    {
+      "title": "defect-additional-expectations.spec.ts",
+      "file": "defect-additional-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "DEFECT-SUBMIT 8.5-08/10/11 8.7-05/08/09 일반직원 격리 등록 warehouse 실제 위치·이력",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e47b2fe58661c44cb32d-f9c53b27b0d7da01dcff",
+          "file": "defect-additional-expectations.spec.ts",
+          "line": 70,
+          "column": 9
+        },
+        {
+          "title": "DEFECT-SUBMIT 8.5-08/10/11 8.7-05/08/09 일반직원 즉시 폐기 warehouse 실제 위치·이력",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e47b2fe58661c44cb32d-0201bc181c6e2403dffa",
+          "file": "defect-additional-expectations.spec.ts",
+          "line": 70,
+          "column": 9
+        },
+        {
+          "title": "DEFECT-SUBMIT 8.5-08/10/11 8.7-05/08/09 일반직원 격리 등록 production 실제 위치·이력",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e47b2fe58661c44cb32d-20f58a9bc761dd34e7cb",
+          "file": "defect-additional-expectations.spec.ts",
+          "line": 70,
+          "column": 9
+        },
+        {
+          "title": "DEFECT-SUBMIT 8.5-08/10/11 8.7-05/08/09 일반직원 즉시 폐기 production 실제 위치·이력",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e47b2fe58661c44cb32d-64318625a6949875877e",
+          "file": "defect-additional-expectations.spec.ts",
+          "line": 70,
+          "column": 9
+        },
+        {
+          "title": "DEFECT-SCRAP-ERRORS 8.7-04 8.10-05 warehouse 모든 행의 수량·가용·사유 오류를 표시하고 확인·처리·재고 변경을 막는다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e47b2fe58661c44cb32d-32cff088cfca565199d8",
+          "file": "defect-additional-expectations.spec.ts",
+          "line": 169,
+          "column": 7
+        },
+        {
+          "title": "DEFECT-SCRAP-ERRORS 8.7-04 8.10-05 production 모든 행의 수량·가용·사유 오류를 표시하고 확인·처리·재고 변경을 막는다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e47b2fe58661c44cb32d-b0ebfdc71d7900d9a6cf",
+          "file": "defect-additional-expectations.spec.ts",
+          "line": 169,
+          "column": 7
+        },
+        {
+          "title": "DEFECT-RESTORE-BUSY 8.6-06 지연 응답 중 버튼잠금·정상복귀 API/수량/거래 한 번",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e47b2fe58661c44cb32d-8e0d7de5e76b002f0abd",
+          "file": "defect-additional-expectations.spec.ts",
+          "line": 219,
+          "column": 5
+        },
+        {
+          "title": "DEFECT-ORIGINS 8.6-02/09 8.9-03/04 원건 사유/메모 분리·PIN실패보존·분류/메모 이력",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e47b2fe58661c44cb32d-1132d0d8c24c5ab81558",
+          "file": "defect-additional-expectations.spec.ts",
+          "line": 249,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "defect-auto-department.spec.ts",
+      "file": "defect-auto-department.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "8.5-02 불량 격리는 튜브·고압·조립 공정의 실제 부서를 자동 표시하고 수동 처리부서 선택 없이 같은 위치에 반영한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e7f2e3174f71f75558eb-d4bc3f7e0e172e6f0a25",
+          "file": "defect-auto-department.spec.ts",
+          "line": 12,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "defect-bulk-boundaries.spec.ts",
+      "file": "defect-bulk-boundaries.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "DEFECT-BULK-BOUNDARY PC 부서·품목·필터 변경은 선택을 초기화하고 잔량 전체와 개별 부분처리를 구분한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d4416bcaa0e533621f8c-12ba98af10738e80e8bc",
+          "file": "defect-bulk-boundaries.spec.ts",
+          "line": 83,
+          "column": 7
+        },
+        {
+          "title": "DEFECT-BULK-BLOCK PC 서버 응답형 대기·출처불명 원건 투영은 선택 불가이며 보관 관리분류는 분리한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d4416bcaa0e533621f8c-5813d3f2b449ba9fc740",
+          "file": "defect-bulk-boundaries.spec.ts",
+          "line": 126,
+          "column": 7
+        },
+        {
+          "title": "DEFECT-RETURN-RETRY PC 실제 반품 성공응답 유실·재시도는 동일요청과 한 거래만 유지한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d4416bcaa0e533621f8c-22b42c302c5a48987fe7",
+          "file": "defect-bulk-boundaries.spec.ts",
+          "line": 175,
+          "column": 7
+        },
+        {
+          "title": "DEFECT-BULK-BOUNDARY 모바일 부서·품목·필터 변경은 선택을 초기화하고 잔량 전체와 개별 부분처리를 구분한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d4416bcaa0e533621f8c-35244ade907e74a15e48",
+          "file": "defect-bulk-boundaries.spec.ts",
+          "line": 83,
+          "column": 7
+        },
+        {
+          "title": "DEFECT-BULK-BLOCK 모바일 서버 응답형 대기·출처불명 원건 투영은 선택 불가이며 보관 관리분류는 분리한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d4416bcaa0e533621f8c-c52bcf92f05a47f1a3cb",
+          "file": "defect-bulk-boundaries.spec.ts",
+          "line": 126,
+          "column": 7
+        },
+        {
+          "title": "DEFECT-RETURN-RETRY 모바일 실제 반품 성공응답 유실·재시도는 동일요청과 한 거래만 유지한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d4416bcaa0e533621f8c-c1a1c8bca878d4fd21e5",
+          "file": "defect-bulk-boundaries.spec.ts",
+          "line": 175,
+          "column": 7
+        },
+        {
+          "title": "DEFECT-BULK-RETURN 창고 일괄반품 업체필수·숨김경합 전체불변과 조립 반품 없음",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d4416bcaa0e533621f8c-4a7b715552b923346e59",
+          "file": "defect-bulk-boundaries.spec.ts",
+          "line": 216,
+          "column": 5
+        },
+        {
+          "title": "DEFECT-BULK-STALE 처리중 실제 두 원건 잔량변경은 모든 오류를 표시하고 일괄 변경을 남기지 않는다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d4416bcaa0e533621f8c-0856d65096e6392512d4",
+          "file": "defect-bulk-boundaries.spec.ts",
+          "line": 243,
+          "column": 5
+        },
+        {
+          "title": "DEFECT-BULK-MOBILE 실제 전량 복귀 제출은 원건·위치를 보존하고 복귀분만 후속 사용한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d4416bcaa0e533621f8c-db043102e558bc56db4d",
+          "file": "defect-bulk-boundaries.spec.ts",
+          "line": 275,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "defect-draft-navigation.spec.ts",
+      "file": "defect-draft-navigation.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "PC-DELTA-DEFECT-03 두 행 사유·기타메모는 실제 Back·새로고침·메뉴 머무르기에 보존되고 나가기는 처리 호출 없이 버린다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2baed7454bb489c5a69f-05a59a58dcecc1194539",
+          "file": "defect-draft-navigation.spec.ts",
+          "line": 35,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "defect-expectations.spec.ts",
+      "file": "defect-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "불량 확정 기대값의 독립 브라우저 조건",
+          "file": "defect-expectations.spec.ts",
+          "line": 44,
+          "column": 6,
+          "specs": [
+            {
+              "title": "8.5-01 8.5-03 8.7-01 8.7-03 작업·출처·가용 격리 등록 창고 재고",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e072f334ad656d2f3886-cf0be8a9dcf011fb7871",
+              "file": "defect-expectations.spec.ts",
+              "line": 47,
+              "column": 11
+            },
+            {
+              "title": "8.5-01 8.5-03 8.7-01 8.7-03 작업·출처·가용 즉시 폐기 창고 재고",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e072f334ad656d2f3886-da0be90feb78b900bb55",
+              "file": "defect-expectations.spec.ts",
+              "line": 47,
+              "column": 11
+            },
+            {
+              "title": "8.5-01 8.5-03 8.7-01 8.7-03 작업·출처·가용 격리 등록 부서 재고",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e072f334ad656d2f3886-247b74af02234c453fcd",
+              "file": "defect-expectations.spec.ts",
+              "line": 47,
+              "column": 11
+            },
+            {
+              "title": "8.5-01 8.5-03 8.7-01 8.7-03 작업·출처·가용 즉시 폐기 부서 재고",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e072f334ad656d2f3886-ed9e9e27b29f6c2da5c1",
+              "file": "defect-expectations.spec.ts",
+              "line": 47,
+              "column": 11
+            },
+            {
+              "title": "8.5-07 8.10-02 8.10-05 제출 사유·기타 메모·초과량은 확인 전 차단",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e072f334ad656d2f3886-8ef879f5693728f9bfeb",
+              "file": "defect-expectations.spec.ts",
+              "line": 68,
+              "column": 7
+            },
+            {
+              "title": "8.7-05 PC-DELTA-DEFECT-03 확인 취소·이탈 머무르기·나가기는 서버 무변경",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e072f334ad656d2f3886-a437cfa2a15eaeac05d7",
+              "file": "defect-expectations.spec.ts",
+              "line": 91,
+              "column": 7
+            },
+            {
+              "title": "8.10-05 8.10-06 복수 행 로컬 오류·서버 거부를 모두 표시하고 입력·재고 보존",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e072f334ad656d2f3886-b7495fbf2b740d9eb50d",
+              "file": "defect-expectations.spec.ts",
+              "line": 118,
+              "column": 7
+            },
+            {
+              "title": "8.11-05 기간만 변경하면 부서·모델·공정 필터 유지, 명시 초기화만 제거",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e072f334ad656d2f3886-53625119f6cb8ce2e019",
+              "file": "defect-expectations.spec.ts",
+              "line": 155,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "defect-history-expectations.spec.ts",
+      "file": "defect-history-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "DEFECT-HISTORY 8.5-10/11 8.6-07/08 8.13-03/12/13 격리·복귀·반품·취소의 실제 숫자쌍·처리자·시각·사유와 연결",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "684fa81703a30c3e1f1a-f28a44cf064a58c88c2f",
+          "file": "defect-history-expectations.spec.ts",
+          "line": 12,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "defect-order-expectations.spec.ts",
+      "file": "defect-order-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "DEFECT-ORDER PC-DELTA-DEFECTORDER-01 실제 포인터 드래그 저장·재진입·새로고침·초기화는 본인 순서만 바꾸고 격리·다른 직원은 보존한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "fc737a378f902ba79d09-1418aadf4834786bb978",
+          "file": "defect-order-expectations.spec.ts",
+          "line": 25,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "defect-processing-expectations.spec.ts",
+      "file": "defect-processing-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "DEFECT-RETURN PC-DELTA-DEFECT-05/06 8.13-03/04/05 활성업체·숨김경합·당시이름·PIN취소·실제격리수량",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "b9384071b83b09520758-b8564aec60c07d7c3873",
+          "file": "defect-processing-expectations.spec.ts",
+          "line": 53,
+          "column": 5
+        },
+        {
+          "title": "DEFECT-LIVE 8.6-03 8.7-07 PC-DELTA-DEFECT-02 격리 부분·전량 복귀와 폐기는 원건·다른 카드·건수를 즉시 갱신한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "b9384071b83b09520758-23334c98853f93402d47",
+          "file": "defect-processing-expectations.spec.ts",
+          "line": 129,
+          "column": 5
+        },
+        {
+          "title": "DEFECT-BULK 8.18-01/03/04/07 같은품목 독립원건 전체잔량·각원건재확인·한묶음실행",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "b9384071b83b09520758-2a2700d07b771aef1008",
+          "file": "defect-processing-expectations.spec.ts",
+          "line": 186,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "defect-quarantine-records.spec.ts",
+      "file": "defect-quarantine-records.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "불량 격리 건별 원장",
+          "file": "defect-quarantine-records.spec.ts",
+          "line": 98,
+          "column": 6,
+          "specs": [
+            {
+              "title": "같은 품목의 독립 행·부분 처리·통합 이력·즉시 처리 작업자 기록",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b3a3a65d06238edc9931-1f96f4fd2fc401729544",
+              "file": "defect-quarantine-records.spec.ts",
+              "line": 109,
+              "column": 7
+            },
+            {
+              "title": "B급 등록·분류 변경·일부 정상 복귀는 보관 목록에 남는다",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b3a3a65d06238edc9931-f4f72143c14646e7669d",
+              "file": "defect-quarantine-records.spec.ts",
+              "line": 274,
+              "column": 7
+            },
+            {
+              "title": "불량 허브 4카드는 데스크톱과 모바일 폭에서 가로 넘침 없이 보인다",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b3a3a65d06238edc9931-98489f8bd9367c29bec5",
+              "file": "defect-quarantine-records.spec.ts",
+              "line": 345,
+              "column": 7
+            },
+            {
+              "title": "정상 복귀 navigation PC B_GRADE 부분",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b3a3a65d06238edc9931-04f698b972ce0eab0ac6",
+              "file": "defect-quarantine-records.spec.ts",
+              "line": 367,
+              "column": 13
+            },
+            {
+              "title": "정상 복귀 navigation PC B_GRADE 전량",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b3a3a65d06238edc9931-e21e9b1dab6948981db9",
+              "file": "defect-quarantine-records.spec.ts",
+              "line": 367,
+              "column": 13
+            },
+            {
+              "title": "정상 복귀 navigation PC OBSOLETE 부분",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b3a3a65d06238edc9931-616157810863a81ffd58",
+              "file": "defect-quarantine-records.spec.ts",
+              "line": 367,
+              "column": 13
+            },
+            {
+              "title": "정상 복귀 navigation PC OBSOLETE 전량",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b3a3a65d06238edc9931-81596741963eedb206df",
+              "file": "defect-quarantine-records.spec.ts",
+              "line": 367,
+              "column": 13
+            },
+            {
+              "title": "정상 복귀 navigation 모바일 B_GRADE 부분",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b3a3a65d06238edc9931-c3975db55465656ffc07",
+              "file": "defect-quarantine-records.spec.ts",
+              "line": 367,
+              "column": 13
+            },
+            {
+              "title": "정상 복귀 navigation 모바일 B_GRADE 전량",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b3a3a65d06238edc9931-3c940999e22128ef1cd9",
+              "file": "defect-quarantine-records.spec.ts",
+              "line": 367,
+              "column": 13
+            },
+            {
+              "title": "정상 복귀 navigation 모바일 OBSOLETE 부분",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b3a3a65d06238edc9931-581577dfa3d7bb32b997",
+              "file": "defect-quarantine-records.spec.ts",
+              "line": 367,
+              "column": 13
+            },
+            {
+              "title": "정상 복귀 navigation 모바일 OBSOLETE 전량",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b3a3a65d06238edc9931-47e31184cd5261f2746a",
+              "file": "defect-quarantine-records.spec.ts",
+              "line": 367,
+              "column": 13
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "defect-reason-fields-expectations.spec.ts",
+      "file": "defect-reason-fields-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f56c530aefc89097494c-bdbae0139a27e83a72e1",
+          "file": "defect-reason-fields-expectations.spec.ts",
+          "line": 20,
+          "column": 5
+        },
+        {
+          "title": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f56c530aefc89097494c-cfa965fec859f4c4ab2b",
+          "file": "defect-reason-fields-expectations.spec.ts",
+          "line": 84,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "defect-return-cancel-retry.spec.ts",
+      "file": "defect-return-cancel-retry.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "PC-DELTA-DEFECT-06 실제 반품취소 성공응답 유실 뒤 stale 확인 재시도는 원건만 복구하고 역거래를 중복하지 않는다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "fd28b549bf15ad69aab6-911463131dd251353a69",
+          "file": "defect-return-cancel-retry.spec.ts",
+          "line": 22,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "defect-rework-expectations.spec.ts",
+      "file": "defect-rework-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "ba8ea38c7d28f9e68bb1-d71b04c988c6569acb85",
+          "file": "defect-rework-expectations.spec.ts",
+          "line": 13,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "defect-server-race-expectations.spec.ts",
+      "file": "defect-server-race-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "DEFECT-SERVER-RACE 8.10-02/06 warehouse 실제 동시작업의 두 재고부족을 모두 표시하고 유효한 셋째 행까지 전체 미반영한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1c12babddec067785de3-5b0c4c79982945f3fb70",
+          "file": "defect-server-race-expectations.spec.ts",
+          "line": 21,
+          "column": 7
+        },
+        {
+          "title": "DEFECT-SERVER-RACE 8.10-02/06 production 실제 동시작업의 두 재고부족을 모두 표시하고 유효한 셋째 행까지 전체 미반영한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1c12babddec067785de3-333d44250b5056f04f7b",
+          "file": "defect-server-race-expectations.spec.ts",
+          "line": 21,
+          "column": 7
+        }
+      ]
+    },
+    {
+      "title": "defect-source-detail-expectations.spec.ts",
+      "file": "defect-source-detail-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "DEFECT-SOURCE-DETAIL 8.5-03/8.7-03/8.8-01 격리 등록 warehouse 실제 품목 상세와 선택 표의 위치별 가용량 왕복 대조",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5d1299760d2f1c007b05-eb353d1751ccdda3baf1",
+          "file": "defect-source-detail-expectations.spec.ts",
+          "line": 56,
+          "column": 7
+        },
+        {
+          "title": "DEFECT-SOURCE-DETAIL 8.5-03/8.7-03/8.8-01 격리 등록 production 실제 품목 상세와 선택 표의 위치별 가용량 왕복 대조",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5d1299760d2f1c007b05-5d404fd51352c175f177",
+          "file": "defect-source-detail-expectations.spec.ts",
+          "line": 56,
+          "column": 7
+        },
+        {
+          "title": "DEFECT-SOURCE-DETAIL 8.5-03/8.7-03/8.8-01 즉시 폐기 warehouse 실제 품목 상세와 선택 표의 위치별 가용량 왕복 대조",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5d1299760d2f1c007b05-40e8d32ab79e77b57443",
+          "file": "defect-source-detail-expectations.spec.ts",
+          "line": 56,
+          "column": 7
+        },
+        {
+          "title": "DEFECT-SOURCE-DETAIL 8.5-03/8.7-03/8.8-01 즉시 폐기 production 실제 품목 상세와 선택 표의 위치별 가용량 왕복 대조",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5d1299760d2f1c007b05-066b2939e2a58e20fa25",
+          "file": "defect-source-detail-expectations.spec.ts",
+          "line": 56,
+          "column": 7
+        },
+        {
+          "title": "DEFECT-SOURCE-DETAIL 8.5-03/8.7-03/8.8-01 즉시 재작업 production 실제 품목 상세와 선택 표의 위치별 가용량 왕복 대조",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5d1299760d2f1c007b05-f8894a52aaf01a9e2c98",
+          "file": "defect-source-detail-expectations.spec.ts",
+          "line": 56,
+          "column": 7
+        }
+      ]
+    },
+    {
+      "title": "defect-statistics-expectations.spec.ts",
+      "file": "defect-statistics-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "3aad8d903e953b2b6178-babc0aff3fdf9ec84c93",
+          "file": "defect-statistics-expectations.spec.ts",
+          "line": 65,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "defect-storage-expectations.spec.ts",
+      "file": "defect-storage-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "DEFECT-STORAGE-CREATE 8.10-03 B급 실제 격리 등록은 선택 분류만 증가하고 다른 원건·위치·목록을 보존한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "4fcb56c2812fbc2c63bd-bcc513807e31f3efbece",
+          "file": "defect-storage-expectations.spec.ts",
+          "line": 26,
+          "column": 7
+        },
+        {
+          "title": "DEFECT-STORAGE-CREATE 8.10-03 구형 실제 격리 등록은 선택 분류만 증가하고 다른 원건·위치·목록을 보존한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "4fcb56c2812fbc2c63bd-56672192582d0f85a8ca",
+          "file": "defect-storage-expectations.spec.ts",
+          "line": 26,
+          "column": 7
+        },
+        {
+          "title": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "4fcb56c2812fbc2c63bd-61eeca74c4ad47aba33c",
+          "file": "defect-storage-expectations.spec.ts",
+          "line": 89,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "history-expectations.spec.ts",
+      "file": "history-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "HISTORY 8.3-01~05 실제 기간·부서OR·업무OR·그룹AND와 요약 일치",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "81cc3714f46f9390c02b-1fcada86d5e155e3dc9a",
+          "file": "history-expectations.spec.ts",
+          "line": 122,
+          "column": 5
+        },
+        {
+          "title": "HISTORY01 실제 cursor 추가조회 실패·반복클릭·필터 보존·정확한 append",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "81cc3714f46f9390c02b-0283208431e98b27c1db",
+          "file": "history-expectations.spec.ts",
+          "line": 156,
+          "column": 5
+        },
+        {
+          "title": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "81cc3714f46f9390c02b-d7214fec582c63fe045f",
+          "file": "history-expectations.spec.ts",
+          "line": 191,
+          "column": 5
+        },
+        {
+          "title": "HISTORY02 실제 서버 변경은 받은 두 페이지와 끝 행을 보존하며 새 행을 반영",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "81cc3714f46f9390c02b-155accdc95fcaf7e8672",
+          "file": "history-expectations.spec.ts",
+          "line": 243,
+          "column": 5
+        },
+        {
+          "title": "HISTORY03 늦은 이전 검색 응답은 최신 목록과 마지막 선택 상세를 덮지 않음",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "81cc3714f46f9390c02b-de0ed60dfe1f796ee6ea",
+          "file": "history-expectations.spec.ts",
+          "line": 282,
+          "column": 5
+        },
+        {
+          "title": "HISTORY05 HISTORY06 복원 재작업의 모품목·정상·불량·폐기 결과는 검색·추가조회·상세가 일치",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "81cc3714f46f9390c02b-c5b06adf95a5a0b29b91",
+          "file": "history-expectations.spec.ts",
+          "line": 318,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "inventory-expectations.spec.ts",
+      "file": "inventory-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "ITEM01 실제 PC·모바일 새로고침은 검색·품목·열림과 닫힘을 서버 재조회로 복원",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a2b8f285e1a342e7bb5e-5158c015a2ab81977ba5",
+          "file": "inventory-expectations.spec.ts",
+          "line": 41,
+          "column": 5
+        },
+        {
+          "title": "ITEM01 다른 직원 로그인은 앞 직원의 검색·선택 상세를 노출하지 않음",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a2b8f285e1a342e7bb5e-6be1149d34d7c6d8298a",
+          "file": "inventory-expectations.spec.ts",
+          "line": 70,
+          "column": 5
+        },
+        {
+          "title": "ITEM02 미사용 품목의 실제 삭제 SSE는 상세·이력 조회를 유지하고 작업만 차단",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a2b8f285e1a342e7bb5e-06e2b9756b6090032e5a",
+          "file": "inventory-expectations.spec.ts",
+          "line": 83,
+          "column": 5
+        },
+        {
+          "title": "ITEM02 과거 삭제 품목의 기존 거래는 서버·최근 내역에서 보존되고 신규 요청은 거부",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a2b8f285e1a342e7bb5e-52714f93cf4eb0fc1b32",
+          "file": "inventory-expectations.spec.ts",
+          "line": 104,
+          "column": 5
+        },
+        {
+          "title": "DASHBOARD02 최근 작업은 한국어로 표시하며 사진과 부분 조회 실패를 닫아도 검색·선택 유지",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a2b8f285e1a342e7bb5e-03d4d889dc5c188784ff",
+          "file": "inventory-expectations.spec.ts",
+          "line": 135,
+          "column": 5
+        },
+        {
+          "title": "ITEM02 404·권한·통신 오류 주입은 삭제와 구분하고 같은 품목 재시도로 복구",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a2b8f285e1a342e7bb5e-b0681eeb59c18d089695",
+          "file": "inventory-expectations.spec.ts",
+          "line": 168,
+          "column": 5
+        },
+        {
+          "title": "DASHBOARD01 실제 KPI·목록은 PA·PF 제외 동일 모집단이며 검색0·초기화가 일치",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a2b8f285e1a342e7bb5e-649226dc8c7f1f53e2f7",
+          "file": "inventory-expectations.spec.ts",
+          "line": 186,
+          "column": 5
+        },
+        {
+          "title": "CACHE01 실제 목록은 배경503 중 유지하고 재시도 후 새 재고를 반영",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a2b8f285e1a342e7bb5e-dc792c8cf181a702a055",
+          "file": "inventory-expectations.spec.ts",
+          "line": 202,
+          "column": 5
+        },
+        {
+          "title": "DASHBOARD01 부서·모델·공정 AND/OR와 실제 더 보기는 같은 품목 집합",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a2b8f285e1a342e7bb5e-ddadacb102a2ebf6ed0c",
+          "file": "inventory-expectations.spec.ts",
+          "line": 219,
+          "column": 5
+        },
+        {
+          "title": "DASHBOARD02 CACHE01 실제 격리품 이동·내역 탭 왕복은 검색·선택·받은 내역을 보존",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a2b8f285e1a342e7bb5e-b9b673fd08ebf4983d90",
+          "file": "inventory-expectations.spec.ts",
+          "line": 269,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "inventory-image-expectations.spec.ts",
+      "file": "inventory-image-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "CONSOLE-IMAGE PC-DELTA-CONSOLE-01 실제 품목 사진의 목록·상세 크기와 비율 경고 없음",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8d23a58d0eb337ee28de-38a86f759a894abb4af0",
+          "file": "inventory-image-expectations.spec.ts",
+          "line": 5,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "inventory-shortcut-expectations.spec.ts",
+      "file": "inventory-shortcut-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "DASHBOARD03 실제 빠른 작업은 직원 권한·선택 품목·창고 방향과 부족 수량 차단을 보존",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "0d2363f1e7ce7edb4e82-87e170ea36753b52b319",
+          "file": "inventory-shortcut-expectations.spec.ts",
+          "line": 4,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "io-additional-expectations.spec.ts",
+      "file": "io-additional-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "IO-ROLE 8.1-01/02/06 조립 일반 독립 역할의 전체 작업·승인함과 불허 직접 URL",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5a6e410a7d45e574570e-47552a86fec37b0f7c9c",
+          "file": "io-additional-expectations.spec.ts",
+          "line": 29,
+          "column": 7
+        },
+        {
+          "title": "IO-ROLE 8.1-01/02/06 창고 정 독립 역할의 전체 작업·승인함과 불허 직접 URL",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5a6e410a7d45e574570e-3add0809b88b78757d53",
+          "file": "io-additional-expectations.spec.ts",
+          "line": 29,
+          "column": 7
+        },
+        {
+          "title": "IO-ROLE 8.1-01/02/06 창고 부 독립 역할의 전체 작업·승인함과 불허 직접 URL",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5a6e410a7d45e574570e-7d18ebe3f1cdab3fd955",
+          "file": "io-additional-expectations.spec.ts",
+          "line": 29,
+          "column": 7
+        },
+        {
+          "title": "IO-ROLE 8.1-01/02/06 부서 정 독립 역할의 전체 작업·승인함과 불허 직접 URL",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5a6e410a7d45e574570e-13600302b15a728a78e5",
+          "file": "io-additional-expectations.spec.ts",
+          "line": 29,
+          "column": 7
+        },
+        {
+          "title": "IO-ROLE 8.1-01/02/06 부서 부 독립 역할의 전체 작업·승인함과 불허 직접 URL",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5a6e410a7d45e574570e-ee0111e5edde74cadb21",
+          "file": "io-additional-expectations.spec.ts",
+          "line": 29,
+          "column": 7
+        },
+        {
+          "title": "IO-ROLE 8.1-01/02/06 AS 일반 독립 역할의 전체 작업·승인함과 불허 직접 URL",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5a6e410a7d45e574570e-0f759fa24f6657b09d25",
+          "file": "io-additional-expectations.spec.ts",
+          "line": 29,
+          "column": 7
+        },
+        {
+          "title": "IO-ROLE 8.1-01/02/06 연구 일반 독립 역할의 전체 작업·승인함과 불허 직접 URL",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5a6e410a7d45e574570e-2582d57ab442b2ec7d6f",
+          "file": "io-additional-expectations.spec.ts",
+          "line": 29,
+          "column": 7
+        },
+        {
+          "title": "IO-ROLE 8.1-01/02/06 AS 독립결재 독립 역할의 전체 작업·승인함과 불허 직접 URL",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5a6e410a7d45e574570e-1fa43a5dc134bf9be20a",
+          "file": "io-additional-expectations.spec.ts",
+          "line": 29,
+          "column": 7
+        },
+        {
+          "title": "IO-ROLE 8.1-01/02/06 출하 일반 독립 역할의 전체 작업·승인함과 불허 직접 URL",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5a6e410a7d45e574570e-5699aba7fd33126967d3",
+          "file": "io-additional-expectations.spec.ts",
+          "line": 29,
+          "column": 7
+        },
+        {
+          "title": "IO-ROLE 8.1-01/02/06 복합 부서·AS 독립 역할의 전체 작업·승인함과 불허 직접 URL",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5a6e410a7d45e574570e-42e5badb93c65abfd6ea",
+          "file": "io-additional-expectations.spec.ts",
+          "line": 29,
+          "column": 7
+        },
+        {
+          "title": "IO-ROLE 8.1-01/02/06 복합 창고정·부서정 독립 역할의 전체 작업·승인함과 불허 직접 URL",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5a6e410a7d45e574570e-6f210f01a3d0232b8070",
+          "file": "io-additional-expectations.spec.ts",
+          "line": 29,
+          "column": 7
+        },
+        {
+          "title": "IO-ROLE 8.1-01/02/06 복합 창고부·AS 독립 역할의 전체 작업·승인함과 불허 직접 URL",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5a6e410a7d45e574570e-1d05bb012b76a5ab464b",
+          "file": "io-additional-expectations.spec.ts",
+          "line": 29,
+          "column": 7
+        },
+        {
+          "title": "IO-ROLE 8.1-01/02/06 복합 창고부·부서부·AS 독립 역할의 전체 작업·승인함과 불허 직접 URL",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5a6e410a7d45e574570e-88c5f4f3861785afc271",
+          "file": "io-additional-expectations.spec.ts",
+          "line": 29,
+          "column": 7
+        },
+        {
+          "title": "IO-DRAFT 8.2-02/03/08/09 8.15-01/02 실제 낱개 preview·자동부서·저장·복원·삭제는 수량과 재고를 보존",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5a6e410a7d45e574570e-d17dbfe5778829e7266e",
+          "file": "io-additional-expectations.spec.ts",
+          "line": 62,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "io-as-research-audit.spec.ts",
+      "file": "io-as-research-audit.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "31c072176dbc914ff430-8116d04a289b09e83c84",
+          "file": "io-as-research-audit.spec.ts",
+          "line": 130,
+          "column": 5
+        },
+        {
+          "title": "IO-RESEARCH-BOM 8.15-01/03 상·하위 차감 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "31c072176dbc914ff430-940d2b684dc0db9b9f8e",
+          "file": "io-as-research-audit.spec.ts",
+          "line": 202,
+          "column": 7
+        },
+        {
+          "title": "IO-RESEARCH-BOM 8.15-01/03 하위만 차감 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "31c072176dbc914ff430-48cb5d0f2d492379f273",
+          "file": "io-as-research-audit.spec.ts",
+          "line": 202,
+          "column": 7
+        }
+      ]
+    },
+    {
+      "title": "io-completion-expectations.spec.ts",
+      "file": "io-completion-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "IO-RAW-COMPLETE 8.17-02/04/05/07 원자재 입고는 부서 선택 없이 창고 즉시 완료·현재/후 수량·실제 이력이 일치",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "4e14b6a9551aab701f35-7d27d42d6d3059b8a158",
+          "file": "io-completion-expectations.spec.ts",
+          "line": 36,
+          "column": 5
+        },
+        {
+          "title": "IO-COMPLETION 8.14-07 창고정 반출 완료·대기 문구는 실제 승인상태와 같은 위치 수량을 표시한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "4e14b6a9551aab701f35-6a4b0897cda00552661f",
+          "file": "io-completion-expectations.spec.ts",
+          "line": 123,
+          "column": 7
+        },
+        {
+          "title": "IO-COMPLETION 8.14-07 창고부 반입 완료·대기 문구는 실제 승인상태와 같은 위치 수량을 표시한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "4e14b6a9551aab701f35-8ee8443f72138d5587c1",
+          "file": "io-completion-expectations.spec.ts",
+          "line": 123,
+          "column": 7
+        },
+        {
+          "title": "IO-COMPLETION 8.14-07 일반 반출 완료·대기 문구는 실제 승인상태와 같은 위치 수량을 표시한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "4e14b6a9551aab701f35-0baf9b1d67b552c16cf8",
+          "file": "io-completion-expectations.spec.ts",
+          "line": 123,
+          "column": 7
+        },
+        {
+          "title": "IO-COMPLETION 8.14-07 일반 반입 완료·대기 문구는 실제 승인상태와 같은 위치 수량을 표시한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "4e14b6a9551aab701f35-ef1e7511c84d2a90945a",
+          "file": "io-completion-expectations.spec.ts",
+          "line": 123,
+          "column": 7
+        }
+      ]
+    },
+    {
+      "title": "io-compose-extra-expectations.spec.ts",
+      "file": "io-compose-extra-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "IO-PICKER 8.1-06 8.2-01/02 전체 모집단·복합 필터·추가 표시·선택 경로·한 오류 진행 차단",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "0b9d56cd03d1e818eb1d-39da1a82934fbc56ad5a",
+          "file": "io-compose-extra-expectations.spec.ts",
+          "line": 55,
+          "column": 5
+        },
+        {
+          "title": "IO-MYREQUEST 8.2-06 상태·품목·수량·경로·메모와 수정 재제출 취소가 실제 요청과 일치",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "0b9d56cd03d1e818eb1d-c59376d020aae7ea6ba4",
+          "file": "io-compose-extra-expectations.spec.ts",
+          "line": 112,
+          "column": 5
+        },
+        {
+          "title": "IO-STALE-DRAFT 8.1-03 빈 초안의 새 요청 진입과 복원 후 바뀐 현재 재고 재검증",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "0b9d56cd03d1e818eb1d-e167e3acba11666851ae",
+          "file": "io-compose-extra-expectations.spec.ts",
+          "line": 156,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "io-conversion-execution-expectations.spec.ts",
+      "file": "io-conversion-execution-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "IO-CONVERSION-EXECUTION 8.16-10/11/12/13/14 두 부족품·직접 BOM 차이·모든 위치와 내역·묶음 한 번 취소를 실제 화면에서 검증한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "82fbe864066f6c4e1950-0031d6bd708a09c16455",
+          "file": "io-conversion-execution-expectations.spec.ts",
+          "line": 24,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "io-conversion-extra-expectations.spec.ts",
+      "file": "io-conversion-extra-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "IO-CONVERSION-CANDIDATES 8.16-08/09 전체 원본·대상 후보와 후반부 검색·선택 유지·원본 변경 초기화",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "08c6af0b588d1b715eb8-a59530c93a8e12128fab",
+          "file": "io-conversion-extra-expectations.spec.ts",
+          "line": 23,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "io-custom-bom-expectations.spec.ts",
+      "file": "io-custom-bom-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "IO-CUSTOM-BOM 8.22-02/07/08/09/10/11 자동 승인 포함 하위6·상위 제외·모든 건수와 실제 효과",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "115adb49dc52ccf7b247-84da45686d3d0db73ccd",
+          "file": "io-custom-bom-expectations.spec.ts",
+          "line": 23,
+          "column": 7
+        },
+        {
+          "title": "IO-CUSTOM-BOM 8.22-02/07/08/09/10/11 승인 대기 포함 하위6·상위 제외·모든 건수와 실제 효과",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "115adb49dc52ccf7b247-e35a5ca98e1aa7c65bf7",
+          "file": "io-custom-bom-expectations.spec.ts",
+          "line": 23,
+          "column": 7
+        }
+      ]
+    },
+    {
+      "title": "io-location-audit-expectations.spec.ts",
+      "file": "io-location-audit-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "IO-LOCATION 8.24 비결재 요청과 창고 승인 튜브 7→8과 창고 20→19·별도 고압 7을 보존하고 이력의 양쪽 위치·참여자를 검증한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "b13e2edd9e027d89471d-39da059ec7d0762c4656",
+          "file": "io-location-audit-expectations.spec.ts",
+          "line": 70,
+          "column": 7
+        },
+        {
+          "title": "IO-LOCATION 8.25 창고 결재권자 낱개 자동 승인 튜브 7→8과 창고 20→19·별도 고압 7을 보존하고 이력의 양쪽 위치·참여자를 검증한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "b13e2edd9e027d89471d-be58b12effc1dd1687a7",
+          "file": "io-location-audit-expectations.spec.ts",
+          "line": 70,
+          "column": 7
+        },
+        {
+          "title": "IO-DEPARTMENT-AUDIT 8.23-03/09/10 비결재 부서 입고의 대기·실제 튜브 승인·작업유형·요청자와 승인자를 분리한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "b13e2edd9e027d89471d-d7caa9eb46536c7e861b",
+          "file": "io-location-audit-expectations.spec.ts",
+          "line": 171,
+          "column": 5
+        },
+        {
+          "title": "IO-ADJUST-AUDIT 8.16-04/06 두 행 모두 실제 창고 20→21을 표시하고 모든 부서 불변과 각각의 이력 숫자·담당자·메모를 보존한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "b13e2edd9e027d89471d-176cdce19cac612f721d",
+          "file": "io-location-audit-expectations.spec.ts",
+          "line": 252,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "io-multi-error-expectations.spec.ts",
+      "file": "io-multi-error-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "IO-MULTI-ERROR 8.2-03/8.25-03 자동승인=false 부서반납=false 모든 행 오류·단일 잔여 오류는 전체 진행을 막고 위치별 미리보기는 무변경이다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "33eca7cf8688418da859-ab638ac9ab3195150449",
+          "file": "io-multi-error-expectations.spec.ts",
+          "line": 23,
+          "column": 7
+        },
+        {
+          "title": "IO-MULTI-ERROR 8.2-03/8.25-03 자동승인=false 부서반납=true 모든 행 오류·단일 잔여 오류는 전체 진행을 막고 위치별 미리보기는 무변경이다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "33eca7cf8688418da859-5cf10a292963ee34c2c5",
+          "file": "io-multi-error-expectations.spec.ts",
+          "line": 23,
+          "column": 7
+        },
+        {
+          "title": "IO-MULTI-ERROR 8.2-03/8.25-03 자동승인=true 부서반납=false 모든 행 오류·단일 잔여 오류는 전체 진행을 막고 위치별 미리보기는 무변경이다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "33eca7cf8688418da859-2e108bd1f49f026b2ff1",
+          "file": "io-multi-error-expectations.spec.ts",
+          "line": 23,
+          "column": 7
+        },
+        {
+          "title": "IO-MULTI-ERROR 8.2-03/8.25-03 자동승인=true 부서반납=true 모든 행 오류·단일 잔여 오류는 전체 진행을 막고 위치별 미리보기는 무변경이다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "33eca7cf8688418da859-7fec63569213d2a276d6",
+          "file": "io-multi-error-expectations.spec.ts",
+          "line": 23,
+          "column": 7
+        }
+      ]
+    },
+    {
+      "title": "io-receipt-candidates.spec.ts",
+      "file": "io-receipt-candidates.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "8.17-02 원자재 입고 부서필터는 후보만 바꾸고 선택품·창고위치·수량을 보존한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e6ead908593c4d138182-cfd3a9d5cf2e87bae57b",
+          "file": "io-receipt-candidates.spec.ts",
+          "line": 40,
+          "column": 5
+        },
+        {
+          "title": "8.17-03 현재 전체 공정의 원자재만 선택하고 공정·조립·일반분류·삭제와 선택후분류변경은 진행을 막는다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e6ead908593c4d138182-578b97120a2406383693",
+          "file": "io-receipt-candidates.spec.ts",
+          "line": 74,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "io-request-report-audit.spec.ts",
+      "file": "io-request-report-audit.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "8.2-08/8.24-06 실제 튜브 입고의 내요청 완료·승인자와 같은거래 일보·내역의 수량·메모를 대조한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "9132bbafac209cda3dfd-0db20180503d32d464be",
+          "file": "io-request-report-audit.spec.ts",
+          "line": 17,
+          "column": 7
+        },
+        {
+          "title": "8.2-08/8.24-06 실제 고압 입고의 내요청 완료·승인자와 같은거래 일보·내역의 수량·메모를 대조한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "9132bbafac209cda3dfd-55919b082e08bb9f7520",
+          "file": "io-request-report-audit.spec.ts",
+          "line": 17,
+          "column": 7
+        }
+      ]
+    },
+    {
+      "title": "report-expectations.spec.ts",
+      "file": "report-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "8.20-01 오늘·과거 UI와 미래 UI·실제 조회저장 API 차단",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "0b3a501a46625d4f95bb-affed4c5387d15d2a6d2",
+          "file": "report-expectations.spec.ts",
+          "line": 29,
+          "column": 5
+        },
+        {
+          "title": "8.20-02/04/05 빈 일보·동명이인·비활성 과거 행·타인 읽기전용",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "0b3a501a46625d4f95bb-0b6f206d557d614ccee5",
+          "file": "report-expectations.spec.ts",
+          "line": 46,
+          "column": 5
+        },
+        {
+          "title": "PC-DELTA-DAILY-01 저장중 최신 입력·빈 저장·실패 이탈차단·실제 버튼 재시도",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "0b3a501a46625d4f95bb-d117b486fc798e99722b",
+          "file": "report-expectations.spec.ts",
+          "line": 71,
+          "column": 5
+        },
+        {
+          "title": "8.20-03 같은 직원 두 실제탭 최종본과 기존 감사 CSV 전후내용",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "0b3a501a46625d4f95bb-bf6b1d13a0fc1b217758",
+          "file": "report-expectations.spec.ts",
+          "line": 100,
+          "column": 5
+        },
+        {
+          "title": "8.20-06/07/08/09/10/12 PC 주입 거래 단위·취소 상세·반복토글·미작성 독립",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "0b3a501a46625d4f95bb-e0a7402a9fca7d61103d",
+          "file": "report-expectations.spec.ts",
+          "line": 120,
+          "column": 7
+        },
+        {
+          "title": "8.20-06/07/08/09/10/12 mobile 주입 거래 단위·취소 상세·반복토글·미작성 독립",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "0b3a501a46625d4f95bb-bdf48ca483c869df369e",
+          "file": "report-expectations.spec.ts",
+          "line": 120,
+          "column": 7
+        },
+        {
+          "title": "8.20-08 AS 사용출고 취소의 주입 역방향·담당자·사유",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "0b3a501a46625d4f95bb-c53afe1d8fd0a96a4533",
+          "file": "report-expectations.spec.ts",
+          "line": 166,
+          "column": 5
+        },
+        {
+          "title": "8.20-11 같은 주입 거래를 일보와 실제 이력 상세에서 유형·상태·방향 비교",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "0b3a501a46625d4f95bb-a81db3638612abd58dea",
+          "file": "report-expectations.spec.ts",
+          "line": 180,
+          "column": 5
+        },
+        {
+          "title": "8.20-11 같은 주입 정거래의 완료상태·유형·방향을 일보와 이력 상세에서 비교",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "0b3a501a46625d4f95bb-549dc798793547fb5e4d",
+          "file": "report-expectations.spec.ts",
+          "line": 205,
+          "column": 5
+        },
+        {
+          "title": "8.21-02/03/04/05 주입 숫자는 실제 공정카드·품목 열·모델0 안내에 일치",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "0b3a501a46625d4f95bb-3ed64289d57ef56aef4c",
+          "file": "report-expectations.spec.ts",
+          "line": 242,
+          "column": 5
+        },
+        {
+          "title": "8.21-06/07/10 실제 서버 집계 범위와 검산·분류 안내가 화면에 표시된다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "0b3a501a46625d4f95bb-bebdfe32f9ef09f3c4a6",
+          "file": "report-expectations.spec.ts",
+          "line": 260,
+          "column": 5
+        },
+        {
+          "title": "8.21-07 주입 검산실패는 숫자표 대신 원인만 표시",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "0b3a501a46625d4f95bb-1325f03846ed5aaad83d",
+          "file": "report-expectations.spec.ts",
+          "line": 313,
+          "column": 5
+        },
+        {
+          "title": "8.21-01/11 실제 브라우저 F705 수신·선택 연도·유효 XLSX",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "0b3a501a46625d4f95bb-7e94b5c0b8454201d591",
+          "file": "report-expectations.spec.ts",
+          "line": 323,
+          "column": 5
+        },
+        {
+          "title": "8.21-01 실제 연도경계 주차 화면은 두 연도 F705 파일의 해당 날짜 합과 일치",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "0b3a501a46625d4f95bb-0f16f74df0edd891e5e7",
+          "file": "report-expectations.spec.ts",
+          "line": 340,
+          "column": 5
+        },
+        {
+          "title": "PC-DELTA-WEEKLY-01 실제 PF 픽업·취소 뒤 같은탭 주간 수량 자동갱신",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "0b3a501a46625d4f95bb-a522e932633b22440a32",
+          "file": "report-expectations.spec.ts",
+          "line": 404,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "shipping-additional-expectations.spec.ts",
+      "file": "shipping-additional-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "SHIP-DOUBLE 8.4-06 실제 최종 버튼 연타는 생성 호출·원건 각각 1회",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e3fcbb0aa0d6604ef331-aa739849268f23b0b024",
+          "file": "shipping-additional-expectations.spec.ts",
+          "line": 107,
+          "column": 1
+        },
+        {
+          "title": "SHIP-DISCARD 8.4-07 새로고침 경고·머무르기 전체 입력·폐기 서버 무효과",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e3fcbb0aa0d6604ef331-506f2e4ed7ba48d3317d",
+          "file": "shipping-additional-expectations.spec.ts",
+          "line": 127,
+          "column": 1
+        },
+        {
+          "title": "SHIP-VARIANT 8.12-01/03 동일 BOM 국가·색상·판매처 이름 후보와 목록 실제 품목",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e3fcbb0aa0d6604ef331-3233d2f5b47c52ffe705",
+          "file": "shipping-additional-expectations.spec.ts",
+          "line": 156,
+          "column": 1
+        },
+        {
+          "title": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e3fcbb0aa0d6604ef331-3d4f4f26155b37e764f9",
+          "file": "shipping-additional-expectations.spec.ts",
+          "line": 178,
+          "column": 1
+        },
+        {
+          "title": "SHIP-GENERATED-ROLES 8.12-12 기준 PF와 새 PA·PF 역할·실제 저장 식별값 구분",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e3fcbb0aa0d6604ef331-5538f53bf9c4c3bc73ab",
+          "file": "shipping-additional-expectations.spec.ts",
+          "line": 219,
+          "column": 1
+        },
+        {
+          "title": "SHIP-INACTIVE PC-DELTA-SHIPPING-04 세션 중 비활성화 뒤 화면·직접 생성·준비·픽업 차단",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e3fcbb0aa0d6604ef331-c72fa801184209a2359b",
+          "file": "shipping-additional-expectations.spec.ts",
+          "line": 249,
+          "column": 1
+        },
+        {
+          "title": "SHIP-HISTORY-COUNT 8.12-15 G09 실제 출하 원작업1+취소1 보존·필터·합계",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e3fcbb0aa0d6604ef331-a2acdaf29ddc2f6f81d6",
+          "file": "shipping-additional-expectations.spec.ts",
+          "line": 262,
+          "column": 1
+        },
+        {
+          "title": "SHIP-HISTORY-LINK 8.12-15 원출하·취소 역거래 상세 양방향 이동",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e3fcbb0aa0d6604ef331-ef7c0d8371ebcdc85ec6",
+          "file": "shipping-additional-expectations.spec.ts",
+          "line": 282,
+          "column": 1
+        },
+        {
+          "title": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e3fcbb0aa0d6604ef331-2f3b55ba107965a48d34",
+          "file": "shipping-additional-expectations.spec.ts",
+          "line": 304,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "shipping-edge-expectations.spec.ts",
+      "file": "shipping-edge-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "SHIP-INVALID-PF deleted 8.4-02 선택 뒤 무효화된 PF의 실제 제출 거부·무저장",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "82135e46b6d6d483e6ad-0d24b8c22b695b850f86",
+          "file": "shipping-edge-expectations.spec.ts",
+          "line": 50,
+          "column": 7
+        },
+        {
+          "title": "SHIP-INVALID-PF not_pf 8.4-02 선택 뒤 무효화된 PF의 실제 제출 거부·무저장",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "82135e46b6d6d483e6ad-0bcca32615400d335eda",
+          "file": "shipping-edge-expectations.spec.ts",
+          "line": 50,
+          "column": 7
+        },
+        {
+          "title": "SHIP-CANCEL-INTEGRITY PC-DELTA-SHIPPING-07 취소 원건 정역거래와 실제 관리자 정합성 무오판",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "82135e46b6d6d483e6ad-bd6e1e5eae7a0eeb8789",
+          "file": "shipping-edge-expectations.spec.ts",
+          "line": 80,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "shipping-expectations.spec.ts",
+      "file": "shipping-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "SHIP-WIZARD PC 8.4-02/04/05/06 인보이스·메모 선택, 실제 최종값 1회 생성",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-c4773c436f3254575dd8",
+          "file": "shipping-expectations.spec.ts",
+          "line": 107,
+          "column": 1
+        },
+        {
+          "title": "SHIP-FULL-DRAFT 8.4-06/07 제외·추가·후보·동반품 전체 초안 유지와 최종 저장 동등",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-7c2a0f2acb7d08d40f1a",
+          "file": "shipping-expectations.spec.ts",
+          "line": 127,
+          "column": 1
+        },
+        {
+          "title": "SHIP-CANDIDATE PC 8.4-03/04 8.12-03/04/05 제외·추가 후보 PA/PF 일치와 원본 BOM 보존",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-cba250593af553c1a396",
+          "file": "shipping-expectations.spec.ts",
+          "line": 184,
+          "column": 1
+        },
+        {
+          "title": "SHIP-MOBILE-CONFIRM 8.12-07 기준 PF와 실제 준비품·동반품 구분",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-7f9d94e109b026889915",
+          "file": "shipping-expectations.spec.ts",
+          "line": 253,
+          "column": 1
+        },
+        {
+          "title": "SHIP-BOM-SNAPSHOT 8.19-20 관리자 BOM 변경 전후 출하 구성·실행·원복 보존",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-59929719a449e9a34cdc",
+          "file": "shipping-expectations.spec.ts",
+          "line": 282,
+          "column": 1
+        },
+        {
+          "title": "SHIP-RETRY PC 8.4-06 PC-DELTA-SHIPPING-06 응답 유실 뒤 초안·키 유지 및 서버 1건",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-1fce1e162dcab20e64a6",
+          "file": "shipping-expectations.spec.ts",
+          "line": 352,
+          "column": 1
+        },
+        {
+          "title": "SHIP-LOADING PC 8.12-02 편집 품목 응답 보류 시 로딩 표시와 진행 차단",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-56ec2d7b28bcdab7dfdd",
+          "file": "shipping-expectations.spec.ts",
+          "line": 371,
+          "column": 1
+        },
+        {
+          "title": "SHIP-CYCLE PC 8.4-01 8.12-07~16 준비·픽업·역순 취소의 같은 원건",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-2e0d8c65e0fb5bf548d1",
+          "file": "shipping-expectations.spec.ts",
+          "line": 385,
+          "column": 3
+        },
+        {
+          "title": "SHIP-CYCLE mobile 8.4-01 8.12-07~16 준비·픽업·역순 취소의 같은 원건",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-217d8fc74d4e50715def",
+          "file": "shipping-expectations.spec.ts",
+          "line": 385,
+          "column": 3
+        },
+        {
+          "title": "SHIP-LIST PC 8.4-01 각 단계 목록의 같은 요청 1건",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-52e1e04bcd34d0cb37fc",
+          "file": "shipping-expectations.spec.ts",
+          "line": 476,
+          "column": 3
+        },
+        {
+          "title": "SHIP-LIST mobile 8.4-01 각 단계 목록의 같은 요청 1건",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-e3ee31474d0f8e074b46",
+          "file": "shipping-expectations.spec.ts",
+          "line": 476,
+          "column": 3
+        },
+        {
+          "title": "SHIP-REVISION-ALL 8.12-06 PC-DELTA-SHIPPING-03 전체 수정 전후·준비 유지/해제·새 예약 일치",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-b53fd3734e0945f0ebda",
+          "file": "shipping-expectations.spec.ts",
+          "line": 507,
+          "column": 1
+        },
+        {
+          "title": "SHIP-INVOICE PC-DELTA-SHIPPING-01/03 실제 인보이스 수정 전후·작업자·시각·펼침",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-86c28d873db0b5af2242",
+          "file": "shipping-expectations.spec.ts",
+          "line": 595,
+          "column": 1
+        },
+        {
+          "title": "SHIP-MOBILE-WIZARD 8.4-02/05/06 모바일 실제 5단계·전체 BOM·요청자·메모",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-3e686db3872d673cb6da",
+          "file": "shipping-expectations.spec.ts",
+          "line": 612,
+          "column": 1
+        },
+        {
+          "title": "SHIP-ACCESS PC-DELTA-SHIPPING-04 탭 회수 뒤 직접 URL·직접 요청 차단",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-336319b5f9c63d33506d",
+          "file": "shipping-expectations.spec.ts",
+          "line": 630,
+          "column": 1
+        },
+        {
+          "title": "SHIP-NOOP 8.12-06 변경 없음 안내와 수정 이력 불변",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-83d9a58846285f428afa",
+          "file": "shipping-expectations.spec.ts",
+          "line": 641,
+          "column": 1
+        },
+        {
+          "title": "SHIP-PREPARED-INVOICE PC-DELTA-SHIPPING-01 준비 이력 뒤 필수 인보이스 삭제 차단",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-0a04b3f0d7c2c547b306",
+          "file": "shipping-expectations.spec.ts",
+          "line": 652,
+          "column": 1
+        },
+        {
+          "title": "SHIP-BOM-INVALID 8.4-03 정수가 아닌 구성품 수량은 다음 차단",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-5630ac44b346bcd3261f",
+          "file": "shipping-expectations.spec.ts",
+          "line": 663,
+          "column": 1
+        },
+        {
+          "title": "SHIP-STOCK-POLICY 8.4-03 BOM 무재고 허용과 PF·동반품 부족 준비 차단",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-246e95f695491688192c",
+          "file": "shipping-expectations.spec.ts",
+          "line": 671,
+          "column": 1
+        },
+        {
+          "title": "SHIP-REMATCH 8.12-05 변경 뒤 재검증 전 다음·제출 차단",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-cc20b395647504fe246d",
+          "file": "shipping-expectations.spec.ts",
+          "line": 711,
+          "column": 1
+        },
+        {
+          "title": "SHIP-SHORTAGE PC-DELTA-SHIPPING-02 부족 품목·7개·출하 부서 보존과 원건 불변",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-90ae8273741fe5218d58",
+          "file": "shipping-expectations.spec.ts",
+          "line": 723,
+          "column": 1
+        },
+        {
+          "title": "SHIP-F705 PC-DELTA-PF-01/03 실제 픽업의 주간 PF·다운로드 일자/모델/월합계 증분",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-a45fd0e15148ad3acb05",
+          "file": "shipping-expectations.spec.ts",
+          "line": 738,
+          "column": 1
+        },
+        {
+          "title": "SHIP-DOWNLOAD-FAIL PC-DELTA-PF-03 중복 클릭 1회·실패 안내·다시 다운로드",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "e127c848562d886d88f7-7bc2db905aff16d16e1c",
+          "file": "shipping-expectations.spec.ts",
+          "line": 796,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-09T09:21:39.367Z",
+    "duration": 560.7690000000001,
+    "expected": 0,
+    "skipped": 259,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

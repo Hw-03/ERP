@@ -1,0 +1,777 @@
+{
+  "purpose": "2026-10-08 추천안 승인 전 미해결 기대와 이유. 과거 실패를 현재 실행으로 사용하지 않는다.",
+  "cases": [
+    {
+      "id": "8.19-22",
+      "decisionIds": [],
+      "atomicReview": "reviewed",
+      "finalExpected": "같은 회귀 계약의 거래 분류와 수량을 공식 서식에도 누락·중복 없이 반영",
+      "finalStaffExpected": "2026년 F704-02 자재 입출고 대장을 내려받으면 실제로 창고 수량이 변한 2026년 거래가 빠짐없이 한 번씩 들어가야 한다. 각 줄의 날짜, 품목 코드와 이름, 수량, 입고·출고 구분, 상대 위치, 담당자와 비고도 원래 거래와 같아야 한다. F705-02 생산일지도 같은 기준으로 생산과 출하 완료 수량을 정확히 담아야 한다.",
+      "verificationTags": [
+        "P0"
+      ],
+      "conditions": [
+        {
+          "id": "official-download-ui-file-content",
+          "origin": "technical+staff",
+          "expected": "선택 연도 공식 파일을 실제 내려받아 두 서식의 행·수량을 대조한다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "f704-kst-year-warehouse-receive",
+          "origin": "technical+staff",
+          "expected": "F704는 KST 해당 연도 창고 입고의 날짜·품목명·수량·입출구분을 표시한다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "f704-transfer-counterpart-actor",
+          "origin": "technical+staff",
+          "expected": "F704 창고→부서 거래는 상대 위치와 요청자를 원거래대로 표시한다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "f704-all-warehouse-types-once",
+          "origin": "technical+staff",
+          "expected": "F704의 모든 실제 창고 변동 유형을 누락·중복 없이 한 번씩 반영한다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "f705-production-and-final-pickup",
+          "origin": "technical+staff",
+          "expected": "F705는 생산과 최종 완제품 픽업의 날짜별 수량을 정확히 반영한다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "f704-final-worksheet",
+          "origin": "technical+staff",
+          "expected": "선택 연도 F704 최종 파일의 원본 양식 시트를 받는다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "f704-each-change-once",
+          "origin": "technical+staff",
+          "expected": "실제 창고증감과 정·역거래를 각각한번 반영한다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "f704-date-item",
+          "origin": "technical+staff",
+          "expected": "F704 날짜·품목코드·품목명은 원거래와 같다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "f704-counterpart-requester-memo",
+          "origin": "technical+staff",
+          "expected": "상대위치·실제요청자·원본메모를 보존한다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "f705-final-file-year",
+          "origin": "technical+staff",
+          "expected": "선택 연도 F705 최종 파일의 월별 시트를 받는다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "f705-real-pf-screen-file-quantity",
+          "origin": "technical+staff",
+          "expected": "실제 PF 생산·픽업 화면과 내려받은 F705 수치가 같다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "f705-real-pf-screen-file-quantity-unverified",
+          "origin": "review-gap",
+          "expected": "PF만 양수인 주간 모델표가 동결 화면에서 숨겨짐. report browser6 RED, 실제파일비교 미도달.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "PC-DELTA-ADMIN-02",
+      "decisionIds": [],
+      "atomicReview": "reviewed",
+      "finalExpected": "신규 직원은 맡은 업무에 필요한 메뉴만 기본 허용하고 관리자 메뉴는 명시적으로 권한을 줄 때만 표시한다.",
+      "finalStaffExpected": "튜브나 고압 같은 일반 부서 직원을 새로 만들 때는 그 직원이 실제로 볼 수 있는 메뉴와 관리자 화면의 기본 체크 상태가 서로 맞아야 한다. 관리자 메뉴는 관리 권한이 있는 직원에게만 선택할 수 있거나, 역할 때문에 자동 차단된다는 점을 알려줘야 한다.",
+      "verificationTags": [
+        "P0"
+      ],
+      "conditions": [
+        {
+          "id": "new-employee-default-menu-policy",
+          "origin": "technical+staff",
+          "expected": "신규 직원의 기본 메뉴 허용은 맡은 업무와 실제 접근 설정에 맞고 관리자 메뉴는 명시적 허용일 때만 표시한다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "admin-form-login-menu-consistency",
+          "origin": "technical+staff",
+          "expected": "신규 일반 부서 직원의 기본 체크 상태와 실제 로그인 메뉴·직접URL 접근이 일치한다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "8.4-03",
+      "decisionIds": [],
+      "atomicReview": "reviewed",
+      "finalExpected": "변경은 해당 출하 요청에만 적용되고 기준 BOM 원본은 바뀌지 않으며 오류가 하나라도 있으면 다음 단계 차단",
+      "finalStaffExpected": "출하 요청 안에서 구성품을 빼거나 수량을 바꿔도 기준 BOM 자체는 바뀌지 않아야 한다. 잘못된 수량이나 재고 부족 품목이 하나라도 있으면 다음 단계로 넘어가지 못해야 한다.",
+      "verificationTags": [
+        "P0"
+      ],
+      "conditions": [
+        {
+          "id": "base-bom-immutable",
+          "origin": "technical+staff",
+          "expected": "요청 구성 제외·수량 수정은 해당 요청만 변경하며 기준 BOM을 바꾸지 않는다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "invalid-bom-block",
+          "origin": "technical+staff",
+          "expected": "잘못된 구성품 수량이 하나라도 있으면 다음 단계·제출을 차단한다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "component-shortage-block",
+          "origin": "technical+staff",
+          "expected": "구성품 재고 부족이 하나라도 있으면 BOM 단계에서 다음 진행을 차단한다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "component-shortage-block-unverified",
+          "origin": "review-gap",
+          "expected": "원문의 구성품 부족 단계 차단과 현행 최종 PF·동반품 예약 정책이 충돌한다. 후속 승인 근거가 없어 사용자 정책 결정이 필요하며, 구성품 부족 BOM 단계 차단 assertion은 없다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "PC-DELTA-PF-01",
+      "decisionIds": [],
+      "atomicReview": "reviewed",
+      "finalExpected": "최종 PF 원장 한 건이 동일 수량·모델·날짜로 주간 PF 열과 F705 셀에 한 번씩 나타난다.",
+      "finalStaffExpected": "PF 완제품 1개를 출하 요청하고 준비 완료와 픽업 완료까지 처리하면, 선택한 PF 재고가 1개 줄어야 한다. 같은 출하 완료 수량이 주간보고와 F705 생산일지에도 한 번씩만 반영돼야 하며, 어느 화면에서도 빠지거나 두 번 더해지면 안 된다.",
+      "verificationTags": [
+        "P0"
+      ],
+      "conditions": [
+        {
+          "id": "final-pf-stock",
+          "origin": "technical+staff",
+          "expected": "실제 선택한 최종 PF 픽업 수량만큼 재고가 한 번 차감된다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "weekly-final-once",
+          "origin": "technical+staff",
+          "expected": "그 최종 PF 원장이 같은 모델·주간 날짜·수량으로 주간 PF에 한 번 반영된다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "f705-final-once",
+          "origin": "technical+staff",
+          "expected": "같은 최종 PF 원장이 F705의 모델·날짜·출하 공정 셀에 한 번 반영된다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "pf-browser-crosscheck",
+          "origin": "technical+staff",
+          "expected": "실제 요청→준비→픽업 후 재고·주간보고·다운로드 파일을 동일 건으로 대조한다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "pf-browser-crosscheck-unverified",
+          "origin": "review-gap",
+          "expected": "동일 요청 물리 재고·주간 API·실제 파일·취소 상쇄 assertion은 보강했다. 생산 합계 0이어도 PF 실적이 있으면 화면 행이 보여야 한다는 별도 UI assertion은 frozen 화면의 기존 결함 때문에 실패할 수 있으며, 승인 전 UI 조건을 완료로 승격하지 않는다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "PC-DELTA-PF-03",
+      "decisionIds": [],
+      "atomicReview": "reviewed",
+      "finalExpected": "선택 주 연도와 모델·일자·공정 셀이 화면 매트릭스와 일치하고 중복 클릭과 실패를 안전하게 처리한다.",
+      "finalStaffExpected": "주간보고의 F705 다운로드 버튼을 누르면 선택한 주가 속한 연도의 생산일지가 열 수 있는 엑셀 파일로 내려받아져야 한다. 이번 PF 출하 수량은 정확한 날짜와 모델, 출하 공정 칸에 들어가고 월 합계도 같은 수량만큼 늘어야 한다.",
+      "verificationTags": [
+        "P0"
+      ],
+      "conditions": [
+        {
+          "id": "download-selected-year",
+          "origin": "technical+staff",
+          "expected": "선택한 주의 연도로 F705 파일을 요청하고 맞는 파일명을 사용한다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "download-real-file",
+          "origin": "technical+staff",
+          "expected": "브라우저 다운로드를 완료하고 열 수 있는 xlsx 파일을 실제 수신한다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "workbook-cells",
+          "origin": "technical+staff",
+          "expected": "모델·일자·출하 공정의 수량 셀이 선택 주 화면 매트릭스와 같다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "workbook-cells-unverified",
+          "origin": "review-gap",
+          "expected": "다운로드 셀·API PF·월 수식·캐시는 직접 대조한다. PF만 존재하는 주의 화면 매트릭스가 숨겨지는 frozen UI gap을 별도로 유지하며, 이 상태를 빈 주차 정상으로 간주하지 않는다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "monthly-total",
+          "origin": "technical+staff",
+          "expected": "출하 수량만큼 월 합계 수식과 캐시 값이 정확히 증가한다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "download-double-click",
+          "origin": "technical+staff",
+          "expected": "다운로드 처리 중 중복 클릭은 한 번만 요청한다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "download-failure",
+          "origin": "technical+staff",
+          "expected": "다운로드 생성 실패를 안내하고 다시 실행할 수 있다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "8.21-01",
+      "decisionIds": [],
+      "atomicReview": "reviewed",
+      "finalExpected": "화면·API·내보내기가 같은 KST 반개구간을 사용",
+      "finalStaffExpected": "주간보고 화면, 내려받은 보고서, 서버 계산이 모두 같은 주간 시작일과 종료일을 사용해야 하며 다른 주의 작업이 섞이면 안 된다.",
+      "verificationTags": [
+        "P0"
+      ],
+      "conditions": [
+        {
+          "id": "kst-half-open",
+          "origin": "technical+staff",
+          "expected": "KST 월요일 00:00 포함·다음 월요일 00:00 제외의 같은 경계를 사용한다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "screen-file-period",
+          "origin": "technical+staff",
+          "expected": "선택 주차와 F705 연도·날짜 범위의 공통 구간 수치를 일치시킨다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "screen-file-period-unverified",
+          "origin": "review-gap",
+          "expected": "실제 browser14 RED: KST 주차 2025-12-29~2026-01-04 생산 기대5/실제6. frozen weekly_report.py366–367/614의 snapshot 없는 경로가 UTC 날짜 경계를 사용하여 다음 KST 월요일0시의 q1까지 포함. 동결 해제 승인 전 제품 수정 금지; 기대5를 완화하지 않는다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "8.21-02",
+      "decisionIds": [],
+      "atomicReview": "reviewed",
+      "finalExpected": "세 단계 합계가 같은 품목 모집단과 기준 시각으로 일치",
+      "finalStaffExpected": "공정 카드의 현재 재고는 그 공정 아래 품목들의 현재 정상재고를 모두 더한 값과 같아야 한다. 같은 품목을 빠뜨리거나 다른 공정 품목을 섞으면 안 된다.",
+      "verificationTags": [
+        "P0"
+      ],
+      "conditions": [
+        {
+          "id": "same-scope-time",
+          "origin": "technical+staff",
+          "expected": "품목·공정·전체는 같은 활성 모집단과 재고 기준 시각을 사용한다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "three-level-screen",
+          "origin": "technical+staff",
+          "expected": "화면 카드와 품목 행 합계가 전체 정상재고와 일치한다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "three-level-screen-unverified",
+          "origin": "review-gap",
+          "expected": "동결 DesktopWeeklyReportView 실제 렌더에는 전체 정상재고 합계가 표시되지 않는다. 단일 TF 카드·품목 행은 확인되지만 전체 합계 화면 조건은 미충족. 사용자 동결 해제 승인 전 변경하지 않는다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "8.21-03",
+      "decisionIds": [],
+      "atomicReview": "reviewed",
+      "finalExpected": "각 거래는 정의된 열 하나에만 분류되고 `전주 + 전체 순변화 = 현재`",
+      "finalStaffExpected": "생산·입고·출고·불량 거래는 정해진 열 한 곳에만 들어가야 하고, 전주 재고에 증가를 더하고 감소를 빼면 현재 재고가 되어야 한다.",
+      "verificationTags": [
+        "P0"
+      ],
+      "conditions": [
+        {
+          "id": "one-class-column",
+          "origin": "technical+staff",
+          "expected": "원문은 각 거래를 생산·입고·출고·불량 한 열만으로 분류하도록 요구한다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "one-class-column-unverified",
+          "origin": "review-gap",
+          "expected": "POLICY_CONTRACT_CONFLICT: 재작업 불량·폐기 자식 한 원행을 receive+defect 두 열에 넣는 현 계산과 원문 한 열 조건 충돌. 사용자 답변 전 기대값 변경 금지.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "inventory-equation",
+          "origin": "technical+staff",
+          "expected": "전주 정상재고+전체 원장 순변화=현재 정상재고를 검산한다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "equation-screen",
+          "origin": "technical+staff",
+          "expected": "품목 행에 전주·분류 열·현재·순변화를 정확히 표시한다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "8.21-06",
+      "decisionIds": [],
+      "atomicReview": "reviewed",
+      "finalExpected": "공정 생산 합계는 모든 완료 공정 생산을 세고, 모델별 매트릭스는 TF~AF 공정 생산과 PF 출하 완료를 센다는 차이를 화면과 API에 명시하며 각 수치는 자기 원천과 일치",
+      "finalStaffExpected": "공정 생산 합계와 모델별 생산 표는 계산 범위가 다르므로 서로 다른 값이어도 오류가 아니다. 화면과 서버는 둘을 별도 값으로 전달하고 같은 합계라고 오해시키지 않아야 한다.",
+      "verificationTags": [
+        "P0"
+      ],
+      "conditions": [
+        {
+          "id": "overall-own-source",
+          "origin": "technical+staff",
+          "expected": "공정 생산 합계는 모든 완료 공정 생산 원천과 일치한다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "model-own-source",
+          "origin": "technical+staff",
+          "expected": "모델 TF~AF 생산과 PF 실제 출하 완료만 자체 원천으로 집계한다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "screen-scope-guide",
+          "origin": "technical+staff",
+          "expected": "서로 다른 공정 전체·모델 집계 범위를 화면에 설명한다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "screen-scope-guide-unverified",
+          "origin": "review-gap",
+          "expected": "FROZEN_PRODUCT_GUIDANCE_RED: 사용자 동결 해제/문구 정리 응답 대기. 브라우저 필수 조건의 실제 UI assertion 미연결",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "api-scope-guide",
+          "origin": "technical+staff",
+          "expected": "API에서도 두 집계의 범위 차이를 명시한다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "8.21-07",
+      "decisionIds": [],
+      "atomicReview": "reviewed",
+      "finalExpected": "`verified`는 재고 경계와 활동 원장의 검산 범위를 정확히 설명하고, 별도 정의인 모델별 매트릭스도 자체 원천과 일치해야 하며 서로 다른 두 합계가 같다고 오해시키지 않음",
+      "finalStaffExpected": "검산 완료 표시는 품목·공정·전체 재고 산식이 맞다는 뜻으로만 사용해야 한다. 계산 범위가 다른 모델별 생산표까지 공정 합계와 같다고 오해시키면 안 된다.",
+      "verificationTags": [
+        "P0"
+      ],
+      "conditions": [
+        {
+          "id": "verified-means-ledger",
+          "origin": "technical+staff",
+          "expected": "verified는 품목·공정·전체 재고 경계와 활동 원장의 일치를 뜻한다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "scope-guide-screen",
+          "origin": "technical+staff",
+          "expected": "검산 범위와 모델표 자체 원천을 설명하며 두 합계 동일성을 주장하지 않는다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "scope-guide-screen-unverified",
+          "origin": "review-gap",
+          "expected": "FROZEN_PRODUCT_GUIDANCE_RED: 사용자 응답 대기. 브라우저 필수 조건의 실제 UI assertion 미연결",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "failure-screen",
+          "origin": "technical+staff",
+          "expected": "검산 실패 시 숫자 표 대신 원인·문제 식별자를 보여준다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "8.21-10",
+      "decisionIds": [],
+      "atomicReview": "reviewed",
+      "finalExpected": "열에서 제외한 거래도 전체 순증 검산에는 포함하며 사용자에게 분류 기준을 명시",
+      "finalStaffExpected": "불량 격리·복귀·폐기·재작업이 생산·입고·출고·불량 열 중 어디에 들어가는지 직원이 화면에서 알 수 있어야 한다. 특정 열에서 제외된 거래라도 전주 재고와 현재 재고를 맞추는 전체 검산에는 빠지면 안 된다.",
+      "verificationTags": [
+        "P0"
+      ],
+      "conditions": [
+        {
+          "id": "quarantine-restore-scrap",
+          "origin": "technical+staff",
+          "expected": "격리·복귀·기존 불량 폐기는 실제 정상재고 증감에 맞게 분류한다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "excluded-full-net",
+          "origin": "technical+staff",
+          "expected": "표시 열0인 거래도 전체 원장 순증 검산에 포함한다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "classification-guide",
+          "origin": "technical+staff",
+          "expected": "사용자에게 격리·복귀·폐기·재작업 열 기준과 전체 순증 포함을 설명한다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "classification-guide-unverified",
+          "origin": "review-gap",
+          "expected": "FROZEN_PRODUCT_GUIDANCE_RED: 사용자 응답 대기. 브라우저 필수 조건의 실제 UI assertion 미연결",
+          "requiredEvidence": [
+            "browser"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "8.21-11",
+      "decisionIds": [],
+      "atomicReview": "reviewed",
+      "finalExpected": "같은 생산 정의와 원천 거래를 사용해 화면과 파일이 일치",
+      "finalStaffExpected": "주간보고의 F705-02 생산일지를 내려받으면 화면에 보이는 모델별 생산 수량이 같은 날짜와 같은 공정 칸에 들어가야 한다. 생산이 없는 칸은 비어 있어야 하고, 날짜별 수량과 월 합계를 더했을 때 서버가 계산한 값과 달라서는 안 된다.",
+      "verificationTags": [
+        "P0"
+      ],
+      "conditions": [
+        {
+          "id": "same-source-definition",
+          "origin": "technical+staff",
+          "expected": "화면 모델 생산과 파일은 같은 생산·최종 픽업 원천을 사용한다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "valid-real-download",
+          "origin": "technical+staff",
+          "expected": "실제 browser F705 파일을 수신하며 선택 연도·유효 XLSX 수식을 확인한다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "pf-week-file-screen",
+          "origin": "technical+staff",
+          "expected": "실제 픽업 후 PF 모델의 선택 주차 화면 수치는 다운로드 일별 합계와 일치한다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "pf-week-file-screen-unverified",
+          "origin": "review-gap",
+          "expected": "FROZEN_PRODUCT_PF_ONLY_MATRIX_RED: browser6 실제 PF1, 전체 생산0이면 모델표가 숨겨짐. 사용자 동결 해제 승인 대기. 파일 비교 단계 미도달.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "zero-and-month-totals",
+          "origin": "technical+staff",
+          "expected": "파일0 입력은 빈 셀이며 날짜·모델·공정 행과 월합계 cached 값이 실제 합계와 일치한다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "PC-DELTA-WEEKLY-01",
+      "decisionIds": [],
+      "atomicReview": "reviewed",
+      "finalExpected": "주간보고를 새로 열면 방금 완료한 출하가 자동으로 반영돼야 하며, 직원이 별도로 동기화 버튼을 누르지 않아도 최신 수치를 보여야 한다.",
+      "finalStaffExpected": "PF 픽업을 끝낸 뒤 주간보고를 열면 방금 출하한 1개가 바로 포함돼야 한다. 직원이 동기화 버튼을 한 번 더 누르지 않아도 새 화면은 최신 수치를 보여야 한다.",
+      "verificationTags": [
+        "P0"
+      ],
+      "conditions": [
+        {
+          "id": "real-pickup-refresh",
+          "origin": "technical+staff",
+          "expected": "실제 PF 픽업 후 같은 탭으로 돌아오면 별도 동기화 없이 실제 최신 모델 수치를 표시한다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "real-pickup-refresh-unverified",
+          "origin": "review-gap",
+          "expected": "FROZEN_PRODUCT_PF_ONLY_MATRIX_RED: 실제 픽업 API 모델 PF1과 UI 생산 실적 없음 불일치. runtime/closure/weekly-pf-only-browser6-context.md 보존. 제품 미수정/기대값1 유지.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        },
+        {
+          "id": "cancel-refresh",
+          "origin": "technical+staff",
+          "expected": "실제 픽업 취소 후 탭 복귀 시 주간 PF가 원래 수치로 갱신된다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        }
+      ]
+    }
+  ],
+  "gaps": [
+    {
+      "caseId": "8.19-22",
+      "conditionId": "f705-real-pf-screen-file-quantity-unverified",
+      "bindings": [],
+      "reason": "PF만 양수인 주간 모델표가 동결 화면에서 숨겨짐. report browser6 RED, 실제파일비교 미도달.",
+      "execution": {
+        "status": "NOT_RUN"
+      }
+    },
+    {
+      "caseId": "PC-DELTA-ADMIN-02",
+      "conditionId": "new-employee-default-menu-policy",
+      "bindings": [],
+      "execution": {
+        "status": "NOT_RUN"
+      },
+      "reason": "G01 등급 제거 뒤 관리자 메뉴는 hidden_sidebar_tabs 접근 설정과 PIN계약으로 해석해야 한다. 단순 emptyhidden 기본값 assertion으로 정책 충족을 주장하지 않는다."
+    },
+    {
+      "caseId": "PC-DELTA-ADMIN-02",
+      "conditionId": "admin-form-login-menu-consistency",
+      "bindings": [],
+      "execution": {
+        "status": "NOT_RUN"
+      },
+      "reason": "신규 일반 부서 직원의 기본 체크 상태와 실제 로그인 메뉴·직접URL 접근이 일치한다."
+    },
+    {
+      "caseId": "8.4-03",
+      "conditionId": "component-shortage-block-unverified",
+      "bindings": [],
+      "reason": "원문의 구성품 부족 단계 차단과 현행 최종 PF·동반품 예약 정책이 충돌한다. 후속 승인 근거가 없어 사용자 정책 결정이 필요하며, 구성품 부족 BOM 단계 차단 assertion은 없다.",
+      "execution": {
+        "status": "NOT_RUN"
+      }
+    },
+    {
+      "caseId": "PC-DELTA-PF-01",
+      "conditionId": "pf-browser-crosscheck-unverified",
+      "bindings": [],
+      "reason": "동일 요청 물리 재고·주간 API·실제 파일·취소 상쇄 assertion은 보강했다. 생산 합계 0이어도 PF 실적이 있으면 화면 행이 보여야 한다는 별도 UI assertion은 frozen 화면의 기존 결함 때문에 실패할 수 있으며, 승인 전 UI 조건을 완료로 승격하지 않는다.",
+      "execution": {
+        "status": "NOT_RUN"
+      }
+    },
+    {
+      "caseId": "PC-DELTA-PF-03",
+      "conditionId": "workbook-cells-unverified",
+      "bindings": [],
+      "reason": "다운로드 셀·API PF·월 수식·캐시는 직접 대조한다. PF만 존재하는 주의 화면 매트릭스가 숨겨지는 frozen UI gap을 별도로 유지하며, 이 상태를 빈 주차 정상으로 간주하지 않는다.",
+      "execution": {
+        "status": "NOT_RUN"
+      }
+    },
+    {
+      "caseId": "8.21-01",
+      "conditionId": "screen-file-period-unverified",
+      "bindings": [],
+      "reason": "실제 browser14 RED: KST 주차 2025-12-29~2026-01-04 생산 기대5/실제6. frozen weekly_report.py366–367/614의 snapshot 없는 경로가 UTC 날짜 경계를 사용하여 다음 KST 월요일0시의 q1까지 포함. 동결 해제 승인 전 제품 수정 금지; 기대5를 완화하지 않는다.",
+      "execution": {
+        "status": "NOT_RUN"
+      }
+    },
+    {
+      "caseId": "8.21-02",
+      "conditionId": "three-level-screen-unverified",
+      "bindings": [],
+      "reason": "동결 DesktopWeeklyReportView 실제 렌더에는 전체 정상재고 합계가 표시되지 않는다. 단일 TF 카드·품목 행은 확인되지만 전체 합계 화면 조건은 미충족. 사용자 동결 해제 승인 전 변경하지 않는다.",
+      "execution": {
+        "status": "NOT_RUN"
+      }
+    },
+    {
+      "caseId": "8.21-03",
+      "conditionId": "one-class-column-unverified",
+      "bindings": [],
+      "reason": "POLICY_CONTRACT_CONFLICT: 재작업 불량·폐기 자식 한 원행을 receive+defect 두 열에 넣는 현 계산과 원문 한 열 조건 충돌. 사용자 답변 전 기대값 변경 금지.",
+      "execution": {
+        "status": "NOT_RUN"
+      }
+    },
+    {
+      "caseId": "8.21-06",
+      "conditionId": "screen-scope-guide-unverified",
+      "bindings": [],
+      "reason": "FROZEN_PRODUCT_GUIDANCE_RED: 사용자 동결 해제/문구 정리 응답 대기. 브라우저 필수 조건의 실제 UI assertion 미연결",
+      "execution": {
+        "status": "NOT_RUN"
+      }
+    },
+    {
+      "caseId": "8.21-07",
+      "conditionId": "scope-guide-screen-unverified",
+      "bindings": [],
+      "reason": "FROZEN_PRODUCT_GUIDANCE_RED: 사용자 응답 대기. 브라우저 필수 조건의 실제 UI assertion 미연결",
+      "execution": {
+        "status": "NOT_RUN"
+      }
+    },
+    {
+      "caseId": "8.21-10",
+      "conditionId": "classification-guide-unverified",
+      "bindings": [],
+      "reason": "FROZEN_PRODUCT_GUIDANCE_RED: 사용자 응답 대기. 브라우저 필수 조건의 실제 UI assertion 미연결",
+      "execution": {
+        "status": "NOT_RUN"
+      }
+    },
+    {
+      "caseId": "8.21-11",
+      "conditionId": "pf-week-file-screen-unverified",
+      "bindings": [],
+      "reason": "FROZEN_PRODUCT_PF_ONLY_MATRIX_RED: browser6 실제 PF1, 전체 생산0이면 모델표가 숨겨짐. 사용자 동결 해제 승인 대기. 파일 비교 단계 미도달.",
+      "execution": {
+        "status": "NOT_RUN"
+      }
+    },
+    {
+      "caseId": "PC-DELTA-WEEKLY-01",
+      "conditionId": "real-pickup-refresh-unverified",
+      "bindings": [],
+      "reason": "FROZEN_PRODUCT_PF_ONLY_MATRIX_RED: 실제 픽업 API 모델 PF1과 UI 생산 실적 없음 불일치. runtime/closure/weekly-pf-only-browser6-context.md 보존. 제품 미수정/기대값1 유지.",
+      "execution": {
+        "status": "NOT_RUN"
+      }
+    }
+  ]
+}
