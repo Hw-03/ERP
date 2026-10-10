@@ -268,6 +268,28 @@ describe("CapacityDetailModal 데스크톱 요약과 PF BOM 상세", () => {
     expect(firstBranchButton).toHaveAttribute("aria-expanded", "false");
   });
 
+  it("PF BOM의 전체 펼치기·접기 버튼은 가지 상태에 따라 활성화된다", async () => {
+    renderModal();
+    openPfDetail("DX3000 PF A");
+
+    const detail = screen.getByRole("region", { name: "선택한 출하 완제품 BOM" });
+    const expand = within(detail).getByRole("button", { name: "모두 펼치기" });
+    const collapse = within(detail).getByRole("button", { name: "모두 접기" });
+    expect(await within(detail).findByText("pf-1 최하위 구성품")).toBeInTheDocument();
+    expect(expand).toBeDisabled();
+    expect(collapse).toBeEnabled();
+
+    fireEvent.click(collapse);
+    expect(within(detail).queryByText("pf-1 최하위 구성품")).not.toBeInTheDocument();
+    expect(expand).toBeEnabled();
+    expect(collapse).toBeDisabled();
+
+    fireEvent.click(expand);
+    expect(within(detail).getByText("pf-1 최하위 구성품")).toBeInTheDocument();
+    expect(expand).toBeDisabled();
+    expect(collapse).toBeEnabled();
+  });
+
   it("BOM 로딩 실패 뒤 재시도와 하위 품목 없음 상태를 표시한다", async () => {
     vi.mocked(api.getBOMTree)
       .mockRejectedValueOnce(new Error("network"))

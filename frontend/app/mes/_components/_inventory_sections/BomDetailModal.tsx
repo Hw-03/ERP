@@ -10,6 +10,7 @@ import { tint } from "@/lib/mes/colorUtils";
 import { useFocusTrap } from "@/lib/mes/useFocusTrap";
 import { DesktopPanelCloseButton } from "../DesktopRightPanel";
 import { EmptyState } from "../common/EmptyState";
+import { DesktopBomExpandControls } from "../common/DesktopBomExpandControls";
 import { getBomBranchItemIds, ModalBomTree, useBomTree } from "../_warehouse_v2/BomSubExpander";
 import { ReadFailure, ReadLoading } from "../common/ReadState";
 import { SkeletonBlock, dataRevealClassName } from "../common/LoadingSkeleton";
@@ -167,24 +168,12 @@ export function BomDetailModal({ itemId, open, onClose, mobilePresentation = fal
                 ? `추가 생산 가능 ${formatQty(currentTree.additional_producible_quantity)} ${currentTree.unit}`
                 : "추가 생산 가능 계산 불가"}
             </span>}
-            <button
-              type="button"
-              onClick={() => setExpandedItemIds(new Set(branchItemIds))}
-              disabled={!hasCollapsedItems}
-              className="h-8 rounded-[10px] border px-3 text-xs font-bold transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
-              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text, background: LEGACY_COLORS.s2 }}
-            >
-              모두 펼치기
-            </button>
-            <button
-              type="button"
-              onClick={() => setExpandedItemIds(new Set())}
-              disabled={!hasExpandedItems}
-              className="h-8 rounded-[10px] border px-3 text-xs font-bold transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
-              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text, background: LEGACY_COLORS.s2 }}
-            >
-              모두 접기
-            </button>
+            <DesktopBomExpandControls
+              hasCollapsedItems={hasCollapsedItems}
+              hasExpandedItems={hasExpandedItems}
+              onExpand={() => setExpandedItemIds(new Set(branchItemIds))}
+              onCollapse={() => setExpandedItemIds(new Set())}
+            />
           <DesktopPanelCloseButton
             ref={closeRef}
             onClick={onClose}

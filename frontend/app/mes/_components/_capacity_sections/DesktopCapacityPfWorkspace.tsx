@@ -12,6 +12,7 @@ import {
   useBomTree,
 } from "../_warehouse_v2/BomSubExpander";
 import { EmptyState } from "../common/EmptyState";
+import { DesktopBomExpandControls } from "../common/DesktopBomExpandControls";
 
 type Props = {
   variant: ProductionCapacityPfVariant;
@@ -121,24 +122,12 @@ export function DesktopCapacityPfWorkspace({ variant, onBack, onClose }: Props) 
             <SummaryCard label="총생산" value={variant.total_production} color={LEGACY_COLORS.purple} />
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setExpandedItemIds(new Set(branchItemIds))}
-              disabled={!hasCollapsedItems}
-              className="h-8 rounded-[10px] border px-3 text-xs font-bold transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
-              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text, background: LEGACY_COLORS.s2 }}
-            >
-              모두 펼치기
-            </button>
-            <button
-              type="button"
-              onClick={() => setExpandedItemIds(new Set())}
-              disabled={!hasExpandedItems}
-              className="h-8 rounded-[10px] border px-3 text-xs font-bold transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
-              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text, background: LEGACY_COLORS.s2 }}
-            >
-              모두 접기
-            </button>
+            <DesktopBomExpandControls
+              hasCollapsedItems={hasCollapsedItems}
+              hasExpandedItems={hasExpandedItems}
+              onExpand={() => setExpandedItemIds(new Set(branchItemIds))}
+              onCollapse={() => setExpandedItemIds(new Set())}
+            />
           </div>
           <button
             type="button"
