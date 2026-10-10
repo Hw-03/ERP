@@ -54,11 +54,18 @@ node scripts/dev/normalize-mes-expectations.mjs --check --require-complete
 
 ## 격리 코드·DB 공동복구의 재검증
 
+CI의 합성 자료로 브라우저를 재검증할 때는 익명 직원의 사번으로 검색하고 실제 이름 옵션을 선택한다. 날짜 기대는 브라우저와 같은 `Asia/Seoul`을 명시하며 영업일 왕복 테스트는 고정된 평일을 사용한다. 목록을 다시 조회한 뒤에는 요약 수치뿐 아니라 행 렌더를 기다리고 초기 ID를 저장한다. 초기 표시 범위에 의존하는 품목 선택은 검색으로 대상 행을 찾는다. 불량 복귀는 사전 원건 집합·이번 신규 원건·복귀 후 신규 원건 부재와 사전 집합 보존을 확인한다. 공용 QA DB 전체가 비었다는 가정으로 개별 작업의 성공을 판정하지 않는다.
+
 실제 복구는 브라우저 흐름과 별도 실행이다. 전용 복제 DB·코드·Node·프론트 묶음의 manifest, 파일 해시, PID와 생성 시각, 전용 포트를 고정한 뒤 기존 `backend/tests/ops/recovery_rehearsal.py`의 실제 lifecycle과 설치·복구 구현을 사용한다. 스킬의 `scripts/recovery_readiness_probe.py` 문맥은 고정 JSON 건강 조회의 성공 판정만 보조한다. 운영 경로·소유권 가드를 완화하거나 실제 설치/복구 함수를 모의 구현으로 바꾸지 않는다.
+
+단계별 QA 마이그레이션은 `managed_migration`으로 감싼다. 시작 스키마와 정확한 head를 확인하고 기존 profile을 보존하며, 성공 후 canonical 스키마 확인값 갱신과 managed-head 검사를 수행한다. Alembic revision만 이동하거나 확인값을 임의로 찍어 ready를 통과시키지 않는다. 중간 실패는 성공한 마이그레이션으로 기록하지 않는다.
+
+- 실제 테스트 사본은 해당 워크트리의 `_attic/runtime/qa/run-*`에 두고, 빌드·manifest·증거는 `_attic/runtime/closure/recovery`에 둔다. 직원 사본의 `FIXTURE_ROOT` 경계와 프론트 산출물의 `OUTPUT_ROOT` 경계는 각각 유지한다. Alembic이 읽는 migration 경로와 `recovery-tool` 경로의 최대 길이를 실행 전에 확인한다. 이 배치는 임의의 초장 Windows 경로 지원을 증명하지 않는다.
+- harness를 변경하면 공유 readiness의 canonical LF 해시도 정확히 갱신한다. 과거 실행의 raw 핀과 원문은 따로 보존하고 새 코드의 변경 범위를 명시한다. 해시 검사를 삭제하거나 과거 PASS를 새 소스의 PASS로 재표시하지 않는다.
 
 - `_previous_node(employee_root)`의 실제 반환은 `path`와 `files`다. 버전은 반환한 경로를 `release.node_version(Path(node_state["path"]))`로 조회한다. 순수 fixture에 없는 `version` 키를 넣어 계약 오류를 숨기지 않는다.
 - 프론트 복사와 기존 코드의 `superseded-code` 이동은 서로 다른 Windows 긴 경로 소비자다. 실제 경로 경계 검증 뒤 extended 경로로 파일 I/O를 수행한다. 캐시나 기존 파일을 검사에서 제외해 통과시키지 않는다. 정상 설치 및 이동 직후 실패의 bytes·mtime/mode·DB·설정·journal 원복을 함께 확인한다.
-- 먼저 `python -m pytest backend/tests/ops/test_employee_frontend_release_long_paths.py backend/tests/ops/test_employee_code_release_long_paths.py backend/tests/ops/test_friday_profile_cutover_long_paths.py -q`를 실행한다. 마지막 파일은 cutover의 보존 파일 읽기와 `..` 경로의 접합점 우회 차단을 검증한다. native Windows 검사를 다른 플랫폼의 SKIP으로 대신하지 않으며, Windows 권한 부족으로 SKIP한 조건도 PASS로 기록하지 않는다. 이어서 스킬의 readiness 순수 검사를 실행한다.
+- 경로 소비자가 바뀌면 해당 검사를 선택한다: `python -m pytest backend/tests/ops/test_employee_frontend_release_long_paths.py backend/tests/ops/test_employee_code_release_long_paths.py backend/tests/ops/test_friday_profile_cutover_long_paths.py -q`. 마지막 파일은 cutover의 보존 파일 읽기와 `..` 경로의 접합점 우회 차단을 검증한다. 코드·설정·검증 입력이 같은 유효한 통과 근거는 재사용하고, 테스트 사본 경로만 바뀌면 해당 containment·경로 길이·readiness 검사를 국소 실행한다. native Windows 검사를 다른 플랫폼의 SKIP으로 대신하지 않으며 권한 부족으로 SKIP한 조건도 PASS로 기록하지 않는다.
 - 이전 실패의 admission·journal·owner·원문은 보존한다. 정확한 이전 묶음 복원을 대조한 뒤 새 manifest와 실행 ID로 재시도한다. 설치 실패·강제 종료·재개·정상 복구 결과를 각각 기록한다. 구버전과 새 버전의 실제 기동·조회·종료·포트 해제는 파일 해시와 별도 근거다.
 - 같은 프론트 소스를 재사용하더라도 Node·설정·전체 산출물의 현재 해시를 다시 확인한다. 운영 빌드의 정확 복원과 QA 주소의 실제 production 기동을 구분한다. DB 보존 근거도 현재 입력 목록과 실제 호출 경로를 대조해 재사용 여부를 판단한다.
 - 제품이나 검증 입력이 바뀌면 이전 전체 기대값 PASS를 현재로 옮기지 않는다. 새 run ID에서 검사하고 원장 승격·엄격 완료 검사를 수행한다. 공유 스킬·CI 변경은 해당 소비자의 별도 검사를 남긴다.

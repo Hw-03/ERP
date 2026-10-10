@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-10T09:45:28+09:00",
+  "scope": "ISOLATED_CODE_DATABASE_RECOVERY",
+  "mainApplied": false,
+  "employeeDeployed": false,
+  "sourceCodeSha256": "e49257a4d57d8f6c5b9a01f448e924e50d06ecea80e12e2690989903725afba8",
+  "manifestSha256": "01cdc5531ab724bc32ed26c59750a36335411fde2211534f153f068f5217c94c",
+  "databaseComparison": "Original recovery SQLite snapshot digest and schema/data validation; not raw-file SHA equivalence",
+  "failureResume": {
+    "status": "PASS",
+    "nativeExit": 0,
+    "outerExit": 0,
+    "resultSha256": "c6ff6f8e2d3dd46ccd0afdd4b271c944edcf5ad7e282af054e18f35a91ecdb68",
+    "exitSha256": "bd754043fc3cd0989f29f9f79cb9410a8ad21a91eca7c0c65ae6cbf6adb2bddb",
+    "guards": ["wrong-target", "admission-hash", "resume-hash", "concurrent-writer"]
+  },
+  "hardExit": {
+    "actualRecoveryStatus": "PASS",
+    "nativeExit": 0,
+    "injectedChildExit": 73,
+    "resultSha256": "6c6b3334100add1ae10aa3caf1e1c7999a358d34aa2a4c3ec19cb38910eb4f3f",
+    "originalCollectorStatus": "FAIL",
+    "originalOuterExit": 125,
+    "originalExitSha256": "222b3487fd19626fe73c075fe6619c8012130d32e2af5f10752657352539d9d5",
+    "collectorError": "Unspecified optional hash: Python null versus PowerShell empty string",
+    "separateReviewStatus": "HARD_EXIT_TERMINAL_REVALIDATED",
+    "reviewSha256": "777c0407fe83722639da7d4b84430d6f082993bdc18323c21a1ef90a7ddc3f72",
+    "actualRecoveryReexecuted": false,
+    "originalFailurePreserved": true
+  },
+  "normal": {
+    "status": "PASS",
+    "nativeExit": 0,
+    "outerExit": 0,
+    "resume": false,
+    "resultSha256": "d493108edde457653330cec528d922d541ec06fd62e2889dc89061fc048844fc",
+    "exitSha256": "14cbc4915ba70e17614b7f22d92727442896ca7b5116e7105e916b5f407487f9"
+  },
+  "validated": {
+    "revisions": ["20260928_0038", "20261008_0044", "20260928_0038"],
+    "actualBackendFrontendStartQueryStop": true,
+    "oldDatabaseCodeFrontendNodeRestored": true,
+    "failedGenerationPreserved": true,
+    "perRunProtectedInputsUnchanged": true,
+    "frozenSourceAndRuntimeUnchanged": true,
+    "ownedProcessesStopped": true,
+    "isolatedPortsReleased": true
+  },
+  "historicalFailuresPreserved": ["C15 migration path failure", "C16 external protected-input change", "C17 missing QA schema checkpoint update", "C18 original hard-exit collector failure"],
+  "postRehearsalChangesAllowedForEvidenceReuse": "CI test files and expectation binding metadata only; verify production source and build inputs remain unchanged"
+}

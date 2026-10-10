@@ -6,7 +6,7 @@ Every mutation stays under the worktree's ignored recovery output directory.
 from __future__ import annotations
 
 import argparse
-from contextlib import closing
+from contextlib import closing, contextmanager
 from dataclasses import asdict
 import hashlib
 import json
@@ -16,7 +16,7 @@ import socket
 import subprocess
 import sys
 import time
-from typing import BinaryIO
+from typing import TYPE_CHECKING, BinaryIO, Iterator
 from urllib.error import URLError
 from urllib.request import urlopen
 import uuid
@@ -29,7 +29,11 @@ from scripts.ops import employee_release_recovery as recovery  # noqa: E402
 from scripts.ops import employee_schema_preflight as preflight  # noqa: E402
 from scripts.ops.recovery_owner import process_started_at_ns  # noqa: E402
 
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Connection
+
 OUTPUT_ROOT = ROOT / "_attic/runtime/closure/recovery"
+FIXTURE_ROOT = ROOT / "_attic/runtime/qa"
 BACKEND_PORT = 8042
 FRONTEND_PORT = 3042
 REVISIONS = tuple(f"20261007_{number:04}" for number in range(39, 44))
@@ -112,7 +116,7 @@ class IsolatedLifecycle:
     def _validate(self, employee: Path) -> None:
         """Contain every managed root beneath the current worktree rehearsal."""
         if (employee != self.employee or employee.name != "employee"
-                or not employee.is_relative_to(release._physical(OUTPUT_ROOT).resolve())):
+                or not employee.is_relative_to(release._physical(FIXTURE_ROOT).resolve())):
             raise release.ReleaseError("Lifecycle requires the isolated rehearsal employee root")
 
     @staticmethod
@@ -302,6 +306,34 @@ def _preserve_crash_evidence(record: Path, child_owner: dict[str, int], exit_cod
     return destination / "metadata.json"
 
 
+@contextmanager
+def managed_migration(connection: Connection, target_revision: str) -> Iterator[None]:
+    """Keep stepped QA migrations within the public schema checkpoint contract."""
+    from bootstrap import schema
+
+    inspection = schema.inspect_schema(connection)
+    head, _ = schema._revision_contract(connection)
+    if (
+        connection.dialect.name != "sqlite"
+        or target_revision != head
+        or inspection.state is not schema.SchemaState.VERSIONED
+        or inspection.revision != "20260928_0038"
+        or inspection.profile_id is None
+        or inspection.schema_fingerprint is None
+        or inspection.differences
+    ):
+        raise release.ReleaseError("Rehearsal migration requires an intact managed 0038 schema and exact head")
+    profile_id = inspection.profile_id
+    yield
+    if profile_id == "canonical":
+        schema._assert_head_schema(connection)
+    schema._record_sqlite_schema_state(
+        connection, profile_id=profile_id, revision=head,
+    )
+    schema._assert_managed_head(connection, head)
+    connection.commit()
+
+
 def run(artifacts_path: Path, *, hard_exit: bool) -> Path:
     """Exercise install, migration, guards, process lifetime, failure and paired restore."""
     from alembic import command
@@ -330,7 +362,7 @@ def run(artifacts_path: Path, *, hard_exit: bool) -> Path:
     assert_frozen_source(ROOT, release._code_files(sources["new"]), receipts["new"]["source"])
     baseline = next((ROOT / "_attic/runtime/employee-baseline/backups/sqlite").glob("*.db"))
     baseline_hash = recovery._sha(baseline)
-    sandbox = OUTPUT_ROOT / ("run-" + uuid.uuid4().hex[:8])
+    sandbox = FIXTURE_ROOT / ("run-" + uuid.uuid4().hex[:8])
     employee = sandbox / "employee"
     lifecycle = IsolatedLifecycle(employee)
     lifecycle.assert_stopped(employee)
@@ -380,15 +412,16 @@ def run(artifacts_path: Path, *, hard_exit: bool) -> Path:
             migration_connection.exec_driver_sql("PRAGMA foreign_keys=ON")
             migration_connection.commit()
             config.attributes["connection"] = migration_connection
-            for revision in revisions:
-                command.upgrade(config, revision)
-                migration_connection.commit()
-                assert migration_connection.exec_driver_sql("PRAGMA foreign_keys").scalar_one() == 1
-                migration_connection.commit()
-                preflight.assert_existing_rows_unchanged(database, before, frozenset(), removed_columns=removed)
-                with closing(sqlite3.connect(database)) as connection:
-                    assert connection.execute("SELECT version_num FROM alembic_version").fetchone()[0] == revision
-                    assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+            with managed_migration(migration_connection, target_revision):
+                for revision in revisions:
+                    command.upgrade(config, revision)
+                    migration_connection.commit()
+                    assert migration_connection.exec_driver_sql("PRAGMA foreign_keys").scalar_one() == 1
+                    migration_connection.commit()
+                    preflight.assert_existing_rows_unchanged(database, before, frozenset(), removed_columns=removed)
+                    with closing(sqlite3.connect(database)) as connection:
+                        assert connection.execute("SELECT version_num FROM alembic_version").fetchone()[0] == revision
+                        assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
     finally:
         engine.dispose()
     with closing(sqlite3.connect(database)) as connection:

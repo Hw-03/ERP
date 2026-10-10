@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import ast
 import hashlib
 import json
 from pathlib import Path
@@ -10,6 +11,7 @@ import os
 import sqlite3
 import subprocess
 import sys
+import time
 
 import pytest
 
@@ -29,7 +31,7 @@ def _adapter():
 
 def test_lifecycle_rejects_production_and_paths_outside_rehearsal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     module = _adapter()
-    monkeypatch.setattr(module, "OUTPUT_ROOT", tmp_path / "output")
+    monkeypatch.setattr(module, "FIXTURE_ROOT", tmp_path / "output")
     for employee in (Path("C:/ERP"), Path("C:/ERP-dev"), tmp_path / "employee"):
         with pytest.raises(module.release.ReleaseError, match="isolated"):
             module.IsolatedLifecycle(employee)
@@ -37,7 +39,7 @@ def test_lifecycle_rejects_production_and_paths_outside_rehearsal(tmp_path: Path
 
 def test_lifecycle_refuses_occupied_port_without_signalling_owner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     module = _adapter()
-    monkeypatch.setattr(module, "OUTPUT_ROOT", tmp_path)
+    monkeypatch.setattr(module, "FIXTURE_ROOT", tmp_path)
     employee = tmp_path / "sandbox" / "employee"
     employee.mkdir(parents=True)
     lifecycle = module.IsolatedLifecycle(employee)
@@ -52,7 +54,7 @@ def test_lifecycle_refuses_occupied_port_without_signalling_owner(tmp_path: Path
 
 def test_lifecycle_refuses_unknown_process_identity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     module = _adapter()
-    monkeypatch.setattr(module, "OUTPUT_ROOT", tmp_path)
+    monkeypatch.setattr(module, "FIXTURE_ROOT", tmp_path)
     employee = tmp_path / "sandbox" / "employee"
     employee.mkdir(parents=True)
     lifecycle = module.IsolatedLifecycle(employee)
@@ -71,9 +73,9 @@ def test_test_adapter_does_not_relax_employee_production_contract() -> None:
 
 
 def test_lifecycle_stops_its_real_owned_process_and_releases_port(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Use a harmless actual HTTP child to test handles and port release on both OSes."""
+    """Check owned listener shutdown without introducing HTTP connection TIME_WAIT."""
     module = _adapter()
-    monkeypatch.setattr(module, "OUTPUT_ROOT", tmp_path)
+    monkeypatch.setattr(module, "FIXTURE_ROOT", tmp_path)
     employee = tmp_path / "sandbox/employee"
     employee.mkdir(parents=True)
     with socket.socket() as selection:
@@ -82,16 +84,65 @@ def test_lifecycle_stops_its_real_owned_process_and_releases_port(tmp_path: Path
     monkeypatch.setattr(module, "BACKEND_PORT", port)
     lifecycle = module.IsolatedLifecycle(employee)
     lifecycle.assert_stopped(employee)
+    ready = employee / "listener.ready"
+    child = (
+        "from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler\n"
+        "from pathlib import Path\n"
+        "import sys\n"
+        "server = ThreadingHTTPServer(('127.0.0.1', int(sys.argv[1])), SimpleHTTPRequestHandler)\n"
+        "Path(sys.argv[2]).touch(exist_ok=False)\n"
+        "server.serve_forever()\n"
+    )
     try:
-        lifecycle._spawn("backend", [sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1"],
+        lifecycle._spawn("backend", [sys.executable, "-c", child, str(port), str(ready)],
                          employee, os.environ.copy())
-        assert lifecycle._probe(f"http://127.0.0.1:{port}/")
+        process, owner, _ = lifecycle.processes["backend"]
+        deadline = time.monotonic() + 10
+        while not ready.is_file() and time.monotonic() < deadline:
+            assert process.poll() is None, "Owned listener exited before readiness"
+            time.sleep(0.01)
+        assert ready.is_file(), "Owned listener did not signal bind/listen readiness"
+        assert process.poll() is None
+        assert owner["pid"] == process.pid
+        lifecycle.require_identity(owner)
         with pytest.raises(module.release.ReleaseError, match="occupied"):
             lifecycle.assert_stopped(employee)
     finally:
         lifecycle.stop(employee)
     assert lifecycle.processes == {}
+    assert process.poll() is not None
     lifecycle.assert_stopped(employee)
+
+
+def test_fixture_root_is_short_and_separate_from_artifacts() -> None:
+    module = _adapter()
+    assert getattr(module, "FIXTURE_ROOT", None) == ROOT / "_attic/runtime/qa"
+    assert module.OUTPUT_ROOT == ROOT / "_attic/runtime/closure/recovery"
+    lifecycle = module.IsolatedLifecycle(module.FIXTURE_ROOT / "run-12345678/employee")
+    assert lifecycle.employee == (module.FIXTURE_ROOT / "run-12345678/employee").resolve()
+    with pytest.raises(module.release.ReleaseError, match="isolated"):
+        module.IsolatedLifecycle(module.OUTPUT_ROOT / "run-12345678/employee")
+    tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
+    run = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "run")
+    sandbox = next(node.value for node in ast.walk(run) if isinstance(node, ast.Assign)
+                   and any(isinstance(target, ast.Name) and target.id == "sandbox" for target in node.targets))
+    assert isinstance(sandbox, ast.BinOp) and isinstance(sandbox.left, ast.Name)
+    assert sandbox.left.id == "FIXTURE_ROOT"
+    lifecycle_class = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "IsolatedLifecycle")
+    start = next(node for node in lifecycle_class.body if isinstance(node, ast.FunctionDef) and node.name == "start_and_query")
+    assert "frontend.is_relative_to(OUTPUT_ROOT.resolve())" in ast.unparse(start)
+
+
+def test_fixture_migration_and_validator_paths_fit_windows_limit() -> None:
+    module = _adapter()
+    fixture = getattr(module, "FIXTURE_ROOT", module.OUTPUT_ROOT)
+    journal = fixture / "run-12345678/employee/_attic/runtime/frontend-releases" / ("a" * 32)
+    migrations = list((ROOT / "backend/alembic/versions").glob("*.py"))
+    assert migrations
+    for branch in ("old-code", "recovery-tool"):
+        paths = [journal / branch / "backend/alembic/versions" / path.name for path in migrations]
+        longest = max(paths, key=lambda path: len(str(path)))
+        assert len(str(longest)) < 260, f"Windows validator transport exceeds MAX_PATH: {longest}"
 
 
 def test_frozen_capture_rejects_frontend_only_source_change(tmp_path: Path) -> None:

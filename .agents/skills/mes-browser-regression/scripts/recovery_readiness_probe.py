@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[4]
 sys.path[:0] = [str(ROOT), str(ROOT / "backend/tests/ops")]
 import recovery_rehearsal as harness  # noqa: E402
 
-HARNESS_SHA = "bcd6ae85e2ab3b813850fc1f126d267fc42db1f15e47e19a7e29b1f63f2cbcf0"
+HARNESS_SHA = "ed6e1c36d2463492860cee47de23dcb4744e88318f567b6b6a71fb11fdc00b9f"
 
 
 def bounded_probe(self: harness.IsolatedLifecycle, url: str) -> bytes:
