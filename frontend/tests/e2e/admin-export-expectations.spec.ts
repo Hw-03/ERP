@@ -293,7 +293,7 @@ test.describe("관리자 내보내기·진단의 최종 파일과 읽기 전용 
     await controls.getByRole("textbox", { name: "현재 단말명", exact: true }).fill(name);
     await controls.getByRole("button", { name: "단말명 등록", exact: true }).click();
     expect((await saved).status()).toBe(200);
-    await expect(controls.getByRole("status")).toHaveText(`현재 단말명을 ${name}로 등록했습니다.`);
+    await expect(controls.getByRole("status").filter({ hasText: `현재 단말명을 ${name}로 등록했습니다.` })).toHaveText(`현재 단말명을 ${name}로 등록했습니다.`);
     const after = await page.evaluate(() => ({ terminal: localStorage.getItem("dexcowin_mes_audit_terminal"), operator: sessionStorage.getItem("dexcowin_mes_operator"), session: sessionStorage.getItem("dexcowin_mes_audit_session") }));
     expect(after.terminal).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
     expect({ operator: after.operator, session: after.session }).toEqual(before);

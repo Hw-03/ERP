@@ -5121,6 +5121,61 @@
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
           "assertion": "await expect(page.getByRole(\"group\", { name: \"공식 서식 내보내기\", exact: true })).toBeVisible();",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(downloads.map((file) => file.suggestedFilename().split(\"_\")[0]).sort()).toEqual([\"bom\", \"employees\", \"items\", \"transactions\"]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 KST 오늘 양쪽 자정 CSV·Excel 최종파일과 업무DB 불변",
+          "assertion": "expect(fixtureRows.map((row) => row[5]).sort()).toEqual(historicalExport.fixture.notes.slice(1, 3).sort());",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 115
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 KST 오늘 양쪽 자정 CSV·Excel 최종파일과 업무DB 불변",
+          "assertion": "expect(excelRows).toHaveLength(2);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 115
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 KST 오늘 양쪽 자정 CSV·Excel 최종파일과 업무DB 불변",
+          "assertion": "expect(businessSnapshot()).toEqual(before);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 115
+        }
+      ],
+      "execution": {
+        "status": "NOT_RUN"
+      },
+      "historicalExecutions": [
+        {
+          "status": "PASS",
+          "evidence": [
+            {
+              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+              "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+            },
+            {
+              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/vitest-d4c81f0c18-execution.json",
+              "evidenceHash": "fd9282301fc9b8c9e95440bc3c2dddb327bcf5252389b2be8e082475777666e8"
+            }
+          ]
+        }
+      ],
+      "historicalBindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "await expect(page.getByRole(\"group\", { name: \"공식 서식 내보내기\", exact: true })).toBeVisible();",
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 69
         },
@@ -5151,24 +5206,6 @@
           "assertion": "expect(businessSnapshot()).toEqual(before);",
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 115
-        }
-      ],
-      "execution": {
-        "status": "NOT_RUN"
-      },
-      "historicalExecutions": [
-        {
-          "status": "PASS",
-          "evidence": [
-            {
-              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-              "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-            },
-            {
-              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/vitest-d4c81f0c18-execution.json",
-              "evidenceHash": "fd9282301fc9b8c9e95440bc3c2dddb327bcf5252389b2be8e082475777666e8"
-            }
-          ]
         }
       ]
     },
@@ -5232,6 +5269,113 @@
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
           "assertion": "expect(parsed.get(\"items\")![0]).toEqual([\"품목 코드\", \"품명\", \"단위\", \"현재고\", \"안전재고\", \"부서\", \"공급처\"]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(sorted(parsed.get(\"items\")!.slice(1))).toEqual(sorted(items.map((item) => [item.mes_code, item.item_name, item.unit, item.quantity, item.min_stock, item.department ?? \"\", item.supplier ?? \"\"].map(csvCell))));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(parsed.get(\"items\")!.filter((row) => row[0] === historicalExport.item.mes_code)).toHaveLength(1);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(parsed.get(\"items\")!.find((row) => row[0] === historicalExport.item.mes_code)?.[1]).toBe(historicalExport.item.item_name);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(parsed.get(\"employees\")![0]).toEqual([\"이름\", \"부서\", \"직급\", \"창고 역할\", \"활성\"]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(sorted(parsed.get(\"employees\")!.slice(1))).toEqual(sorted(employees.map((row) => [row.name, row.department, row.role ?? \"\", row.warehouse_role, row.is_active ? \"Y\" : \"N\"].map(csvCell))));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(parsed.get(\"employees\")!.some((row) => row[0] === actors.other.name)).toBe(false);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(sorted(inactive.rows.slice(1))).toEqual(sorted(allEmployees.map((row) => [row.name, row.department, row.role ?? \"\", row.warehouse_role, row.is_active ? \"Y\" : \"N\"].map(csvCell))));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(inactive.rows.find((row) => row[0] === actors.other.name)?.[4]).toBe(\"N\");",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(parsed.get(\"bom\")![0]).toEqual([\"부모 코드\", \"부모명\", \"자식 코드\", \"자식명\", \"수량\", \"단위\"]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(sorted(parsed.get(\"bom\")!.slice(1))).toEqual(sorted(bom.map((row) => [row.parent_mes_code ?? \"\", row.parent_item_name, row.child_mes_code ?? \"\", row.child_item_name, row.quantity, row.unit].map(csvCell))));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(parsed.get(\"transactions\")![0]).toEqual([\"거래일시\", \"구분\", \"품목명\", \"수량변화\", \"단위\", \"메모\", \"품목 정보 기준\", \"현재 품목명\", \"현재 품목 코드\"]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(sorted(parsed.get(\"transactions\")!.slice(1))).toEqual(sorted(inRange.map((row) => [row.created_at, row.transaction_type, row.item_name, row.quantity_change, row.item_unit, row.notes ?? \"\", row.item_snapshot_preserved ? \"거래 당시\" : \"현재 품목 (당시 정보 미보존)\", row.current_item_name ?? row.item_name, row.current_mes_code ?? row.mes_code ?? \"\"].map(csvCell))));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        }
+      ],
+      "execution": {
+        "status": "NOT_RUN"
+      },
+      "historicalExecutions": [
+        {
+          "status": "PASS",
+          "evidence": [
+            {
+              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+              "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+            }
+          ]
+        }
+      ],
+      "historicalBindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(parsed.get(\"items\")![0]).toEqual([\"품목 코드\", \"품명\", \"단위\", \"현재고\", \"안전재고\", \"부서\", \"공급처\"]);",
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 69
         },
@@ -5319,6 +5463,26 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 69
         }
+      ]
+    },
+    {
+      "caseId": "8.19-21",
+      "conditionId": "purpose-separation",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "await expect(page.getByRole(\"group\", { name: \"공식 서식 내보내기\", exact: true })).toBeVisible();",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "await expect(page.getByRole(\"region\", { name: \"데이터 내보내기\", exact: true })).toBeVisible();",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -5333,12 +5497,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "8.19-21",
-      "conditionId": "purpose-separation",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
@@ -5353,6 +5513,26 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 69
         }
+      ]
+    },
+    {
+      "caseId": "8.19-21",
+      "conditionId": "four-csv-final-files",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "await expect.poll(() => downloads.length).toBe(4);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(downloads.map((file) => file.suggestedFilename().split(\"_\")[0]).sort()).toEqual([\"bom\", \"employees\", \"items\", \"transactions\"]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -5367,12 +5547,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "8.19-21",
-      "conditionId": "four-csv-final-files",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
@@ -5387,6 +5563,40 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 69
         }
+      ]
+    },
+    {
+      "caseId": "8.19-21",
+      "conditionId": "items-csv-db-population",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(parsed.get(\"items\")![0]).toEqual([\"품목 코드\", \"품명\", \"단위\", \"현재고\", \"안전재고\", \"부서\", \"공급처\"]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(sorted(parsed.get(\"items\")!.slice(1))).toEqual(sorted(items.map((item) => [item.mes_code, item.item_name, item.unit, item.quantity, item.min_stock, item.department ?? \"\", item.supplier ?? \"\"].map(csvCell))));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(parsed.get(\"items\")!.filter((row) => row[0] === historicalExport.item.mes_code)).toHaveLength(1);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(parsed.get(\"items\")!.find((row) => row[0] === historicalExport.item.mes_code)?.[1]).toBe(historicalExport.item.item_name);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -5401,12 +5611,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "8.19-21",
-      "conditionId": "items-csv-db-population",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
@@ -5435,6 +5641,33 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 69
         }
+      ]
+    },
+    {
+      "caseId": "8.19-21",
+      "conditionId": "employees-active-csv",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(parsed.get(\"employees\")![0]).toEqual([\"이름\", \"부서\", \"직급\", \"창고 역할\", \"활성\"]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(sorted(parsed.get(\"employees\")!.slice(1))).toEqual(sorted(employees.map((row) => [row.name, row.department, row.role ?? \"\", row.warehouse_role, row.is_active ? \"Y\" : \"N\"].map(csvCell))));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(parsed.get(\"employees\")!.some((row) => row[0] === actors.other.name)).toBe(false);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -5449,12 +5682,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "8.19-21",
-      "conditionId": "employees-active-csv",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
@@ -5476,6 +5705,26 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 69
         }
+      ]
+    },
+    {
+      "caseId": "8.19-21",
+      "conditionId": "employees-inactive-csv",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(sorted(inactive.rows.slice(1))).toEqual(sorted(allEmployees.map((row) => [row.name, row.department, row.role ?? \"\", row.warehouse_role, row.is_active ? \"Y\" : \"N\"].map(csvCell))));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(inactive.rows.find((row) => row[0] === actors.other.name)?.[4]).toBe(\"N\");",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -5490,12 +5739,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "8.19-21",
-      "conditionId": "employees-inactive-csv",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
@@ -5510,6 +5755,26 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 69
         }
+      ]
+    },
+    {
+      "caseId": "8.19-21",
+      "conditionId": "bom-csv-db-population",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(parsed.get(\"bom\")![0]).toEqual([\"부모 코드\", \"부모명\", \"자식 코드\", \"자식명\", \"수량\", \"단위\"]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(sorted(parsed.get(\"bom\")!.slice(1))).toEqual(sorted(bom.map((row) => [row.parent_mes_code ?? \"\", row.parent_item_name, row.child_mes_code ?? \"\", row.child_item_name, row.quantity, row.unit].map(csvCell))));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -5524,12 +5789,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "8.19-21",
-      "conditionId": "bom-csv-db-population",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
@@ -5544,6 +5805,26 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 69
         }
+      ]
+    },
+    {
+      "caseId": "8.19-21",
+      "conditionId": "transactions-csv-db-population",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(parsed.get(\"transactions\")![0]).toEqual([\"거래일시\", \"구분\", \"품목명\", \"수량변화\", \"단위\", \"메모\", \"품목 정보 기준\", \"현재 품목명\", \"현재 품목 코드\"]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
+          "assertion": "expect(sorted(parsed.get(\"transactions\")!.slice(1))).toEqual(sorted(inRange.map((row) => [row.created_at, row.transaction_type, row.item_name, row.quantity_change, row.item_unit, row.notes ?? \"\", row.item_snapshot_preserved ? \"거래 당시\" : \"현재 품목 (당시 정보 미보존)\", row.current_item_name ?? row.item_name, row.current_mes_code ?? row.mes_code ?? \"\"].map(csvCell))));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 69
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -5558,12 +5839,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "8.19-21",
-      "conditionId": "transactions-csv-db-population",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-21 공식·일반 구분과 전체 CSV4종·비활성 직원·한글 특수문자 최종파일",
@@ -5578,6 +5855,33 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 69
         }
+      ]
+    },
+    {
+      "caseId": "8.19-21",
+      "conditionId": "today-csv-both-kst-midnights",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 KST 오늘 양쪽 자정 CSV·Excel 최종파일과 업무DB 불변",
+          "assertion": "await expect(page.getByTestId(\"export-period-settings\")).toContainText(`${today()} ~ ${today()}`);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 115
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 KST 오늘 양쪽 자정 CSV·Excel 최종파일과 업무DB 불변",
+          "assertion": "expect(fixtureRows.map((row) => row[5]).sort()).toEqual(historicalExport.fixture.notes.slice(1, 3).sort());",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 115
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 KST 오늘 양쪽 자정 CSV·Excel 최종파일과 업무DB 불변",
+          "assertion": "expect(fixtureRows.map((row) => new Date(row[0]).toISOString()).sort()).toEqual(historicalExport.fixture.dates.slice(1, 3).map((value) => new Date(`${value}Z`).toISOString()).sort());",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 115
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -5592,12 +5896,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "8.19-21",
-      "conditionId": "today-csv-both-kst-midnights",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-21 KST 오늘 양쪽 자정 CSV·Excel 최종파일과 업무DB 불변",
@@ -5619,6 +5919,33 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 115
         }
+      ]
+    },
+    {
+      "caseId": "8.19-21",
+      "conditionId": "today-xlsx-both-kst-midnights",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 KST 오늘 양쪽 자정 CSV·Excel 최종파일과 업무DB 불변",
+          "assertion": "expect(excelRows).toHaveLength(2);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 115
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 KST 오늘 양쪽 자정 CSV·Excel 최종파일과 업무DB 불변",
+          "assertion": "for (const note of historicalExport.fixture.notes.slice(1, 3)) expect(excelRows.some((row) => row.includes(note))).toBe(true);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 115
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 KST 오늘 양쪽 자정 CSV·Excel 최종파일과 업무DB 불변",
+          "assertion": "for (const note of [historicalExport.fixture.notes[0], historicalExport.fixture.notes[3]]) expect(excelRows.some((row) => row.includes(note))).toBe(false);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 115
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -5633,12 +5960,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "8.19-21",
-      "conditionId": "today-xlsx-both-kst-midnights",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-21 KST 오늘 양쪽 자정 CSV·Excel 최종파일과 업무DB 불변",
@@ -5660,20 +5983,6 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 115
         }
-      ],
-      "execution": {
-        "status": "NOT_RUN"
-      },
-      "historicalExecutions": [
-        {
-          "status": "PASS",
-          "evidence": [
-            {
-              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-              "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-            }
-          ]
-        }
       ]
     },
     {
@@ -5684,7 +5993,7 @@
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-21 KST 오늘 양쪽 자정 CSV·Excel 최종파일과 업무DB 불변",
           "assertion": "expect(businessSnapshot()).toEqual(before);",
-          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
           "line": 115
         }
       ],
@@ -5700,6 +6009,15 @@
               "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
             }
           ]
+        }
+      ],
+      "historicalBindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-21 KST 오늘 양쪽 자정 CSV·Excel 최종파일과 업무DB 불변",
+          "assertion": "expect(businessSnapshot()).toEqual(before);",
+          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "line": 115
         }
       ]
     },
@@ -5725,21 +6043,21 @@
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
           "assertion": "expect(selected.map((row) => row[5])).toEqual([\"3\", \"2\", \"1\", \"1\"]);",
-          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
           "line": 134
         },
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
           "assertion": "expect(production.sheets).toHaveLength(12);",
-          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
           "line": 134
         },
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
           "assertion": "expect(production.sheets).toContain(`${String(historicalExport.fixture.year).slice(2)}.01`);",
-          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
           "line": 134
         },
         {
@@ -5773,6 +6091,29 @@
               "evidenceHash": "fd9282301fc9b8c9e95440bc3c2dddb327bcf5252389b2be8e082475777666e8"
             }
           ]
+        }
+      ],
+      "historicalBindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
+          "assertion": "expect(selected.map((row) => row[5])).toEqual([\"3\", \"2\", \"1\", \"1\"]);",
+          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "line": 134
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
+          "assertion": "expect(production.sheets).toHaveLength(12);",
+          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "line": 134
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
+          "assertion": "expect(production.sheets).toContain(`${String(historicalExport.fixture.year).slice(2)}.01`);",
+          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "line": 134
         }
       ]
     },
@@ -5996,7 +6337,7 @@
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
           "assertion": "expect(ledger.sheets).toContain(\"양식\");",
-          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
           "line": 134
         }
       ],
@@ -6013,12 +6354,58 @@
             }
           ]
         }
+      ],
+      "historicalBindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
+          "assertion": "expect(ledger.sheets).toContain(\"양식\");",
+          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "line": 134
+        }
       ]
     },
     {
       "caseId": "8.19-22",
       "conditionId": "f704-each-change-once",
       "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
+          "assertion": "expect(selected).toHaveLength(4);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 134
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
+          "assertion": "expect(selected.map((row) => row[5])).toEqual([\"3\", \"2\", \"1\", \"1\"]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 134
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
+          "assertion": "expect(selected.map((row) => row[6])).toEqual([\"입고\", \"출고\", \"입고\", \"출고\"]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 134
+        }
+      ],
+      "execution": {
+        "status": "NOT_RUN"
+      },
+      "historicalExecutions": [
+        {
+          "status": "PASS",
+          "evidence": [
+            {
+              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+              "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+            }
+          ]
+        }
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
@@ -6040,6 +6427,26 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 134
         }
+      ]
+    },
+    {
+      "caseId": "8.19-22",
+      "conditionId": "f704-date-item",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
+          "assertion": "expect(selected.map((row) => row[4])).toEqual(Array(4).fill(historicalExport.item.item_name));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 134
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
+          "assertion": "expect(selected.map((row) => row[1].slice(0, 10))).toEqual(historicalExport.fixture.dates.map((value) => new Date(new Date(`${value}Z`).getTime() + 9 * 3_600_000).toISOString().slice(0, 10)));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 134
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -6054,12 +6461,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "8.19-22",
-      "conditionId": "f704-date-item",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
@@ -6074,6 +6477,33 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 134
         }
+      ]
+    },
+    {
+      "caseId": "8.19-22",
+      "conditionId": "f704-counterpart-requester-memo",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
+          "assertion": "expect(selected.map((row) => row[7])).toEqual([\"검수 공급사\", \"AS\", \"검수 공급사\", \"검수 공급사\"]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 134
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
+          "assertion": "expect(selected.map((row) => row[8])).toEqual(Array(4).fill(actors.approver.name));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 134
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
+          "assertion": "expect(selected.map((row) => row[10])).toEqual(historicalExport.fixture.notes.map((note) => note.replace(/[\\r\\n]/g, \" \")));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 134
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -6088,12 +6518,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "8.19-22",
-      "conditionId": "f704-counterpart-requester-memo",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
@@ -6115,6 +6541,26 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 134
         }
+      ]
+    },
+    {
+      "caseId": "8.19-22",
+      "conditionId": "f705-final-file-year",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
+          "assertion": "expect(production.sheets).toHaveLength(12);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 134
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
+          "assertion": "expect(production.sheets).toContain(`${String(historicalExport.fixture.year).slice(2)}.01`);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 134
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -6129,12 +6575,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "8.19-22",
-      "conditionId": "f705-final-file-year",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-22 F704 실제 창고 증감·요청자·취소역전·서식과 F705 최종파일",
@@ -6148,20 +6590,6 @@
           "assertion": "expect(production.sheets).toContain(`${String(historicalExport.fixture.year).slice(2)}.01`);",
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 134
-        }
-      ],
-      "execution": {
-        "status": "NOT_RUN"
-      },
-      "historicalExecutions": [
-        {
-          "status": "PASS",
-          "evidence": [
-            {
-              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-              "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-            }
-          ]
         }
       ]
     },
@@ -6311,6 +6739,50 @@
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
           "assertion": "expect(csv.rows[0]).toEqual(rawHeaders);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 155
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "expect(xlsx.rows).toEqual(csv.rows);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 155
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "expect(sorted(csv.rows.slice(1))).toEqual(sorted(expectedRows));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 155
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "expect(new Set(csv.rows.slice(1).map((row) => row[11])).size).toBe(expectedRows.length);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 155
+        }
+      ],
+      "execution": {
+        "status": "NOT_RUN"
+      },
+      "historicalExecutions": [
+        {
+          "status": "PASS",
+          "evidence": [
+            {
+              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+              "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+            }
+          ]
+        }
+      ],
+      "historicalBindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "expect(csv.rows[0]).toEqual(rawHeaders);",
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 155
         },
@@ -6335,6 +6807,47 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 155
         }
+      ]
+    },
+    {
+      "caseId": "8.19-23",
+      "conditionId": "original-log-no-stale-backfill",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "expect(sorted(csv.rows.slice(1))).toEqual(sorted(expectedRows));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 155
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "expect(new Set(csv.rows.slice(1).map((row) => row[11])).size).toBe(expectedRows.length);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 155
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "expect(row?.[0]).toBe(historicalExport.fixture.dates[index].replace(\"T\", \" \"));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 155
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "expect(log.log_id).toBe(logId);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 155
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "if (index === 3) expect(log.reverses_log_id).toBe(historicalExport.fixture.logIds[2]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 155
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -6349,12 +6862,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "8.19-23",
-      "conditionId": "original-log-no-stale-backfill",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
@@ -6390,6 +6899,26 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 155
         }
+      ]
+    },
+    {
+      "caseId": "8.19-23",
+      "conditionId": "raw-12-headers",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "expect(csv.rows[0]).toEqual(rawHeaders);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 155
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "expect(xlsx.rows).toEqual(csv.rows);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 155
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -6404,12 +6933,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "8.19-23",
-      "conditionId": "raw-12-headers",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
@@ -6424,6 +6949,26 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 155
         }
+      ]
+    },
+    {
+      "caseId": "8.19-23",
+      "conditionId": "raw-current-db-all-rows-once",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "expect(sorted(csv.rows.slice(1))).toEqual(sorted(expectedRows));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 155
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "expect(new Set(csv.rows.slice(1).map((row) => row[11])).size).toBe(expectedRows.length);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 155
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -6438,12 +6983,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "8.19-23",
-      "conditionId": "raw-current-db-all-rows-once",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
@@ -6458,20 +6999,6 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 155
         }
-      ],
-      "execution": {
-        "status": "NOT_RUN"
-      },
-      "historicalExecutions": [
-        {
-          "status": "PASS",
-          "evidence": [
-            {
-              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-              "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-            }
-          ]
-        }
       ]
     },
     {
@@ -6482,7 +7009,7 @@
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
           "assertion": "expect(xlsx.rows).toEqual(csv.rows);",
-          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
           "line": 155
         }
       ],
@@ -6499,12 +7026,58 @@
             }
           ]
         }
+      ],
+      "historicalBindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "expect(xlsx.rows).toEqual(csv.rows);",
+          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "line": 155
+        }
       ]
     },
     {
       "caseId": "8.19-23",
       "conditionId": "raw-time-ids-and-reversal",
       "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "expect(row?.[0]).toBe(historicalExport.fixture.dates[index].replace(\"T\", \" \"));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 155
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "expect(log.log_id).toBe(logId);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 155
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "if (index === 3) expect(log.reverses_log_id).toBe(historicalExport.fixture.logIds[2]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 155
+        }
+      ],
+      "execution": {
+        "status": "NOT_RUN"
+      },
+      "historicalExecutions": [
+        {
+          "status": "PASS",
+          "evidence": [
+            {
+              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+              "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+            }
+          ]
+        }
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
@@ -6526,6 +7099,26 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 155
         }
+      ]
+    },
+    {
+      "caseId": "8.19-23",
+      "conditionId": "ordinary-staff-ui-gate",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "await expect(employeePage.getByText(\"관리자 인증\", { exact: true })).toBeVisible();",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 155
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "await expect(employeePage.getByTestId(\"admin-export-section\")).toHaveCount(0);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 155
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -6540,12 +7133,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "8.19-23",
-      "conditionId": "ordinary-staff-ui-gate",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
@@ -6559,20 +7148,6 @@
           "assertion": "await expect(employeePage.getByTestId(\"admin-export-section\")).toHaveCount(0);",
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 155
-        }
-      ],
-      "execution": {
-        "status": "NOT_RUN"
-      },
-      "historicalExecutions": [
-        {
-          "status": "PASS",
-          "evidence": [
-            {
-              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-              "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-            }
-          ]
         }
       ]
     },
@@ -6584,14 +7159,14 @@
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
           "assertion": "expect(denied.status()).toBe(400);",
-          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
           "line": 155
         },
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
           "assertion": "expect(deniedExcel.status()).toBe(400);",
-          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
           "line": 155
         }
       ],
@@ -6608,26 +7183,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "8.19-23",
-      "conditionId": "raw-export-no-general-employee-ui",
-      "bindings": [
-        {
-          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
-          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
-          "assertion": "await expect(employeePage.getByText(\"관리자 인증\", { exact: true })).toBeVisible();",
-          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
-          "line": 155
-        },
-        {
-          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
-          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
-          "assertion": "await expect(employeePage.getByTestId(\"admin-export-section\")).toHaveCount(0);",
-          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
-          "line": 155
-        },
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
@@ -6640,6 +7197,40 @@
           "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
           "assertion": "expect(deniedExcel.status()).toBe(400);",
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "line": 155
+        }
+      ]
+    },
+    {
+      "caseId": "8.19-23",
+      "conditionId": "raw-export-no-general-employee-ui",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "await expect(employeePage.getByText(\"관리자 인증\", { exact: true })).toBeVisible();",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 155
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "await expect(employeePage.getByTestId(\"admin-export-section\")).toHaveCount(0);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 155
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "expect(denied.status()).toBe(400);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 155
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "expect(deniedExcel.status()).toBe(400);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
           "line": 155
         },
         {
@@ -6663,6 +7254,36 @@
             }
           ]
         }
+      ],
+      "historicalBindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "await expect(employeePage.getByText(\"관리자 인증\", { exact: true })).toBeVisible();",
+          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "line": 155
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "await expect(employeePage.getByTestId(\"admin-export-section\")).toHaveCount(0);",
+          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "line": 155
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "expect(denied.status()).toBe(400);",
+          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "line": 155
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-23 원본 CSV·Excel 동일12열·전건ID·시각·정역거래와 실제 인증gate",
+          "assertion": "expect(deniedExcel.status()).toBe(400);",
+          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "line": 155
+        }
       ]
     },
     {
@@ -6683,6 +7304,61 @@
           "sourceHash": "3454f5a22edf0521c9efd2d891d94defb8faf1997b6bfeccc41a6a7902f35cc0",
           "line": 121
         },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "await expect(issue.getByRole(\"heading\", { name: \"전체 재고 합계 불일치\", exact: true })).toBeVisible();",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 190
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "await expect(issue).toContainText(\"현재 전체 재고 1\");",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 190
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "await expect(issue).toContainText(\"계산된 전체 재고 0\");",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 190
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "await expect(issue).toContainText(\"수동 검토 필요\");",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 190
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "await expect.poll(() => issues.locator(\".admin-integrity-issue-meta span:nth-child(2)\").allTextContents()).toEqual(identities);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 190
+        }
+      ],
+      "execution": {
+        "status": "NOT_RUN"
+      },
+      "historicalExecutions": [
+        {
+          "status": "PASS",
+          "evidence": [
+            {
+              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+              "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+            },
+            {
+              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/vitest-d4c81f0c18-execution.json",
+              "evidenceHash": "fd9282301fc9b8c9e95440bc3c2dddb327bcf5252389b2be8e082475777666e8"
+            }
+          ]
+        }
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
@@ -6717,24 +7393,6 @@
           "assertion": "await expect.poll(() => issues.locator(\".admin-integrity-issue-meta span:nth-child(2)\").allTextContents()).toEqual(identities);",
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 190
-        }
-      ],
-      "execution": {
-        "status": "NOT_RUN"
-      },
-      "historicalExecutions": [
-        {
-          "status": "PASS",
-          "evidence": [
-            {
-              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-              "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-            },
-            {
-              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/vitest-d4c81f0c18-execution.json",
-              "evidenceHash": "fd9282301fc9b8c9e95440bc3c2dddb327bcf5252389b2be8e082475777666e8"
-            }
-          ]
         }
       ]
     },
@@ -6870,21 +7528,21 @@
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
           "assertion": "expect(check.samples.filter((sample: { item_id: string }) => ids.includes(sample.item_id))).toHaveLength(7);",
-          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
           "line": 190
         },
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
           "assertion": "await expect(issue).toHaveCount(1);",
-          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
           "line": 190
         },
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
           "assertion": "await expect(issue.getByRole(\"heading\", { name: \"전체 재고 합계 불일치\", exact: true })).toBeVisible();",
-          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
           "line": 190
         },
         {
@@ -6937,12 +7595,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "8.19-24",
-      "conditionId": "all-engine-only-issues",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
@@ -6964,6 +7618,33 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 190
         }
+      ]
+    },
+    {
+      "caseId": "8.19-24",
+      "conditionId": "all-engine-only-issues",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "expect(check.samples.filter((sample: { item_id: string }) => ids.includes(sample.item_id))).toHaveLength(7);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 190
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "await expect(issue).toHaveCount(1);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 190
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "await expect(issue.getByRole(\"heading\", { name: \"전체 재고 합계 불일치\", exact: true })).toBeVisible();",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 190
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -6978,12 +7659,65 @@
             }
           ]
         }
+      ],
+      "historicalBindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "expect(check.samples.filter((sample: { item_id: string }) => ids.includes(sample.item_id))).toHaveLength(7);",
+          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "line": 190
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "await expect(issue).toHaveCount(1);",
+          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "line": 190
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "await expect(issue.getByRole(\"heading\", { name: \"전체 재고 합계 불일치\", exact: true })).toBeVisible();",
+          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "line": 190
+        }
       ]
     },
     {
       "caseId": "8.19-24",
       "conditionId": "problem-cause-current-expected",
       "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "await expect(issue).toContainText(\"현재 전체 재고 1\");",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 190
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "await expect(issue).toContainText(\"계산된 전체 재고 0\");",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 190
+        }
+      ],
+      "execution": {
+        "status": "NOT_RUN"
+      },
+      "historicalExecutions": [
+        {
+          "status": "PASS",
+          "evidence": [
+            {
+              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+              "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+            }
+          ]
+        }
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
@@ -6998,6 +7732,33 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 190
         }
+      ]
+    },
+    {
+      "caseId": "8.19-24",
+      "conditionId": "server-counts-not-legacy-zero",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "await expect(page.locator(\".admin-integrity-summary\")).toContainText(`발견 문제 ${result.blocking_count + result.warning_count}건`);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 190
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "await expect(page.locator(\".admin-integrity-summary\")).toContainText(`차단 ${result.blocking_count}건 · 경고 ${result.warning_count}건`);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 190
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "await expect(page.getByText(\"발견된 정합성 문제가 없습니다.\", { exact: true })).toHaveCount(0);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 190
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -7012,12 +7773,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "8.19-24",
-      "conditionId": "server-counts-not-legacy-zero",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
@@ -7039,20 +7796,6 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 190
         }
-      ],
-      "execution": {
-        "status": "NOT_RUN"
-      },
-      "historicalExecutions": [
-        {
-          "status": "PASS",
-          "evidence": [
-            {
-              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-              "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-            }
-          ]
-        }
       ]
     },
     {
@@ -7063,7 +7806,7 @@
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
           "assertion": "await expect.poll(() => issues.locator(\".admin-integrity-issue-meta span:nth-child(2)\").allTextContents()).toEqual(identities);",
-          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
           "line": 190
         }
       ],
@@ -7079,6 +7822,15 @@
               "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
             }
           ]
+        }
+      ],
+      "historicalBindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "await expect.poll(() => issues.locator(\".admin-integrity-issue-meta span:nth-child(2)\").allTextContents()).toEqual(identities);",
+          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "line": 190
         }
       ]
     },
@@ -7090,7 +7842,7 @@
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
           "assertion": "expect(businessSnapshot()).toEqual(before);",
-          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
           "line": 190
         }
       ],
@@ -7106,6 +7858,15 @@
               "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
             }
           ]
+        }
+      ],
+      "historicalBindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "expect(businessSnapshot()).toEqual(before);",
+          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "line": 190
         }
       ]
     },
@@ -7124,14 +7885,14 @@
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
           "assertion": "await expect(page.getByRole(\"button\", { name: /복구|적용/ })).toHaveCount(0);",
-          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
           "line": 190
         },
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
           "assertion": "expect(businessSnapshot()).toEqual(before);",
-          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
           "line": 190
         }
       ],
@@ -7151,6 +7912,22 @@
               "evidenceHash": "fd9282301fc9b8c9e95440bc3c2dddb327bcf5252389b2be8e082475777666e8"
             }
           ]
+        }
+      ],
+      "historicalBindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "await expect(page.getByRole(\"button\", { name: /복구|적용/ })).toHaveCount(0);",
+          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "line": 190
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "expect(businessSnapshot()).toEqual(before);",
+          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "line": 190
         }
       ]
     },
@@ -7448,7 +8225,7 @@
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
           "assertion": "await expect(page.getByRole(\"button\", { name: /복구|적용/ })).toHaveCount(0);",
-          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
           "line": 190
         }
       ],
@@ -7465,12 +8242,51 @@
             }
           ]
         }
+      ],
+      "historicalBindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "await expect(page.getByRole(\"button\", { name: /복구|적용/ })).toHaveCount(0);",
+          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "line": 190
+        }
       ]
     },
     {
       "caseId": "8.19-25",
       "conditionId": "engine-manual-review",
       "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "await expect(issue).toContainText(\"수동 검토 필요\");",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 190
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "await expect(issue).toContainText(\"이 화면에서는 복구하지 않습니다.\");",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 190
+        }
+      ],
+      "execution": {
+        "status": "NOT_RUN"
+      },
+      "historicalExecutions": [
+        {
+          "status": "PASS",
+          "evidence": [
+            {
+              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+              "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+            }
+          ]
+        }
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
@@ -7485,20 +8301,6 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 190
         }
-      ],
-      "execution": {
-        "status": "NOT_RUN"
-      },
-      "historicalExecutions": [
-        {
-          "status": "PASS",
-          "evidence": [
-            {
-              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-              "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-            }
-          ]
-        }
       ]
     },
     {
@@ -7509,7 +8311,7 @@
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
           "assertion": "expect(businessSnapshot()).toEqual(before);",
-          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
           "line": 190
         }
       ],
@@ -7525,6 +8327,15 @@
               "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
             }
           ]
+        }
+      ],
+      "historicalBindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "8.19-24 8.19-25 실제 엔진전용7문제 전건원인·현재기대·안정ID·재검사DB불변·수동검토",
+          "assertion": "expect(businessSnapshot()).toEqual(before);",
+          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "line": 190
         }
       ]
     },
@@ -10769,6 +11580,99 @@
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
           "assertion": "expect(facts.rows.map((row) => row.terminalName)).toEqual(names);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(facts.rows.map((row) => row.employeeCode)).toEqual(Array(2).fill(actors.approver.employee_code));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(target.map((row) => row[3])).toEqual(names);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(target.map((row) => row[2])).toEqual(Array(2).fill(actors.approver.employee_code));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(csv.rows[0]).toEqual(activityHeaders);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(target).toHaveLength(2);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(xlsx.rows[0]).toEqual(activityHeaders);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(xlsx.rows.filter((row) => row[11] === terminalId && row[6] === \"감사 단말 등록/변경\")).toEqual(target);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(target.map((row) => row[4])).toEqual([\"데스크톱\", \"데스크톱\"]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(target.map((row) => row[7])).toEqual([\"성공\", \"성공\"]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "for (const row of target) { expect(row[5]).not.toBe(\"\"); expect(row[9]).not.toBe(\"\"); expect(row[10]).not.toBe(\"\"); }",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        }
+      ],
+      "execution": {
+        "status": "NOT_RUN"
+      },
+      "historicalExecutions": [
+        {
+          "status": "PASS",
+          "evidence": [
+            {
+              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+              "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+            }
+          ]
+        }
+      ],
+      "historicalBindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(facts.rows.map((row) => row.terminalName)).toEqual(names);",
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 227
         },
@@ -10842,6 +11746,54 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 227
         }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ADMINAUDIT-01",
+      "conditionId": "legacy-terminal-format-recovery",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 실제 오래된단말 형식 자동복구는 직원·감사세션을 보존",
+          "assertion": "expect((await saved).status()).toBe(200);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 282
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 실제 오래된단말 형식 자동복구는 직원·감사세션을 보존",
+          "assertion": "await expect(controls.getByRole(\"status\").filter({ hasText: `현재 단말명을 ${name}로 등록했습니다.` })).toHaveText(`현재 단말명을 ${name}로 등록했습니다.`);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 282
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 실제 오래된단말 형식 자동복구는 직원·감사세션을 보존",
+          "assertion": "expect(after.terminal).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 282
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 실제 오래된단말 형식 자동복구는 직원·감사세션을 보존",
+          "assertion": "expect({ operator: after.operator, session: after.session }).toEqual(before);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 282
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 실제 오래된단말 형식 자동복구는 직원·감사세션을 보존",
+          "assertion": "expect(terminalFacts(after.terminal!).terminals).toEqual([{ id: after.terminal, name }]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 282
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 실제 오래된단말 형식 자동복구는 직원·감사세션을 보존",
+          "assertion": "expect(terminalFacts(\"legacy-terminal-2025\").terminals).toHaveLength(0);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 282
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -10856,12 +11808,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "PC-DELTA-ADMINAUDIT-01",
-      "conditionId": "legacy-terminal-format-recovery",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "PC-DELTA-ADMINAUDIT-01 실제 오래된단말 형식 자동복구는 직원·감사세션을 보존",
@@ -10903,20 +11851,6 @@
           "assertion": "expect(terminalFacts(\"legacy-terminal-2025\").terminals).toHaveLength(0);",
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 282
-        }
-      ],
-      "execution": {
-        "status": "NOT_RUN"
-      },
-      "historicalExecutions": [
-        {
-          "status": "PASS",
-          "evidence": [
-            {
-              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-              "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-            }
-          ]
         }
       ]
     },
@@ -10960,7 +11894,7 @@
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
           "assertion": "await name.fill(\"   \"); await expect(save).toBeDisabled();",
-          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
           "line": 227
         }
       ],
@@ -10977,12 +11911,72 @@
             }
           ]
         }
+      ],
+      "historicalBindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "await name.fill(\"   \"); await expect(save).toBeDisabled();",
+          "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
+          "line": 227
+        }
       ]
     },
     {
       "caseId": "PC-DELTA-ADMINAUDIT-01",
       "conditionId": "terminal-ui-same-uuid-upsert",
       "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect((await saved).status()).toBe(200);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "await expect(controls.getByRole(\"status\")).toHaveText(`현재 단말명을 ${terminalName}로 등록했습니다.`);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "await expect(name).toHaveValue(terminalName);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(await page.evaluate(() => localStorage.getItem(\"dexcowin_mes_audit_terminal\"))).toBe(terminalId);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(facts.terminals).toEqual([{ id: terminalId, name: names[1] }]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        }
+      ],
+      "execution": {
+        "status": "NOT_RUN"
+      },
+      "historicalExecutions": [
+        {
+          "status": "PASS",
+          "evidence": [
+            {
+              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+              "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+            }
+          ]
+        }
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
@@ -11018,6 +12012,40 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 227
         }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ADMINAUDIT-01",
+      "conditionId": "terminal-snapshot-name-and-employee",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(facts.rows.map((row) => row.terminalName)).toEqual(names);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(facts.rows.map((row) => row.employeeCode)).toEqual(Array(2).fill(actors.approver.employee_code));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(target.map((row) => row[3])).toEqual(names);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(target.map((row) => row[2])).toEqual(Array(2).fill(actors.approver.employee_code));",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -11032,12 +12060,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "PC-DELTA-ADMINAUDIT-01",
-      "conditionId": "terminal-snapshot-name-and-employee",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
@@ -11066,6 +12090,40 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 227
         }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ADMINAUDIT-01",
+      "conditionId": "activity-fixed-headers-and-actual-files",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(csv.rows[0]).toEqual(activityHeaders);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(target).toHaveLength(2);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(xlsx.rows[0]).toEqual(activityHeaders);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(xlsx.rows.filter((row) => row[11] === terminalId && row[6] === \"감사 단말 등록/변경\")).toEqual(target);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -11080,12 +12138,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "PC-DELTA-ADMINAUDIT-01",
-      "conditionId": "activity-fixed-headers-and-actual-files",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
@@ -11114,6 +12168,33 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 227
         }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ADMINAUDIT-01",
+      "conditionId": "activity-context-columns",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(target.map((row) => row[4])).toEqual([\"데스크톱\", \"데스크톱\"]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(target.map((row) => row[7])).toEqual([\"성공\", \"성공\"]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "for (const row of target) { expect(row[5]).not.toBe(\"\"); expect(row[9]).not.toBe(\"\"); expect(row[10]).not.toBe(\"\"); }",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -11128,12 +12209,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "PC-DELTA-ADMINAUDIT-01",
-      "conditionId": "activity-context-columns",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
@@ -11155,6 +12232,54 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 227
         }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ADMINAUDIT-01",
+      "conditionId": "legacy-terminal-real-recovery",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 실제 오래된단말 형식 자동복구는 직원·감사세션을 보존",
+          "assertion": "expect((await saved).status()).toBe(200);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 282
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 실제 오래된단말 형식 자동복구는 직원·감사세션을 보존",
+          "assertion": "await expect(controls.getByRole(\"status\").filter({ hasText: `현재 단말명을 ${name}로 등록했습니다.` })).toHaveText(`현재 단말명을 ${name}로 등록했습니다.`);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 282
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 실제 오래된단말 형식 자동복구는 직원·감사세션을 보존",
+          "assertion": "expect(after.terminal).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 282
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 실제 오래된단말 형식 자동복구는 직원·감사세션을 보존",
+          "assertion": "expect({ operator: after.operator, session: after.session }).toEqual(before);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 282
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 실제 오래된단말 형식 자동복구는 직원·감사세션을 보존",
+          "assertion": "expect(terminalFacts(after.terminal!).terminals).toEqual([{ id: after.terminal, name }]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 282
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 실제 오래된단말 형식 자동복구는 직원·감사세션을 보존",
+          "assertion": "expect(terminalFacts(\"legacy-terminal-2025\").terminals).toHaveLength(0);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 282
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -11169,12 +12294,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "PC-DELTA-ADMINAUDIT-01",
-      "conditionId": "legacy-terminal-real-recovery",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "PC-DELTA-ADMINAUDIT-01 실제 오래된단말 형식 자동복구는 직원·감사세션을 보존",
@@ -11217,6 +12338,33 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 282
         }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ADMINAUDIT-01",
+      "conditionId": "injected-terminal-error-retry",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 주입 서버오류는 등록·다운로드 성공을 표시하지 않음",
+          "assertion": "await expect(controls.getByRole(\"alert\")).toContainText(\"다시 시도\");",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 268
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 주입 서버오류는 등록·다운로드 성공을 표시하지 않음",
+          "assertion": "await expect(controls.getByRole(\"status\")).toHaveCount(0);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 268
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 주입 서버오류는 등록·다운로드 성공을 표시하지 않음",
+          "assertion": "await expect(controls.getByRole(\"button\", { name: \"단말명 등록\", exact: true })).toBeEnabled();",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 268
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -11231,12 +12379,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "PC-DELTA-ADMINAUDIT-01",
-      "conditionId": "injected-terminal-error-retry",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "PC-DELTA-ADMINAUDIT-01 주입 서버오류는 등록·다운로드 성공을 표시하지 않음",
@@ -11258,6 +12402,117 @@
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 268
         }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ADMINAUDIT-01",
+      "conditionId": "terminal-ui-save-edit-export",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect((await saved).status()).toBe(200);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "await expect(controls.getByRole(\"status\")).toHaveText(`현재 단말명을 ${terminalName}로 등록했습니다.`);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "await expect(name).toHaveValue(terminalName);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(await page.evaluate(() => localStorage.getItem(\"dexcowin_mes_audit_terminal\"))).toBe(terminalId);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(facts.terminals).toEqual([{ id: terminalId, name: names[1] }]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(csv.rows[0]).toEqual(activityHeaders);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(target).toHaveLength(2);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(xlsx.rows[0]).toEqual(activityHeaders);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
+          "assertion": "expect(xlsx.rows.filter((row) => row[11] === terminalId && row[6] === \"감사 단말 등록/변경\")).toEqual(target);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 227
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 실제 오래된단말 형식 자동복구는 직원·감사세션을 보존",
+          "assertion": "expect((await saved).status()).toBe(200);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 282
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 실제 오래된단말 형식 자동복구는 직원·감사세션을 보존",
+          "assertion": "await expect(controls.getByRole(\"status\").filter({ hasText: `현재 단말명을 ${name}로 등록했습니다.` })).toHaveText(`현재 단말명을 ${name}로 등록했습니다.`);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 282
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 실제 오래된단말 형식 자동복구는 직원·감사세션을 보존",
+          "assertion": "expect(after.terminal).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 282
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 실제 오래된단말 형식 자동복구는 직원·감사세션을 보존",
+          "assertion": "expect({ operator: after.operator, session: after.session }).toEqual(before);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 282
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 실제 오래된단말 형식 자동복구는 직원·감사세션을 보존",
+          "assertion": "expect(terminalFacts(after.terminal!).terminals).toEqual([{ id: after.terminal, name }]);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 282
+        },
+        {
+          "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
+          "selector": "PC-DELTA-ADMINAUDIT-01 실제 오래된단말 형식 자동복구는 직원·감사세션을 보존",
+          "assertion": "expect(terminalFacts(\"legacy-terminal-2025\").terminals).toHaveLength(0);",
+          "sourceHash": "bf6b4fa7caecf9916a7d39a9c44c8838b79c956575e7c23c7d6e6e29e50e8d4a",
+          "line": 282
+        }
       ],
       "execution": {
         "status": "NOT_RUN"
@@ -11272,12 +12527,8 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "caseId": "PC-DELTA-ADMINAUDIT-01",
-      "conditionId": "terminal-ui-save-edit-export",
-      "bindings": [
+      ],
+      "historicalBindings": [
         {
           "file": "frontend/tests/e2e/admin-export-expectations.spec.ts",
           "selector": "PC-DELTA-ADMINAUDIT-01 현재단말 동일UUID 이름변경과 변경당시 감사 CSV·Excel 실제파일",
@@ -11382,20 +12633,6 @@
           "assertion": "expect(terminalFacts(\"legacy-terminal-2025\").terminals).toHaveLength(0);",
           "sourceHash": "0bf089b347913e19731c9c74f5f1046ee09c3b57d9531745b3b6d0a4f44ef02f",
           "line": 282
-        }
-      ],
-      "execution": {
-        "status": "NOT_RUN"
-      },
-      "historicalExecutions": [
-        {
-          "status": "PASS",
-          "evidence": [
-            {
-              "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-              "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-            }
-          ]
         }
       ]
     },

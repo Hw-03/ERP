@@ -6,6 +6,7 @@
  * PR #17에서 삭제됐던 spec 을 전용 DB 인프라 위에서 재작성.
  */
 import { expect, test } from "@playwright/test";
+import { randomUUID } from "node:crypto";
 import { loginAsOperator, readSeed } from "./_helpers";
 
 test.describe("불량 — 격리 / 해제", () => {
@@ -15,13 +16,29 @@ test.describe("불량 — 격리 / 해제", () => {
   });
 
   test("새 불량 격리 → 정상 복귀", async ({ page }) => {
-    const activeRecords = async (): Promise<Array<{ record_id: string; item_id: string }>> => {
+    const activeRecords = async (): Promise<Array<{ record_id: string; item_id: string; reason_memo: string | null }>> => {
       const response = await page.request.get("/api/defects/locations");
       expect(response.ok()).toBeTruthy();
       return response.json();
     };
-    const priorIds = new Set((await activeRecords()).map((record) => record.record_id));
+    const existingMarker = `기존 격리 ${randomUUID()}`;
+    const existing = await page.request.post("/api/defects/quarantine", { data: {
+      actor_employee_id: readSeed().warehouseEmployee.employee_id,
+      item_id: readSeed().rawItem.item_id,
+      qty: 1,
+      source: "warehouse",
+      target_dept: "창고",
+      reason_category: "외관 불량",
+      reason_memo: existingMarker,
+    } });
+    expect(existing.status(), await existing.text()).toBe(200);
+    const before = await activeRecords();
+    const existingRecords = before.filter((record) => record.reason_memo === existingMarker);
+    expect(existingRecords).toHaveLength(1);
+    const priorIds = new Set(before.map((record) => record.record_id));
+    const marker = `새 격리 ${randomUUID()}`;
 
+    try {
     await page.goto("/mes?tab=defect");
     // 4장 허브의 통합 등록·처리 카드 확인 — 첫 컴파일만 넉넉히 기다린다.
     const workCard = page.getByRole("button").filter({ hasText: "불량 처리", visible: true });
@@ -45,6 +62,7 @@ test.describe("불량 — 격리 / 해제", () => {
     // 사유 마스터 선택 다이얼로그에서 활성 카테고리를 선택한다.
     await page.getByRole("button", { name: "사유 카테고리 선택", exact: true }).filter({ visible: true }).click();
     await page.getByRole("dialog", { name: "사유 카테고리", exact: true }).getByRole("button", { name: "외관 불량", exact: true }).click();
+    await page.getByPlaceholder("예: 스크래치 다수 / 우측 끝단").fill(marker);
     // 제출 → ConfirmModal → 확인
     await page.getByRole("button", { name: /격리하기 \(1건\)/ }).click();
     await page
@@ -64,9 +82,13 @@ test.describe("불량 — 격리 / 해제", () => {
     const created = (await activeRecords()).filter((record) => !priorIds.has(record.record_id));
     expect(created).toHaveLength(1);
     expect(created[0].item_id).toBe(readSeed().rawItem.item_id);
+    expect(created[0].reason_memo).toBe(marker);
 
     // ── 해제(정상 복귀) ───────────────────────────────────
-    await page.getByRole("button", { name: "처리", exact: true }).filter({ visible: true }).first().click();
+    await page.getByRole("searchbox", { name: "불량 검색" }).filter({ visible: true }).fill(marker);
+    const createdRow = page.getByRole("article", { name: "E2E원자재튜브 격리 기록" }).filter({ hasText: marker, visible: true });
+    await expect(createdRow).toHaveCount(1);
+    await createdRow.getByRole("button", { name: "처리", exact: true }).click();
     await expect(page.getByRole("heading", { name: /불량 처리/ })).toBeVisible();
     await expect(page.getByRole("button", { name: "정상 복귀 →" })).toBeDisabled();
     await page.getByRole("button", { name: "사유 카테고리 선택", exact: true }).filter({ visible: true }).click();
@@ -92,5 +114,18 @@ test.describe("불량 — 격리 / 해제", () => {
         allIds: ids.sort(),
       };
     }).toEqual({ createdStillPresent: false, priorIds: [...priorIds].sort(), allIds: [...priorIds].sort() });
+    } finally {
+      if ((await activeRecords()).some((record) => record.record_id === existingRecords[0].record_id)) {
+        const restored = await page.request.post("/api/defects/unquarantine", { data: {
+          actor_employee_id: readSeed().warehouseEmployee.employee_id,
+          record_id: existingRecords[0].record_id,
+          item_id: readSeed().rawItem.item_id,
+          qty: 1,
+          dept: "창고",
+          reason_category: "검사 통과",
+        } });
+        expect(restored.status(), await restored.text()).toBe(200);
+      }
+    }
   });
 });
