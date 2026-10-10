@@ -6,7 +6,7 @@
  * PR #17에서 삭제됐던 spec 을 전용 DB 인프라 위에서 재작성.
  */
 import { expect, test } from "@playwright/test";
-import { loginAsOperator } from "./_helpers";
+import { loginAsOperator, readSeed } from "./_helpers";
 
 test.describe("불량 — 격리 / 해제", () => {
   test.beforeEach(async ({ page }) => {
@@ -15,6 +15,13 @@ test.describe("불량 — 격리 / 해제", () => {
   });
 
   test("새 불량 격리 → 정상 복귀", async ({ page }) => {
+    const activeRecords = async (): Promise<Array<{ record_id: string; item_id: string }>> => {
+      const response = await page.request.get("/api/defects/locations");
+      expect(response.ok()).toBeTruthy();
+      return response.json();
+    };
+    const priorIds = new Set((await activeRecords()).map((record) => record.record_id));
+
     await page.goto("/mes?tab=defect");
     // 4장 허브의 통합 등록·처리 카드 확인 — 첫 컴파일만 넉넉히 기다린다.
     const workCard = page.getByRole("button").filter({ hasText: "불량 처리", visible: true });
@@ -54,6 +61,9 @@ test.describe("불량 — 격리 / 해제", () => {
     // 첫 화면에서 격리 목록을 함께 보여주므로 같은 품목명/버튼/빈 메시지가 (숨은) 모바일 셸에도
     // 존재 → 보이는(데스크톱) 요소만 골라야 strict 위반을 피한다. [[project_e2e_dual_shell_visible_filter]]
     await expect(page.getByText("E2E원자재튜브").filter({ visible: true }).first()).toBeVisible();
+    const created = (await activeRecords()).filter((record) => !priorIds.has(record.record_id));
+    expect(created).toHaveLength(1);
+    expect(created[0].item_id).toBe(readSeed().rawItem.item_id);
 
     // ── 해제(정상 복귀) ───────────────────────────────────
     await page.getByRole("button", { name: "처리", exact: true }).filter({ visible: true }).first().click();
@@ -74,8 +84,13 @@ test.describe("불량 — 격리 / 해제", () => {
       page.getByRole("button").filter({ hasText: "불량 처리", visible: true }),
     ).toBeVisible();
     await page.getByRole("button").filter({ hasText: "격리 목록" }).filter({ hasText: "격리 항목" }).click();
-    await expect(
-      page.getByText("격리된 불량 재고가 없습니다.").filter({ visible: true }).first(),
-    ).toBeVisible();
+    await expect.poll(async () => {
+      const ids = (await activeRecords()).map((record) => record.record_id);
+      return {
+        createdStillPresent: ids.includes(created[0].record_id),
+        priorIds: ids.filter((id) => priorIds.has(id)).sort(),
+        allIds: ids.sort(),
+      };
+    }).toEqual({ createdStillPresent: false, priorIds: [...priorIds].sort(), allIds: [...priorIds].sort() });
   });
 });

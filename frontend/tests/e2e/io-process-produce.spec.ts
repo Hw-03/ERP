@@ -26,6 +26,7 @@ test.describe("입출고 V2 — 부서 입출고(생산)", () => {
     await clickNextStep(page);
 
     // 3. BOM 부모(E2E조립튜브) 행의 "BOM" 으로 자동 전개
+    await page.getByPlaceholder("품목명 · 품목 코드").fill("E2E조립튜브");
     await page
       .getByRole("row", { name: /E2E조립튜브/ })
       .getByRole("button", { name: "BOM", exact: true })
@@ -52,6 +53,7 @@ test.describe("입출고 V2 — 부서 입출고(생산)", () => {
     await pickWorkType(page, /부서 입출고/);
     await page.getByRole("button", { name: "생산 입고" }).first().click();
     await clickNextStep(page);
+    await page.getByPlaceholder("품목명 · 품목 코드").fill("E2E조립튜브");
     await page
       .getByRole("row", { name: /E2E조립튜브/ })
       .getByRole("button", { name: "BOM", exact: true })

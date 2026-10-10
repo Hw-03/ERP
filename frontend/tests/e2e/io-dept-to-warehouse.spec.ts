@@ -24,6 +24,7 @@ test.describe("입출고 V2 — 부서 → 창고 회수", () => {
     await clickNextStep(page);
 
     // 3. 품목 선택 — 튜브 부서에 재고 있는 원자재 낱개
+    await page.getByPlaceholder("품목명 · 품목 코드").fill("E2E원자재튜브");
     await page
       .getByRole("row", { name: /E2E원자재튜브/ })
       .getByRole("button", { name: "낱개", exact: true })

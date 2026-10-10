@@ -22,6 +22,7 @@ test.describe("입출고 V2 — 창고 → 부서 자동 승인", () => {
     await clickNextStep(page);
 
     // 3. 품목 선택 — 원자재 낱개
+    await page.getByPlaceholder("품목명 · 품목 코드").fill("E2E원자재튜브");
     await page
       .getByRole("row", { name: /E2E원자재튜브/ })
       .getByRole("button", { name: "낱개", exact: true })

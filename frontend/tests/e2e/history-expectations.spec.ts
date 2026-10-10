@@ -159,6 +159,7 @@ test("HISTORY01 실제 cursor 추가조회 실패·반복클릭·필터 보존·
   await openHistory(page, fixture.name);
   await page.getByRole("button", { name: "전체", exact: true }).click();
   await expect(stats(page)).toContainText("121건");
+  await expect(rows(page)).toHaveCount(100);
   const initial = await rows(page).evaluateAll((elements) => elements.map((element) => element.getAttribute("data-log-id")));
   let fail = true; let pageRequests = 0; let release!: () => void;
   const waiting = new Promise<void>((resolve) => { release = resolve; });

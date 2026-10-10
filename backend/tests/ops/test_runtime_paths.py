@@ -471,7 +471,7 @@ def test_windows_ci_runs_the_ops_profile_contract_suite() -> None:
     assert "runs-on: windows-latest" in windows_section
     assert "actions/checkout@v4" in windows_section
     assert "actions/setup-python@v5" in windows_section
-    assert 'python-version: "3.11"' in windows_section
+    assert 'python-version: "3.12"' in windows_section
     assert "pip install -r requirements.txt" in windows_section
     assert (
         'pytest tests/ops/test_runtime_paths.py -q -k '

@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DailyWorkReportScreen } from "../DailyWorkReportScreen";
 import { formatWorkDateLabel, toKstDateKey } from "../dailyReportDate";
 
@@ -86,6 +86,8 @@ describe("DailyWorkReportScreen", () => {
     registerDirtyMock.mockClear();
   });
 
+  afterEach(() => vi.useRealTimers());
+
   it("모바일 내 일보는 활동을 펼칠 때만 스크롤 모드로 바꾸고 편집기를 유지한다", () => {
     queryState.activity.data = {
       work_date: "2026-08-03", employee_id: "employee-1", cancelled_count: 0,
@@ -107,6 +109,8 @@ describe("DailyWorkReportScreen", () => {
   });
 
   it("모바일만 날짜 보조 라벨과 빈 기록 설명을 줄이고 날짜 이동을 유지한다", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-04T03:00:00.000Z"));
     const props = { employeeId: "employee-1", operator: { employee_id: "employee-1", name: "김현우", department: "조립" } as never };
     const { rerender } = render(<DailyWorkReportScreen {...props} />);
     expect(screen.getByText("작성일")).not.toHaveClass("sr-only");
@@ -325,6 +329,8 @@ describe("DailyWorkReportScreen", () => {
   });
 
   it("선택한 작성자가 없는 날짜에서는 선택을 숨겼다가 해당 작성자의 글이 있는 날 다시 선택한다", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-04T03:00:00.000Z"));
     const today = toKstDateKey();
     const [year, month, day] = today.split("-").map(Number);
     const previousDate = toKstDateKey(new Date(Date.UTC(year, month - 1, day - 1, 3)));

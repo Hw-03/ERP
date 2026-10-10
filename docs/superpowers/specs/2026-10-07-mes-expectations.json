@@ -3382,6 +3382,43 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY 8.3-01~05 실제 기간·부서OR·업무OR·그룹AND와 요약 일치",
               "assertion": "await expect(stats(page)).toContainText(\"120건\");",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 122
+            },
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY 8.3-01~05 실제 기간·부서OR·업무OR·그룹AND와 요약 일치",
+              "assertion": "await expect(rows(page)).toHaveCount(10);",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 122
+            },
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY 8.3-01~05 실제 기간·부서OR·업무OR·그룹AND와 요약 일치",
+              "assertion": "await expect(stats(page)).toContainText(\"10건\");",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 122
+            }
+          ],
+          "execution": {
+            "status": "NOT_RUN"
+          },
+          "historicalExecutions": [
+            {
+              "status": "PASS",
+              "evidence": [
+                {
+                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+                }
+              ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY 8.3-01~05 실제 기간·부서OR·업무OR·그룹AND와 요약 일치",
+              "assertion": "await expect(stats(page)).toContainText(\"120건\");",
               "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
               "line": 122
             },
@@ -3399,20 +3436,6 @@
               "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
               "line": 122
             }
-          ],
-          "execution": {
-            "status": "NOT_RUN"
-          },
-          "historicalExecutions": [
-            {
-              "status": "PASS",
-              "evidence": [
-                {
-                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-                }
-              ]
-            }
           ]
         },
         {
@@ -3429,14 +3452,14 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY 8.3-01~05 실제 기간·부서OR·업무OR·그룹AND와 요약 일치",
               "assertion": "await expect(rows(page)).toHaveCount(0);",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
               "line": 122
             },
             {
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY 8.3-01~05 실제 기간·부서OR·업무OR·그룹AND와 요약 일치",
               "assertion": "await expect(stats(page)).toContainText(\"0건\");",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
               "line": 122
             }
           ],
@@ -3452,6 +3475,22 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY 8.3-01~05 실제 기간·부서OR·업무OR·그룹AND와 요약 일치",
+              "assertion": "await expect(rows(page)).toHaveCount(0);",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 122
+            },
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY 8.3-01~05 실제 기간·부서OR·업무OR·그룹AND와 요약 일치",
+              "assertion": "await expect(stats(page)).toContainText(\"0건\");",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 122
             }
           ]
         },
@@ -3633,14 +3672,14 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY 8.3-01~05 실제 기간·부서OR·업무OR·그룹AND와 요약 일치",
               "assertion": "await expect(rows(page)).toHaveCount(90);",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
               "line": 122
             },
             {
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY 8.3-01~05 실제 기간·부서OR·업무OR·그룹AND와 요약 일치",
               "assertion": "await expect(rows(page)).toHaveCount(10);",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
               "line": 122
             }
           ],
@@ -3656,6 +3695,22 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY 8.3-01~05 실제 기간·부서OR·업무OR·그룹AND와 요약 일치",
+              "assertion": "await expect(rows(page)).toHaveCount(90);",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 122
+            },
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY 8.3-01~05 실제 기간·부서OR·업무OR·그룹AND와 요약 일치",
+              "assertion": "await expect(rows(page)).toHaveCount(10);",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 122
             }
           ]
         },
@@ -3673,14 +3728,14 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY01 실제 cursor 추가조회 실패·반복클릭·필터 보존·정확한 append",
               "assertion": "expect(url.searchParams.get(\"search\")).toBe(fixture.name);",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
               "line": 156
             },
             {
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY01 실제 cursor 추가조회 실패·반복클릭·필터 보존·정확한 append",
               "assertion": "expect(ids.slice(0, 100)).toEqual(initial);",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
               "line": 156
             }
           ],
@@ -3696,6 +3751,22 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY01 실제 cursor 추가조회 실패·반복클릭·필터 보존·정확한 append",
+              "assertion": "expect(url.searchParams.get(\"search\")).toBe(fixture.name);",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 156
+            },
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY01 실제 cursor 추가조회 실패·반복클릭·필터 보존·정확한 append",
+              "assertion": "expect(ids.slice(0, 100)).toEqual(initial);",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 156
             }
           ]
         }
@@ -3798,14 +3869,14 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY 8.3-01~05 실제 기간·부서OR·업무OR·그룹AND와 요약 일치",
               "assertion": "await expect(rows(page).first()).toContainText(\"불량\");",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
               "line": 122
             },
             {
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY 8.3-01~05 실제 기간·부서OR·업무OR·그룹AND와 요약 일치",
               "assertion": "await expect(stats(page)).toContainText(\"10건\");",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
               "line": 122
             }
           ],
@@ -3825,6 +3896,22 @@
                   "evidenceHash": "d468ec0a4812cb5d3d6a470d94d74e71d54b945a8456dc9d4c8adbed6ad522a8"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY 8.3-01~05 실제 기간·부서OR·업무OR·그룹AND와 요약 일치",
+              "assertion": "await expect(rows(page).first()).toContainText(\"불량\");",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 122
+            },
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY 8.3-01~05 실제 기간·부서OR·업무OR·그룹AND와 요약 일치",
+              "assertion": "await expect(stats(page)).toContainText(\"10건\");",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 122
             }
           ]
         },
@@ -4147,7 +4234,7 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY 8.3-01~05 실제 기간·부서OR·업무OR·그룹AND와 요약 일치",
               "assertion": "await expect(operation.getByRole(\"button\", { name: label, exact: true })).toBeVisible();",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
               "line": 122
             }
           ],
@@ -4163,6 +4250,15 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY 8.3-01~05 실제 기간·부서OR·업무OR·그룹AND와 요약 일치",
+              "assertion": "await expect(operation.getByRole(\"button\", { name: label, exact: true })).toBeVisible();",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 122
             }
           ]
         },
@@ -4368,6 +4464,43 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
               "assertion": "expect(original).toMatchObject({ requester_name: actors.requester.name, approver_name: actors.approver.name, executor_name: actors.approver.name });",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 192
+            },
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
+              "assertion": "await expect(participants.filter({ hasText: \"요청자\" })).toContainText(actors.requester.name);",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 192
+            },
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
+              "assertion": "await expect(participants.filter({ hasText: \"승인자\" })).toContainText(actors.approver.name);",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 192
+            }
+          ],
+          "execution": {
+            "status": "NOT_RUN"
+          },
+          "historicalExecutions": [
+            {
+              "status": "PASS",
+              "evidence": [
+                {
+                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+                }
+              ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
+              "assertion": "expect(original).toMatchObject({ requester_name: actors.requester.name, approver_name: actors.approver.name, executor_name: actors.approver.name });",
               "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
               "line": 191
             },
@@ -4385,6 +4518,39 @@
               "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
               "line": 191
             }
+          ]
+        },
+        {
+          "id": "movement-before-after",
+          "origin": "technical+staff",
+          "expected": "품목과 출발·도착 위치, 이동량과 전후 수량을 실제 상세에서 확인한다.",
+          "requiredEvidence": [
+            "browser"
+          ],
+          "coverage": "linked",
+          "reason": null,
+          "bindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
+              "assertion": "await expect(movement).toContainText(/창고.*조립/);",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 192
+            },
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
+              "assertion": "await expect(movement).toContainText(/20\\s*17/);",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 192
+            },
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
+              "assertion": "await expect(movement).toContainText(/0\\s*3/);",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 192
+            }
           ],
           "execution": {
             "status": "NOT_RUN"
@@ -4399,18 +4565,8 @@
                 }
               ]
             }
-          ]
-        },
-        {
-          "id": "movement-before-after",
-          "origin": "technical+staff",
-          "expected": "품목과 출발·도착 위치, 이동량과 전후 수량을 실제 상세에서 확인한다.",
-          "requiredEvidence": [
-            "browser"
           ],
-          "coverage": "linked",
-          "reason": null,
-          "bindings": [
+          "historicalBindings": [
             {
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
@@ -4432,20 +4588,6 @@
               "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
               "line": 191
             }
-          ],
-          "execution": {
-            "status": "NOT_RUN"
-          },
-          "historicalExecutions": [
-            {
-              "status": "PASS",
-              "evidence": [
-                {
-                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-                }
-              ]
-            }
           ]
         },
         {
@@ -4462,8 +4604,8 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
               "assertion": "await expect(page.getByText(\"내역 취소 이동 근거\", { exact: false }).filter({ visible: true }).first()).toBeVisible();",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
-              "line": 191
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 192
             }
           ],
           "execution": {
@@ -4478,6 +4620,15 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
+              "assertion": "await expect(page.getByText(\"내역 취소 이동 근거\", { exact: false }).filter({ visible: true }).first()).toBeVisible();",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 191
             }
           ]
         }
@@ -38990,7 +39141,7 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
               "assertion": "expect(new Set(population.map((item) => item.item_id)).size).toBe(population.length);",
-              "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
               "line": 97
             }
           ],
@@ -39010,6 +39161,15 @@
                   "evidenceHash": "d468ec0a4812cb5d3d6a470d94d74e71d54b945a8456dc9d4c8adbed6ad522a8"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
+              "assertion": "expect(new Set(population.map((item) => item.item_id)).size).toBe(population.length);",
+              "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
+              "line": 97
             }
           ]
         },
@@ -39074,6 +39234,57 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
               "assertion": "await expect(rows).toHaveCount(population.length);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 97
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
+              "assertion": "expect([...displayedIds].sort()).toEqual(population.map((item) => item.item_id).sort());",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 97
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
+              "assertion": "await expect(total).toContainText(String(population.length));",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 97
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
+              "assertion": "await expect(page.getByPlaceholder(\"예: 텅스텐 필라멘트\")).toHaveValue(item.item_name);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 97
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
+              "assertion": "await expect(page.locator(\"[aria-readonly]\")).toHaveText(item.mes_code!);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 97
+            }
+          ],
+          "execution": {
+            "status": "NOT_RUN"
+          },
+          "historicalExecutions": [
+            {
+              "status": "PASS",
+              "evidence": [
+                {
+                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+                }
+              ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
+              "assertion": "await expect(rows).toHaveCount(population.length);",
               "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
               "line": 97
             },
@@ -39104,20 +39315,6 @@
               "assertion": "await expect(page.locator(\"[aria-readonly]\")).toHaveText(item.mes_code!);",
               "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
               "line": 97
-            }
-          ],
-          "execution": {
-            "status": "NOT_RUN"
-          },
-          "historicalExecutions": [
-            {
-              "status": "PASS",
-              "evidence": [
-                {
-                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-                }
-              ]
             }
           ]
         }
@@ -39223,7 +39420,7 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
               "assertion": "expect(item.mes_code).toBe(previewCodes[index]);",
-              "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
               "line": 199
             },
             {
@@ -39260,6 +39457,15 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
+              "assertion": "expect(item.mes_code).toBe(previewCodes[index]);",
+              "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
+              "line": 199
             }
           ]
         },
@@ -39315,7 +39521,7 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
               "assertion": "expect(new Set(created.map((item) => item.mes_code)).size).toBe(2);",
-              "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
               "line": 199
             }
           ],
@@ -39331,6 +39537,15 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
+              "assertion": "expect(new Set(created.map((item) => item.mes_code)).size).toBe(2);",
+              "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
+              "line": 199
             }
           ]
         },
@@ -39462,6 +39677,71 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
               "assertion": "expect(previewCodes[0]).toBe(previewCodes[1]);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 199
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
+              "assertion": "expect(responses.map((response) => response.status()).sort()).toEqual([201, 409]);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 199
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
+              "assertion": "await expect(conflictPage.getByPlaceholder(\"예: 텅스텐 필라멘트\")).toHaveValue(names[conflicted]);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 199
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
+              "assertion": "await expect(conflictPage.getByPlaceholder(\"수량\", { exact: true })).toHaveValue(\"20\");",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 199
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
+              "assertion": "await expect(conflictPage.locator(\"[aria-readonly]\")).not.toHaveText(previewCodes[conflicted]);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 199
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
+              "assertion": "expect(retried.status()).toBe(201);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 199
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
+              "assertion": "expect(item.mes_code).toBe(previewCodes[index]);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 199
+            }
+          ],
+          "execution": {
+            "status": "NOT_RUN"
+          },
+          "historicalExecutions": [
+            {
+              "status": "PASS",
+              "evidence": [
+                {
+                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+                }
+              ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
+              "assertion": "expect(previewCodes[0]).toBe(previewCodes[1]);",
               "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
               "line": 199
             },
@@ -39506,20 +39786,6 @@
               "assertion": "expect(item.mes_code).toBe(previewCodes[index]);",
               "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
               "line": 199
-            }
-          ],
-          "execution": {
-            "status": "NOT_RUN"
-          },
-          "historicalExecutions": [
-            {
-              "status": "PASS",
-              "evidence": [
-                {
-                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-                }
-              ]
             }
           ]
         }
@@ -40278,21 +40544,21 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-08 이미 열린 로그인 후보는 실제 직원 이름 변경·비활성화를 갱신",
               "assertion": "await expect(page.locator(`[data-admin-employee-row=\"${actors.requester.employee_id}\"]`)).toContainText(name);",
-              "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
               "line": 168
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-08 이미 열린 로그인 후보는 실제 직원 이름 변경·비활성화를 갱신",
               "assertion": "await expect(login.getByRole(\"option\", { name: new RegExp(name) })).toBeVisible({ timeout: 30_000 });",
-              "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
               "line": 168
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-08 이미 열린 로그인 후보는 실제 직원 이름 변경·비활성화를 갱신",
               "assertion": "await expect(login.getByRole(\"option\", { name: new RegExp(name) })).toHaveCount(0, { timeout: 30_000 });",
-              "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
               "line": 168
             },
             {
@@ -40329,6 +40595,29 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-08 이미 열린 로그인 후보는 실제 직원 이름 변경·비활성화를 갱신",
+              "assertion": "await expect(page.locator(`[data-admin-employee-row=\"${actors.requester.employee_id}\"]`)).toContainText(name);",
+              "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
+              "line": 168
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-08 이미 열린 로그인 후보는 실제 직원 이름 변경·비활성화를 갱신",
+              "assertion": "await expect(login.getByRole(\"option\", { name: new RegExp(name) })).toBeVisible({ timeout: 30_000 });",
+              "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
+              "line": 168
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-08 이미 열린 로그인 후보는 실제 직원 이름 변경·비활성화를 갱신",
+              "assertion": "await expect(login.getByRole(\"option\", { name: new RegExp(name) })).toHaveCount(0, { timeout: 30_000 });",
+              "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
+              "line": 168
             }
           ]
         }
@@ -40935,6 +41224,50 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-10 관리자 표시탭 저장 뒤 새 로그인 메뉴와 직접 URL 접근이 일치",
               "assertion": "await expect(employeePage.getByRole(\"button\", { name: \"출하\", exact: true }).filter({ visible: true })).toHaveCount(0);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 145
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-10 관리자 표시탭 저장 뒤 새 로그인 메뉴와 직접 URL 접근이 일치",
+              "assertion": "await expect(employeePage.getByRole(\"button\", { name: \"창고 지도\", exact: true }).filter({ visible: true })).toHaveCount(0);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 145
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-10 관리자 표시탭 저장 뒤 새 로그인 메뉴와 직접 URL 접근이 일치",
+              "assertion": "await expect(employeePage).toHaveURL(/tab=dashboard/);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 145
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-10 관리자 표시탭 저장 뒤 새 로그인 메뉴와 직접 URL 접근이 일치",
+              "assertion": "await expect(employeePage.getByRole(\"textbox\", { name: \"자재 검색\", exact: true })).toBeVisible();",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 145
+            }
+          ],
+          "execution": {
+            "status": "NOT_RUN"
+          },
+          "historicalExecutions": [
+            {
+              "status": "PASS",
+              "evidence": [
+                {
+                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+                }
+              ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-10 관리자 표시탭 저장 뒤 새 로그인 메뉴와 직접 URL 접근이 일치",
+              "assertion": "await expect(employeePage.getByRole(\"button\", { name: \"출하\", exact: true }).filter({ visible: true })).toHaveCount(0);",
               "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
               "line": 145
             },
@@ -40958,20 +41291,6 @@
               "assertion": "await expect(employeePage.getByRole(\"textbox\", { name: \"자재 검색\", exact: true })).toBeVisible();",
               "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
               "line": 145
-            }
-          ],
-          "execution": {
-            "status": "NOT_RUN"
-          },
-          "historicalExecutions": [
-            {
-              "status": "PASS",
-              "evidence": [
-                {
-                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-                }
-              ]
             }
           ]
         }
@@ -41209,6 +41528,64 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-11 지정 직원 PIN 초기화 상세·시각·감사 변경자·이전PIN 거부를 실제 확인",
               "assertion": "await expect(page.getByText(\"기본 PIN (0000)\", { exact: true })).toBeVisible();",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 419
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-11 지정 직원 PIN 초기화 상세·시각·감사 변경자·이전PIN 거부를 실제 확인",
+              "assertion": "await expect(page.getByText(/마지막 변경:/)).toContainText(new Date(employee.pin_last_changed!).toLocaleDateString(\"ko-KR\", { timeZone: \"Asia/Seoul\" }));",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 419
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-11 지정 직원 PIN 초기화 상세·시각·감사 변경자·이전PIN 거부를 실제 확인",
+              "assertion": "expect(audit[0][1]).toBe(actors.approver.name);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 419
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-11 지정 직원 PIN 초기화 상세·시각·감사 변경자·이전PIN 거부를 실제 확인",
+              "assertion": "expect(audit[0][2]).toBe(actors.approver.employee_code);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 419
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-11 지정 직원 PIN 초기화 상세·시각·감사 변경자·이전PIN 거부를 실제 확인",
+              "assertion": "expect(audit[0][11]).toBe(actors.requester.employee_id);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 419
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-11 지정 직원 PIN 초기화 상세·시각·감사 변경자·이전PIN 거부를 실제 확인",
+              "assertion": "expect(audit[0][0]).toMatch(/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 419
+            }
+          ],
+          "execution": {
+            "status": "NOT_RUN"
+          },
+          "historicalExecutions": [
+            {
+              "status": "PASS",
+              "evidence": [
+                {
+                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+                }
+              ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-11 지정 직원 PIN 초기화 상세·시각·감사 변경자·이전PIN 거부를 실제 확인",
+              "assertion": "await expect(page.getByText(\"기본 PIN (0000)\", { exact: true })).toBeVisible();",
               "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
               "line": 419
             },
@@ -41246,20 +41623,6 @@
               "assertion": "expect(audit[0][0]).toMatch(/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/);",
               "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
               "line": 419
-            }
-          ],
-          "execution": {
-            "status": "NOT_RUN"
-          },
-          "historicalExecutions": [
-            {
-              "status": "PASS",
-              "evidence": [
-                {
-                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-                }
-              ]
             }
           ]
         }
@@ -41756,14 +42119,14 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-13 실제 담당 모델 순서 저장·재진입·새 로그인은 조립 업무 후보에 같은 우선순위",
               "assertion": "expect(persisted.assigned_model_slots).toEqual([2, 1]);",
-              "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
               "line": 277
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-13 실제 담당 모델 순서 저장·재진입·새 로그인은 조립 업무 후보에 같은 우선순위",
               "assertion": "expect(order.indexOf(items[1].item_id)).toBeLessThan(order.indexOf(items[0].item_id));",
-              "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
               "line": 277
             },
             {
@@ -41800,6 +42163,22 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-13 실제 담당 모델 순서 저장·재진입·새 로그인은 조립 업무 후보에 같은 우선순위",
+              "assertion": "expect(persisted.assigned_model_slots).toEqual([2, 1]);",
+              "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
+              "line": 277
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-13 실제 담당 모델 순서 저장·재진입·새 로그인은 조립 업무 후보에 같은 우선순위",
+              "assertion": "expect(order.indexOf(items[1].item_id)).toBeLessThan(order.indexOf(items[0].item_id));",
+              "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
+              "line": 277
             }
           ]
         }
@@ -41993,6 +42372,50 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-14 상태 필터의 실제 빈 결과는 정상 안내이며 해제하면 전체 부서 복원",
               "assertion": "await expect(rows).toHaveCount(0);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 126
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-14 상태 필터의 실제 빈 결과는 정상 안내이며 해제하면 전체 부서 복원",
+              "assertion": "await expect(page.getByText(\"검색 결과가 없습니다.\", { exact: true })).toBeVisible();",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 126
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-14 상태 필터의 실제 빈 결과는 정상 안내이며 해제하면 전체 부서 복원",
+              "assertion": "await expect(page.locator('[role=\"alert\"]:not(#__next-route-announcer__)')).toHaveCount(0);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 126
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-14 상태 필터의 실제 빈 결과는 정상 안내이며 해제하면 전체 부서 복원",
+              "assertion": "await expect(rows).toHaveCount(population.length);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 126
+            }
+          ],
+          "execution": {
+            "status": "NOT_RUN"
+          },
+          "historicalExecutions": [
+            {
+              "status": "PASS",
+              "evidence": [
+                {
+                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+                }
+              ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-14 상태 필터의 실제 빈 결과는 정상 안내이며 해제하면 전체 부서 복원",
+              "assertion": "await expect(rows).toHaveCount(0);",
               "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
               "line": 126
             },
@@ -42016,20 +42439,6 @@
               "assertion": "await expect(rows).toHaveCount(population.length);",
               "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
               "line": 126
-            }
-          ],
-          "execution": {
-            "status": "NOT_RUN"
-          },
-          "historicalExecutions": [
-            {
-              "status": "PASS",
-              "evidence": [
-                {
-                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-                }
-              ]
             }
           ]
         }
@@ -47571,6 +47980,61 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-26 관리자 PIN 길이·확인 불일치 차단과 실제 저장 중 중복 제출 방지",
               "assertion": "await expect(save).toBeDisabled();",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 58
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-26 관리자 PIN 길이·확인 불일치 차단과 실제 저장 중 중복 제출 방지",
+              "assertion": "expect(writes).toEqual([]);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 58
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-26 관리자 PIN 길이·확인 불일치 차단과 실제 저장 중 중복 제출 방지",
+              "assertion": "await expect(page.getByText(\"새 PIN과 일치하지 않습니다.\", { exact: true })).toBeVisible();",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 58
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-26 관리자 PIN 길이·확인 불일치 차단과 실제 저장 중 중복 제출 방지",
+              "assertion": "expect(writes).toHaveLength(1);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 58
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-26 관리자 PIN 길이·확인 불일치 차단과 실제 저장 중 중복 제출 방지",
+              "assertion": "await expect(current).toHaveValue(\"\"); await expect(next).toHaveValue(\"\"); await expect(confirm).toHaveValue(\"\");",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 58
+            }
+          ],
+          "execution": {
+            "status": "NOT_RUN"
+          },
+          "historicalExecutions": [
+            {
+              "status": "PASS",
+              "evidence": [
+                {
+                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+                },
+                {
+                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/vitest-d4c81f0c18-execution.json",
+                  "evidenceHash": "fd9282301fc9b8c9e95440bc3c2dddb327bcf5252389b2be8e082475777666e8"
+                }
+              ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-26 관리자 PIN 길이·확인 불일치 차단과 실제 저장 중 중복 제출 방지",
+              "assertion": "await expect(save).toBeDisabled();",
               "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
               "line": 58
             },
@@ -47601,24 +48065,6 @@
               "assertion": "await expect(current).toHaveValue(\"\"); await expect(next).toHaveValue(\"\"); await expect(confirm).toHaveValue(\"\");",
               "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
               "line": 58
-            }
-          ],
-          "execution": {
-            "status": "NOT_RUN"
-          },
-          "historicalExecutions": [
-            {
-              "status": "PASS",
-              "evidence": [
-                {
-                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-                },
-                {
-                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/vitest-d4c81f0c18-execution.json",
-                  "evidenceHash": "fd9282301fc9b8c9e95440bc3c2dddb327bcf5252389b2be8e082475777666e8"
-                }
-              ]
             }
           ]
         }
@@ -47836,15 +48282,15 @@
               "file": "frontend/app/mes/_components/_daily_report/__tests__/DailyWorkReportScreen.test.tsx",
               "selector": "일보 달력에서 미래 날짜는 선택할 수 없다",
               "assertion": "expect(screen.getByRole(\"button\", { name: futureLabel })).toBeDisabled();",
-              "sourceHash": "00d30141ce7c1105f8592ac55666a7adca209412b942e94fc23fc07ca5409685",
-              "line": 653
+              "sourceHash": "9d692da8f96431faa97b3b0f67193e713426746d21058dfe9df84d2215b0e72c",
+              "line": 659
             },
             {
               "file": "frontend/app/mes/_components/_daily_report/__tests__/DailyWorkReportScreen.test.tsx",
               "selector": "일보 달력에서 미래 날짜는 선택할 수 없다",
               "assertion": "expect(screen.getByRole(\"button\", { name: \"다음 달\" })).toBeDisabled();",
-              "sourceHash": "00d30141ce7c1105f8592ac55666a7adca209412b942e94fc23fc07ca5409685",
-              "line": 653
+              "sourceHash": "9d692da8f96431faa97b3b0f67193e713426746d21058dfe9df84d2215b0e72c",
+              "line": 659
             }
           ],
           "execution": {
@@ -47863,6 +48309,22 @@
                   "evidenceHash": "fd9282301fc9b8c9e95440bc3c2dddb327bcf5252389b2be8e082475777666e8"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/app/mes/_components/_daily_report/__tests__/DailyWorkReportScreen.test.tsx",
+              "selector": "일보 달력에서 미래 날짜는 선택할 수 없다",
+              "assertion": "expect(screen.getByRole(\"button\", { name: futureLabel })).toBeDisabled();",
+              "sourceHash": "00d30141ce7c1105f8592ac55666a7adca209412b942e94fc23fc07ca5409685",
+              "line": 653
+            },
+            {
+              "file": "frontend/app/mes/_components/_daily_report/__tests__/DailyWorkReportScreen.test.tsx",
+              "selector": "일보 달력에서 미래 날짜는 선택할 수 없다",
+              "assertion": "expect(screen.getByRole(\"button\", { name: \"다음 달\" })).toBeDisabled();",
+              "sourceHash": "00d30141ce7c1105f8592ac55666a7adca209412b942e94fc23fc07ca5409685",
+              "line": 653
             }
           ]
         },
@@ -48846,6 +49308,61 @@
               "file": "frontend/app/mes/_components/_daily_report/__tests__/DailyWorkReportScreen.test.tsx",
               "selector": "전체 일보에서 다른 직원의 스냅샷과 작업 내역을 읽기 전용으로 보여 준다",
               "assertion": "expect(screen.getByText(\"당시 작성자\")).toBeInTheDocument();",
+              "sourceHash": "9d692da8f96431faa97b3b0f67193e713426746d21058dfe9df84d2215b0e72c",
+              "line": 204
+            },
+            {
+              "file": "frontend/app/mes/_components/_daily_report/__tests__/DailyWorkReportScreen.test.tsx",
+              "selector": "전체 일보에서 다른 직원의 스냅샷과 작업 내역을 읽기 전용으로 보여 준다",
+              "assertion": "expect(screen.getByText(\"당시 부서\")).toBeInTheDocument();",
+              "sourceHash": "9d692da8f96431faa97b3b0f67193e713426746d21058dfe9df84d2215b0e72c",
+              "line": 204
+            },
+            {
+              "file": "frontend/app/mes/_components/_daily_report/__tests__/DailyWorkReportScreen.test.tsx",
+              "selector": "전체 일보에서 다른 직원의 스냅샷과 작업 내역을 읽기 전용으로 보여 준다",
+              "assertion": "expect(screen.getByText(\"다른 직원 작업 내역\")).toBeInTheDocument();",
+              "sourceHash": "9d692da8f96431faa97b3b0f67193e713426746d21058dfe9df84d2215b0e72c",
+              "line": 204
+            },
+            {
+              "file": "frontend/app/mes/_components/_daily_report/__tests__/DailyWorkReportScreen.test.tsx",
+              "selector": "전체 일보에서 다른 직원의 스냅샷과 작업 내역을 읽기 전용으로 보여 준다",
+              "assertion": "expect(screen.queryByRole(\"textbox\", { name: \"작업 내역\" })).not.toBeInTheDocument();",
+              "sourceHash": "9d692da8f96431faa97b3b0f67193e713426746d21058dfe9df84d2215b0e72c",
+              "line": 204
+            },
+            {
+              "file": "frontend/app/mes/_components/_daily_report/__tests__/DailyWorkReportScreen.test.tsx",
+              "selector": "전체 일보에서 다른 직원의 스냅샷과 작업 내역을 읽기 전용으로 보여 준다",
+              "assertion": "expect(screen.queryByRole(\"button\", { name: \"저장\" })).not.toBeInTheDocument();",
+              "sourceHash": "9d692da8f96431faa97b3b0f67193e713426746d21058dfe9df84d2215b0e72c",
+              "line": 204
+            }
+          ],
+          "execution": {
+            "status": "NOT_RUN"
+          },
+          "historicalExecutions": [
+            {
+              "status": "PASS",
+              "evidence": [
+                {
+                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+                },
+                {
+                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/vitest-d4c81f0c18-execution.json",
+                  "evidenceHash": "fd9282301fc9b8c9e95440bc3c2dddb327bcf5252389b2be8e082475777666e8"
+                }
+              ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/app/mes/_components/_daily_report/__tests__/DailyWorkReportScreen.test.tsx",
+              "selector": "전체 일보에서 다른 직원의 스냅샷과 작업 내역을 읽기 전용으로 보여 준다",
+              "assertion": "expect(screen.getByText(\"당시 작성자\")).toBeInTheDocument();",
               "sourceHash": "00d30141ce7c1105f8592ac55666a7adca209412b942e94fc23fc07ca5409685",
               "line": 200
             },
@@ -48876,24 +49393,6 @@
               "assertion": "expect(screen.queryByRole(\"button\", { name: \"저장\" })).not.toBeInTheDocument();",
               "sourceHash": "00d30141ce7c1105f8592ac55666a7adca209412b942e94fc23fc07ca5409685",
               "line": 200
-            }
-          ],
-          "execution": {
-            "status": "NOT_RUN"
-          },
-          "historicalExecutions": [
-            {
-              "status": "PASS",
-              "evidence": [
-                {
-                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-                },
-                {
-                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/vitest-d4c81f0c18-execution.json",
-                  "evidenceHash": "fd9282301fc9b8c9e95440bc3c2dddb327bcf5252389b2be8e082475777666e8"
-                }
-              ]
             }
           ]
         },
@@ -50038,6 +50537,61 @@
               "file": "frontend/app/mes/_components/_daily_report/__tests__/DailyWorkReportScreen.test.tsx",
               "selector": "모바일 내 일보는 활동을 펼칠 때만 스크롤 모드로 바꾸고 편집기를 유지한다",
               "assertion": "expect(scrollModes.at(-1)).toBe(false);",
+              "sourceHash": "9d692da8f96431faa97b3b0f67193e713426746d21058dfe9df84d2215b0e72c",
+              "line": 91
+            },
+            {
+              "file": "frontend/app/mes/_components/_daily_report/__tests__/DailyWorkReportScreen.test.tsx",
+              "selector": "모바일 내 일보는 활동을 펼칠 때만 스크롤 모드로 바꾸고 편집기를 유지한다",
+              "assertion": "expect(scrollModes.at(-1)).toBe(true);",
+              "sourceHash": "9d692da8f96431faa97b3b0f67193e713426746d21058dfe9df84d2215b0e72c",
+              "line": 91
+            },
+            {
+              "file": "frontend/app/mes/_components/_daily_report/__tests__/DailyWorkReportScreen.test.tsx",
+              "selector": "모바일 내 일보는 활동을 펼칠 때만 스크롤 모드로 바꾸고 편집기를 유지한다",
+              "assertion": "expect(screen.getByRole(\"textbox\", { name: \"작업 내역\" })).toBe(editor);",
+              "sourceHash": "9d692da8f96431faa97b3b0f67193e713426746d21058dfe9df84d2215b0e72c",
+              "line": 91
+            },
+            {
+              "file": "frontend/app/mes/_components/_daily_report/__tests__/DailyWorkReportScreen.test.tsx",
+              "selector": "데스크톱 본인 일보는 MES 상세를 열면 본문 스크롤을 허용한다",
+              "assertion": "expect(header?.parentElement).toHaveClass(\"lg:overflow-y-auto\");",
+              "sourceHash": "9d692da8f96431faa97b3b0f67193e713426746d21058dfe9df84d2215b0e72c",
+              "line": 471
+            },
+            {
+              "file": "frontend/app/mes/_components/_daily_report/__tests__/DailyWorkReportScreen.test.tsx",
+              "selector": "데스크톱 본인 일보는 MES 상세를 열면 본문 스크롤을 허용한다",
+              "assertion": "expect(header?.parentElement).not.toHaveClass(\"lg:overflow-hidden\");",
+              "sourceHash": "9d692da8f96431faa97b3b0f67193e713426746d21058dfe9df84d2215b0e72c",
+              "line": 471
+            }
+          ],
+          "execution": {
+            "status": "NOT_RUN"
+          },
+          "historicalExecutions": [
+            {
+              "status": "PASS",
+              "evidence": [
+                {
+                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+                },
+                {
+                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/vitest-d4c81f0c18-execution.json",
+                  "evidenceHash": "fd9282301fc9b8c9e95440bc3c2dddb327bcf5252389b2be8e082475777666e8"
+                }
+              ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/app/mes/_components/_daily_report/__tests__/DailyWorkReportScreen.test.tsx",
+              "selector": "모바일 내 일보는 활동을 펼칠 때만 스크롤 모드로 바꾸고 편집기를 유지한다",
+              "assertion": "expect(scrollModes.at(-1)).toBe(false);",
               "sourceHash": "00d30141ce7c1105f8592ac55666a7adca209412b942e94fc23fc07ca5409685",
               "line": 89
             },
@@ -50068,24 +50622,6 @@
               "assertion": "expect(header?.parentElement).not.toHaveClass(\"lg:overflow-hidden\");",
               "sourceHash": "00d30141ce7c1105f8592ac55666a7adca209412b942e94fc23fc07ca5409685",
               "line": 465
-            }
-          ],
-          "execution": {
-            "status": "NOT_RUN"
-          },
-          "historicalExecutions": [
-            {
-              "status": "PASS",
-              "evidence": [
-                {
-                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-                },
-                {
-                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/vitest-d4c81f0c18-execution.json",
-                  "evidenceHash": "fd9282301fc9b8c9e95440bc3c2dddb327bcf5252389b2be8e082475777666e8"
-                }
-              ]
             }
           ]
         }
@@ -73997,6 +74533,50 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "PC-DELTA-IOORDER-01 실제 드래그 저장·재진입·새로고침·초기화는 다른 직원 탭 순서를 보존",
               "assertion": "expect(await ids(page)).toEqual(expected);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 316
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-IOORDER-01 실제 드래그 저장·재진입·새로고침·초기화는 다른 직원 탭 순서를 보존",
+              "assertion": "expect([...persisted].sort((left, right) => left.display_order - right.display_order).map((row) => row.item_id)).toEqual(expected);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 316
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-IOORDER-01 실제 드래그 저장·재진입·새로고침·초기화는 다른 직원 탭 순서를 보존",
+              "assertion": "expect(await ids(other)).toEqual(otherBaseline);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 316
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-IOORDER-01 실제 드래그 저장·재진입·새로고침·초기화는 다른 직원 탭 순서를 보존",
+              "assertion": "await expect.poll(() => ids(page)).toEqual(baseline);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 316
+            }
+          ],
+          "execution": {
+            "status": "NOT_RUN"
+          },
+          "historicalExecutions": [
+            {
+              "status": "PASS",
+              "evidence": [
+                {
+                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+                }
+              ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-IOORDER-01 실제 드래그 저장·재진입·새로고침·초기화는 다른 직원 탭 순서를 보존",
+              "assertion": "expect(await ids(page)).toEqual(expected);",
               "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
               "line": 316
             },
@@ -74020,20 +74600,6 @@
               "assertion": "await expect.poll(() => ids(page)).toEqual(baseline);",
               "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
               "line": 316
-            }
-          ],
-          "execution": {
-            "status": "NOT_RUN"
-          },
-          "historicalExecutions": [
-            {
-              "status": "PASS",
-              "evidence": [
-                {
-                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-                }
-              ]
             }
           ]
         }
@@ -80169,7 +80735,7 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY01 실제 cursor 추가조회 실패·반복클릭·필터 보존·정확한 append",
               "assertion": "await expect.poll(() => pageRequests).toBe(beforeRetry + 1);",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
               "line": 156
             }
           ],
@@ -80185,6 +80751,15 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY01 실제 cursor 추가조회 실패·반복클릭·필터 보존·정확한 append",
+              "assertion": "await expect.poll(() => pageRequests).toBe(beforeRetry + 1);",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 156
             }
           ]
         },
@@ -80202,7 +80777,7 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY01 실제 cursor 추가조회 실패·반복클릭·필터 보존·정확한 append",
               "assertion": "expect(await rows(page).evaluateAll((elements) => elements.map((element) => element.getAttribute(\"data-log-id\")))).toEqual(initial);",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
               "line": 156
             }
           ],
@@ -80218,6 +80793,15 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY01 실제 cursor 추가조회 실패·반복클릭·필터 보존·정확한 append",
+              "assertion": "expect(await rows(page).evaluateAll((elements) => elements.map((element) => element.getAttribute(\"data-log-id\")))).toEqual(initial);",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 156
             }
           ]
         },
@@ -80235,14 +80819,14 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY01 실제 cursor 추가조회 실패·반복클릭·필터 보존·정확한 append",
               "assertion": "expect(new Set(ids).size).toBe(121);",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
               "line": 156
             },
             {
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY01 실제 cursor 추가조회 실패·반복클릭·필터 보존·정확한 append",
               "assertion": "expect(new Set(ids)).toEqual(new Set(fixture.ids));",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
               "line": 156
             }
           ],
@@ -80258,6 +80842,22 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY01 실제 cursor 추가조회 실패·반복클릭·필터 보존·정확한 append",
+              "assertion": "expect(new Set(ids).size).toBe(121);",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 156
+            },
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY01 실제 cursor 추가조회 실패·반복클릭·필터 보존·정확한 append",
+              "assertion": "expect(new Set(ids)).toEqual(new Set(fixture.ids));",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 156
             }
           ]
         },
@@ -80383,8 +80983,8 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY02 실제 서버 변경은 받은 두 페이지와 끝 행을 보존하며 새 행을 반영",
               "assertion": "expect(await rows(page).evaluateAll((elements) => elements.map((element) => element.getAttribute(\"data-log-id\")))).toEqual(before);",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
-              "line": 243
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 244
             }
           ],
           "execution": {
@@ -80399,6 +80999,15 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY02 실제 서버 변경은 받은 두 페이지와 끝 행을 보존하며 새 행을 반영",
+              "assertion": "expect(await rows(page).evaluateAll((elements) => elements.map((element) => element.getAttribute(\"data-log-id\")))).toEqual(before);",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 243
             }
           ]
         },
@@ -80416,15 +81025,15 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY02 실제 서버 변경은 받은 두 페이지와 끝 행을 보존하며 새 행을 반영",
               "assertion": "expect(new Set(after)).toEqual(new Set([...before, newLogs[0].log_id]));",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
-              "line": 243
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 244
             },
             {
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY02 실제 서버 변경은 받은 두 페이지와 끝 행을 보존하며 새 행을 반영",
               "assertion": "expect(new Set(after).size).toBe(after.length);",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
-              "line": 243
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 244
             }
           ],
           "execution": {
@@ -80439,6 +81048,22 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY02 실제 서버 변경은 받은 두 페이지와 끝 행을 보존하며 새 행을 반영",
+              "assertion": "expect(new Set(after)).toEqual(new Set([...before, newLogs[0].log_id]));",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 243
+            },
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY02 실제 서버 변경은 받은 두 페이지와 끝 행을 보존하며 새 행을 반영",
+              "assertion": "expect(new Set(after).size).toBe(after.length);",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 243
             }
           ]
         },
@@ -80456,8 +81081,8 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY02 실제 서버 변경은 받은 두 페이지와 끝 행을 보존하며 새 행을 반영",
               "assertion": "expect(after.at(-1)).toBe(before.at(-1));",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
-              "line": 243
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 244
             }
           ],
           "execution": {
@@ -80472,6 +81097,15 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY02 실제 서버 변경은 받은 두 페이지와 끝 행을 보존하며 새 행을 반영",
+              "assertion": "expect(after.at(-1)).toBe(before.at(-1));",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 243
             }
           ]
         }
@@ -80566,15 +81200,15 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY03 늦은 이전 검색 응답은 최신 목록과 마지막 선택 상세를 덮지 않음",
               "assertion": "await expect(search).toHaveValue(latest.name);",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
-              "line": 282
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 283
             },
             {
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY03 늦은 이전 검색 응답은 최신 목록과 마지막 선택 상세를 덮지 않음",
               "assertion": "expect(new Set(await rows(page).evaluateAll((elements) => elements.map((element) => element.getAttribute(\"data-log-id\"))))).toEqual(new Set(latest.ids.slice(0, 100)));",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
-              "line": 282
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 283
             }
           ],
           "execution": {
@@ -80589,6 +81223,22 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY03 늦은 이전 검색 응답은 최신 목록과 마지막 선택 상세를 덮지 않음",
+              "assertion": "await expect(search).toHaveValue(latest.name);",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 282
+            },
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY03 늦은 이전 검색 응답은 최신 목록과 마지막 선택 상세를 덮지 않음",
+              "assertion": "expect(new Set(await rows(page).evaluateAll((elements) => elements.map((element) => element.getAttribute(\"data-log-id\"))))).toEqual(new Set(latest.ids.slice(0, 100)));",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 282
             }
           ]
         },
@@ -80606,15 +81256,15 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY03 늦은 이전 검색 응답은 최신 목록과 마지막 선택 상세를 덮지 않음",
               "assertion": "await expect(second.first()).toHaveAttribute(\"aria-pressed\", \"true\");",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
-              "line": 282
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 283
             },
             {
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY03 늦은 이전 검색 응답은 최신 목록과 마지막 선택 상세를 덮지 않음",
               "assertion": "await expect(page.getByText(\"QA-HISTORY-001\", { exact: true }).filter({ visible: true }).first()).toBeVisible();",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
-              "line": 282
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 283
             }
           ],
           "execution": {
@@ -80629,6 +81279,22 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY03 늦은 이전 검색 응답은 최신 목록과 마지막 선택 상세를 덮지 않음",
+              "assertion": "await expect(second.first()).toHaveAttribute(\"aria-pressed\", \"true\");",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 282
+            },
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY03 늦은 이전 검색 응답은 최신 목록과 마지막 선택 상세를 덮지 않음",
+              "assertion": "await expect(page.getByText(\"QA-HISTORY-001\", { exact: true }).filter({ visible: true }).first()).toBeVisible();",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 282
             }
           ]
         },
@@ -80770,8 +81436,8 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
               "assertion": "expect(original.operation_id).toBeTruthy();",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
-              "line": 191
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 192
             }
           ],
           "execution": {
@@ -80791,6 +81457,15 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
+              "assertion": "expect(original.operation_id).toBeTruthy();",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 191
+            }
           ]
         },
         {
@@ -80807,15 +81482,15 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
               "assertion": "await expect(page.locator('[role=\"alert\"]:not(#__next-route-announcer__)')).toContainText(/PIN/);",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
-              "line": 191
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 192
             },
             {
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
               "assertion": "expect((await (await request.get(`/api/items/${item.item_id}`)).json()).warehouse_qty).toBe(17);",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
-              "line": 191
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 192
             }
           ],
           "execution": {
@@ -80830,6 +81505,22 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
+              "assertion": "await expect(page.locator('[role=\"alert\"]:not(#__next-route-announcer__)')).toContainText(/PIN/);",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 191
+            },
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
+              "assertion": "expect((await (await request.get(`/api/items/${item.item_id}`)).json()).warehouse_qty).toBe(17);",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 191
             }
           ]
         },
@@ -80847,15 +81538,15 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
               "assertion": "await expect.poll(async () => (await (await request.get(`/api/items/${item.item_id}`)).json()).warehouse_qty).toBe(20);",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
-              "line": 191
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 192
             },
             {
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
               "assertion": "expect(result.filter((entry: { reverses_log_id: string }) => entry.reverses_log_id === original.log_id)).toHaveLength(1);",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
-              "line": 191
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 192
             }
           ],
           "execution": {
@@ -80870,6 +81561,22 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
+              "assertion": "await expect.poll(async () => (await (await request.get(`/api/items/${item.item_id}`)).json()).warehouse_qty).toBe(20);",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 191
+            },
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
+              "assertion": "expect(result.filter((entry: { reverses_log_id: string }) => entry.reverses_log_id === original.log_id)).toHaveLength(1);",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 191
             }
           ]
         },
@@ -80887,8 +81594,8 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
               "assertion": "expect(cancelled).toMatchObject({ cancelled: true, requester_name: actors.requester.name, approver_name: actors.approver.name, cancelled_by: actors.requester.employee_id });",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
-              "line": 191
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 192
             }
           ],
           "execution": {
@@ -80903,6 +81610,15 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고 재고를 한 번만 원복",
+              "assertion": "expect(cancelled).toMatchObject({ cancelled: true, requester_name: actors.requester.name, approver_name: actors.approver.name, cancelled_by: actors.requester.employee_id });",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 191
             }
           ]
         },
@@ -81028,8 +81744,8 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY05 HISTORY06 복원 재작업의 모품목·정상·불량·폐기 결과는 검색·추가조회·상세가 일치",
               "assertion": "await expect(header).toContainText(/불량.*2.*[−-]2.*0/);",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
-              "line": 318
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 319
             }
           ],
           "execution": {
@@ -81044,6 +81760,15 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY05 HISTORY06 복원 재작업의 모품목·정상·불량·폐기 결과는 검색·추가조회·상세가 일치",
+              "assertion": "await expect(header).toContainText(/불량.*2.*[−-]2.*0/);",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 318
             }
           ]
         },
@@ -81061,8 +81786,8 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY05 HISTORY06 복원 재작업의 모품목·정상·불량·폐기 결과는 검색·추가조회·상세가 일치",
               "assertion": "await expect(child).toContainText(delta.startsWith(\"-\") ? new RegExp(`[−-]${delta.slice(1)}`) : delta);",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
-              "line": 318
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 319
             }
           ],
           "execution": {
@@ -81077,6 +81802,15 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY05 HISTORY06 복원 재작업의 모품목·정상·불량·폐기 결과는 검색·추가조회·상세가 일치",
+              "assertion": "await expect(child).toContainText(delta.startsWith(\"-\") ? new RegExp(`[−-]${delta.slice(1)}`) : delta);",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 318
             }
           ]
         },
@@ -81094,8 +81828,8 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY05 HISTORY06 복원 재작업의 모품목·정상·불량·폐기 결과는 검색·추가조회·상세가 일치",
               "assertion": "await expect(impact).toContainText(delta.startsWith(\"-\") ? new RegExp(`[−-]${delta.slice(1)}`) : delta);",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
-              "line": 318
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 319
             }
           ],
           "execution": {
@@ -81110,6 +81844,15 @@
                   "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
                 }
               ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY05 HISTORY06 복원 재작업의 모품목·정상·불량·폐기 결과는 검색·추가조회·상세가 일치",
+              "assertion": "await expect(impact).toContainText(delta.startsWith(\"-\") ? new RegExp(`[−-]${delta.slice(1)}`) : delta);",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 318
             }
           ]
         }
@@ -83634,6 +84377,50 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
               "assertion": "expect(actions.map((records) => records.length)).toEqual([1, 1]);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 373
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
+              "assertion": "expect(records[0][1]).toBe(actors.approver.name);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 373
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
+              "assertion": "expect(records[0][2]).toBe(actors.approver.employee_code);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 373
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
+              "assertion": "expect(actions.map((records) => records[0][6])).toEqual([\"POST /api/items\", \"PUT /api/items/:id\"]);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 373
+            }
+          ],
+          "execution": {
+            "status": "NOT_RUN"
+          },
+          "historicalExecutions": [
+            {
+              "status": "PASS",
+              "evidence": [
+                {
+                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+                }
+              ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
+              "assertion": "expect(actions.map((records) => records.length)).toEqual([1, 1]);",
               "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
               "line": 373
             },
@@ -83657,20 +84444,6 @@
               "assertion": "expect(actions.map((records) => records[0][6])).toEqual([\"POST /api/items\", \"PUT /api/items/:id\"]);",
               "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
               "line": 373
-            }
-          ],
-          "execution": {
-            "status": "NOT_RUN"
-          },
-          "historicalExecutions": [
-            {
-              "status": "PASS",
-              "evidence": [
-                {
-                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-                }
-              ]
             }
           ]
         }
@@ -83896,6 +84669,43 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
               "assertion": "await expect(detail.getByTestId(\"history-stock-movement-summary\")).toContainText(/창고.*0\\s*20/);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 373
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
+              "assertion": "await expect(detail.getByTestId(\"history-participant-row\")).toContainText(actors.approver.name);",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 373
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
+              "assertion": "await expect(detail.getByTestId(\"history-participant-row\")).toContainText(formatHistoryDateTimeLong(logs[0].created_at));",
+              "sourceHash": "2fb8623a92fcc61c53dfa068a384a7d33d3bb643c0d37f49bc6735e2101a6eec",
+              "line": 373
+            }
+          ],
+          "execution": {
+            "status": "NOT_RUN"
+          },
+          "historicalExecutions": [
+            {
+              "status": "PASS",
+              "evidence": [
+                {
+                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+                }
+              ]
+            }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
+              "assertion": "await expect(detail.getByTestId(\"history-stock-movement-summary\")).toContainText(/창고.*0\\s*20/);",
               "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
               "line": 373
             },
@@ -83912,20 +84722,6 @@
               "assertion": "await expect(detail.getByTestId(\"history-participant-row\")).toContainText(formatHistoryDateTimeLong(logs[0].created_at));",
               "sourceHash": "f4b00589b69614fcd688bd93378ad95cade32c5def22ece99149865891b468e6",
               "line": 373
-            }
-          ],
-          "execution": {
-            "status": "NOT_RUN"
-          },
-          "historicalExecutions": [
-            {
-              "status": "PASS",
-              "evidence": [
-                {
-                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-                }
-              ]
             }
           ]
         }
@@ -88937,8 +89733,8 @@
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY05 HISTORY06 복원 재작업의 모품목·정상·불량·폐기 결과는 검색·추가조회·상세가 일치",
               "assertion": "await expect(impact).toContainText(delta.startsWith(\"-\") ? new RegExp(`[−-]${delta.slice(1)}`) : delta);",
-              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
-              "line": 318
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 319
             },
             {
               "file": "backend/tests/routers/test_history_expectation_closure.py",
@@ -88964,6 +89760,15 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY05 HISTORY06 복원 재작업의 모품목·정상·불량·폐기 결과는 검색·추가조회·상세가 일치",
+              "assertion": "await expect(impact).toContainText(delta.startsWith(\"-\") ? new RegExp(`[−-]${delta.slice(1)}`) : delta);",
+              "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
+              "line": 318
+            }
           ]
         },
         {
@@ -88976,6 +89781,43 @@
           "coverage": "linked",
           "reason": null,
           "bindings": [
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY05 HISTORY06 복원 재작업의 모품목·정상·불량·폐기 결과는 검색·추가조회·상세가 일치",
+              "assertion": "await expect(rows(page)).toHaveCount(expectedGroupCount);",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 319
+            },
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY05 HISTORY06 복원 재작업의 모품목·정상·불량·폐기 결과는 검색·추가조회·상세가 일치",
+              "assertion": "await expect(page.getByPlaceholder(\"작업 · 품명 · 코드 · 담당자 · 메모\")).toHaveValue(fixture.search);",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 319
+            },
+            {
+              "file": "frontend/tests/e2e/history-expectations.spec.ts",
+              "selector": "HISTORY05 HISTORY06 복원 재작업의 모품목·정상·불량·폐기 결과는 검색·추가조회·상세가 일치",
+              "assertion": "expect(fixture.ids.every((id) => logs.some((row: { log_id: string }) => row.log_id === id))).toBe(true);",
+              "sourceHash": "1d650c412d8fa0172df7e4d11a310e15035bb787bb0f99f2455e9b148407748b",
+              "line": 319
+            }
+          ],
+          "execution": {
+            "status": "NOT_RUN"
+          },
+          "historicalExecutions": [
+            {
+              "status": "PASS",
+              "evidence": [
+                {
+                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
+                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
+                }
+              ]
+            }
+          ],
+          "historicalBindings": [
             {
               "file": "frontend/tests/e2e/history-expectations.spec.ts",
               "selector": "HISTORY05 HISTORY06 복원 재작업의 모품목·정상·불량·폐기 결과는 검색·추가조회·상세가 일치",
@@ -88996,20 +89838,6 @@
               "assertion": "expect(fixture.ids.every((id) => logs.some((row: { log_id: string }) => row.log_id === id))).toBe(true);",
               "sourceHash": "084f84cb3cabee9eff421c86a00ea7314420622e28ce7455c22cb01b47285319",
               "line": 318
-            }
-          ],
-          "execution": {
-            "status": "NOT_RUN"
-          },
-          "historicalExecutions": [
-            {
-              "status": "PASS",
-              "evidence": [
-                {
-                  "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/final-c13-verified-20261009/playwright-16369f9327-execution.json",
-                  "evidenceHash": "b020bfc876d43584b15b0026423a646b129fe4c7fe428907ec41613ff02719e1"
-                }
-              ]
             }
           ]
         }

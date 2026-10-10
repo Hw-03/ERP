@@ -434,7 +434,7 @@ test("8.19-11 지정 직원 PIN 초기화 상세·시각·감사 변경자·이�
   const employees = await read<typeof actors.requester[]>(request, "/api/employees");
   const employee = employees.find((employee) => employee.employee_id === actors.requester.employee_id)!;
   expect(employee.pin_last_changed).toBeTruthy();
-  await expect(page.getByText(/마지막 변경:/)).toContainText(new Date(employee.pin_last_changed!).toLocaleDateString("ko-KR"));
+  await expect(page.getByText(/마지막 변경:/)).toContainText(new Date(employee.pin_last_changed!).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" }));
   const oldPin = await request.post(`/api/employees/${employee.employee_id}/verify-pin`, { data: { pin: "1234" } });
   expect(oldPin.status()).toBe(403);
   const currentPin = await request.post(`/api/employees/${employee.employee_id}/verify-pin`, { data: { pin: "0000" } });
