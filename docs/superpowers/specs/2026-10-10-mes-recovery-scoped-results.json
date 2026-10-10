@@ -48,5 +48,72 @@
     "isolatedPortsReleased": true
   },
   "historicalFailuresPreserved": ["C15 migration path failure", "C16 external protected-input change", "C17 missing QA schema checkpoint update", "C18 original hard-exit collector failure"],
-  "postRehearsalChangesAllowedForEvidenceReuse": "CI test files and expectation binding metadata only; verify production source and build inputs remain unchanged"
+  "postRehearsalEvidenceScope": "C18 exact-source and paired artifact recovery results apply to its frozen P10/Q10 artifacts. Later desktop BOM button extraction, new frontend build, CI test metadata and dependency-range corrections are excluded from that exact-source result. Backend application, database and installation/recovery implementation evidence is retained for unchanged inputs. The dependency corrections retain the locally verified SQLAlchemy 2.0 and Pydantic 2.13 families rather than adopting CI's unverified minor upgrades.",
+  "postRehearsalDependencyCorrections": {
+    "sqlalchemyRange": ">=2.0.31,<2.1",
+    "pydanticRange": ">=2.9.0,<2.14",
+    "verifiedLocalSqlalchemyVersion": "2.0.52",
+    "verifiedLocalPydanticVersion": "2.13.4",
+    "existingOpenapiExactMatch": true,
+    "openapiCheckDatabaseConnections": 0,
+    "postgresCi": {
+      "sourceCommit": "6d8ca629d25865fab8548b2413f70faa45c17e3e",
+      "runUrl": "https://github.com/Hw-03/ERP/actions/runs/38014354782",
+      "requiredTests": 88,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "completeWithoutSkip": true,
+      "wholeBackendJobStatus": "FAIL_OPENAPI_BASELINE"
+    }
+  },
+  "postRehearsalCodeCi": {
+    "sourceCommit": "6c7c348dab2022cc6e0d4ad5c43f9a64ce716253",
+    "runUrl": "https://github.com/Hw-03/ERP/actions/runs/38018425265",
+    "status": "SUCCESS",
+    "completedJobs": 8,
+    "successfulJobs": 8,
+    "frontendTestsPassed": 3799,
+    "postgresRequiredTestsPassed": 88,
+    "postgresSkipped": 0,
+    "postgresFailures": 0,
+    "postgresErrors": 0,
+    "openapiDriftCheck": "PASS",
+    "generalE2ePassedWithoutRetry": 289,
+    "generalE2eFlakyPassedOnRetry": 1,
+    "generalE2eFailures": 0,
+    "generalE2eOriginalAttemptFailurePreserved": true,
+    "scope": "CI contracts only; not a promotion of the current whole expectation ledger or deferred performance checks; closing documentation commit excluded"
+  },
+  "postRehearsalFrontend": {
+    "scope": "Desktop BOM button extraction; separate build and page startup only",
+    "sourceCommit": "da804bb183210ba7c2c1e4f43baa98f1d1661ecc",
+    "relatedTestsPassed": 78,
+    "localBuildStatus": "PASS",
+    "localBundleBytes": 3145717,
+    "approvedBundleLimitBytes": 3145728,
+    "linuxCiFrontend": {
+      "status": "PASS",
+      "runUrl": "https://github.com/Hw-03/ERP/actions/runs/38012538454",
+      "jobId": 114095582203,
+      "sourceCommit": "da804bb183210ba7c2c1e4f43baa98f1d1661ecc",
+      "testsPassed": 3799,
+      "bundleBytes": 3145717,
+      "wholeCiStatusAtRecording": "IN_PROGRESS"
+    },
+    "buildReceiptSha256": "48785b6c9d0d12b9030d68390870a03e15d8df3bf8431d574d5a06b95c05c177",
+    "pageStartupStatus": "PASS",
+    "pageStartupFinishedAt": "2026-10-10T10:19:38+09:00",
+    "pageStartupResultSha256": "a72708d87cbf1f4c5ee562812e89ba46db62699041569c61b432dffe582e004a",
+    "pageStartupExitSha256": "2fc5d24ce3bf755f37161bc512db4a570f5fc54c26cae405f60251b5e5e63fd2",
+    "httpStatus": 200,
+    "apiVerifiedByPageStartup": false,
+    "buttonBehaviorVerifiedByPageStartup": false,
+    "pairedRecoveryReexecutedForNewBuild": false,
+    "databaseConnectionCalls": 0,
+    "backendStarted": false,
+    "ownedProcessesStopped": true,
+    "isolatedPortsReleased": true,
+    "prelaunchAuditFailurePreserved": true
+  }
 }
