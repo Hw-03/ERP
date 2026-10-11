@@ -16721,6 +16721,20 @@
           "selector": "test_warehouse_adjust_retry_keeps_one_effect_and_one_correct_summary",
           "assertion": "assert _cells(db_session) == expected",
           "sourceHash": "63ac37b7597bed267365464058b51a430b33fe8feaa45e94fb9d3caace5e2da0"
+        },
+        {
+          "file": "frontend/tests/e2e/io-warehouse-adjust.spec.ts",
+          "selector": "데스크톱 보정 입고 → 즉시 완료 → 창고 ADJUST 이력",
+          "assertion": "expect(after - before).toBe(1);",
+          "sourceHash": "f3aaa2df11454ed8760c7d62322c233986cc68937f376abd8d1579de95f74bcb",
+          "line": 37
+        },
+        {
+          "file": "frontend/tests/e2e/io-warehouse-adjust.spec.ts",
+          "selector": "데스크톱 보정 입고 → 즉시 완료 → 창고 ADJUST 이력",
+          "assertion": "transaction_type: \"ADJUST\",",
+          "sourceHash": "f3aaa2df11454ed8760c7d62322c233986cc68937f376abd8d1579de95f74bcb",
+          "line": 37
         }
       ],
       "execution": {
