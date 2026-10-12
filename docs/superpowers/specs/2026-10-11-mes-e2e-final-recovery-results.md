@@ -67,3 +67,11 @@
 커밋 직전 소스·의존성 명세·설정·실행기 해시가 기존 통과 근거와 일치함을 다시 확인했다. E2E 30회·관련 ESLint/타입·안전성 24검사·새 빌드와 실제 정상 복구 결과를 재사용하며, 전체 검사나 복구를 반복하지 않는다. 각 커밋은 명시한 파일만 stage하고 staged diff/whitespace와 smart 계획을 확인한다. 기대값 JSON은 선택적 바인딩 외 과거 실행·현재 NOT_RUN·분모를 유지한다. DB·자격 증명·대용량 원문은 로컬 보존 자료이며 커밋 대상이 아니다.
 
 작업 브랜치만 정상 푸시하고 전체 CI 완료는 기다리지 않는다. main 반영·강제 푸시·직원 배포는 제외하며, 최종 푸시 결과와 새 CI 링크/시작 상태는 사용자 보고로 확인한다.
+
+## 2026-10-12 CI 바인딩 오류와 수정
+
+HEAD `b59ce634`의 [기대값 근거 검사](https://github.com/Hw-03/ERP/actions/runs/38185343867/job/114606349794)가 `8.16-02/warehouse-adjust-signed-cell-effect: selector/assertion not found in actual test body`로 실패했다. 추가한 ADJUST 바인딩의 `transaction_type: "ADJUST",`는 실제 객체 속성이지만 실행 단언 전체가 아니었다. 이전의 단순 본문 포함 확인으로는 이를 발견하지 못했고, 실제 CI의 엄격 검사가 거부했다.
+
+로컬 Node 20에서 CI와 같은 `node scripts/dev/normalize-mes-expectations.mjs --check`의 실패/종료 코드 1을 재현했다. 기대값 registry와 생성 JSON의 해당 바인딩을 기존 테스트에 있는 `expect(logs).toEqual(...)` 전체로 바꾼 뒤 같은 검사가 종료 코드 0으로 통과했다. 테스트·업무 API·DB·단언 검증기는 수정하지 않았다. 기존 source hash와 선택자·선언 행, 다른 바인딩·분모·과거 실행·현재 NOT_RUN은 유지한다.
+
+원문 CI 실패 로그는 `_attic/runtime/e2e-final-normal-20261011/ci-38185343867-binding-failure.log`에 보존한다. 이번 통과는 원장 구조·실제 단언 연결 검사이며, 전체 기대값의 현재 실행 PASS가 아니다. 전체 테스트·브라우저·복구는 반복하지 않았고, 후속 푸시의 전체 CI 완료는 사용자 요청에 따라 기다리지 않는다.

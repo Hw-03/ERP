@@ -16732,7 +16732,7 @@
         {
           "file": "frontend/tests/e2e/io-warehouse-adjust.spec.ts",
           "selector": "데스크톱 보정 입고 → 즉시 완료 → 창고 ADJUST 이력",
-          "assertion": "transaction_type: \"ADJUST\",",
+          "assertion": "expect(logs).toEqual(\n      expect.arrayContaining([\n        expect.objectContaining({\n          transaction_type: \"ADJUST\",\n          department: \"창고\",\n          warehouse_qty_before: expect.any(Number),\n          warehouse_qty_after: expect.any(Number),\n        }),\n      ]),\n    );",
           "sourceHash": "f3aaa2df11454ed8760c7d62322c233986cc68937f376abd8d1579de95f74bcb",
           "line": 37
         }
