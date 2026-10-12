@@ -233,7 +233,7 @@ function AfPanel({
           </span>
         )
       )}
-      {interactive && (
+      {interactive && !mobile && (
         <span
           className="mt-0.5 hidden w-full shrink-0 text-right text-sm sm:block lg:mt-0 lg:ml-auto lg:w-auto"
           style={{ color: accent }}
@@ -246,7 +246,7 @@ function AfPanel({
 
   if (interactive) {
     return (
-      <button type="button" className={className} style={baseStyle} onClick={onClick} title="생산 가능수량 상세">
+      <button type="button" className={className} style={baseStyle} onClick={onClick} title="생산 가능수량 상세" aria-label={mobile ? "생산 가능수량 상세 보기" : undefined}>
         {inner}
       </button>
     );
@@ -408,7 +408,7 @@ function LegacyPanel({
           </span>
         )
       )}
-      {interactive && (
+      {interactive && !mobile && (
         <span
           className="mt-0.5 w-full shrink-0 text-right text-sm lg:mt-0 lg:ml-auto lg:w-auto"
           style={{ color: LEGACY_COLORS.muted2 }}
@@ -420,7 +420,7 @@ function LegacyPanel({
   );
   if (interactive) {
     return (
-      <button type="button" className={className} style={baseStyle} onClick={onClick} title="생산 가능수량 상세">
+      <button type="button" className={className} style={baseStyle} onClick={onClick} title="생산 가능수량 상세" aria-label={mobile ? "생산 가능수량 상세 보기" : undefined}>
         {inner}
       </button>
     );

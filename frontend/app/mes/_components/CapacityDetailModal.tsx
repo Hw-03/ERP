@@ -15,6 +15,7 @@ import { BomDetailModal } from "./_inventory_sections/BomDetailModal";
 import { ReadLoading } from "./common/ReadState";
 import { LoadFailureCard } from "./common/LoadFailureCard";
 import { SkeletonBlock, dataRevealClassName } from "./common/LoadingSkeleton";
+import { MOBILE_MODAL_VIEWPORT_STYLE } from "./mobile/mobileModalLayout";
 
 const DESKTOP_PF_GRID =
   "lg:grid-cols-[20px_120px_72px_minmax(0,1fr)_120px_84px_84px_84px]";
@@ -141,11 +142,11 @@ export function CapacityDetailModal({
     <>
     <div
       className="fixed inset-0 z-[300] flex items-center justify-center p-4"
-      style={{ background: LEGACY_COLORS.bg }}
+      style={{ background: LEGACY_COLORS.bg, ...(!isDesktopCapacityLayout ? MOBILE_MODAL_VIEWPORT_STYLE : {}) }}
       onClick={onClose}
     >
       <div
-        className="flex h-[92vh] w-[calc(100vw-32px)] min-h-0 flex-col rounded-[24px] border lg:h-[84vh] lg:w-[calc(100vw-128px)]"
+        className="flex h-full w-[calc(100vw-32px)] min-h-0 flex-col rounded-[24px] border lg:h-[84vh] lg:w-[calc(100vw-128px)]"
         style={{
           background: "var(--c-popup-bg)",
           borderColor: LEGACY_COLORS.border,

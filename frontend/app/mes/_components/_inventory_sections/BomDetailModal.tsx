@@ -13,6 +13,7 @@ import { EmptyState } from "../common/EmptyState";
 import { getBomBranchItemIds, ModalBomTree, useBomTree } from "../_warehouse_v2/BomSubExpander";
 import { ReadFailure, ReadLoading } from "../common/ReadState";
 import { SkeletonBlock, dataRevealClassName } from "../common/LoadingSkeleton";
+import { MOBILE_MODAL_VIEWPORT_STYLE } from "../mobile/mobileModalLayout";
 
 type Props = {
   itemId: string;
@@ -71,7 +72,7 @@ export function BomDetailModal({ itemId, open, onClose, mobilePresentation = fal
   return createPortal(
     <div
       className="fixed inset-0 z-[400] flex items-center justify-center p-4"
-      style={{ background: LEGACY_COLORS.bg }}
+      style={{ background: LEGACY_COLORS.bg, ...(mobilePresentation ? MOBILE_MODAL_VIEWPORT_STYLE : {}) }}
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
@@ -85,7 +86,7 @@ export function BomDetailModal({ itemId, open, onClose, mobilePresentation = fal
       <div
         ref={panelRef}
         data-testid="bom-detail-modal-panel"
-        className={mobilePresentation ? "flex h-[88dvh] w-full max-w-[720px] min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border" : "flex h-[84vh] w-[calc(100vw-128px)] min-h-0 flex-col overflow-hidden rounded-[24px] border"}
+        className={mobilePresentation ? "flex h-full w-full max-w-[720px] min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border" : "flex h-[84vh] w-[calc(100vw-128px)] min-h-0 flex-col overflow-hidden rounded-[24px] border"}
         style={{
           background: "var(--c-popup-bg)",
           borderColor: LEGACY_COLORS.border,

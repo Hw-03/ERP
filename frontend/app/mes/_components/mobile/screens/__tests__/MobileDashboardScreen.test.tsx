@@ -43,7 +43,7 @@ vi.mock("../../../_inventory_sections/InventoryKpiPanel", () => ({
 }));
 
 vi.mock("../../../_inventory_sections/InventoryCapacityPanel", () => ({
-  InventoryCapacityPanel: () => null,
+  InventoryCapacityPanel: ({ onClick }: { onClick?: () => void }) => <button onClick={onClick}>생산 요약 표</button>,
   capacityStatusBadge: () => null,
 }));
 
@@ -80,6 +80,18 @@ vi.mock("../../../_inventory_sections/InventoryDetailPanel", () => ({
 }));
 
 describe("MobileDashboardScreen", () => {
+  it("별도 상세 버튼 없이 생산 요약 표를 눌러 상세를 연다", () => {
+    const onCapacityClick = vi.fn();
+    render(<MobileDashboardScreen globalSearch="" onStatusChange={() => {}} onGoToWarehouse={() => {}}
+      capacityData={{ immediate: 2, maximum: 5, limiting_item: null, top_items: [] }} onCapacityClick={onCapacityClick} />);
+    fireEvent.click(screen.getByRole("button", { name: /생산 가능 현황/ }));
+    fireEvent.click(screen.getByRole("button", { name: "생산 요약 표" }));
+    expect(onCapacityClick).toHaveBeenCalledOnce();
+    expect(screen.queryByText("자세히 보기 →")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /생산 가능 현황/ }));
+    expect(onCapacityClick).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("button", { name: "생산 요약 표" })).not.toBeInTheDocument();
+  });
   beforeEach(() => {
     inventoryState.loading = false;
     inventoryState.items = [{ item_id: "item-1", item_name: "테스트 품목", quantity: 10, warehouse_qty: 10, locations: [], model_slots: [] }];

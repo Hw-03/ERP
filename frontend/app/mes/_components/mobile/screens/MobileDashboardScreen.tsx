@@ -233,20 +233,7 @@ export function MobileDashboardScreen({
                 {capacityError && <ReadFailure message={capacityError} onRetry={onCapacityRetry} refresh />}
                 {capacityOpen && capacityData && (
                   <div className="mt-2 flex flex-col gap-2">
-                    {/* 항목 1 — 인라인 패널은 표만(클릭 X), 자세히 보기는 아래 전폭 버튼으로 분리 */}
-                    <InventoryCapacityPanel capacityData={capacityData} mobile />
-                    <button
-                      type="button"
-                      onClick={onCapacityClick}
-                      className="min-h-11 w-full rounded-[12px] border px-3 py-2.5 text-sm font-semibold transition-[transform] active:scale-[0.99]"
-                      style={{
-                        background: LEGACY_COLORS.s2,
-                        borderColor: LEGACY_COLORS.border,
-                        color: LEGACY_COLORS.blue,
-                      }}
-                    >
-                      자세히 보기 →
-                    </button>
+                    <InventoryCapacityPanel capacityData={capacityData} mobile onClick={onCapacityClick} />
                   </div>
                 )}
               </div>

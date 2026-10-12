@@ -1,5 +1,5 @@
-import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import type { ProductionCapacity } from "@/lib/api/types/production";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { capacityStatusBadge, InventoryCapacityPanel } from "../InventoryCapacityPanel";
@@ -82,6 +82,13 @@ const incompleteCapacityData = {
 } satisfies ProductionCapacity;
 
 describe("InventoryCapacityPanel 모바일 표", () => {
+  it.each([capacityData, { immediate: 2, maximum: 5, limiting_item: null, top_items: [] }])("모바일 표 전체를 상세 버튼으로 사용하고 별도 안내는 표시하지 않는다", (data) => {
+    const onClick = vi.fn();
+    render(<InventoryCapacityPanel capacityData={data} mobile onClick={onClick} />);
+    fireEvent.click(screen.getByRole("button", { name: "생산 가능수량 상세 보기" }));
+    expect(onClick).toHaveBeenCalledOnce();
+    expect(screen.queryByText("자세히 보기")).not.toBeInTheDocument();
+  });
   it("최초 조회 중에는 데스크톱 패널 높이를 예약한다", () => {
     render(<InventoryCapacityPanel capacityData={null} loading />);
 
