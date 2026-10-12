@@ -1,6 +1,6 @@
 import { act, fireEvent, render as rtlRender, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MobileDefectCartFlow } from "../MobileDefectCartFlow";
 import { MobileDefectProcessPanel } from "../MobileDefectProcessPanel";
@@ -37,28 +37,34 @@ vi.mock("../../rework/MobileReworkWorkspace", () => ({
 }));
 
 vi.mock("../../../_defect_hub/DefectItemPicker", () => ({
-  DefectItemPicker: ({ onAdd, mobilePresentation }: { onAdd?: (item: unknown) => void; mobilePresentation?: boolean }) => (
+  DefectItemPicker: ({ onAdd, onSelected, selectedLineCounts, selectedIds, disabled, addingDisabled, mobilePresentation }: { onAdd?: (item: unknown) => void; onSelected?: (item: unknown) => void; selectedLineCounts?: ReadonlyMap<string, number>; selectedIds?: Set<string>; disabled?: boolean; addingDisabled?: boolean; mobilePresentation?: boolean }) => (
     <div data-testid="defect-item-picker" data-mobile-presentation={mobilePresentation}>
       <button
         type="button"
+        aria-label="mock add"
+        data-defect-picker-button="mock-item-1"
+        disabled={disabled || (addingDisabled && !selectedIds?.has("mock-item-1"))}
         onClick={() =>
-          onAdd?.({
+          (selectedIds?.has("mock-item-1") && onSelected ? onSelected : onAdd)?.({
             item_id: "mock-item-1",
             item_name: "Mock item",
             mes_code: "MOCK-001",
             quantity: 10,
             warehouse_qty: 20,
             pending_quantity: 0,
-            locations: [{ department: "튜브", status: "PRODUCTION", quantity: 20, pending_quantity: 0, available_quantity: 20 }],
+            locations: [{ department: "튜브", status: "PRODUCTION", quantity: 20, pending_quantity: reservedQuantity, available_quantity: 20 - reservedQuantity }],
             has_bom: true,
             process_type_code: "TR",
           })
         }
       >
         mock add
+        {selectedLineCounts?.has("mock-item-1") && <span>담김 · {selectedLineCounts.get("mock-item-1")}건</span>}
       </button>
       <button
         type="button"
+        data-defect-picker-button="mock-item-2"
+        disabled={disabled || (addingDisabled && !selectedIds?.has("mock-item-2"))}
         onClick={() =>
           onAdd?.({
             item_id: "mock-item-2",
@@ -80,8 +86,8 @@ vi.mock("../../../_defect_hub/DefectItemPicker", () => ({
 }));
 
 vi.mock("../../../_defect_hub/ReasonFormFields", () => ({
-  ReasonFormFields: ({ memo, onCategoryChange, onMemoChange }: { memo: string; onCategoryChange: (category: string, id?: string) => void; onMemoChange: (memo: string) => void }) => (
-    <><button type="button" onClick={() => onCategoryChange("외관 불량", "surface-id")}>사유 선택</button><textarea aria-label="품목 메모" value={memo} onChange={(event) => onMemoChange(event.target.value)} /></>
+  ReasonFormFields: ({ memo, onCategoryChange, onMemoChange, quarantineControls }: { memo: string; onCategoryChange: (category: string, id?: string) => void; onMemoChange: (memo: string) => void; quarantineControls?: { quantity: ReactNode; management: ReactNode; remove: ReactNode } }) => (
+    <>{quarantineControls && <div data-testid="quarantine-controls">{quarantineControls.quantity}<span>관리 분류</span>{quarantineControls.remove}{quarantineControls.management}</div>}<button type="button" onClick={() => onCategoryChange("외관 불량", "surface-id")}>사유 선택</button><textarea aria-label="품목 메모" value={memo} onChange={(event) => onMemoChange(event.target.value)} /></>
   ),
 }));
 
@@ -100,6 +106,7 @@ vi.mock("@/lib/api/stock-requests", () => ({
 }));
 
 const employee = { employee_id: "emp-1", name: "Kim", department: "Assembly" };
+let reservedQuantity = 0;
 
 const item = {
   item_id: "item-1",
@@ -130,6 +137,7 @@ const location: DefectLocation = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  reservedQuantity = 0;
   window.history.replaceState({}, "");
   vi.mocked(defectsApi.quarantine).mockResolvedValue(undefined);
   vi.mocked(defectsApi.quarantineBulk).mockResolvedValue(undefined as never);
@@ -137,6 +145,186 @@ beforeEach(() => {
 });
 
 describe("mobile defect compact headers", () => {
+  function openQuarantine(): void {
+    render(<MobileDefectCartFlow mode="add" initialAction="scrap" items={[item]} productModels={[]} currentEmployee={employee} onDone={() => {}} onCancel={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "mock add" }));
+    fireEvent.click(screen.getByRole("button", { name: /수량 조정 \(1건\)/ }));
+  }
+
+  it("격리 사유는 순번과 복사 버튼 없이 수량·관리 분류·삭제를 공용 입력에 배치한다", () => {
+    openQuarantine();
+    fireEvent.click(screen.getByRole("button", { name: "사유 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "다른 사유 추가" }));
+    expect(screen.queryAllByText(/^사유 \d+$/)).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: /사유 복사/ })).not.toBeInTheDocument();
+    const controls = screen.getAllByTestId("quarantine-controls");
+    expect(controls).toHaveLength(2);
+    expect(within(controls[0]).getByRole("spinbutton")).toBeInTheDocument();
+    expect(within(controls[0]).getByRole("group", { name: "보관 분류" })).toBeInTheDocument();
+    expect(within(controls[1]).getByRole("button", { name: "Mock item 사유 2 삭제" })).toBeInTheDocument();
+    expect(screen.getAllByRole("group", { name: /Mock item 사유/ })).toHaveLength(2);
+  });
+
+  it("동일 품목 3+4+3 사유를 하나의 카드와 합계로 표시하고 중간 삭제 후 인접 수량에 포커스를 둔다", () => {
+    openQuarantine();
+    fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "3" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "품목 메모" }), { target: { value: "첫 사유" } });
+    fireEvent.click(screen.getByRole("button", { name: "사유 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "다른 사유 추가" }));
+    expect(screen.getAllByRole("spinbutton")[1]).toHaveFocus();
+    expect(screen.getAllByRole("textbox", { name: "품목 메모" })[1]).toHaveValue("");
+    expect(screen.getByRole("button", { name: /격리하기 \(2건\)/ })).toBeDisabled();
+    fireEvent.change(screen.getAllByRole("spinbutton")[1], { target: { value: "4" } });
+    fireEvent.click(screen.getByRole("button", { name: "다른 사유 추가" }));
+    fireEvent.change(screen.getAllByRole("spinbutton")[2], { target: { value: "3" } });
+    const group = screen.getByTestId("defect-quarantine-item-group");
+    expect(within(group).getByText("총 10 EA · 3건")).toBeInTheDocument();
+    expect(within(group).getAllByText("Mock item")).toHaveLength(1);
+    expect(within(group).getAllByText("가능 재고")).toHaveLength(1);
+    expect(screen.getByText("1품목 · 3건")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Mock item 사유 2 삭제" }));
+    expect(screen.getAllByRole("spinbutton").map((input) => (input as HTMLInputElement).value)).toEqual(["3", "3"]);
+    expect(screen.getAllByRole("spinbutton")[1]).toHaveFocus();
+    expect(screen.getAllByRole("textbox", { name: "품목 메모" })[0]).toHaveValue("첫 사유");
+  });
+
+  it("예약을 제외한 가용 재고보다 같은 품목 사유 합계가 많으면 제출을 막는다", () => {
+    reservedQuantity = 13;
+    openQuarantine();
+    fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "4" } });
+    fireEvent.click(screen.getByRole("button", { name: "다른 사유 추가" }));
+    fireEvent.change(screen.getAllByRole("spinbutton")[1], { target: { value: "4" } });
+    screen.getAllByRole("button", { name: "사유 선택" }).forEach((button) => fireEvent.click(button));
+    expect(screen.getByText("사유 합계 8개는 튜브 가용 7개보다 1개 많습니다.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /격리하기 \(2건\)/ })).toBeDisabled();
+  });
+
+  it("이미 담긴 품목은 해제하지 않고 해당 사유 카드로 이동한다", async () => {
+    openQuarantine();
+    fireEvent.click(screen.getByRole("button", { name: "다른 사유 추가" }));
+    fireEvent.click(screen.getByRole("button", { name: "이전" }));
+    await screen.findByTestId("defect-item-picker");
+    expect(screen.getByText("담김 · 2건")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "mock add" }));
+    expect(screen.getByTestId("defect-quarantine-item-group")).toBeInTheDocument();
+    expect(screen.getAllByRole("spinbutton")).toHaveLength(2);
+    expect(screen.getAllByRole("spinbutton")[0]).toHaveFocus();
+  });
+
+  it("100건에 도달하면 새 사유와 새 품목을 막고 담긴 품목은 계속 열 수 있다", async () => {
+    openQuarantine();
+    const addReason = screen.getByRole("button", { name: "다른 사유 추가" });
+    for (let count = 1; count < 100; count++) fireEvent.click(addReason);
+    expect(screen.getAllByTestId("defect-quarantine-reason-line")).toHaveLength(100);
+    expect(addReason).toBeDisabled();
+    expect(screen.getByText(/한 번에 최대 100건/)).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("이전"));
+    await screen.findByTestId("defect-item-picker");
+    expect(screen.getByRole("button", { name: "mock add second" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "mock add" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "mock add" }));
+    fireEvent.click(screen.getByLabelText("Mock item 사유 100 삭제"));
+    expect(screen.getByLabelText("다른 사유 추가")).toBeEnabled();
+  }, 30_000);
+
+  it("새 사유는 같은 품목 마지막 뒤에 제출하고 수정하면 오류를 지우고 batch ID를 갱신한다", async () => {
+    vi.mocked(defectsApi.quarantineBulk).mockRejectedValue(new Error("확인 후 재시도"));
+    openQuarantine();
+    fireEvent.change(screen.getByRole("textbox", { name: "품목 메모" }), { target: { value: "공통 메모" } });
+    fireEvent.click(screen.getByRole("button", { name: "사유 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "이전" }));
+    await screen.findByTestId("defect-item-picker");
+    fireEvent.click(screen.getByRole("button", { name: "mock add second" }));
+    fireEvent.click(screen.getByRole("button", { name: /수량 조정 \(2건\)/ }));
+    const firstGroup = screen.getAllByTestId("defect-quarantine-item-group")[0];
+    fireEvent.click(within(firstGroup).getByRole("button", { name: "다른 사유 추가" }));
+    screen.getAllByRole("button", { name: "사유 선택" }).forEach((button) => fireEvent.click(button));
+    fireEvent.click(within(screen.getAllByRole("group", { name: "보관 분류" })[1]).getByRole("button", { name: "B급" }));
+    fireEvent.click(screen.getByRole("button", { name: /격리하기 \(3건\)/ }));
+    fireEvent.click(screen.getByRole("button", { name: "격리하기", exact: true }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("확인 후 재시도");
+    expect(screen.getAllByText("확인 후 재시도")).toHaveLength(1);
+    expect(screen.queryByText(/\d+건 실패/)).not.toBeInTheDocument();
+    expect(screen.getByTestId("mobile-defect-cart-scroll")).toContainElement(alert);
+    const first = vi.mocked(defectsApi.quarantineBulk).mock.calls[0][0];
+    expect(first.lines.map((line) => line.item_id)).toEqual(["mock-item-1", "mock-item-1", "mock-item-2"]);
+    expect(first.lines[1].reason_memo).toBeNull();
+    fireEvent.change(screen.getAllByRole("textbox", { name: "품목 메모" })[1], { target: { value: "수정 메모" } });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("textbox", { name: "품목 메모" }).map((input) => (input as HTMLTextAreaElement).value)).toEqual(["공통 메모", "수정 메모", ""]);
+    fireEvent.click(screen.getByRole("button", { name: /격리하기 \(3건\)/ }));
+    fireEvent.click(screen.getByRole("button", { name: "격리하기", exact: true }));
+    await waitFor(() => expect(defectsApi.quarantineBulk).toHaveBeenCalledTimes(2));
+    const second = vi.mocked(defectsApi.quarantineBulk).mock.calls[1][0];
+    expect(second.client_request_id).not.toBe(first.client_request_id);
+    expect(second.submission_id).toBe(first.submission_id);
+    expect(second.lines[1].management_category).toBe("B_GRADE");
+    vi.mocked(defectsApi.quarantineBulk).mockReset();
+  });
+
+  it("동일 품목 실패 재시도는 입력과 요청 순서를 보존하고 처리 중 모든 사유 조작을 잠근다", async () => {
+    let resolveRequest: (value: never) => void = () => {};
+    vi.mocked(defectsApi.quarantineBulk).mockRejectedValueOnce(new Error("전체 실패"))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveRequest = resolve; }));
+    openQuarantine();
+    fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "3" } });
+    fireEvent.click(screen.getByRole("button", { name: "다른 사유 추가" }));
+    fireEvent.change(screen.getAllByRole("spinbutton")[1], { target: { value: "4" } });
+    screen.getAllByRole("button", { name: "사유 선택" }).forEach((button) => fireEvent.click(button));
+    fireEvent.click(screen.getByRole("button", { name: /격리하기 \(2건\)/ }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(/총 7 EA · 2건/)).toBeInTheDocument();
+    expect(within(dialog).getAllByText(/외관 불량/)).toHaveLength(2);
+    fireEvent.click(within(dialog).getByRole("button", { name: "격리하기", exact: true }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("전체 실패");
+    const original = vi.mocked(defectsApi.quarantineBulk).mock.calls[0][0];
+    expect(original.lines.map((line) => line.qty)).toEqual([3, 4]);
+    fireEvent.click(screen.getByRole("button", { name: /격리하기 \(2건\)/ }));
+    fireEvent.click(screen.getByRole("button", { name: "격리하기", exact: true }));
+    await waitFor(() => expect(defectsApi.quarantineBulk).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(vi.mocked(defectsApi.quarantineBulk).mock.calls[1][0]).toEqual(original);
+    expect(screen.getByRole("button", { name: "다른 사유 추가" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Mock item 사유 1 삭제" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /사유 복사/ })).not.toBeInTheDocument();
+    screen.getAllByRole("spinbutton").forEach((input) => expect(input).toBeDisabled());
+    screen.getAllByRole("button", { name: "B급" }).forEach((button) => expect(button).toBeDisabled());
+    screen.getAllByRole("button", { name: "사유 선택" }).forEach((button) => expect(button).toBeDisabled());
+    screen.getAllByRole("textbox", { name: "품목 메모" }).forEach((input) => expect(input).toBeDisabled());
+    await act(async () => resolveRequest(undefined as never));
+  });
+
+  it.each(["quantity", "category", "management", "add", "delete"] as const)("격리 일괄 실패 후 %s 조작은 지난 오류를 지운다", async (change) => {
+    vi.mocked(defectsApi.quarantineBulk).mockRejectedValueOnce(new Error("지난 일괄 오류"));
+    openQuarantine();
+    fireEvent.click(screen.getByRole("button", { name: "다른 사유 추가" }));
+    screen.getAllByRole("button", { name: "사유 선택" }).forEach((button) => fireEvent.click(button));
+    fireEvent.click(screen.getByRole("button", { name: /격리하기 \(2건\)/ }));
+    fireEvent.click(screen.getByRole("button", { name: "격리하기", exact: true }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("지난 일괄 오류");
+    if (change === "quantity") fireEvent.change(screen.getAllByRole("spinbutton")[0], { target: { value: "2" } });
+    else if (change === "category") fireEvent.click(screen.getAllByRole("button", { name: "사유 선택" })[0]);
+    else if (change === "management") fireEvent.click(screen.getAllByRole("button", { name: "B급" })[0]);
+    else if (change === "add") fireEvent.click(screen.getByRole("button", { name: "다른 사유 추가" }));
+    else fireEvent.click(screen.getByRole("button", { name: "Mock item 사유 1 삭제" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText("지난 일괄 오류")).not.toBeInTheDocument();
+  });
+
+  it("단일 격리 실패도 장바구니 오류 하나로 표시하고 메모 수정 시 지운다", async () => {
+    vi.mocked(defectsApi.quarantine).mockRejectedValueOnce(new Error("단일 격리 오류"));
+    openQuarantine();
+    fireEvent.click(screen.getByRole("button", { name: "사유 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: /격리하기 \(1건\)/ }));
+    fireEvent.click(screen.getByRole("button", { name: "격리하기", exact: true }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("단일 격리 오류");
+    expect(screen.queryByText(/\d+건 실패/)).not.toBeInTheDocument();
+    expect(screen.getByRole("spinbutton")).toHaveValue(1);
+    fireEvent.change(screen.getByRole("textbox", { name: "품목 메모" }), { target: { value: "수정" } });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it.each(["add", "scrap"] as const)("%s 입력은 화면 이전 버튼과 브라우저 앞뒤 이동에도 보존한다", async (mode) => {
     render(<MobileDefectCartFlow mode={mode} initialAction="scrap" initialSource="production" items={[item]} productModels={[]} currentEmployee={employee} onDone={() => {}} onCancel={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: "mock add" }));
@@ -151,7 +339,11 @@ describe("mobile defect compact headers", () => {
     expect(screen.getAllByRole("spinbutton")[0]).toHaveValue(7);
     expect(screen.getAllByRole("spinbutton")[1]).toHaveValue(1);
     expect(screen.getAllByRole("textbox", { name: "품목 메모" })[0]).toHaveValue("입력 보존");
-    fireEvent.click(screen.getByRole("button", { name: "아래 줄에 사유 복사" }));
+    if (mode === "scrap") fireEvent.click(screen.getByRole("button", { name: "아래 줄에 사유 복사" }));
+    else {
+      fireEvent.click(screen.getAllByRole("button", { name: "사유 선택" })[1]);
+      fireEvent.change(screen.getAllByRole("textbox", { name: "품목 메모" })[1], { target: { value: "두 번째 입력" } });
+    }
     expect(screen.getByRole("button", { name: mode === "add" ? /격리하기 \(2건\)/ : /즉시 폐기 \(2건\)/ })).toBeEnabled();
     act(() => window.history.back());
     await screen.findByTestId("defect-item-picker");
@@ -159,17 +351,26 @@ describe("mobile defect compact headers", () => {
     await screen.findByRole("heading", { name: "수량 조정" });
     expect(screen.getAllByRole("spinbutton")[0]).toHaveValue(7);
     expect(screen.getAllByRole("spinbutton")[1]).toHaveValue(1);
-    expect(screen.getAllByRole("textbox", { name: "품목 메모" })[1]).toHaveValue("입력 보존");
+    expect(screen.getAllByRole("textbox", { name: "품목 메모" })[1]).toHaveValue(mode === "scrap" ? "입력 보존" : "두 번째 입력");
   });
 
-  it("모두 삭제하면 제출을 막고 품목 선택으로 돌아갈 수 있다", async () => {
+  it("마지막 격리 사유 삭제는 품목 선택으로 자동 복귀하고 다시 담을 수 있다", async () => {
     render(<MobileDefectCartFlow mode="add" initialAction="scrap" items={[item]} productModels={[]} currentEmployee={employee} onDone={() => {}} onCancel={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: "mock add" }));
     fireEvent.click(screen.getByRole("button", { name: /수량 조정 \(1건\)/ }));
-    fireEvent.click(screen.getByRole("button", { name: "삭제" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mock item 사유 1 삭제" }));
     expect(screen.getByRole("button", { name: /격리하기 \(0건\)/ })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "품목 선택으로 돌아가기" }));
     expect(await screen.findByTestId("defect-item-picker")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "mock add" })).toHaveFocus();
+    expect(screen.queryByText("담김 · 1건")).not.toBeInTheDocument();
+    expect(window.history.state).toMatchObject({ step: 2 });
+    act(() => window.history.forward());
+    await screen.findByRole("button", { name: "품목 선택으로 돌아가기" });
+    act(() => window.history.back());
+    await screen.findByTestId("defect-item-picker");
+    fireEvent.click(screen.getByRole("button", { name: "mock add" }));
+    fireEvent.click(screen.getByRole("button", { name: /수량 조정 \(1건\)/ }));
+    expect(screen.getByRole("spinbutton")).toHaveValue(1);
   });
 
   it("재작업 단일 선택을 유지하고 수량 변경 시 BOM 결정을 초기화한다", async () => {
@@ -338,8 +539,11 @@ describe("mobile defect compact headers", () => {
 
     const dialog = await screen.findByRole("dialog");
     const confirmLines = screen.getAllByTestId("mobile-defect-confirm-line");
-    expect(confirmLines[0]).toHaveTextContent("Mock item수량 3·튜브B급");
-    expect(confirmLines[1]).toHaveTextContent("Mock second item수량 8·조립구형");
+    expect(confirmLines[0]).toHaveTextContent("외관 불량 · 수량 3 · B급");
+    expect(confirmLines[1]).toHaveTextContent("외관 불량 · 수량 8 · 구형");
+    expect(dialog).not.toHaveTextContent(/사유 \d+/);
+    expect(confirmLines[0].parentElement).toHaveTextContent("Mock item튜브 · 총 3 EA · 1건");
+    expect(confirmLines[1].parentElement).toHaveTextContent("Mock second item조립 · 총 8 EA · 1건");
     expect(dialog).not.toHaveTextContent("자동 부서");
   });
 

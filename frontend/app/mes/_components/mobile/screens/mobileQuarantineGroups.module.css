@@ -1,0 +1,40 @@
+.card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--c-border);
+  border-radius: 20px;
+  background: var(--c-s1);
+  color: var(--c-text);
+  overflow-wrap: anywhere;
+}
+
+.header { display: flex; min-width: 0; flex-direction: column; gap: 6px; }
+.titleRow { display: flex; min-width: 0; align-items: baseline; justify-content: space-between; gap: 8px; }
+.title { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.total { flex-shrink: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.metaRow { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; }
+.meta { display: flex; min-width: 0; gap: 6px; color: var(--c-muted2); }
+.meta > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta > span:not(:first-child) { flex-shrink: 0; }
+.stock { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 8px; margin-left: auto; font-size: 12px; color: var(--c-muted2); }
+.stock b { margin-left: 4px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.reason { display: flex; min-width: 0; flex-direction: column; gap: 8px; padding: 12px 0; margin-top: 8px; border-top: 1px solid var(--c-border); }
+.delete { display: flex; align-items: center; justify-content: center; width: 44px; min-height: 44px; border-radius: 12px; color: var(--c-red); }
+.add { width: 100%; min-height: 44px; border: 1px solid var(--c-blue); border-radius: 12px; color: var(--c-blue); background: transparent; }
+.add:active, .delete:active { transform: scale(.98); }
+.add:disabled, .reason:disabled { opacity: .5; }
+.card button:focus-visible { outline: 2px solid var(--c-blue); outline-offset: 2px; }
+.reason button, .reason input { min-height: 44px; }
+.stepper { min-width: 0; align-items: flex-start; gap: 4px; }
+.stepper > span { letter-spacing: 0; }
+.stepper > div { display: grid; grid-template-columns: repeat(3, 44px); width: 132px; gap: 0; border-radius: 10px; overflow: hidden; background: var(--c-s2); box-shadow: inset 0 0 0 1px var(--c-border-strong); }
+.stepper > div:focus-within { outline: 2px solid var(--c-blue); }
+.stepper > div > button { display: none; }
+.stepper input { grid-column: 2; grid-row: 1; width: 44px; min-width: 44px; height: 44px; padding: 0 4px; border: 0; border-radius: 0; background: transparent; appearance: textfield; }
+.stepper input::-webkit-inner-spin-button, .stepper input::-webkit-outer-spin-button { appearance: none; }
+.stepper [data-io-arrow-controls] { display: contents; }
+.stepper [data-io-arrow-controls] > button { display: flex; align-items: center; justify-content: center; width: 44px; min-height: 44px; color: var(--c-blue); }
+.stepper [data-io-arrow-controls] > button:first-child { grid-column: 3; grid-row: 1; border-left: 1px solid var(--c-border); }
+.stepper [data-io-arrow-controls] > button:last-child { grid-column: 1; grid-row: 1; border-right: 1px solid var(--c-border); }
+.stepper [data-io-arrow-controls] > button:disabled { opacity: .35; }
+@media (max-width: 360px) { .card { padding: 12px; } }

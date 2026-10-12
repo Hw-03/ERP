@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactElement } from "react";
+import { useEffect, useId, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Archive, Check, ChevronDown, Pencil, Plus, RotateCcw, Search, X } from "lucide-react";
@@ -11,7 +11,9 @@ import { tint } from "@/lib/mes/colorUtils";
 import { useFocusTrap } from "@/lib/mes/useFocusTrap";
 import { matchesSearchText } from "@/lib/searchText";
 import { Button } from "@/lib/ui/Button";
+import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
+import styles from "./ReasonFormFields.module.css";
 
 export interface ReasonFormFieldsProps {
   employeeId: string;
@@ -23,12 +25,14 @@ export interface ReasonFormFieldsProps {
   required?: boolean;
   requireAny?: boolean;
   mobilePresentation?: boolean;
+  /** 격리 화면만 수량·분류·삭제를 사유 입력과 함께 배치한다. */
+  quarantineControls?: { quantity: ReactNode; management: ReactNode; remove: ReactNode; add?: ReactNode };
 }
 
 /** 선택기는 마스터를 공유하고, 개별 이력에 저장된 사유 이름은 보존한다. */
 export function ReasonFormFields({
   employeeId, category, categoryId, memo, onCategoryChange, onMemoChange,
-  required = true, mobilePresentation = false,
+  required = true, mobilePresentation = false, quarantineControls,
 }: ReasonFormFieldsProps): ReactElement {
   const queryClient = useQueryClient();
   const revision = useRealtimeRevision();
@@ -41,7 +45,12 @@ export function ReasonFormFields({
   const dialogId = useId();
   const searchRef = useRef<HTMLInputElement>(null);
   const editingRef = useRef<HTMLInputElement>(null);
-  const dialogRef = useFocusTrap<HTMLDivElement>(open, { initialFocusRef: searchRef });
+  const [hideTarget, setHideTarget] = useState<DefectReasonCategory | null>(null);
+  const hideTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const hideStatusRef = useRef<HTMLParagraphElement>(null);
+  const focusFrameRef = useRef<number | null>(null);
+  const savingRef = useRef(false);
+  const dialogRef = useFocusTrap<HTMLDivElement>(open && !hideTarget, { initialFocusRef: searchRef });
   const [search, setSearch] = useState("");
   const [showInactive, setShowInactive] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -59,21 +68,53 @@ export function ReasonFormFields({
   const hiddenNameTaken = categories.some((entry) => !entry.is_active && entry.name.normalize("NFKC").trim().toLocaleLowerCase() === needle);
   const canCreate = Boolean(search.trim() && !nameTaken);
 
+  useEffect(() => () => {
+    if (focusFrameRef.current !== null) cancelAnimationFrame(focusFrameRef.current);
+  }, []);
+
+  /** 중첩 팝업의 포커스 복원 이후 선택창의 올바른 조작으로 돌아간다. */
+  function closeHideConfirmation(toSearch: boolean = false): void {
+    if (savingRef.current) return;
+    setHideTarget(null);
+    setError(null);
+    if (focusFrameRef.current !== null) cancelAnimationFrame(focusFrameRef.current);
+    focusFrameRef.current = requestAnimationFrame(() => {
+      const trigger = hideTriggerRef.current;
+      (toSearch || !trigger?.isConnected ? searchRef.current : trigger)?.focus();
+      focusFrameRef.current = null;
+    });
+  }
+
   useEffect(() => {
     if (editingId) editingRef.current?.focus();
   }, [editingId]);
 
   useEffect(() => {
+    if (hideTarget && busy) hideStatusRef.current?.focus();
+    else if (hideTarget && document.activeElement === hideStatusRef.current) {
+      hideStatusRef.current?.closest('[role="dialog"]')?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+    }
+  }, [hideTarget, busy]);
+
+  useEffect(() => {
     if (!open) return;
     const handleEscape = (event: KeyboardEvent): void => {
+      if (hideTarget && busy && event.key === "Tab") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
       if (event.key !== "Escape") return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      if (!busy) setOpen(false);
+      if (!busy) {
+        if (hideTarget) closeHideConfirmation();
+        else setOpen(false);
+      }
     };
     window.addEventListener("keydown", handleEscape, true);
     return () => window.removeEventListener("keydown", handleEscape, true);
-  }, [open, busy]);
+  }, [open, busy, hideTarget]);
 
   useEffect(() => {
     if (!query.data || !category) return;
@@ -84,8 +125,9 @@ export function ReasonFormFields({
     }
   }, [query.data, category, categoryId, onCategoryChange]);
 
-  async function save(changes: { name?: string; is_active?: boolean }, id?: string): Promise<void> {
-    if (busy || !employeeId) return;
+  async function save(changes: { name?: string; is_active?: boolean }, id?: string): Promise<boolean> {
+    if (savingRef.current || !employeeId) return false;
+    savingRef.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -96,17 +138,19 @@ export function ReasonFormFields({
         [...previous.filter((entry) => entry.category_id !== saved.category_id), saved]);
       if (!id) { onCategoryChange(saved.name, saved.category_id); setOpen(false); }
       setEditingId(null);
-      if (id) searchRef.current?.focus();
+      if (id && !hideTarget) searchRef.current?.focus();
       await queryClient.invalidateQueries({ queryKey: ["defect-reason-categories", employeeId] });
+      return true;
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "사유를 저장하지 못했습니다.");
+      return false;
     } finally {
+      savingRef.current = false;
       setBusy(false);
     }
   }
 
-  return <div className="flex flex-col gap-3">
-    <div className="flex flex-col gap-1">
+  const categoryField = <div className="flex min-w-0 flex-col gap-1">
       <label className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
         사유 카테고리 {required && <span style={{ color: LEGACY_COLORS.red }}>*</span>}
       </label>
@@ -114,23 +158,53 @@ export function ReasonFormFields({
         aria-controls={open ? dialogId : undefined} disabled={!employeeId}
         onClick={() => { setSearch(""); setEditingId(null); setError(null); setShowInactive(false); setOpen(true); }}
         className="flex min-h-11 w-full items-center justify-between gap-2 rounded-[12px] border px-3 text-left text-sm outline-none focus-visible:ring-2 disabled:opacity-40"
-        style={{ background: LEGACY_COLORS.s2, color: category ? LEGACY_COLORS.text : LEGACY_COLORS.muted2, borderColor: LEGACY_COLORS.border }}>
+        style={{ background: LEGACY_COLORS.s2, color: category ? LEGACY_COLORS.text : quarantineControls && required ? LEGACY_COLORS.red : LEGACY_COLORS.muted2, borderColor: LEGACY_COLORS.border }}>
         <span className="min-w-0 break-words">{selected?.name || category || "카테고리 선택"}</span>
         <ChevronDown size={16} className="shrink-0" />
       </button>
-    </div>
-    <div className="flex flex-col gap-1">
+    </div>;
+  const memoField = <div className="flex min-w-0 flex-col gap-1">
       <label className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
         메모 {selected?.is_other ? <span style={{ color: LEGACY_COLORS.red }}>*</span> : !mobilePresentation && "(선택)"}
       </label>
-      <textarea value={memo} onChange={(event) => onMemoChange(event.target.value)} placeholder="예: 스크래치 다수 / 우측 끝단" rows={2}
+      <textarea aria-label="메모" value={memo} onChange={(event) => onMemoChange(event.target.value)} placeholder="예: 스크래치 다수 / 우측 끝단" rows={2}
         className="w-full resize-none rounded-[10px] border px-3 py-2 text-sm outline-none focus-visible:ring-2"
         style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text, borderColor: otherMissingMemo ? LEGACY_COLORS.red : LEGACY_COLORS.border }} />
       {otherMissingMemo && <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>기타를 선택하면 메모를 입력하세요.</span>}
-    </div>
+    </div>;
+
+  return <div className="flex min-w-0 flex-col gap-3">
+    {quarantineControls ? mobilePresentation ? <div className={styles.mobileFields}>
+      <div className={styles.mobileTop}>
+        {quarantineControls.quantity}
+        <div className={styles.mobileRight}>
+          <div className={styles.mobileHeading}>
+            <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>관리 분류</span>
+          </div>
+          {quarantineControls.management}
+        </div>
+        <div className={styles.mobileRemove}>{quarantineControls.remove}</div>
+      </div>
+      {categoryField}
+      {memoField}
+    </div> : <div className={styles.desktopFields}>
+      <div className={styles.desktopTop}>
+        {quarantineControls.quantity}
+        {categoryField}
+        <div className={styles.add}>{quarantineControls.add}</div>
+        <div className={styles.remove}>{quarantineControls.remove}</div>
+      </div>
+      <div className={styles.desktopBottom}>
+        <div className={styles.memo}>{memoField}</div>
+        <div className={`${styles.management} [&_button]:min-h-11 [&_button]:text-sm`}>
+          <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>관리 분류</span>
+          {quarantineControls.management}
+        </div>
+      </div>
+    </div> : <>{categoryField}{memoField}</>}
     {open && createPortal(<div className="fixed inset-0 z-[500] flex items-end justify-center bg-black/30 p-3 backdrop-blur-sm md:items-center"
-      onClick={(event) => { if (event.target === event.currentTarget && !busy) setOpen(false); }}>
-      <div ref={dialogRef} id={dialogId} role="dialog" aria-modal="true" aria-labelledby={`${dialogId}-title`}
+      onClick={(event) => { if (event.target === event.currentTarget && !busy && !hideTarget) setOpen(false); }}>
+      <div ref={dialogRef} id={dialogId} role="dialog" aria-modal={!hideTarget || undefined} aria-hidden={Boolean(hideTarget)} inert={Boolean(hideTarget)} aria-labelledby={`${dialogId}-title`}
         className="flex h-[min(76dvh,600px)] w-full max-w-[430px] min-h-0 min-w-0 flex-col gap-3 rounded-[24px] border p-4 md:max-w-[560px] md:p-5"
         style={{ background: "var(--c-popup-bg)", borderColor: LEGACY_COLORS.border, boxShadow: "var(--c-popup-shadow)", paddingBottom: "max(16px, env(safe-area-inset-bottom))" }}>
         <div className="flex shrink-0 items-center justify-between gap-2">
@@ -163,7 +237,7 @@ export function ReasonFormFields({
           </div>
         </div>
         {hiddenNameTaken && <p className="shrink-0 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>같은 이름의 사유가 숨김 상태입니다. 숨김 사유 관리에서 복원하세요.</p>}
-        {error && <p role="alert" className="shrink-0 text-sm" style={{ color: LEGACY_COLORS.red }}>{error}</p>}
+        {error && !hideTarget && <p role="alert" className="shrink-0 text-sm" style={{ color: LEGACY_COLORS.red }}>{error}</p>}
         {query.isError && <div role="alert" className="shrink-0 text-sm" style={{ color: LEGACY_COLORS.red }}>
           사유 목록을 불러오지 못했습니다. <Button variant="ghost" className="min-h-11" onClick={() => void query.refetch()}>다시 시도</Button>
         </div>}
@@ -197,7 +271,12 @@ export function ReasonFormFields({
                       onClick={() => { setEditingId(entry.category_id); setEditingName(entry.name); }}><Pencil size={16} /></Button>
                     <Button variant={entry.is_active ? "ghost" : "secondary"} className="min-h-11 min-w-11 !px-2"
                       aria-label={`${entry.name} ${entry.is_active ? "숨김" : "복원"}`} title={entry.is_active ? "숨김" : "복원"} disabled={busy}
-                      onClick={() => void save({ is_active: !entry.is_active }, entry.category_id)}>
+                      onClick={(event) => {
+                        if (!entry.is_active) { void save({ is_active: true }, entry.category_id); return; }
+                        hideTriggerRef.current = event.currentTarget;
+                        setError(null);
+                        setHideTarget(entry);
+                      }}>
                       {entry.is_active ? <Archive size={16} /> : <RotateCcw size={16} />}
                     </Button>
                   </>}
@@ -219,5 +298,12 @@ export function ReasonFormFields({
         </div>
       </div>
     </div>, document.body)}
+    <ConfirmModal open={Boolean(hideTarget)} title={`“${hideTarget?.name ?? ""}” 사유를 숨길까요?`}
+      className="!z-[600]" tone="caution" confirmLabel="숨기기" busy={busy}
+      onClose={() => closeHideConfirmation()}
+      onConfirm={async () => { if (hideTarget && await save({ is_active: false }, hideTarget.category_id)) closeHideConfirmation(true); }}>
+      <p ref={hideStatusRef} tabIndex={-1} className="text-sm outline-none" style={{ color: LEGACY_COLORS.text }}>새 작업의 선택 목록에서 숨겨집니다. 기존 기록은 유지됩니다.</p>
+      {error && hideTarget && <p role="alert" className="mt-3 text-sm" style={{ color: LEGACY_COLORS.red }}>{error}</p>}
+    </ConfirmModal>
   </div>;
 }

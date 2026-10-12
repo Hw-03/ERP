@@ -191,12 +191,9 @@ def quarantine_inventory_bulk(
     lines: Sequence[BulkQuarantineLine],
     actor: Employee,
 ) -> list[Inventory]:
-    """복수 격리를 하나의 트랜잭션으로 처리해 일부 라인만 반영되는 일을 막는다."""
+    """같은 품목의 사유별 라인도 순차 차감하며 하나의 트랜잭션으로 확정한다."""
     if not lines:
         raise ValueError("격리할 품목을 한 개 이상 선택하세요.")
-    item_ids = [line.item_id for line in lines]
-    if len(item_ids) != len(set(item_ids)):
-        raise ValueError("같은 품목을 한 요청에 중복해 격리할 수 없습니다.")
 
     inventories: list[Inventory] = []
     submission_id = uuid.uuid4()

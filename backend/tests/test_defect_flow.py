@@ -12,10 +12,15 @@ from __future__ import annotations
 
 import json
 import uuid
+from copy import deepcopy
+from collections.abc import Callable
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from typing import Any
 
 import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 from app.models import (
     DepartmentEnum,
@@ -26,6 +31,8 @@ from app.models import (
     Employee,
     Inventory,
     InventoryLocation,
+    InventoryOperation,
+    Item,
     LocationStatusEnum,
     RequestBucketEnum,
     StockRequest,
@@ -390,6 +397,195 @@ def test_quarantine_requires_category_and_other_memo(
     inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
     expected_warehouse = Decimal("5") if expected_status == 422 else Decimal("4")
     assert inventory.warehouse_qty == expected_warehouse
+
+
+def _prepare_same_item_quarantine(
+    db_session: Session,
+    make_item: Callable[..., Item],
+    make_location: Callable[..., InventoryLocation],
+    source: str,
+    stock: Decimal = Decimal("10"),
+    pending: Decimal = Decimal("0"),
+) -> tuple[Item, dict[str, Any]]:
+    """임시 DB에 같은 품목의 세 사유를 만들고 출처별 가용 재고를 설정한다."""
+    item = make_item(
+        name="MULTIREASON", process_type_code="AA",
+        warehouse_qty=stock if source == "warehouse" else Decimal("0"),
+        pending=pending if source == "warehouse" else Decimal("0"),
+    )
+    department = DepartmentEnum.WAREHOUSE if source == "warehouse" else DepartmentEnum.ASSEMBLY
+    if source == "production":
+        location = make_location(item.item_id, department=department, quantity=stock)
+        location.pending_quantity = pending
+        inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+        inventory.quantity = stock
+    actor = _make_employee(db_session, code="MULTIREASON-ACTOR", name="다중 사유 작업자")
+    db_session.add(SystemSetting(
+        setting_key="inventory_operation_cutover_at", setting_value="2020-01-01T00:00:00",
+    ))
+    payload = {
+        "actor_employee_id": str(actor.employee_id),
+        "client_request_id": "same-item-multiple-reasons",
+        "submission_id": str(uuid.uuid4()),
+        "lines": [
+            {
+                "item_id": str(item.item_id), "qty": quantity, "source": source,
+                "target_dept": department.value,
+                "source_dept": department.value if source == "production" else None,
+                "reason_category": reason, "reason_memo": memo,
+                "management_category": category,
+            }
+            for quantity, reason, memo, category in [
+                (3, "외관불량", "사유 A", "DEFECT"),
+                (4, "치수불량", "사유 B", "B_GRADE"),
+                (3, "기능불량", "사유 C", "OBSOLETE"),
+            ]
+        ],
+    }
+    db_session.commit()
+    return item, payload
+
+
+@pytest.mark.parametrize("source", ["warehouse", "production"])
+def test_bulk_quarantine_same_item_preserves_each_reason(
+    db_session: Session, client: TestClient, make_item: Callable[..., Item],
+    make_location: Callable[..., InventoryLocation], source: str,
+) -> None:
+    """3/A + 4/B + 3/C는 각 원건과 원장을 보존하며 같은 제출로 합계 10을 격리한다."""
+    item, payload = _prepare_same_item_quarantine(db_session, make_item, make_location, source)
+
+    response = client.post("/api/defects/quarantine/bulk", json=payload)
+    assert response.status_code == 200, response.json()
+    assert response.json()["processed_lines"] == 3
+    assert Decimal(response.json()["total_quantity"]) == Decimal("10")
+
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("0")
+    assert inventory.quantity == Decimal("10")
+    assert _location_total(db_session, item.item_id, LocationStatusEnum.PRODUCTION) == Decimal("0")
+    assert _location_total(db_session, item.item_id, LocationStatusEnum.DEFECTIVE) == Decimal("10")
+    logs = db_session.query(TransactionLog).filter(
+        TransactionLog.item_id == item.item_id,
+        TransactionLog.transaction_type == TransactionTypeEnum.MARK_DEFECTIVE,
+    ).order_by(TransactionLog.client_request_id).all()
+    records = db_session.query(DefectQuarantineRecord).filter(
+        DefectQuarantineRecord.item_id == item.item_id,
+    ).all()
+    assert len(logs) == len(records) == 3
+    assert len({log.operation_id for log in logs}) == 3
+    records_by_id = {record.record_id: record for record in records}
+    for index, (log, line) in enumerate(zip(logs, payload["lines"], strict=True)):
+        record = records_by_id[log.defect_quarantine_record_id]
+        assert log.client_request_id == f"{payload['client_request_id']}:{index}"
+        assert str(log.submission_id) == payload["submission_id"]
+        assert log.transfer_qty == record.original_quantity == record.remaining_quantity == Decimal(line["qty"])
+        assert log.reason_category == record.reason_category == line["reason_category"]
+        assert log.reason_category_id == record.reason_category_id
+        assert log.reason_category_id is not None
+        assert log.reason_memo == record.current_memo == line["reason_memo"]
+        assert record.management_category == line["management_category"]
+        assert log.producer_employee_id == record.quarantined_by_employee_id == uuid.UUID(payload["actor_employee_id"])
+
+
+@pytest.mark.parametrize("source", ["warehouse", "production"])
+@pytest.mark.parametrize("stock,pending", [(Decimal("8"), Decimal("0")), (Decimal("10"), Decimal("3"))])
+def test_bulk_quarantine_same_item_shortage_rolls_back_every_line(
+    db_session: Session, client: TestClient, make_item: Callable[..., Item],
+    make_location: Callable[..., InventoryLocation], source: str,
+    stock: Decimal, pending: Decimal,
+) -> None:
+    """각 줄이 가용량 이하여도 합계가 재고나 예약 제외 가용량을 넘으면 전부 원복한다."""
+    item, payload = _prepare_same_item_quarantine(
+        db_session, make_item, make_location, source, stock, pending,
+    )
+    before_counts = {
+        model: db_session.query(model).count()
+        for model in [InventoryOperation, TransactionLog, DefectQuarantineRecord, DefectInventoryMovement, DefectQuarantineMemoRevision]
+    }
+    assert all(Decimal(line["qty"]) <= stock - pending for line in payload["lines"])
+
+    response = client.post("/api/defects/quarantine/bulk", json=payload)
+    assert response.status_code == 422, response.json()
+    assert "부족" in response.text
+
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.quantity == stock
+    assert inventory.warehouse_qty == (stock if source == "warehouse" else Decimal("0"))
+    assert inventory.pending_quantity == (pending if source == "warehouse" else Decimal("0"))
+    assert _location_total(db_session, item.item_id, LocationStatusEnum.DEFECTIVE) == Decimal("0")
+    if source == "production":
+        location = db_session.query(InventoryLocation).filter(
+            InventoryLocation.item_id == item.item_id,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        ).one()
+        assert location.quantity == stock
+        assert location.pending_quantity == pending
+    for model, before_count in before_counts.items():
+        assert db_session.query(model).count() == before_count
+
+
+@pytest.mark.parametrize("source", ["warehouse", "production"])
+@pytest.mark.parametrize("change", [None, "quantity", "reason", "order"])
+def test_bulk_quarantine_same_item_retry_checks_each_ordered_line(
+    db_session: Session, client: TestClient, make_item: Callable[..., Item],
+    make_location: Callable[..., InventoryLocation], source: str, change: str | None,
+) -> None:
+    """같은 제출은 한 번만 차감하고 같은 키의 수량·사유·줄 순서 변경은 충돌 처리한다."""
+    item, payload = _prepare_same_item_quarantine(db_session, make_item, make_location, source)
+    first = client.post("/api/defects/quarantine/bulk", json=payload)
+    assert first.status_code == 200, first.json()
+    retry_payload = deepcopy(payload)
+    if change == "quantity":
+        retry_payload["lines"][0]["qty"] = 2
+    elif change == "reason":
+        retry_payload["lines"][0]["reason_category"] = "기능불량"
+    elif change == "order":
+        retry_payload["lines"].reverse()
+
+    retry = client.post("/api/defects/quarantine/bulk", json=retry_payload)
+    assert retry.status_code == (200 if change is None else 409), retry.json()
+    if change is None:
+        assert retry.json() == first.json()
+
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.quantity == Decimal("10")
+    assert inventory.warehouse_qty == Decimal("0")
+    assert _location_total(db_session, item.item_id, LocationStatusEnum.PRODUCTION) == Decimal("0")
+    assert _location_total(db_session, item.item_id, LocationStatusEnum.DEFECTIVE) == Decimal("10")
+    assert db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).count() == 3
+    assert db_session.query(DefectQuarantineRecord).filter(DefectQuarantineRecord.item_id == item.item_id).count() == 3
+    assert db_session.query(DefectInventoryMovement).filter(DefectInventoryMovement.item_id == item.item_id).count() == 3
+
+
+@pytest.mark.parametrize("source", ["warehouse", "production"])
+def test_bulk_quarantine_same_item_failed_key_can_retry_after_replenishment(
+    db_session: Session, client: TestClient, make_item: Callable[..., Item],
+    make_location: Callable[..., InventoryLocation], source: str,
+) -> None:
+    """실패한 트랜잭션은 멱등 키를 남기지 않아 보충 후 같은 제출로 처리할 수 있다."""
+    item, payload = _prepare_same_item_quarantine(
+        db_session, make_item, make_location, source, Decimal("8"),
+    )
+    failed = client.post("/api/defects/quarantine/bulk", json=payload)
+    assert failed.status_code == 422, failed.json()
+    assert "부족" in failed.text
+    assert db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).count() == 0
+    inventory_svc.receive_confirmed(
+        db_session, item.item_id, Decimal("2"), bucket=source,
+        dept=DepartmentEnum.ASSEMBLY if source == "production" else None,
+    )
+    db_session.commit()
+
+    retry = client.post("/api/defects/quarantine/bulk", json=payload)
+    assert retry.status_code == 200, retry.json()
+
+    db_session.expire_all()
+    assert _location_total(db_session, item.item_id, LocationStatusEnum.DEFECTIVE) == Decimal("10")
+    assert db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).count() == 3
+    assert db_session.query(DefectQuarantineRecord).filter(DefectQuarantineRecord.item_id == item.item_id).count() == 3
 
 
 def test_bulk_quarantine_rolls_back_every_line_when_one_item_is_short(

@@ -1,0 +1,132 @@
+.modal > div {
+  display: flex;
+  min-width: 0;
+  max-height: calc(100dvh - 48px);
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal > div > :first-child,
+.modal > div > :last-child {
+  flex-shrink: 0;
+}
+
+.content {
+  min-height: 0;
+  max-height: min(64dvh, 560px);
+  flex: 0 1 auto;
+}
+
+.table {
+  width: 100%;
+  margin-top: 12px;
+  table-layout: fixed;
+  border-collapse: collapse;
+  color: var(--c-text);
+  font-size: 14px;
+}
+
+.quantityColumn {
+  width: 80px;
+}
+
+.categoryColumn {
+  width: 30%;
+}
+
+.managementColumn {
+  width: 110px;
+}
+
+.table th {
+  padding: 8px 12px 8px 0;
+  border-top: 1px solid var(--c-border);
+  color: var(--c-muted2);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.table tbody tr {
+  height: 52px;
+}
+
+.table td {
+  padding: 10px 12px 10px 0;
+  border-top: 1px solid var(--c-border);
+  overflow-wrap: anywhere;
+  vertical-align: middle;
+}
+
+.table th:last-child,
+.table td:last-child {
+  padding-right: 0;
+}
+
+.memo {
+  color: var(--c-muted2);
+  white-space: pre-wrap;
+}
+
+@media (min-width: 1024px) {
+  .modal > div {
+    max-width: 960px;
+  }
+}
+
+@media (max-width: 639px) {
+  .itemGroup {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .table thead,
+  .table colgroup {
+    display: none;
+  }
+
+  .table,
+  .table tbody {
+    display: block;
+  }
+
+  .table tbody tr {
+    display: grid;
+    height: auto;
+    min-height: 52px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 12px;
+    padding: 12px 0;
+    border-top: 1px solid var(--c-border);
+  }
+
+  .table td {
+    min-width: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .table td:nth-child(2),
+  .table td:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .table td:first-child {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .table td:nth-child(3) {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .table td::before {
+    display: block;
+    margin-bottom: 2px;
+    color: var(--c-muted2);
+    font-size: 12px;
+    font-weight: 700;
+    content: attr(data-label);
+  }
+}

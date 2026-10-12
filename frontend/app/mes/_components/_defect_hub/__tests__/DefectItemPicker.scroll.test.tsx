@@ -40,6 +40,26 @@ function makeItem(index: number): Item {
 }
 
 describe("DefectItemPicker mobile scroll", () => {
+  it("격리 등록은 담긴 건수를 표시하고 선택된 품목으로 이동한다", () => {
+    const onSelected = vi.fn();
+    const onRemove = vi.fn();
+    render(<DefectItemPicker items={[makeItem(1)]} productModels={[]} source="warehouse" selectedIds={new Set(["item-1"])} onAdd={vi.fn()} onRemove={onRemove}
+      {...{ selectedLineCounts: new Map([["item-1", 3]]), onSelected }} />);
+    const button = screen.getByRole("button", { name: /SOLO item 1/ });
+    expect(button).toHaveTextContent("담김 · 3건");
+    fireEvent.click(button);
+    expect(onSelected).toHaveBeenCalledWith(expect.objectContaining({ item_id: "item-1" }));
+    expect(onRemove).not.toHaveBeenCalled();
+  });
+
+  it("제출 잠금과 줄수 상한에서는 새 품목을 추가할 수 없다", () => {
+    const onAdd = vi.fn();
+    const { rerender } = render(<DefectItemPicker items={[makeItem(1)]} productModels={[]} source="warehouse" selectedIds={new Set()} onAdd={onAdd} onRemove={vi.fn()} {...{ addingDisabled: true }} />);
+    expect(screen.getByRole("button", { name: /장바구니에 추가/ })).toBeDisabled();
+    rerender(<DefectItemPicker items={[makeItem(1)]} productModels={[]} source="warehouse" selectedIds={new Set()} onAdd={onAdd} onRemove={vi.fn()} {...{ disabled: true }} />);
+    expect(screen.getByRole("button", { name: /장바구니에 추가/ })).toBeDisabled();
+  });
+
   it("모바일은 두 열에서 코드와 모든 재고 정보를 표시하며 선택 문구를 사용한다", () => {
     const onRemove = vi.fn();
     render(<DefectItemPicker mobilePresentation items={[makeItem(1)]} productModels={[]} source="warehouse" selectedIds={new Set(["item-1"])} onAdd={() => {}} onRemove={onRemove} />);

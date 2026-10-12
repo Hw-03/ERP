@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,6 +8,7 @@ const api = vi.hoisted(() => ({
   listReasonCategories: vi.fn(), createReasonCategory: vi.fn(), updateReasonCategory: vi.fn(),
 }));
 vi.mock("@/lib/api/defects", () => ({ defectsApi: api }));
+vi.mock("@/lib/client-events", () => ({ sendClientEvent: vi.fn() }));
 
 const reasons = [
   { category_id: "surface", name: "표면 균열", is_active: true, is_other: false },
@@ -33,7 +34,7 @@ function mount() {
 }
 
 describe("managed defect reasons", () => {
-  beforeEach(() => { vi.clearAllMocks(); api.listReasonCategories.mockResolvedValue(reasons); });
+  beforeEach(() => { vi.clearAllMocks(); api.updateReasonCategory.mockReset(); api.createReasonCategory.mockReset(); api.listReasonCategories.mockResolvedValue(reasons); });
 
   it("selects a server reason by stable ID and excludes inactive reasons", async () => {
     mount();
@@ -101,7 +102,80 @@ describe("managed defect reasons", () => {
     expect(await screen.findByRole("button", { name: "새 균열", exact: true })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("searchbox")).toHaveFocus();
     fireEvent.click(screen.getByRole("button", { name: "새 균열 숨김" }));
+    fireEvent.click(screen.getByRole("button", { name: "숨기기", exact: true }));
     await waitFor(() => expect(screen.getByLabelText("선택 사유 번호")).toBeEmptyDOMElement());
+  });
+
+  it("숨김은 확인 전 저장하지 않고 취소·Escape는 선택창과 버튼 포커스를 유지한다", async () => {
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "사유 카테고리 선택" }));
+    const trigger = await screen.findByRole("button", { name: "표면 균열 숨김" });
+    fireEvent.click(trigger);
+    const confirmation = screen.getByRole("dialog", { name: "“표면 균열” 사유를 숨길까요?" });
+    expect(within(confirmation).getByText("새 작업의 선택 목록에서 숨겨집니다. 기존 기록은 유지됩니다.")).toBeInTheDocument();
+    expect(api.updateReasonCategory).not.toHaveBeenCalled();
+    fireEvent.click(within(confirmation).getByRole("button", { name: "취소" }));
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(screen.getByRole("dialog", { name: "사유 카테고리" })).toBeInTheDocument();
+    fireEvent.click(trigger);
+    const parentEscape = vi.fn();
+    window.addEventListener("keydown", parentEscape);
+    try {
+      fireEvent.keyDown(screen.getByRole("button", { name: "취소" }), { key: "Escape" });
+      await waitFor(() => expect(trigger).toHaveFocus());
+      expect(screen.queryByRole("dialog", { name: /숨길까요/ })).not.toBeInTheDocument();
+      expect(screen.getByRole("dialog", { name: "사유 카테고리" })).toBeInTheDocument();
+      expect(parentEscape).not.toHaveBeenCalled();
+      expect(api.updateReasonCategory).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener("keydown", parentEscape);
+    }
+  });
+
+  it("숨김 확인 중 중복 요청을 막고 성공하면 검색으로 돌아간다", async () => {
+    let resolveSave!: (value: typeof reasons[number]) => void;
+    api.updateReasonCategory.mockImplementation(() => new Promise((resolve) => { resolveSave = resolve; }));
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "사유 카테고리 선택" }));
+    fireEvent.click(await screen.findByRole("button", { name: "표면 균열 숨김" }));
+    const confirmation = screen.getByRole("dialog", { name: /숨길까요/ });
+    fireEvent.click(within(confirmation).getByRole("button", { name: "숨기기" }));
+    expect(api.updateReasonCategory).toHaveBeenCalledTimes(1);
+    expect(api.updateReasonCategory).toHaveBeenCalledWith("employee", "surface", { is_active: false });
+    expect(within(confirmation).getByRole("button", { name: "취소" })).toBeDisabled();
+    expect(within(confirmation).getByRole("button", { name: "처리 중..." })).toBeDisabled();
+    const status = within(confirmation).getByText("새 작업의 선택 목록에서 숨겨집니다. 기존 기록은 유지됩니다.");
+    await waitFor(() => expect(status).toHaveFocus());
+    expect(fireEvent.keyDown(status, { key: "Tab" })).toBe(false);
+    expect(fireEvent.keyDown(status, { key: "Tab", shiftKey: true })).toBe(false);
+    expect(status).toHaveFocus();
+    fireEvent.keyDown(confirmation, { key: "Escape" });
+    expect(confirmation).toBeInTheDocument();
+    const hidden = { ...reasons[0], is_active: false };
+    api.listReasonCategories.mockResolvedValue([hidden, ...reasons.slice(1)]);
+    resolveSave(hidden);
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: /숨길까요/ })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("searchbox")).toHaveFocus());
+    expect(screen.queryByRole("button", { name: "표면 균열", exact: true })).not.toBeInTheDocument();
+  });
+
+  it("숨김 저장 실패는 확인창·선택·메모를 보존하고 재시도할 수 있다", async () => {
+    api.updateReasonCategory.mockRejectedValue(new Error("숨김 저장 실패"));
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "사유 카테고리 선택" }));
+    fireEvent.click(await screen.findByRole("button", { name: "표면 균열", exact: true }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "입력 유지" } });
+    fireEvent.click(screen.getByRole("button", { name: "사유 카테고리 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "표면 균열 숨김" }));
+    const confirmation = screen.getByRole("dialog", { name: /숨길까요/ });
+    fireEvent.click(within(confirmation).getByRole("button", { name: "숨기기" }));
+    expect(await within(confirmation).findByRole("alert")).toHaveTextContent("숨김 저장 실패");
+    await waitFor(() => expect(within(confirmation).getByRole("button", { name: "취소" })).toHaveFocus());
+    expect(screen.getByLabelText("선택 사유 번호")).toHaveTextContent("surface");
+    expect(screen.getByRole("textbox")).toHaveValue("입력 유지");
+    expect(within(confirmation).getByRole("button", { name: "숨기기" })).toBeEnabled();
+    fireEvent.click(within(confirmation).getByRole("button", { name: "숨기기" }));
+    await waitFor(() => expect(api.updateReasonCategory).toHaveBeenCalledTimes(2));
   });
 
   it("닫거나 Escape를 눌러도 선택과 메모를 유지하고 부모 Escape를 막는다", async () => {

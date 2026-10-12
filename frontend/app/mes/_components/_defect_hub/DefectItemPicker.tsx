@@ -47,6 +47,11 @@ interface Props {
   selectedIds: Set<string>;
   onAdd: (item: Item) => void;
   onRemove: (item: Item) => void;
+  /** 격리 등록은 해제 대신 해당 품목의 사유 입력으로 이동한다. */
+  onSelected?: (item: Item) => void;
+  selectedLineCounts?: ReadonlyMap<string, number>;
+  disabled?: boolean;
+  addingDisabled?: boolean;
   mobilePresentation?: boolean;
 }
 
@@ -66,6 +71,10 @@ export function DefectItemPicker({
   selectedIds,
   onAdd,
   onRemove,
+  onSelected,
+  selectedLineCounts,
+  disabled = false,
+  addingDisabled = false,
   mobilePresentation = false,
 }: Props) {
   const [dept, setDept] = useState("ALL");
@@ -77,6 +86,7 @@ export function DefectItemPicker({
   const [editItems, setEditItems] = useState<Item[]>([]);
   const tableRef = useRef<HTMLDivElement | null>(null);
   const operator = useCurrentOperator();
+  const selectedCountDigits = String(Math.max(1, ...(selectedLineCounts?.values() ?? []))).length;
 
   const { data: myOrderData } = useMyItemOrderQuery(operator?.employee_id);
   const putMyOrder = usePutMyItemOrderMutation();
@@ -364,19 +374,21 @@ export function DefectItemPicker({
                         PC(lg)는 기존 빨강 솔리드 유지(lg: 페어로 PC 무변경). */}
                     <button
                       type="button"
-                      onClick={() => added ? onRemove(item) : onAdd(item)}
-                      disabled={!added && !canAdd}
-                      aria-label={mobilePresentation ? `${item.item_name} ${added ? "선택 해제" : "선택"}` : added ? `${item.item_name} 장바구니에서 제거` : `${item.item_name} 장바구니에 추가`}
+                      data-defect-picker-button={item.item_id}
+                      onClick={() => added ? (onSelected ?? onRemove)(item) : onAdd(item)}
+                      disabled={disabled || (!added && (!canAdd || addingDisabled))}
+                      aria-label={added && onSelected ? `${item.item_name} 담긴 사유 ${selectedLineCounts?.get(item.item_id) ?? 1}건 보기` : mobilePresentation ? `${item.item_name} ${added ? "선택 해제" : "선택"}` : added ? `${item.item_name} 장바구니에서 제거` : `${item.item_name} 장바구니에 추가`}
+                      style={onSelected && !mobilePresentation ? { width: 80 + selectedCountDigits * 8, height: 26, justifyContent: "center", paddingTop: 0, paddingBottom: 0 } : undefined}
                       className={`standard-hover inline-flex items-center gap-1 rounded-[10px] border px-2.5 py-1 text-[12px] font-black transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 ${
                         added
                           ? "border-[var(--c-blue)] bg-[color-mix(in_srgb,var(--c-blue)_12%,transparent)] text-[var(--c-blue)]"
                           : "border-[var(--c-red)] bg-[var(--c-red)] text-white"
-                      }`}
+                      } ${onSelected && mobilePresentation ? "min-h-11" : ""}`}
                     >
                       {added ? (
                         <>
                           <Check className="h-3 w-3" />
-                          {mobilePresentation ? "선택 해제" : "담김"}
+                           {onSelected ? `담김 · ${selectedLineCounts?.get(item.item_id) ?? 1}건` : mobilePresentation ? "선택 해제" : "담김"}
                         </>
                       ) : (
                         <>

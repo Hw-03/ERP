@@ -26,9 +26,11 @@ import { makeClientRequestId } from "@/lib/uuid";
 import type { DefectManagementCategory } from "@/lib/api/types/defects";
 import { DefectManagementCategoryControl } from "../../_defect_hub/DefectManagementCategoryControl";
 import { defectCartLineErrors, defectSourceStock } from "../../_defect_hub/defectCartValidation";
+import { MAX_QUARANTINE_LINES, groupDefectCartLines, insertDefectCartLine, defectCartGroupErrors } from "../../_defect_hub/defectCartGroups";
 import { queryKeys } from "@/lib/queries/keys";
 import { TYPO } from "../tokens";
 import panelStyles from "./mobileWarehousePanels.module.css";
+import quarantineStyles from "./mobileQuarantineGroups.module.css";
 import presentation from "../mobilePresentation.module.css";
 import { MobileDefectStepHeader } from "./MobileDefectStepHeader";
 import { MobileReworkWorkspace } from "../rework/MobileReworkWorkspace";
@@ -125,13 +127,31 @@ export function MobileDefectCartFlow({
   const submissionIdRef = useRef<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [failures, setFailures] = useState<LineFailure[]>([]);
+  const [batchError, setBatchError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const quantityRefs = useRef(new Map<string, HTMLInputElement>());
+  const pendingFocusRef = useRef<{ key: string } | { itemId: string } | { empty: true } | null>(null);
+  const emptyReturnRef = useRef<HTMLButtonElement>(null);
   const reworkSessionRef = useRef<MobileReworkMemory | null>(null);
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
   }, [step]);
+
+  useEffect(() => {
+    const target = pendingFocusRef.current;
+    if (!target) return;
+    const pickerButtons = Array.from(bodyRef.current?.querySelectorAll<HTMLButtonElement>("[data-defect-picker-button]") ?? []);
+    const element = "key" in target ? quantityRefs.current.get(target.key)
+      : "itemId" in target ? pickerButtons.find((button) => button.dataset.defectPickerButton === target.itemId && !button.disabled) ?? pickerButtons.find((button) => !button.disabled)
+      : emptyReturnRef.current;
+    if (!element) return;
+    element.focus();
+    if (element instanceof HTMLInputElement) element.select();
+    element.scrollIntoView?.({ block: "nearest" });
+    pendingFocusRef.current = null;
+  }, [lines, step]);
 
   useEffect(() => {
     function restore(state: CartHistoryState, preserveStep = false): void {
@@ -193,6 +213,10 @@ export function MobileDefectCartFlow({
   const submitLabel = submitLabelFor(mode, directAction);
   const pickerItems = isRework ? items.filter(hasKnownBom) : items;
   const selectedIds = useMemo(() => new Set(lines.map((l) => l.item.item_id)), [lines]);
+  const groups = useMemo(() => groupDefectCartLines(lines), [lines]);
+  const selectedLineCounts = useMemo(() => new Map(groups.map((group) => [group.item.item_id, group.lines.length])), [groups]);
+  const groupErrors = useMemo(() => mode === "add" ? defectCartGroupErrors(groups, source) : new Map<string, string>(), [mode, groups, source]);
+  const atLineLimit = mode === "add" && lines.length >= MAX_QUARANTINE_LINES;
   const selectedReworkLine = isRework ? lines[0] : null;
   const reworkLineReady = Boolean(
     selectedReworkLine
@@ -200,11 +224,13 @@ export function MobileDefectCartFlow({
   );
 
   function newLine(item: Item): CartLine {
-    return { key: `${item.item_id}-${Date.now()}`, item, qty: 1, category: "", categoryId: null, memo: "", managementCategory: "DEFECT", decisions: [] };
+    return { key: makeClientRequestId(), item, qty: 1, category: "", categoryId: null, memo: "", managementCategory: "DEFECT", decisions: [] };
   }
 
   function addItem(item: Item) {
+    if (busy || atLineLimit) return;
     if (source === "production" && itemDepartment(item) === null) return;
+    setBatchError(null);
     setLines((prev) => {
       if (prev.some((l) => l.item.item_id === item.item_id)) return prev;
       const line = newLine(item);
@@ -214,12 +240,43 @@ export function MobileDefectCartFlow({
     });
   }
 
+  /** 같은 품목의 마지막 사유 뒤에 빈 입력을 추가하고 수량부터 입력하게 한다. */
+  function addReason(item: Item): void {
+    if (busy || atLineLimit) return;
+    setBatchError(null);
+    const line = newLine(item);
+    pendingFocusRef.current = { key: line.key };
+    setLines((previous) => insertDefectCartLine(previous, line));
+    setRequestIds((ids) => ({ ...ids, [line.key]: makeClientRequestId() }));
+    setBatchRequestId(makeClientRequestId());
+  }
+
+  function showSelectedItem(item: Item): void {
+    if (busy) return;
+    const line = lines.find((entry) => entry.item.item_id === item.item_id);
+    if (!line) return;
+    pendingFocusRef.current = { key: line.key };
+    pushStep(3);
+  }
+
   function updateLine(key: string, patch: Partial<Omit<CartLine, "key" | "item">>) {
+    if (busy) return;
+    setBatchError(null);
     setBatchRequestId(makeClientRequestId());
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   }
 
   function removeLine(key: string) {
+    if (busy) return;
+    setBatchError(null);
+    let returnToPicker = false;
+    if (mode === "add") {
+      const index = lines.findIndex((line) => line.key === key);
+      if (index < 0) return;
+      const adjacent = lines[index + 1] ?? lines[index - 1];
+      returnToPicker = !adjacent && step === 3;
+      pendingFocusRef.current = adjacent ? { key: adjacent.key } : { itemId: lines[index].item.item_id };
+    }
     setLines((prev) => prev.filter((l) => l.key !== key));
     setRequestIds((ids) => {
       const next = { ...ids };
@@ -227,9 +284,12 @@ export function MobileDefectCartFlow({
       return next;
     });
     setBatchRequestId(makeClientRequestId());
+    if (returnToPicker) goBack();
   }
 
   function removeItemById(item: Item) {
+    if (busy) return;
+    setBatchError(null);
     setLines((prev) => {
       const target = prev.find((l) => l.item.item_id === item.item_id);
       if (target) {
@@ -245,6 +305,8 @@ export function MobileDefectCartFlow({
   }
 
   function copyReasonDown(index: number) {
+    if (busy) return;
+    setBatchRequestId(makeClientRequestId());
     setLines((prev) => {
       const src = prev[index];
       if (!src) return prev;
@@ -253,6 +315,7 @@ export function MobileDefectCartFlow({
   }
 
   function goBack() {
+    if (busy) return;
     if (step > 1) {
       window.history.back();
       return;
@@ -270,6 +333,7 @@ export function MobileDefectCartFlow({
   }
 
   function selectSource(nextSource: SourceKind) {
+    setBatchError(null);
     window.history.replaceState({ ...(window.history.state ?? {}), defect: "cart", mode, step: 1, directAction, source: nextSource }, "");
     setSource(nextSource);
     if (nextSource !== source) setLines([]);
@@ -286,6 +350,7 @@ export function MobileDefectCartFlow({
   const allValid =
     directAction !== null &&
     lines.length > 0 &&
+    groupErrors.size === 0 &&
     lines.every((l) => {
       if ((lineErrorsByKey.get(l.key)?.length ?? 0) > 0) return false;
       if (!isRework) return true;
@@ -346,6 +411,7 @@ export function MobileDefectCartFlow({
     submissionIdRef.current ??= batchRequestId;
     setBusy(true);
     setFailures([]);
+    setBatchError(null);
     if (mode === "add" && lines.length > 1) {
       try {
         await defectsApi.quarantineBulk({
@@ -365,7 +431,7 @@ export function MobileDefectCartFlow({
         onDone();
       } catch (error) {
         const message = error instanceof Error ? error.message : "처리 실패";
-        setFailures(lines.map((line) => ({ key: line.key, itemName: line.item.item_name, message })));
+        setBatchError(message);
         setBusy(false);
       }
       return;
@@ -392,8 +458,11 @@ export function MobileDefectCartFlow({
       onDone();
       return;
     }
-    setLines((prev) => prev.filter((l) => failedKeys.has(l.key)));
-    setFailures(nextFailures);
+    if (mode === "add") setBatchError(nextFailures[0].message);
+    else {
+      setLines((prev) => prev.filter((l) => failedKeys.has(l.key)));
+      setFailures(nextFailures);
+    }
   }
 
   if (isDirect && directAction === null) {
@@ -538,9 +607,14 @@ export function MobileDefectCartFlow({
             selectedIds={selectedIds}
             onAdd={addItem}
             onRemove={removeItemById}
+            onSelected={mode === "add" ? showSelectedItem : undefined}
+            selectedLineCounts={mode === "add" ? selectedLineCounts : undefined}
+            disabled={busy}
+            addingDisabled={atLineLimit}
           />
         </div>
         <StickyFooter flat compact embedded className="!px-0">
+          {mode === "add" && <p className={clsx(TYPO.caption, "mb-2 text-center")} style={{ color: LEGACY_COLORS.muted2 }}>{groups.length}품목 · {lines.length}건{atLineLimit && " · 한 번에 최대 100건까지 등록할 수 있습니다."}</p>}
           <PrimaryActionButton label={`수량 조정 (${lines.length}건) →`} intent="primary" disabled={lines.length === 0 || busy} onClick={() => pushStep(3)} />
         </StickyFooter>
       </div>
@@ -550,15 +624,48 @@ export function MobileDefectCartFlow({
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="shrink-0 pb-2">{header}</div>
 
-      <div ref={bodyRef} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+      <div ref={bodyRef} className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-y-auto">
         <div
           data-testid="mobile-defect-cart-scroll"
           className="shrink-0"
         >
+          {mode === "add" && batchError && <p role="alert" className={clsx(TYPO.body, "mb-3 rounded-[12px] border px-3 py-2 font-bold")} style={{ color: LEGACY_COLORS.red, background: LEGACY_COLORS.errorBg, borderColor: LEGACY_COLORS.border }}>{batchError}</p>}
           {lines.length === 0 ? (
             <div className="rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
               <p className={TYPO.body}>선택한 품목이 없습니다.</p>
-              <button type="button" className="mt-2 font-bold" style={{ color: LEGACY_COLORS.blue }} onClick={goBack}>품목 선택으로 돌아가기</button>
+              <button ref={emptyReturnRef} type="button" className="mt-2 min-h-11 font-bold" style={{ color: LEGACY_COLORS.blue }} onClick={() => { if (mode === "add") pendingFocusRef.current = { itemId: items[0]?.item_id ?? "" }; goBack(); }}>품목 선택으로 돌아가기</button>
+            </div>
+          ) : mode === "add" ? (
+            <div className="flex min-w-0 flex-col gap-3">
+              {groups.map((group) => {
+                const stock = defectSourceStock(group.item, source);
+                const remaining = group.totalQuantity === null ? null : stock.available - group.totalQuantity;
+                return <section key={group.item.item_id} className={quarantineStyles.card} data-testid="defect-quarantine-item-group" data-item-id={group.item.item_id}>
+                  <div className={quarantineStyles.header}>
+                    <div className={quarantineStyles.titleRow}>
+                      <div className={clsx(TYPO.body, quarantineStyles.title, "font-bold")}>{group.item.item_name}</div>
+                      <div className={clsx(TYPO.caption, quarantineStyles.total, "font-bold")} style={{ color: LEGACY_COLORS.blue }}>총 {group.totalQuantity ?? "—"} {group.item.unit ?? "EA"} · {group.lines.length}건</div>
+                    </div>
+                    <div className={quarantineStyles.metaRow}>
+                      <div className={clsx(TYPO.caption, quarantineStyles.meta)}><span>{group.item.mes_code ?? "(코드 없음)"}</span><span aria-hidden="true">·</span><span>{stock.locationLabel}</span></div>
+                      <div className={quarantineStyles.stock}><span>가능 재고 <b style={{ color: LEGACY_COLORS.green }}>{stock.available.toLocaleString()}</b></span><span>실행 후 <b style={{ color: remaining !== null && remaining < 0 ? LEGACY_COLORS.red : LEGACY_COLORS.green }}>{remaining?.toLocaleString() ?? "—"}</b></span></div>
+                    </div>
+                  </div>
+                  {groupErrors.has(group.item.item_id) && <p className={TYPO.caption} style={{ color: LEGACY_COLORS.red }}>{groupErrors.get(group.item.item_id)}</p>}
+                  {group.lines.map((line, index) => {
+                    return <fieldset key={line.key} disabled={busy} role="group" aria-label={`${group.item.item_name} 사유 ${index + 1}`} data-testid="defect-quarantine-reason-line" className={quarantineStyles.reason}>
+                      <ReasonFormFields employeeId={currentEmployee.employee_id} categoryId={line.categoryId} mobilePresentation category={line.category} memo={line.memo} onCategoryChange={(category, id) => updateLine(line.key, { category, categoryId: id ?? null })} onMemoChange={(memo) => updateLine(line.key, { memo })} requireAny quarantineControls={{
+                        quantity: <QuantityStepper value={line.qty} min={1} disabled={busy} inputRef={(element) => { if (element) quantityRefs.current.set(line.key, element); else quantityRefs.current.delete(line.key); }} onChange={(qty) => updateLine(line.key, { qty })} className={quarantineStyles.stepper} />,
+                        management: <DefectManagementCategoryControl value={line.managementCategory} onChange={(managementCategory) => updateLine(line.key, { managementCategory })} />,
+                        remove: <button type="button" disabled={busy} onClick={() => removeLine(line.key)} aria-label={`${group.item.item_name} 사유 ${index + 1} 삭제`} className={quarantineStyles.delete}><Trash2 size={20} /></button>,
+                      }} />
+                      {(lineErrorsByKey.get(line.key) ?? []).map((message) => <p key={message} className={TYPO.caption} style={{ color: LEGACY_COLORS.red }}>{message}</p>)}
+                    </fieldset>;
+                  })}
+                  <button type="button" aria-label="다른 사유 추가" disabled={busy || atLineLimit} onClick={() => addReason(group.item)} className={clsx(TYPO.body, quarantineStyles.add)}>+ 다른 사유 추가</button>
+                </section>;
+              })}
+              {atLineLimit && <p className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>한 번에 최대 100건까지 등록할 수 있습니다. 사유를 삭제하거나 나누어 등록하세요.</p>}
             </div>
           ) : (
               <div className="flex flex-col gap-2">
@@ -621,16 +728,6 @@ export function MobileDefectCartFlow({
                         requireAny
                       />
 
-                      {mode === "add" && (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>관리 분류</span>
-                          <DefectManagementCategoryControl
-                            value={line.managementCategory}
-                            onChange={(managementCategory) => updateLine(line.key, { managementCategory })}
-                          />
-                        </div>
-                      )}
-
                       {fail && (
                         <div className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.red }}>
                           실패: {fail.message}
@@ -655,6 +752,7 @@ export function MobileDefectCartFlow({
           </div>
         ) : null}
       <StickyFooter flat compact embedded className="!px-0">
+        {mode === "add" && <p className={clsx(TYPO.caption, "mb-2 text-center")} style={{ color: LEGACY_COLORS.muted2 }}>{groups.length}품목 · {lines.length}건</p>}
         <PrimaryActionButton
           label={isRework ? "BOM 확인 →" : busy ? "처리 중..." : `${submitLabel} (${lines.length}건)`}
           intent={isScrap || isRework ? "danger" : "primary"}
@@ -686,7 +784,14 @@ export function MobileDefectCartFlow({
           </p>
         )}
         <div className="flex max-h-64 flex-col gap-2 overflow-y-auto">
-          {lines.map((line) => (
+          {mode === "add" ? groups.map((group) => <div key={group.item.item_id} className="min-w-0 rounded-[14px] border px-3 py-2.5" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+            <p className={clsx(TYPO.body, "break-words font-bold")}>{group.item.item_name}</p>
+            <p className={clsx(TYPO.caption, "mt-1")} style={{ color: LEGACY_COLORS.muted2 }}>{source === "warehouse" ? "창고" : itemDepartment(group.item) ?? "부서 미지정"} · 총 {group.totalQuantity ?? "—"} {group.item.unit ?? "EA"} · {group.lines.length}건</p>
+            {group.lines.map((line, index) => <div key={line.key} aria-label={`${group.item.item_name} 사유 ${index + 1}`} data-testid="mobile-defect-confirm-line" className="mt-2 border-t pt-2" style={{ borderColor: LEGACY_COLORS.border }}>
+              <p className={TYPO.body}>{line.category} · 수량 {line.qty} · {managementCategoryLabel(line.managementCategory)}</p>
+              {line.memo && <p className={clsx(TYPO.caption, "mt-1 break-words")} style={{ color: LEGACY_COLORS.muted2 }}>{line.memo}</p>}
+            </div>)}
+          </div>) : lines.map((line) => (
             <div
               key={line.key}
               data-testid="mobile-defect-confirm-line"
@@ -703,11 +808,6 @@ export function MobileDefectCartFlow({
                   <span>{source === "warehouse" ? "창고" : itemDepartment(line.item) ?? "부서 미지정"}</span>
                 </div>
               </div>
-              {mode === "add" && (
-                <span className={clsx(TYPO.caption, "shrink-0 rounded-full px-2.5 py-1 font-black")} style={{ background: tint(LEGACY_COLORS.red, 10), color: LEGACY_COLORS.red }}>
-                  {managementCategoryLabel(line.managementCategory)}
-                </span>
-              )}
             </div>
           ))}
         </div>
