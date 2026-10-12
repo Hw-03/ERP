@@ -282,6 +282,7 @@ export const productionApi = {
 
   getTransactionDisplayGroups: (
     params?: {
+      itemId?: string;
       transactionTypes?: string;
       operationKeys?: string;
       search?: string;

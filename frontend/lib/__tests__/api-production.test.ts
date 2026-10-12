@@ -157,6 +157,18 @@ describe("productionApi", () => {
     });
   });
 
+  it("품목별 내역은 기간 제한 없이 품목 ID와 커서를 전달한다", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ groups: [], next_cursor: null, has_more: false })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    await productionApi.getTransactionDisplayGroups({ itemId: "item-1", limit: 10, cursor: "next-page" });
+    const params = new URL(String(fetchSpy.mock.calls[0][0]), "http://localhost").searchParams;
+    expect(params.get("item_id")).toBe("item-1");
+    expect(params.get("cursor")).toBe("next-page");
+    expect(params.get("limit")).toBe("10");
+    expect(params.has("date_from")).toBe(false);
+    expect(params.has("include_archived")).toBe(false);
+  });
+
   it("maps submission work groups without changing raw transaction fields", async () => {
     const log = { log_id: "original", submission_id: "submit-1", reason_category_id: "category-1" };
     globalThis.fetch = vi.fn(() => Promise.resolve(makeResponse({ groups: [{

@@ -106,6 +106,43 @@ def _add_batch(db_session, suffix: str) -> IoBatch:
     return batch
 
 
+def test_item_history_pages_linked_and_legacy_logs_without_omissions(client, db_session, make_item):
+    """Item history must reach all linked and legacy records through the shared cursor API."""
+    item = make_item(name="item mixed history")
+    sibling = make_item(name="unrelated item")
+    logs = []
+    for index in range(16):
+        log = _add_log(db_session, item, created_at=datetime(2026, 9, 1, 12, index))
+        if index < 11:
+            operation = InventoryOperation(
+                kind="BUSINESS", domain="inventory_io", action="receive_supplier",
+                display_label="receive", actor_name="Tester", effective_at=log.created_at,
+            )
+            db_session.add(operation)
+            db_session.flush()
+            log.operation_id = operation.operation_id
+        logs.append(log)
+    _add_log(db_session, sibling, created_at=datetime(2026, 9, 1, 13))
+    db_session.commit()
+    params = {"item_id": str(item.item_id), "limit": 10}
+    actual = []
+    page_sizes = []
+    while True:
+        response = client.get("/api/inventory/transactions/display-groups", params=params)
+        assert response.status_code == 200, response.text
+        page = response.json()
+        rows = [row for group in page["groups"] for row in group["logs"]]
+        assert all(row["item_id"] == str(item.item_id) for row in rows)
+        actual.extend(row["log_id"] for row in rows)
+        page_sizes.append(len(rows))
+        if not page["has_more"]:
+            assert page["next_cursor"] is None
+            break
+        params["cursor"] = page["next_cursor"]
+    assert page_sizes == [10, 6]
+    assert actual == [str(log.log_id) for log in reversed(logs)]
+
+
 def test_display_groups_pages_complete_groups_by_representative_row(client, db_session, make_item):
     item = make_item(name="대표행 페이지 품목")
     base = datetime(2026, 7, 15, 12, 0, 0)
