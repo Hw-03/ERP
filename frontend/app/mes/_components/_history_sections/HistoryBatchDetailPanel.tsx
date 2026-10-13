@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import { GitBranch, Package, XCircle } from "lucide-react";
 import { api, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
@@ -229,7 +229,9 @@ export function HistoryBatchDetailPanel({
       return count + bundle.lines.filter((line) => line !== parent && !line.included).length;
     }, 0)
     : 0;
-  const isBatchCancelled = cancellationLogs.every((log) => log.cancelled);
+  const isBatchCancelled = first.operation_effective_status === "cancelled"
+    || cancellationLogs.every((log) => log.cancelled);
+  const isCancellationReadOnly = isBatchCancelled || first.operation_kind === "CANCELLATION";
   const effects = cancellationScopeStatus === "ready"
     ? cancellationSummary.impactGroups.flatMap((group) => group.effects)
     : [];
@@ -291,7 +293,7 @@ export function HistoryBatchDetailPanel({
           identity={cancellationIdentity}
           scope={cancellationActionScope}
           effects={effects}
-          cancelled={isBatchCancelled}
+          cancelled={isCancellationReadOnly}
           scopeStatus={cancellationScopeStatus}
           onRetryScope={cancellationScope.retry}
           onSubmit={handleCancelSubmit}
@@ -313,7 +315,7 @@ export function HistoryBatchDetailPanel({
       identity={cancellationIdentity}
       scope={cancellationActionScope}
       effects={effects}
-      cancelled={isBatchCancelled}
+      cancelled={isCancellationReadOnly}
       scopeStatus={cancellationScopeStatus}
       onRetryScope={cancellationScope.retry}
       onSubmit={handleCancelSubmit}
@@ -328,7 +330,8 @@ export function HistoryBatchDetailPanel({
             batch={batch}
             loading={state.status === "loading"}
             canCancel={controller.available}
-            scopeStatus={isBatchCancelled ? "ready" : controller.scopeStatus}
+            blocker={isCancellationReadOnly ? null : cancellationScope.blocker}
+            scopeStatus={isCancellationReadOnly ? "ready" : controller.scopeStatus}
             onRetryScope={controller.retryScope}
             onCancelClick={controller.openConfirmation}
             mobilePresentation={mobilePresentation}
@@ -411,6 +414,7 @@ function HistoryBatchHero({
   batch,
   loading,
   canCancel,
+  blocker,
   scopeStatus,
   onRetryScope,
   onCancelClick,
@@ -421,11 +425,13 @@ function HistoryBatchHero({
   batch: IoBatch | null;
   loading: boolean;
   canCancel: boolean;
+  blocker?: string | null;
   scopeStatus: HistoryCancelScopeStatus;
   onRetryScope: () => void;
   onCancelClick: () => void;
   mobilePresentation?: boolean;
 }) {
+  const blockerId = useId();
   const displayType = getHistoryDisplayTransactionType(first, batch);
   const tcolor = transactionColor(displayType);
   const heroStyle = {
@@ -591,11 +597,13 @@ function HistoryBatchHero({
           취소 범위 다시 불러오기
         </button>
       )}
-      {canCancel && (
+      {(canCancel || (scopeStatus === "ready" && blocker)) && (
         <button
           type="button"
+          disabled={!canCancel}
+          aria-describedby={blocker ? blockerId : undefined}
           onClick={onCancelClick}
-          className={`mt-1 rounded-[10px] border px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110${mobilePresentation ? " min-h-[44px] w-full" : ""}`}
+          className={`mt-1 rounded-[10px] border px-3 py-1.5 text-[12px] font-bold transition-colors enabled:hover:brightness-110 disabled:opacity-50${mobilePresentation ? " min-h-[44px] w-full" : ""}`}
           style={{
             borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 40%, transparent)`,
             color: LEGACY_COLORS.red,
@@ -604,6 +612,9 @@ function HistoryBatchHero({
         >
           이 내역 취소
         </button>
+      )}
+      {!canCancel && scopeStatus === "ready" && blocker && (
+        <p id={blockerId} className="mt-2 break-words text-xs font-bold leading-5" style={{ color: LEGACY_COLORS.red }}>{blocker}</p>
       )}
     </div>
   );

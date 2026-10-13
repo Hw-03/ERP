@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import { Activity, ArrowRight, ChevronDown, History, StickyNote, XCircle } from "lucide-react";
 import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
@@ -343,7 +343,7 @@ export function HistoryDetailPanel({
                 log={selected}
                 scope={cancelScope}
                 canCancel={controller.available}
-                blocker={cancellationBlocker}
+                blocker={isCancelled ? null : cancellationBlocker}
                 scopeStatus={isCancelled ? "ready" : controller.scopeStatus}
                 onRetryScope={controller.retryScope}
                 onCancelClick={controller.openConfirmation}
@@ -540,6 +540,7 @@ function HistoryDetailMetaStrip({
   const rawApproverName = (log.approver_name ?? "").trim();
   const approverName = rawApproverName && rawApproverName !== reqName ? rawApproverName : null;
   const cancelScopeLabel = "이 내역 취소";
+  const blockerId = useId();
 
   return (
     <div
@@ -595,11 +596,13 @@ function HistoryDetailMetaStrip({
           취소 범위 다시 불러오기
         </button>
       )}
-      {canCancel && (
+      {(canCancel || (scopeStatus === "ready" && blocker)) && (
         <button
           type="button"
+          disabled={!canCancel}
+          aria-describedby={blocker ? blockerId : undefined}
           onClick={onCancelClick}
-          className="inline-flex items-center gap-1 rounded-[12px] border px-3 py-1.5 text-xs font-bold"
+          className="inline-flex items-center gap-1 rounded-[12px] border px-3 py-1.5 text-xs font-bold disabled:opacity-50"
           style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.red }}
         >
           <XCircle className="h-3.5 w-3.5" />
@@ -607,7 +610,7 @@ function HistoryDetailMetaStrip({
         </button>
       )}
       {!canCancel && scopeStatus === "ready" && blocker && (
-        <span className="max-w-full text-xs font-bold leading-5" style={{ color: LEGACY_COLORS.red }}>
+        <span id={blockerId} className="w-full break-words text-xs font-bold leading-5" style={{ color: LEGACY_COLORS.red }}>
           {blocker}
         </span>
       )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { XCircle } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import { ApiConnectionError } from "@/lib/api-core";
@@ -251,6 +251,12 @@ export function HistoryCancelAction({
   onDesktopCancellationOpenChange?: (open: boolean) => void;
 }) {
   const copy = getHistoryCancelCopy(scope);
+  const blockerId = useId();
+  const blockerMessage = blocker?.startsWith("현재 재고가 부족하여 취소할 수 없습니다.")
+    ? "재고가 부족해 취소할 수 없습니다."
+    : blocker?.startsWith("지난 주 내역은 취소할 수 없습니다.")
+      ? "지난주 내역은 취소할 수 없습니다."
+      : blocker;
   const [step, setStep] = useState<CancelStep>("idle");
   const [reason, setReason] = useState("");
   const [pin, setPin] = useState("");
@@ -275,6 +281,16 @@ export function HistoryCancelAction({
     setError("");
   }, [desktopCancellationOpen]);
 
+  useLayoutEffect(() => {
+    if (!blocker || step === "idle" || step === "submitting") return;
+    lifecycleTokenRef.current += 1;
+    setStep("idle");
+    setReason("");
+    setPin("");
+    setError("");
+    onDesktopCancellationOpenChange?.(false);
+  }, [blocker, step, onDesktopCancellationOpenChange]);
+
   function closeConfirmation(): void {
     lifecycleTokenRef.current += 1;
     setStep("idle");
@@ -290,6 +306,9 @@ export function HistoryCancelAction({
       !normalizedReason
       || !pin
       || blocker
+      || !panelOpen
+      || cancelled
+      || scopeStatus !== "ready"
       || submittingRef.current
       || inFlightCancellationIdentities.has(identity)
     ) return;
@@ -350,15 +369,21 @@ export function HistoryCancelAction({
   let content: ReactNode = null;
   if (panelOpen && !cancelled && scopeStatus !== "ready") {
     content = <HistoryCancelScopeLoadState status={scopeStatus} onRetry={onRetryScope} />;
-  } else if (panelOpen && !cancelled && !blocker && step === "idle") {
+  } else if (panelOpen && !cancelled && (blocker || step === "idle")) {
     content = (
       <div className="hc-idle">
         <button
           type="button"
+          disabled={Boolean(blocker)}
+          aria-label={blocker ? triggerLabel ?? copy.trigger : undefined}
+          aria-describedby={blocker ? blockerId : undefined}
           onClick={controller.openConfirmation}
         >
-          <XCircle className="h-4 w-4" />
-          {triggerLabel ?? copy.trigger}
+          {blocker ? (
+            <span id={blockerId} className="hc-blocker">{blockerMessage}</span>
+          ) : (
+            <><XCircle className="h-4 w-4" />{triggerLabel ?? copy.trigger}</>
+          )}
         </button>
       </div>
     );

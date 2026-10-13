@@ -7,6 +7,7 @@ import { productionApi } from "@/lib/api/production";
 import type { IoBatch } from "@/lib/api/types/io";
 import { HistoryDetailMemo, HistoryDetailPanel } from "../HistoryDetailPanel";
 import { HistoryBatchDetailPanel } from "../HistoryBatchDetailPanel";
+import { HistoryCancelAction } from "../HistoryCancelAction";
 
 const realtimeState = vi.hoisted(() => ({
   revision: 1 as number | null,
@@ -192,6 +193,101 @@ beforeEach(() => {
 });
 
 describe("desktop history detail panels", () => {
+  it("discards confirmation credentials when cancellation becomes blocked", () => {
+    const onSubmit = vi.fn();
+    const props = { panelOpen: true, identity: "operation:1", scope: "batch" as const, effects: [], cancelled: false, onSubmit, triggerLabel: "이 내역 취소" };
+    const { rerender } = render(<HistoryCancelAction {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: "이 내역 취소" }));
+    fireEvent.change(screen.getByLabelText("취소 사유"), { target: { value: "이전 입력" } });
+    fireEvent.change(screen.getByLabelText("PIN"), { target: { value: "0000" } });
+    rerender(<HistoryCancelAction {...props} blocker="픽업 완료를 먼저 취소해 주세요." />);
+    expect(screen.getByRole("button", { name: "이 내역 취소" })).toBeDisabled();
+    expect(screen.queryByLabelText("PIN")).not.toBeInTheDocument();
+    rerender(<HistoryCancelAction {...props} />);
+    expect(screen.queryByLabelText("PIN")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "이 내역 취소" }));
+    expect(screen.getByLabelText("PIN")).toHaveValue("");
+    expect(screen.getByLabelText("취소 사유")).toHaveValue("");
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("clears credentials after an in-flight cancellation fails while blocked", async () => {
+    let rejectRequest!: (error: Error) => void;
+    const onSubmit = vi.fn(() => new Promise<void>((_, reject) => { rejectRequest = reject; }));
+    const props = { panelOpen: true, identity: "operation:in-flight", scope: "batch" as const, effects: [], cancelled: false, onSubmit, triggerLabel: "이 내역 취소" };
+    const { rerender } = render(<HistoryCancelAction {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: "이 내역 취소" }));
+    fireEvent.change(screen.getByLabelText("취소 사유"), { target: { value: "이전 입력" } });
+    fireEvent.change(screen.getByLabelText("PIN"), { target: { value: "0000" } });
+    fireEvent.click(screen.getByRole("button", { name: "취소 확정" }));
+    rerender(<HistoryCancelAction {...props} blocker="현재 재고가 부족하여 취소할 수 없습니다." />);
+    await act(async () => { rejectRequest(new Error("재고 변경")); });
+    rerender(<HistoryCancelAction {...props} />);
+    expect(screen.queryByLabelText("PIN")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "이 내역 취소" }));
+    expect(screen.getByLabelText("PIN")).toHaveValue("");
+  });
+
+  it.each(["desktop", "default"] as const)("keeps reversal operation details read-only in %s", async (variant) => {
+    const selected = makeLog({ operation_id: "reversal-1", operation_kind: "CANCELLATION", operation_effective_status: "cancellation" });
+    vi.mocked(productionApi.getTransactions).mockResolvedValue([selected]);
+    vi.mocked(productionApi.previewInventoryOperationCancellation).mockResolvedValue({
+      operationId: "reversal-1", planHash: "a".repeat(64), canCancel: false, blockers: ["취소 작업은 다시 취소할 수 없습니다."], cells: [], defectRecords: [], effects: [],
+    });
+    render(<HistoryBatchDetailPanel panelOpen variant={variant} mobilePresentation batchId="reversal-1" workOperationId="reversal-1" logs={[selected]} batchCache={new Map()} setBatchCache={() => {}} onBatchCancelled={() => {}} />);
+    await waitFor(() => expect(productionApi.previewInventoryOperationCancellation).toHaveBeenCalled());
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.queryByRole("button", { name: "이 내역 취소" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/취소된 거래/)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["desktop", false], ["desktop", true], ["default", false], ["default", true],
+  ] as const)("shows a disabled cancellation with its reason in %s batch=%s", async (variant, batch) => {
+    const blocker = "현재 재고가 부족하여 취소할 수 없습니다. 현재 재고를 확인한 뒤 다시 시도해 주세요.";
+    const selected = makeLog({ operation_id: "operation-1", operation_kind: "BUSINESS", operation_effective_status: "active" });
+    vi.mocked(productionApi.getTransactions).mockResolvedValue([selected]);
+    vi.mocked(productionApi.previewInventoryOperationCancellation).mockResolvedValue({
+      operationId: "operation-1", planHash: "a".repeat(64), canCancel: false, blockers: [blocker], cells: [], defectRecords: [], effects: [],
+    });
+    render(batch
+      ? <HistoryBatchDetailPanel panelOpen variant={variant} mobilePresentation batchId="operation-1" workOperationId="operation-1" logs={[selected]} batchCache={new Map()} setBatchCache={() => {}} onBatchCancelled={() => {}} />
+      : <HistoryDetailPanel panelOpen variant={variant} mobilePresentation selected={selected} onSelectLog={() => {}} onLogUpdated={() => {}} />);
+    const button = await screen.findByRole("button", { name: "이 내역 취소" });
+    expect(button).toBeDisabled();
+    const message = variant === "desktop" ? "재고가 부족해 취소할 수 없습니다." : blocker;
+    expect(button).toHaveAccessibleDescription(message);
+    expect(screen.getByText(message)).toBeVisible();
+    if (variant === "desktop") expect(button).toContainElement(screen.getByText(message));
+    fireEvent.click(button);
+    fireEvent.keyDown(button, { key: "Enter" });
+    expect(screen.queryByTestId("history-cancel-confirmation")).not.toBeInTheDocument();
+    expect(productionApi.cancelInventoryOperation).not.toHaveBeenCalled();
+    expect(api.cancelTransaction).not.toHaveBeenCalled();
+  });
+
+  it("updates blocked cancellation after realtime refresh and uses the fallback reason", async () => {
+    const selected = makeLog({ operation_id: "operation-1" });
+    vi.mocked(productionApi.getTransactions).mockResolvedValue([selected]);
+    const preview = { operationId: "operation-1", planHash: "a".repeat(64), canCancel: false, blockers: [], cells: [], defectRecords: [], effects: [] };
+    vi.mocked(productionApi.previewInventoryOperationCancellation).mockResolvedValue(preview);
+    const panel = <HistoryDetailPanel panelOpen variant="desktop" selected={selected} onSelectLog={() => {}} onLogUpdated={() => {}} />;
+    const { rerender } = render(panel);
+    const button = await screen.findByRole("button", { name: "이 내역 취소" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription("현재 상태에서는 이 작업을 취소할 수 없습니다.");
+    vi.mocked(productionApi.previewInventoryOperationCancellation).mockResolvedValue({ ...preview, canCancel: true });
+    realtimeState.revision = 2;
+    rerender(<HistoryDetailPanel panelOpen variant="desktop" selected={selected} onSelectLog={() => {}} onLogUpdated={() => {}} />);
+    await waitFor(() => expect(button).toBeEnabled());
+    expect(screen.queryByText("현재 상태에서는 이 작업을 취소할 수 없습니다.")).not.toBeInTheDocument();
+    vi.mocked(productionApi.previewInventoryOperationCancellation).mockResolvedValue({ ...preview, blockers: ["지난 주 내역은 취소할 수 없습니다."] });
+    realtimeState.revision = 3;
+    rerender(<HistoryDetailPanel panelOpen variant="desktop" selected={selected} onSelectLog={() => {}} onLogUpdated={() => {}} />);
+    await waitFor(() => expect(button).toBeDisabled());
+    expect(button).toHaveAccessibleDescription("지난주 내역은 취소할 수 없습니다.");
+  });
+
   it("모바일 구성 조회 실패에도 거래 재고를 유지하고 재시도한다", async () => {
     const batch = makeBatch();
     const selected = makeLog({operation_batch_id:batch.batch_id,operation_line_id:batch.bundles[0].lines[0].line_id});
