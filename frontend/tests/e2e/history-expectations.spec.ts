@@ -127,8 +127,8 @@ test("HISTORY 8.3-01~05 실제 기간·부서OR·업무OR·그룹AND와 요약 �
   await page.getByRole("button", { name: "오늘", exact: true }).click();
   await expect(stats(page)).toContainText("120건");
   await page.getByRole("button", { name: /^필터/ }).click();
-  const department = page.getByText("부서 구분", { exact: true }).locator("..").locator("..");
-  const operation = page.getByText("작업 종류", { exact: true }).locator("..").locator("..");
+  const department = page.getByText("부서 구분", { exact: true }).locator("..");
+  const operation = page.getByText("작업 종류", { exact: true }).locator("..");
   for (const label of ["창고 입출고", "부서 입출고", "불량", "품목 전환", "출하"]) {
     await expect(operation.getByRole("button", { name: label, exact: true })).toBeVisible();
   }

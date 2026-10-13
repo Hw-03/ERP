@@ -272,7 +272,7 @@ test("SHIP-HISTORY-COUNT 8.12-15 G09 실제 출하 원작업1+취소1 보존·�
   await page.getByRole("button", { name: "오늘", exact: true }).click();
   const rows = page.locator('[data-history-main-row="true"]');
   await page.getByRole("button", { name: /^필터/ }).click();
-  const operation = page.getByText("작업 종류", { exact: true }).locator("..").locator("..");
+  const operation = page.getByText("작업 종류", { exact: true }).locator("..");
   await operation.getByRole("button", { name: "출하", exact: true }).click();
   await expect(rows).toHaveCount(2);
   await expect(page.getByTestId("history-scroll-surface").locator("section").first()).toContainText("2건");
