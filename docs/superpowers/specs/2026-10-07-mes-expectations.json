@@ -12885,71 +12885,71 @@
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "정상 복귀 navigation ${presentation.label} ${managementCategory} ${restoreQty === 5 ? \"전량\" : \"부분\"}",
               "assertion": "await expect.poll(normalStock).toBe(normalBefore + restoreQty);",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 367
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 373
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "정상 복귀 navigation ${presentation.label} ${managementCategory} ${restoreQty === 5 ? \"전량\" : \"부분\"}",
               "assertion": "expect(await warehouseProductionStock()).toBe(warehouseProductionBefore);",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 367
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 373
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "정상 복귀 navigation ${presentation.label} ${managementCategory} ${restoreQty === 5 ? \"전량\" : \"부분\"}",
               "assertion": "await expect.poll(transactionCount).toBe(transactionsBefore + 1);",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 367
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 373
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "정상 복귀 navigation ${presentation.label} ${managementCategory} ${restoreQty === 5 ? \"전량\" : \"부분\"}",
               "assertion": "expect(remainingRecord).toBeUndefined();",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 367
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 373
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "정상 복귀 navigation ${presentation.label} ${managementCategory} ${restoreQty === 5 ? \"전량\" : \"부분\"}",
               "assertion": "await expect(page.getByRole(\"article\", { name: `${item.item_name} 격리 기록` }).filter({ hasText: memo, visible: true })).toHaveCount(0);",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 367
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 373
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "정상 복귀 navigation ${presentation.label} ${managementCategory} ${restoreQty === 5 ? \"전량\" : \"부분\"}",
               "assertion": "expect(Number(remainingRecord?.available_quantity)).toBe(5 - restoreQty);",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 367
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 373
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "정상 복귀 navigation ${presentation.label} ${managementCategory} ${restoreQty === 5 ? \"전량\" : \"부분\"}",
               "assertion": "await expect(page.getByRole(\"article\", { name: `${item.item_name} 격리 기록` }).filter({ hasText: memo, visible: true }).getByText(`${5 - restoreQty}개`, { exact: true })).toBeVisible();",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 367
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 373
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "정상 복귀 navigation ${presentation.label} ${managementCategory} ${restoreQty === 5 ? \"전량\" : \"부분\"}",
               "assertion": "await expect(page.getByRole(\"spinbutton\").filter({ visible: true })).toHaveCount(0);",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 367
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 373
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "정상 복귀 navigation ${presentation.label} ${managementCategory} ${restoreQty === 5 ? \"전량\" : \"부분\"}",
               "assertion": "expect(await transactionCount()).toBe(transactionsBefore + 1);",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 367
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 373
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "정상 복귀 navigation ${presentation.label} ${managementCategory} ${restoreQty === 5 ? \"전량\" : \"부분\"}",
               "assertion": "expect(await normalStock()).toBe(normalBefore + restoreQty);",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 367
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 373
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
@@ -18931,42 +18931,42 @@
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(original.summary).toMatchObject({ quantity: 18, record_count: 6 });",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(categories.getByRole(\"row\")).toHaveText([\n    \"최초 분류발생 수량발생 건수이전 수량이전 건수\", \"불량4개2건0개0건\", \"B급6개2건0개0건\", \"구형8개2건0개0건\",\n  ]);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(unchanged.summary).toEqual(filtered.summary);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(unchanged.categories).toEqual(filtered.categories);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(unchanged.items).toEqual(filtered.items);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(remaining.some((row: { record_id: string }) => row.record_id === origin.record_id)).toBe(false);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             }
           ],
@@ -19351,91 +19351,91 @@
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(collection.reduce((total: number, row: { quantity: number }) => total + row.quantity, 0)).toBe(18);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(collection.reduce((total: number, row: { record_count: number }) => total + row.record_count, 0)).toBe(6);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(collection.reduce((total: number, row: { quantity: number }) => total + row.quantity, 0)).toBe(9);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(collection.reduce((total: number, row: { record_count: number }) => total + row.record_count, 0)).toBe(3);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(card).toContainText(\"18개\");",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(card).toContainText(\"9개\");",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(page.locator(\".recharts-tooltip-wrapper\")).toContainText(\"18\");",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(page.locator(\".recharts-tooltip-wrapper\")).toContainText(\"9\");",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(selectedReason).toContainText(\"9개 · 100% · 3건\");",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(ranked.getByRole(\"cell\").nth(1)).toHaveText(\"9개\");",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(ranked.getByRole(\"cell\").nth(2)).toHaveText(\"3건\");",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(repeated.items).toEqual(original.items);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(result.summary).toMatchObject({ quantity: 9, record_count: 3 });",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             }
           ],
@@ -19700,91 +19700,91 @@
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(collection.reduce((total: number, row: { quantity: number }) => total + row.quantity, 0)).toBe(18);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(collection.reduce((total: number, row: { record_count: number }) => total + row.record_count, 0)).toBe(6);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(collection.reduce((total: number, row: { quantity: number }) => total + row.quantity, 0)).toBe(9);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(collection.reduce((total: number, row: { record_count: number }) => total + row.record_count, 0)).toBe(3);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(card).toContainText(\"18개\");",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(card).toContainText(\"9개\");",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(page.locator(\".recharts-tooltip-wrapper\")).toContainText(\"18\");",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(page.locator(\".recharts-tooltip-wrapper\")).toContainText(\"9\");",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(selectedReason).toContainText(\"9개 · 100% · 3건\");",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(ranked.getByRole(\"cell\").nth(1)).toHaveText(\"9개\");",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(ranked.getByRole(\"cell\").nth(2)).toHaveText(\"3건\");",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(repeated.items).toEqual(original.items);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(result.summary).toMatchObject({ quantity: 9, record_count: 3 });",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             }
           ],
@@ -19959,56 +19959,56 @@
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(result.summary).toMatchObject({ quantity: 9, record_count: 3 });",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(result.departments.map((row: { label: string }) => row.label)).toEqual([\"튜브\"]);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(page.getByRole(\"button\", { name: \"부서 튜브 ×\", exact: true })).toBeVisible();",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(page.getByRole(\"button\", { name: `모델 ${data.model.model_name} ×`, exact: true })).toBeVisible();",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(page.getByRole(\"button\", { name: \"공정 원자재 ×\", exact: true })).toBeVisible();",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(page.getByRole(\"button\", { name: \"부서 튜브 ×\", exact: true })).toHaveCount(0);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(page.getByRole(\"button\", { name: `모델 ${data.model.model_name} ×`, exact: true })).toHaveCount(0);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(reset.summary).toMatchObject({ quantity: 18, record_count: 6 });",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             }
           ],
@@ -20240,91 +20240,91 @@
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(collection.reduce((total: number, row: { quantity: number }) => total + row.quantity, 0)).toBe(18);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(collection.reduce((total: number, row: { record_count: number }) => total + row.record_count, 0)).toBe(6);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(collection.reduce((total: number, row: { quantity: number }) => total + row.quantity, 0)).toBe(9);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(collection.reduce((total: number, row: { record_count: number }) => total + row.record_count, 0)).toBe(3);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(card).toContainText(\"18개\");",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(card).toContainText(\"9개\");",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(page.locator(\".recharts-tooltip-wrapper\")).toContainText(\"18\");",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(page.locator(\".recharts-tooltip-wrapper\")).toContainText(\"9\");",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(selectedReason).toContainText(\"9개 · 100% · 3건\");",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(ranked.getByRole(\"cell\").nth(1)).toHaveText(\"9개\");",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(ranked.getByRole(\"cell\").nth(2)).toHaveText(\"3건\");",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(repeated.items).toEqual(original.items);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(result.summary).toMatchObject({ quantity: 9, record_count: 3 });",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             }
           ],
@@ -20527,42 +20527,42 @@
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(original.summary).toMatchObject({ quantity: 18, record_count: 6 });",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "await expect(categories.getByRole(\"row\")).toHaveText([\n    \"최초 분류발생 수량발생 건수이전 수량이전 건수\", \"불량4개2건0개0건\", \"B급6개2건0개0건\", \"구형8개2건0개0건\",\n  ]);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(unchanged.summary).toEqual(filtered.summary);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(unchanged.categories).toEqual(filtered.categories);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(unchanged.items).toEqual(filtered.items);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             },
             {
               "file": "frontend/tests/e2e/defect-statistics-expectations.spec.ts",
               "selector": "DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀",
               "assertion": "expect(remaining.some((row: { record_id: string }) => row.record_id === origin.record_id)).toBe(false);",
-              "sourceHash": "b71f682f40171592ba470db11c6f2ba45a308cebec7e0b701441c73b4b415b6b",
+              "sourceHash": "fe0a6f455440d4d9fdbfaaeca891480990238bcc06ed5cb129090645fbbc676f",
               "line": 65
             }
           ],
@@ -37295,43 +37295,43 @@
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "B급 등록·분류 변경·일부 정상 복귀는 보관 목록에 남는다",
               "assertion": "await expect(record).toContainText(\"B급\");",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 274
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 280
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "B급 등록·분류 변경·일부 정상 복귀는 보관 목록에 남는다",
               "assertion": "await expect(page.getByRole(\"button\", { name: \"전체 폐기\", exact: true }).filter({ visible: true })).toHaveCount(0);",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 274
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 280
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "B급 등록·분류 변경·일부 정상 복귀는 보관 목록에 남는다",
               "assertion": "await expect(page.getByRole(\"button\", { name: \"반품\", exact: true }).filter({ visible: true })).toHaveCount(0);",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 274
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 280
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "B급 등록·분류 변경·일부 정상 복귀는 보관 목록에 남는다",
               "assertion": "await expect(record.getByText(\"3개\", { exact: true })).toBeVisible();",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 274
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 280
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "B급 등록·분류 변경·일부 정상 복귀는 보관 목록에 남는다",
               "assertion": "await expect(record).toContainText(\"구형\");",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 274
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 280
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "B급 등록·분류 변경·일부 정상 복귀는 보관 목록에 남는다",
               "assertion": "expect(history).toEqual(expect.arrayContaining([\n      expect.objectContaining({ is_initial: true, next_category: \"B_GRADE\" }),\n      expect.objectContaining({ previous_category: \"B_GRADE\", next_category: \"OBSOLETE\" }),\n    ]));",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 274
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 280
             },
             {
               "file": "frontend/tests/e2e/defect-bulk-boundaries.spec.ts",
@@ -83992,71 +83992,71 @@
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "정상 복귀 navigation ${presentation.label} ${managementCategory} ${restoreQty === 5 ? \"전량\" : \"부분\"}",
               "assertion": "await expect.poll(normalStock).toBe(normalBefore + restoreQty);",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 367
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 373
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "정상 복귀 navigation ${presentation.label} ${managementCategory} ${restoreQty === 5 ? \"전량\" : \"부분\"}",
               "assertion": "expect(await warehouseProductionStock()).toBe(warehouseProductionBefore);",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 367
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 373
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "정상 복귀 navigation ${presentation.label} ${managementCategory} ${restoreQty === 5 ? \"전량\" : \"부분\"}",
               "assertion": "await expect.poll(transactionCount).toBe(transactionsBefore + 1);",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 367
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 373
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "정상 복귀 navigation ${presentation.label} ${managementCategory} ${restoreQty === 5 ? \"전량\" : \"부분\"}",
               "assertion": "expect(remainingRecord).toBeUndefined();",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 367
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 373
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "정상 복귀 navigation ${presentation.label} ${managementCategory} ${restoreQty === 5 ? \"전량\" : \"부분\"}",
               "assertion": "await expect(page.getByRole(\"article\", { name: `${item.item_name} 격리 기록` }).filter({ hasText: memo, visible: true })).toHaveCount(0);",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 367
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 373
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "정상 복귀 navigation ${presentation.label} ${managementCategory} ${restoreQty === 5 ? \"전량\" : \"부분\"}",
               "assertion": "expect(Number(remainingRecord?.available_quantity)).toBe(5 - restoreQty);",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 367
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 373
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "정상 복귀 navigation ${presentation.label} ${managementCategory} ${restoreQty === 5 ? \"전량\" : \"부분\"}",
               "assertion": "await expect(page.getByRole(\"article\", { name: `${item.item_name} 격리 기록` }).filter({ hasText: memo, visible: true }).getByText(`${5 - restoreQty}개`, { exact: true })).toBeVisible();",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 367
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 373
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "정상 복귀 navigation ${presentation.label} ${managementCategory} ${restoreQty === 5 ? \"전량\" : \"부분\"}",
               "assertion": "await expect(page.getByRole(\"spinbutton\").filter({ visible: true })).toHaveCount(0);",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 367
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 373
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "정상 복귀 navigation ${presentation.label} ${managementCategory} ${restoreQty === 5 ? \"전량\" : \"부분\"}",
               "assertion": "expect(await transactionCount()).toBe(transactionsBefore + 1);",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 367
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 373
             },
             {
               "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
               "selector": "정상 복귀 navigation ${presentation.label} ${managementCategory} ${restoreQty === 5 ? \"전량\" : \"부분\"}",
               "assertion": "expect(await normalStock()).toBe(normalBefore + restoreQty);",
-              "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
-              "line": 367
+              "sourceHash": "1721e501b3685abe9cc1f95c5dd226c156880ae20ca69913194faa29024f2b20",
+              "line": 373
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",

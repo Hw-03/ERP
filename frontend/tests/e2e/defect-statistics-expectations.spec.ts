@@ -98,8 +98,16 @@ test("DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위
   }
   await page.getByRole("button", { name: "선택 기간 상세", exact: true }).click();
   const bars = page.locator(".recharts-bar-rectangle path");
+  // Recharts moves the bar after switching periods; a stationary pointer can
+  // remain over yesterday even though the final bar and API quantity are correct.
+  const hoverChartQuantity = async (quantity: number): Promise<void> => {
+    await expect.poll(async () => {
+      await bars.hover();
+      return page.locator(".recharts-tooltip-wrapper").textContent();
+    }).toContain(`발생 수량 : ${quantity}`);
+  };
   await expect(bars).toHaveCount(1);
-  await bars.hover();
+  await hoverChartQuantity(18);
   await expect(page.locator(".recharts-tooltip-wrapper")).toContainText("18");
   const repeated = await report(() => page.getByRole("button", { name: "새로고침", exact: true }).click());
   expect(repeated.items).toEqual(original.items);
@@ -123,7 +131,7 @@ test("DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위
   await expect(ranked.getByRole("cell").nth(1)).toHaveText("9개");
   await expect(ranked.getByRole("cell").nth(2)).toHaveText("3건");
   await expect(bars).toHaveCount(1);
-  await bars.hover();
+  await hoverChartQuantity(9);
   await expect(page.locator(".recharts-tooltip-wrapper")).toContainText("9");
   for (const label of ["주간", "연간", "월간"]) {
     filters.period = ({ 주간: "week", 연간: "year", 월간: "month" } as Record<string, string>)[label];

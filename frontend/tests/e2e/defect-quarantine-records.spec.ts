@@ -202,7 +202,13 @@ test.describe("불량 격리 건별 원장", () => {
       "수정된 긴 메모 — 보관 중 가장 하단에 깔린 제품이라 외관 손상이 확인됨",
     );
     await editableRow.getByRole("textbox", { name: "직원 PIN" }).fill("0000");
+    const memoSaved = page.waitForResponse((response) =>
+      response.request().method() === "PUT" &&
+      /\/api\/defects\/records\/[^/]+\/memo$/.test(new URL(response.url()).pathname),
+    );
     await editableRow.getByRole("button", { name: "저장", exact: true }).click();
+    expect((await memoSaved).ok()).toBeTruthy();
+    await expect(editableRow.getByRole("textbox", { name: "격리 메모" })).toHaveCount(0);
     await expect(editableRow).toContainText("수정된 긴 메모");
 
     await page.reload();
