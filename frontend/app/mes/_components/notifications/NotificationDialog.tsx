@@ -13,10 +13,13 @@ import { LoadFailureCard } from "../common/LoadFailureCard";
 import { ReadLoading } from "../common/ReadState";
 import { SkeletonBlock } from "../common/LoadingSkeleton";
 import { getNotificationPresentation } from "./notificationPresentation";
+import presentation from "../mobile/mobilePresentation.module.css";
+import { MOBILE_MODAL_VIEWPORT_STYLE } from "../mobile/mobileModalLayout";
 
 export type NotificationFilter = "all" | "unread";
 
 export interface NotificationDialogProps {
+  mobilePresentation?: boolean;
   items: AppNotification[];
   unread: number;
   filter: NotificationFilter;
@@ -51,13 +54,13 @@ const ICONS: Record<string, typeof Bell> = {
   handover_arrived: Handshake,
 };
 
-/** Desktop notification history with a persistent header, scrollable list, and settings footer. */
+/** Shared notification history; the mobile frame keeps its header and settings visible. */
 export function NotificationDialog({
   items, unread, filter, onFilterChange, onClose, onItemClick, onMarkAll,
   onDeleteItem, onDeleteRead, loginPopupEnabled,
   loginPopupUpdating = false, onToggleLoginPopup, loading = false, error = null,
   hasData = items.length > 0 || (!loading && !error),
-  actionError = null, onRetry, actionsPending = false,
+  actionError = null, onRetry, actionsPending = false, mobilePresentation = false,
 }: NotificationDialogProps) {
   const [mounted, setMounted] = useState(false);
   const titleId = useId();
@@ -114,15 +117,15 @@ export function NotificationDialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[260] flex items-center justify-center p-4 sm:p-6"
-      style={{ background: "rgba(0,0,0,.45)" }}
+      className={`fixed inset-0 z-[260] flex items-center justify-center ${mobilePresentation ? `px-4 ${presentation.scope}` : "p-4 sm:p-6"}`}
+      style={{ background: "rgba(0,0,0,.45)", ...(mobilePresentation ? MOBILE_MODAL_VIEWPORT_STYLE : {}) }}
       onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
     >
       <div
         ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId}
-        className="flex w-full max-w-[640px] min-h-0 flex-col overflow-hidden rounded-[24px] border shadow-lg"
+        className={`flex w-full min-h-0 flex-col overflow-hidden rounded-[24px] border shadow-lg ${mobilePresentation ? "h-full max-w-[398px] md:max-w-[688px]" : "max-w-[640px]"}`}
         style={{
-          maxHeight: "min(720px, calc(100dvh - 48px))",
+          maxHeight: mobilePresentation ? undefined : "min(720px, calc(100dvh - 48px))",
           background: "var(--c-popup-bg)", borderColor: LEGACY_COLORS.border,
           boxShadow: "var(--c-popup-shadow)",
         }}
@@ -131,8 +134,13 @@ export function NotificationDialog({
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ color: LEGACY_COLORS.blue, background: tint(LEGACY_COLORS.blue, 12) }} aria-hidden="true">
             <Bell className="h-5 w-5" />
           </span>
-          <h2 id={titleId} className="min-w-0 flex-1 text-xl font-bold" style={{ color: LEGACY_COLORS.text }}>알림</h2>
-          <p className="text-right text-sm" style={{ color: LEGACY_COLORS.muted2 }}>읽지 않은 알림 {unread}건</p>
+          {mobilePresentation ? <div className="min-w-0 flex-1">
+            <h2 id={titleId} className="text-lg font-bold" style={{ color: LEGACY_COLORS.text }}>알림</h2>
+            <p className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>읽지 않은 알림 {unread}건</p>
+          </div> : <>
+            <h2 id={titleId} className="min-w-0 flex-1 text-xl font-bold" style={{ color: LEGACY_COLORS.text }}>알림</h2>
+            <p className="text-right text-sm" style={{ color: LEGACY_COLORS.muted2 }}>읽지 않은 알림 {unread}건</p>
+          </>}
           <button ref={closeRef} type="button" onClick={onClose} aria-label="알림 닫기"
             className="no-btn-inset flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2"
             style={{ color: LEGACY_COLORS.muted2 }}><X className="h-5 w-5" /></button>
@@ -182,11 +190,11 @@ export function NotificationDialog({
                       {!notification.is_read && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full" style={{ background: tone }} />}
                     </span>
                     <span className="min-w-0 flex-1 break-words">
-                      <span className="flex min-h-10 items-center gap-2">
-                        <span className="min-w-0 text-xl font-bold" style={{ color: LEGACY_COLORS.text }}>{presentation.title}</span>
+                      <span className={`flex min-h-10 items-center gap-2 ${mobilePresentation ? "flex-wrap" : ""}`}>
+                        <span className={`min-w-0 font-bold ${mobilePresentation ? "text-base [overflow-wrap:anywhere]" : "text-xl"}`} style={{ color: LEGACY_COLORS.text }}>{presentation.title}</span>
                         {presentation.status && <span className="shrink-0 rounded-full px-2 py-1 text-xs font-semibold"
                           style={{ color: tone, background: tint(tone, 12) }}>{presentation.status}</span>}
-                        <span className="ml-auto flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
+                        <span className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${mobilePresentation ? "w-full" : "ml-auto justify-end"}`}>
                           <span className="whitespace-nowrap text-sm" style={{ color: LEGACY_COLORS.muted2 }}>{formatKstDateTime(notification.created_at)}</span>
                           {presentation.requester && <span className="shrink-0 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>{presentation.requester}</span>}
                         </span>

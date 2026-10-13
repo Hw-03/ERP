@@ -45,6 +45,13 @@ vi.mock("@/lib/queries/useNotificationsQuery", () => ({
   useNotificationsQuery: () => ({ data: state.notifications }),
 }));
 
+vi.mock("../../notifications/useNotificationController", () => ({
+  useNotificationController: ({ onNavigate }: { onNavigate: typeof notificationNavigation.current }) => {
+    notificationNavigation.current = onNavigate;
+    return { open: false, unread: state.notifications.unread_count, visibilityRef: { current: null }, openDialog: vi.fn() };
+  },
+}));
+
 vi.mock("@/lib/client-events", () => ({
   sendClientEvent: vi.fn(),
 }));
@@ -165,21 +172,18 @@ vi.mock("../screens", () => ({
     onShipping,
     onWeekly,
     visibleEntries,
-    onNotificationNavigate,
   }: {
     onChecklist?: () => void;
     onShipping?: () => void;
     onWeekly?: () => void;
     visibleEntries?: string[];
-    onNotificationNavigate?: (target: { tab: string; section: string | null; relatedRequestId: string | null }) => void;
   }) => {
-    notificationNavigation.current = onNotificationNavigate;
     return <>
       <div data-testid="more-entry-order">{visibleEntries?.join(",")}</div>
       <button type="button" onClick={onChecklist}>open checklist</button>
       <button type="button" onClick={onShipping}>open shipping</button>
       <button type="button" onClick={onWeekly}>open weekly</button>
-      <button type="button" onClick={() => onNotificationNavigate?.({ tab: "warehouse", section: "as-research-queue", relatedRequestId: "as-request-1" })}>open AS notification</button>
+      <button type="button" onClick={() => notificationNavigation.current?.({ tab: "warehouse", section: "as-research-queue", relatedRequestId: "as-request-1" })}>open AS notification</button>
     </>;
   },
 }));

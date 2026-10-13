@@ -63,7 +63,17 @@ vi.mock("../../login/useCurrentOperator", () => ({
   },
 }));
 
-import { NotificationBell } from "../NotificationBell";
+import { NotificationBell, NotificationBellButton } from "../NotificationBell";
+import { NotificationDialog } from "../NotificationDialog";
+import { useNotificationController } from "../useNotificationController";
+
+function MobileHost({ more = false }: { more?: boolean }) {
+  const controller = useNotificationController({ operator: state.operator, loginDialogEnabled: true });
+  return <div ref={controller.visibilityRef}>
+    {more && <NotificationBellButton unread={controller.unread} onClick={controller.openDialog} mobilePresentation />}
+    {controller.open && <NotificationDialog {...controller.dialogProps} mobilePresentation />}
+  </div>;
+}
 
 function notification(overrides: Partial<AppNotification> = {}): AppNotification {
   return {
@@ -82,7 +92,94 @@ function notification(overrides: Partial<AppNotification> = {}): AppNotification
 }
 
 describe("NotificationBell", () => {
+  it("더보기 화면 없이 로그인하고 닫은 뒤 더보기 왕복에도 다시 자동 표시하지 않는다", async () => {
+    window.sessionStorage.setItem("dexcowin_mes_login_popup_pending", "emp-1");
+    const { rerender } = render(<MobileHost />);
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "알림 닫기" }));
+    rerender(<MobileHost more />);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "알림 2건" }));
+    expect(screen.getByRole("tab", { name: "전체" })).toHaveAttribute("aria-selected", "true");
+    rerender(<MobileHost />);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "알림 닫기" }));
+    rerender(<MobileHost more />);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it.each([false, true])("모바일 설정 %s에서 미읽음이 없으면 자동 표시 없이 수동 열기는 유지한다", (enabled) => {
+    state.operator.loginPopupEnabled = enabled;
+    state.notifications = { items: [], unread_count: 0 };
+    window.sessionStorage.setItem("dexcowin_mes_login_popup_pending", "emp-1");
+    const { rerender } = render(<MobileHost />);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(window.sessionStorage.getItem("dexcowin_mes_login_popup_pending")).toBeNull();
+    rerender(<MobileHost more />);
+    fireEvent.click(screen.getByRole("button", { name: "알림", exact: true }));
+    expect(screen.getByText("알림이 없습니다.")).toBeInTheDocument();
+  });
+
+  it("모바일 설정이 꺼지면 미읽음이 있어도 자동 표시하지 않는다", () => {
+    state.operator.loginPopupEnabled = false;
+    window.sessionStorage.setItem("dexcowin_mes_login_popup_pending", "emp-1");
+    render(<MobileHost more />);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "알림 2건" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("최초 조회 실패 때 로그인 표시를 보류하고 데이터가 준비되면 한 번 연다", () => {
+    state.queryHasData = false;
+    state.queryError = new Error("offline");
+    window.sessionStorage.setItem("dexcowin_mes_login_popup_pending", "emp-1");
+    const { rerender } = render(<MobileHost />);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(window.sessionStorage.getItem("dexcowin_mes_login_popup_pending")).toBe("emp-1");
+    state.queryHasData = true;
+    state.queryError = null;
+    rerender(<MobileHost />);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(window.sessionStorage.getItem("dexcowin_mes_login_popup_pending")).toBeNull();
+  });
+
+  it("직원이 바뀐 뒤 이전 직원의 읽음 응답으로 업무 이동하지 않는다", async () => {
+    let complete!: (value: unknown) => void;
+    state.markRead.mockReturnValue(new Promise(resolve => { complete = resolve; }));
+    state.notifications.items[0].target_tab = "warehouse";
+    const onNavigate = vi.fn();
+    const { rerender } = render(<NotificationBell onNavigate={onNavigate} loginDialogEnabled={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "알림 2건" }));
+    fireEvent.click(screen.getByText("Approval done"));
+    state.operator = { ...state.operator, employee_id: "emp-2" };
+    state.notifications = { items: [], unread_count: 0 };
+    rerender(<NotificationBell onNavigate={onNavigate} loginDialogEnabled={false} />);
+    complete({});
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(onNavigate).not.toHaveBeenCalled();
+  });
+  it("모바일 로그인에서도 설정이 켜져 있으면 미읽음 모달을 한 번 연다", async () => {
+    window.sessionStorage.setItem("dexcowin_mes_login_popup_pending", "emp-1");
+    const { rerender } = render(<NotificationBell mobilePresentation loginDialogEnabled />);
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("tab", { name: "안 읽음" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(within(dialog).getByRole("button", { name: "알림 닫기" }));
+    rerender(<NotificationBell mobilePresentation loginDialogEnabled />);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("모바일 수동 열기도 공통 모달에서 오래된 미읽음 알림을 조회한다", () => {
+    state.notifications = { items: [notification({ is_read: true })], unread_count: 1 };
+    state.unreadNotifications = { items: [notification({ title: "Older unread", notification_id: "older" })], unread_count: 1 };
+    render(<NotificationBell mobilePresentation loginDialogEnabled={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "알림 1건" }));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("tab", { name: "안 읽음" }));
+    expect(state.queryCalls).toHaveBeenCalledWith("emp-1", { unreadOnly: true, enabled: true });
+    expect(within(dialog).getByText("Older unread")).toBeInTheDocument();
+  });
   beforeEach(() => {
+    state.operator.employee_id = "emp-1";
     state.queryLoading = false;
     state.queryHasData = true;
     state.queryError = null;

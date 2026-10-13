@@ -4,8 +4,7 @@ import { BarChart2, ClipboardCheck, ClipboardList, MapPinned, PackageCheck, type
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { DESKTOP_TAB_ICON_COLORS } from "../../DesktopSidebar";
 import type { Operator } from "../../login/useCurrentOperator";
-import { NotificationBell } from "../../notifications/NotificationBell";
-import type { NotificationNavigationTarget } from "../../notifications/NotificationBell";
+import { NotificationBellButton } from "../../notifications/NotificationBell";
 import presentation from "../mobilePresentation.module.css";
 import { MobilePageHeader } from "../primitives/MobilePageHeader";
 
@@ -48,8 +47,9 @@ const MORE_ENTRIES: Record<
 
 export function MobileMoreScreen({
   operator,
+  unreadCount = 0,
   onProfile,
-  onNotificationNavigate,
+  onOpenNotifications,
   onChecklist,
   onDailyReport,
   onWeekly,
@@ -60,7 +60,7 @@ export function MobileMoreScreen({
   operator: Operator | null;
   unreadCount?: number;
   onProfile: () => void;
-  onNotificationNavigate: (target: NotificationNavigationTarget) => void;
+  onOpenNotifications: () => void;
   onChecklist: () => void;
   onDailyReport: () => void;
   onWeekly: () => void;
@@ -82,9 +82,9 @@ export function MobileMoreScreen({
       <MobilePageHeader className="mx-3" title={operator?.name ?? "더보기"} subtitle={operator ? "프로필" : undefined} onTitleClick={operator ? onProfile : undefined} right={
         <div
           data-testid="mobile-more-notification-target"
-          className="flex h-11 w-11 shrink-0 items-center justify-center [&>div>button]:h-11 [&>div>button]:w-11 [&>div>button>svg]:h-5 [&>div>button>svg]:w-5"
+          className="flex h-11 w-11 shrink-0 items-center justify-center"
         >
-          <NotificationBell onNavigate={onNotificationNavigate} loginDialogEnabled={false} mobilePresentation />
+          <NotificationBellButton unread={unreadCount} onClick={onOpenNotifications} mobilePresentation />
         </div>
       } />
 

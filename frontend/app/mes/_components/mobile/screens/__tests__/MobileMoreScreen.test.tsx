@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { MobileMoreScreen } from "../MobileMoreScreen";
 
 vi.mock("../../../notifications/NotificationBell", () => ({
-  NotificationBell: ({ loginDialogEnabled }: { loginDialogEnabled: boolean }) => (
-    <button type="button" data-login-dialog-enabled={String(loginDialogEnabled)}>
+  NotificationBellButton: ({ unread, onClick }: { unread: number; onClick: () => void }) => (
+    <button type="button" aria-label={`알림 ${unread}건`} onClick={onClick}>
       notification bell
     </button>
   ),
@@ -30,7 +30,7 @@ describe("MobileMoreScreen", () => {
       <MobileMoreScreen
         operator={operator}
         onProfile={() => {}}
-        onNotificationNavigate={() => {}}
+        onOpenNotifications={() => {}}
         onChecklist={() => {}}
         onDailyReport={() => {}}
         onWeekly={() => {}}
@@ -44,13 +44,14 @@ describe("MobileMoreScreen", () => {
 
   it("combines profile and notification into one top card", () => {
     const onProfile = vi.fn();
+    const onOpenNotifications = vi.fn();
 
     render(
       <MobileMoreScreen
         operator={operator}
         unreadCount={7}
         onProfile={onProfile}
-        onNotificationNavigate={() => {}}
+        onOpenNotifications={onOpenNotifications}
         onChecklist={() => {}}
         onDailyReport={() => {}}
         onWeekly={() => {}}
@@ -64,10 +65,8 @@ describe("MobileMoreScreen", () => {
     expect(onProfile).toHaveBeenCalledTimes(1);
     expect(screen.getByText("프로필")).toBeInTheDocument();
     expect(screen.queryByText(/알림.*7건/)).toBeNull();
-    expect(screen.getByRole("button", { name: "notification bell" })).toHaveAttribute(
-      "data-login-dialog-enabled",
-      "false",
-    );
+    fireEvent.click(screen.getByRole("button", { name: "알림 7건" }));
+    expect(onOpenNotifications).toHaveBeenCalledOnce();
     expect(screen.getByText("Kim")).toBeInTheDocument();
   });
 
@@ -82,7 +81,7 @@ describe("MobileMoreScreen", () => {
       <MobileMoreScreen
         operator={operator}
         onProfile={() => {}}
-        onNotificationNavigate={() => {}}
+        onOpenNotifications={() => {}}
         onChecklist={onChecklist}
         onDailyReport={onDailyReport}
         onWeekly={onWeekly}
@@ -122,7 +121,7 @@ describe("MobileMoreScreen", () => {
       <MobileMoreScreen
         operator={operator}
         onProfile={() => {}}
-        onNotificationNavigate={() => {}}
+        onOpenNotifications={() => {}}
         onChecklist={() => {}}
         onDailyReport={() => {}}
         onWeekly={() => {}}

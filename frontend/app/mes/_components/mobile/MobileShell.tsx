@@ -33,7 +33,8 @@ import { sendClientEvent } from "@/lib/client-events";
 import { setAuditScreen } from "@/lib/activity-audit-context";
 import { CapacityDetailModal } from "../CapacityDetailModal";
 import { useCurrentOperator } from "../login/useCurrentOperator";
-import { useNotificationsQuery } from "@/lib/queries/useNotificationsQuery";
+import { useNotificationController } from "../notifications/useNotificationController";
+import { NotificationDialog } from "../notifications/NotificationDialog";
 import { canSeeWorkType } from "../_warehouse_v2/ioWorkType";
 import type { IoEntryIntent } from "../_warehouse_v2/types";
 import { MobileUserMenuSheet } from "./MobileUserMenuSheet";
@@ -169,8 +170,6 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
   const beforeShippingViewportSwitch = useBeforeViewportSwitch();
   const revision = useRealtimeRevision();
   const operator = useCurrentOperator();
-  const employeeId = operator?.employee_id;
-  const { data: notificationsData } = useNotificationsQuery(employeeId);
   const [activeTab, setActiveTab] = useState<MobileTabId>("dashboard");
   const activeTabRef = useRef(activeTab);
   activeTabRef.current = activeTab;
@@ -236,8 +235,6 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
     onBeforeViewportSwitchChange?.(flushBeforeViewportSwitch);
     return () => onBeforeViewportSwitchChange?.(null);
   }, [flushBeforeViewportSwitch, onBeforeViewportSwitchChange]);
-
-  const unreadNotifications = notificationsData?.unread_count ?? 0;
 
   const handleStatusChange = useCallback((_msg: string) => {}, []);
 
@@ -421,6 +418,9 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
     handleTabChange(target, targetInfo);
   }, [canOpenMobileTab, handleTabChange]);
 
+  const notificationController = useNotificationController({ operator, onNavigate: handleNotificationNavigate, loginDialogEnabled: true });
+  const unreadNotifications = notificationController.unread;
+
   const canReceive = canSeeWorkType("receive", operator) && canOpenMobileTab("warehouse");
 
   const handleGoToWarehouse = useCallback((item: Item, intent?: IoEntryIntent) => {
@@ -545,7 +545,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
           operator={operator}
           unreadCount={unreadNotifications}
           onProfile={() => setUserMenuOpen(true)}
-          onNotificationNavigate={handleNotificationNavigate}
+          onOpenNotifications={notificationController.openDialog}
           onChecklist={() => handleTabChange("assemblyChecklist")}
           onDailyReport={() => handleTabChange("dailyReport")}
           onWeekly={() => handleTabChange("weekly")}
@@ -599,12 +599,13 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
     visibleMoreEntries,
     operator,
     unreadNotifications,
-    handleNotificationNavigate,
+    notificationController.openDialog,
   ]);
 
   return (
     <MobileViewportFrame>
       <div
+        ref={notificationController.visibilityRef}
         className="relative flex h-full flex-col overflow-hidden"
         style={{
           background: LEGACY_COLORS.bg,
@@ -673,6 +674,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
         </nav>
       </div>
 
+      {notificationController.open && <NotificationDialog {...notificationController.dialogProps} mobilePresentation />}
       <div className={`${presentation.scope} contents`}>
       {capacityModal && (
         <CapacityDetailModal

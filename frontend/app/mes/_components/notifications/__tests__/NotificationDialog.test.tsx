@@ -24,6 +24,21 @@ function props(overrides: Record<string, unknown> = {}) {
 afterEach(() => { document.body.style.overflow = ""; });
 
 describe("NotificationDialog", () => {
+  it.each([false, true])("조회 상태와 설정 조작을 데스크톱/모바일 %s에서 동일하게 제공한다", (mobilePresentation) => {
+    const p = props({ mobilePresentation, items: [], loading: true, hasData: false });
+    const { rerender } = render(<NotificationDialog {...p} />);
+    expect(screen.getByRole("status", { name: "알림 목록 불러오는 중" })).toBeInTheDocument();
+    expect(screen.queryByText("알림이 없습니다.")).not.toBeInTheDocument();
+    rerender(<NotificationDialog {...p} loading={false} error="조회 실패" onRetry={p.onMarkAll} />);
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(p.onMarkAll).toHaveBeenCalledOnce();
+    expect(screen.queryByText("알림이 없습니다.")).not.toBeInTheDocument();
+    rerender(<NotificationDialog {...p} loading={false} hasData error="갱신 실패" />);
+    expect(screen.getByText("알림이 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText(/기존 내용을 표시합니다/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("switch", { name: "로그인 팝업" }));
+    expect(p.onToggleLoginPopup).toHaveBeenCalledOnce();
+  });
   it("body 포털과 고정 대화상자를 쓰고 내부 클릭은 닫지 않는다", () => {
     const p = props();
     const { container } = render(<NotificationDialog {...p} />);
