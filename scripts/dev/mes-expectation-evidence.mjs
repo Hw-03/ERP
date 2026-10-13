@@ -53,12 +53,36 @@ function verifyArchivedReceipt(report, read) {
   if (digest(bytes) !== reference.sha256 || digest(originalBytes) !== reference.originalExecution.sha256) throw new Error("completion receipt/archive hash mismatch");
   const receipt = JSON.parse(bytes.toString()), original = JSON.parse(originalBytes.toString());
   const entry = receipt.groups?.filter((group) => group.execution.sha256 === reference.originalExecution.sha256);
-  if (receipt.kind !== "mes-expectation-run" || receipt.schemaVersion !== 1 || receipt.runId !== report.runId || receipt.status !== "PASS" || receipt.failures?.length !== 0 || entry?.length !== 1) throw new Error("completion receipt does not prove this execution");
+  if (receipt.kind !== "mes-expectation-run" || receipt.schemaVersion !== 1 || receipt.runId !== (report.aggregationRunId ?? report.runId) || receipt.status !== "PASS" || receipt.failures?.length !== 0 || entry?.length !== 1) throw new Error("completion receipt does not prove this execution");
   const restored = structuredClone(report);
   delete restored.runReceipt;
   for (const key of ["raw", "collection", "environmentFile"]) if (restored[key]) restored[key].path = original[key]?.path;
   for (const [index, screenshot] of (restored.screenshots ?? []).entries()) screenshot.path = original.screenshots?.[index]?.path;
+  if (restored.reusedFrom) restored.reusedFrom = original.reusedFrom;
   if (fingerprint(restored) !== fingerprint(original)) throw new Error("completion receipt execution metadata changed");
+}
+
+/** A reused group retains its native execution identity, even after a failed parent run. */
+export function verifyReusedExecution(report, read) {
+  const reference = report.reusedFrom;
+  if (!reference || !report.aggregationRunId || report.aggregationRunId === report.runId) throw new Error("reuse identity invalid");
+  const receiptBytes = read(relativePath(reference.receipt.path));
+  const executionBytes = read(relativePath(reference.execution.path));
+  if (digest(receiptBytes) !== reference.receipt.sha256 || digest(executionBytes) !== reference.execution.sha256) throw new Error("reuse provenance hash mismatch");
+  const receipt = JSON.parse(receiptBytes.toString()), original = JSON.parse(executionBytes.toString());
+  const entries = receipt.groups?.filter((entry) => entry.execution.sha256 === reference.execution.sha256);
+  if (receipt.schemaVersion !== 1 || receipt.kind !== "mes-expectation-run" || !["PASS", "FAIL"].includes(receipt.status) || !Number.isFinite(Date.parse(receipt.completedAt)) || receipt.runId !== original.runId || entries?.length !== 1 || original.reusedFrom || original.aggregationRunId || original.runReceipt || original.exitCode !== 0 || original.verificationError) throw new Error("reuse completion receipt invalid/cyclic");
+  const entry = entries[0];
+  const declared = original.conditions.map((proof) => ({ ...proof, targets: proof.targets.map(({ file, selector }) => ({ file, selector })) }));
+  if (JSON.stringify(entry.declaration.conditions) !== JSON.stringify(declared) || entry.snapshotSha256 !== original.snapshot.sha256) throw new Error("reuse selection/snapshot mismatch");
+  const originalArtifacts = [original.raw, original.collection, original.environmentFile, ...(original.screenshots ?? [])].filter(Boolean).map(({ path, sha256 }) => ({ path, sha256 }));
+  if (JSON.stringify(entry.artifacts) !== JSON.stringify(originalArtifacts)) throw new Error("reuse receipt artifacts mismatch");
+  const restored = structuredClone(report);
+  delete restored.reusedFrom; delete restored.aggregationRunId; delete restored.runReceipt;
+  for (const key of ["raw", "collection", "environmentFile"]) if (restored[key]) restored[key].path = original[key]?.path;
+  for (const [index, shot] of (restored.screenshots ?? []).entries()) shot.path = original.screenshots?.[index]?.path;
+  if (fingerprint(restored) !== fingerprint(original)) throw new Error("reuse execution metadata changed");
+  return { receipt, original };
 }
 
 /** Only repository-relative paths can identify evidence or snapshot inputs. */
@@ -161,6 +185,7 @@ export function verifyExecution(report, row, condition, { read, paths, requiredI
     if (report.schemaVersion !== 2 || !report.runId || report.exitCode !== 0 || !Array.isArray(report.argv) || !report.argv.length || !report.cwd || !Number.isFinite(Date.parse(report.startedAt)) || !Number.isFinite(Date.parse(report.endedAt)) || Date.parse(report.endedAt) < Date.parse(report.startedAt)) throw new Error("execution metadata incomplete/failed");
     if (!report.environment?.versions || !Object.keys(report.environment.versions).length) throw new Error("runtime identity missing");
     if (report.runReceipt) verifyArchivedReceipt(report, read);
+    if (report.reusedFrom) verifyReusedExecution(report, read);
     if (evidenceKind === "browser") {
       if (report.runner !== "playwright" || report.environment.kind !== "browser" || !report.environment.baseUrl || !report.environment.database?.revision || !report.environment.database?.fixtureHash || !report.environment.database?.logicalSnapshotHash || !report.environment.database?.bootId) throw new Error("browser environment/DB identity missing");
       const environmentBytes = read(relativePath(report.environmentFile?.path));

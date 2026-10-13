@@ -65447,7 +65447,7 @@
               "file": "scripts/dev/run-mes-expectations.test.mjs",
               "selector": "실제 Node runner를 실행해 원본 JUnit·종료코드·현재 입력을 남긴다",
               "assertion": "assert.match(fs.readFileSync(path.join(root, report.raw.path), \"utf8\"), /testcase name=\"saves\"/);",
-              "sourceHash": "7204fc5d5d57ce761bc78530f9ea07549e327797cd1c7ffa12c4f8f126d60d34"
+              "sourceHash": "0011b40d8a53275b7db93fc87dfb8d26df64c90fdc49baa65790e3dc295e585d"
             }
           ],
           "execution": {
@@ -65463,6 +65463,16 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "scripts/dev/run-mes-expectations.test.mjs",
+                "selector": "실제 Node runner를 실행해 원본 JUnit·종료코드·현재 입력을 남긴다",
+                "assertion": "assert.match(fs.readFileSync(path.join(root, report.raw.path), \"utf8\"), /testcase name=\"saves\"/);",
+                "sourceHash": "2ac52c821b222452e4eb583a18a17edc606042b22184113ed9531bbde5265b93"
+              }
+            ]
           ]
         },
         {
@@ -65478,7 +65488,7 @@
               "file": "scripts/dev/run-mes-expectations.test.mjs",
               "selector": "실제 실패 runner는 보고서를 보존하고 PASS로 승격하지 않는다",
               "assertion": "assert.notEqual(report.exitCode, 0);",
-              "sourceHash": "7204fc5d5d57ce761bc78530f9ea07549e327797cd1c7ffa12c4f8f126d60d34"
+              "sourceHash": "0011b40d8a53275b7db93fc87dfb8d26df64c90fdc49baa65790e3dc295e585d"
             }
           ],
           "execution": {
@@ -65494,6 +65504,16 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "scripts/dev/run-mes-expectations.test.mjs",
+                "selector": "실제 실패 runner는 보고서를 보존하고 PASS로 승격하지 않는다",
+                "assertion": "assert.notEqual(report.exitCode, 0);",
+                "sourceHash": "2ac52c821b222452e4eb583a18a17edc606042b22184113ed9531bbde5265b93"
+              }
+            ]
           ]
         },
         {
@@ -65509,7 +65529,13 @@
               "file": "scripts/dev/run-mes-expectations.test.mjs",
               "selector": "검증된 raw와 manifest만 영구 보존하고 조건별 실행을 갱신한다",
               "assertion": "assert.equal(registry.assertions[0].execution.status, \"PASS\");",
-              "sourceHash": "7204fc5d5d57ce761bc78530f9ea07549e327797cd1c7ffa12c4f8f126d60d34"
+              "sourceHash": "0011b40d8a53275b7db93fc87dfb8d26df64c90fdc49baa65790e3dc295e585d"
+            },
+            {
+              "file": "scripts/dev/run-mes-expectations.test.mjs",
+              "selector": "재개는 QA 인증 PIN 변경을 재사용하지 않으며 비밀 원문을 보존하지 않는다",
+              "sourceHash": "0011b40d8a53275b7db93fc87dfb8d26df64c90fdc49baa65790e3dc295e585d",
+              "assertion": "assert.equal(result.reusedGroups, 0);"
             }
           ],
           "execution": {
@@ -65525,6 +65551,16 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "scripts/dev/run-mes-expectations.test.mjs",
+                "selector": "검증된 raw와 manifest만 영구 보존하고 조건별 실행을 갱신한다",
+                "assertion": "assert.equal(registry.assertions[0].execution.status, \"PASS\");",
+                "sourceHash": "2ac52c821b222452e4eb583a18a17edc606042b22184113ed9531bbde5265b93"
+              }
+            ]
           ]
         }
       ],

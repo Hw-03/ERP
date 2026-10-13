@@ -5,7 +5,7 @@ import net from "node:net";
 import { spawn, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { normalizeExpectations, selectAssertions, summarize, validateExpectations } from "./normalize-mes-expectations.mjs";
-import { captureSnapshot, conditionFingerprint, digest, parseReport, relativePath, requiredInputs, verifyExecution } from "./mes-expectation-evidence.mjs";
+import { captureSnapshot, conditionFingerprint, digest, parseReport, relativePath, requiredInputs, verifyExecution, verifyReusedExecution } from "./mes-expectation-evidence.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const BASE = "docs/superpowers/specs/2026-10-07-mes-expectations";
@@ -22,6 +22,17 @@ const runnerFor = (file) => file.startsWith("backend/") ? "pytest" : file.includ
 const inputPaths = (root) => execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }).split("\0").filter(Boolean);
 const groupKey = (group) => `${group.runner}-${digest((group.files ?? [group.file]).join("\n")).slice(0, 10)}`;
 const artifacts = (report) => [report.raw, report.collection, report.environmentFile, ...(report.screenshots ?? [])].filter(Boolean).map(({ path, sha256 }) => ({ path, sha256 }));
+
+/** Installed runtimes and execution-affecting environment must match before reuse. */
+function runtimeIdentity(root) {
+  const python = JSON.parse(execFileSync("python", ["-c", "import sys,json,importlib.metadata as m; print(json.dumps({'executable':sys.executable,'version':sys.version,'packages':sorted((d.metadata['Name'],d.version) for d in m.distributions())}))"], { encoding: "utf8", windowsHide: true, maxBuffer: 4 * 1024 * 1024 }));
+  const packages = ["next", "react", "vitest", "@playwright/test"].map((name) => {
+    const file = path.join(root, "frontend/node_modules", name, "package.json");
+    return { name, hash: fs.existsSync(file) ? digest(fs.readFileSync(file)) : null };
+  });
+  const environment = Object.fromEntries(["PYTEST_ADDOPTS", "PYTHONPATH", "TEST_POSTGRES_URL", "DEXCOWIN_POSTGRES_TEST_ACK", "NODE_OPTIONS", "CI", "E2E_ADMIN_PIN"].map((name) => [name, process.env[name] ?? null]));
+  return { node: process.version, nodeSha256: digest(fs.readFileSync(process.execPath)), python, packages, environmentSha256: digest(JSON.stringify(environment)) };
+}
 
 /** Record intended declarations independently of what the child happened to emit. */
 function groupDeclaration(group) {
@@ -96,6 +107,7 @@ export async function executeGroup(group, { root, runId, output, inputs, paths }
   fs.mkdirSync(directory, { recursive: true });
   const read = (file) => fs.readFileSync(path.join(root, file));
   const snapshot = captureSnapshot(inputs, paths, read);
+  const runtime = runtimeIdentity(root);
   const extension = ["pytest", "node"].includes(group.runner) ? "xml" : "json";
   const rawPath = `${output}/${key}.${extension}`, collectionPath = `${output}/${key}-collection.json`;
   const rawAbsolute = path.join(root, rawPath);
@@ -119,7 +131,7 @@ export async function executeGroup(group, { root, runId, output, inputs, paths }
     cwd = path.join(root, "frontend");
     env.PLAYWRIGHT_JSON_OUTPUT_NAME = rawAbsolute;
     env.E2E_BASE_URL = "http://127.0.0.1:3100";
-    args = ["node_modules/@playwright/test/cli.js", "test", ...files.map((file) => file.slice("frontend/".length)), "--retries=0", "--reporter=json", "--forbid-only", "--grep=.*", "--grep-invert=(?!)", "--repeat-each=1", "--shard=1/1"];
+    args = ["node_modules/@playwright/test/cli.js", "test", ...files.map((file) => file.slice("frontend/".length)), "--retries=0", "--reporter=json", "--forbid-only", "--grep=.*", "--grep-invert=(?!)", "--repeat-each=1", "--shard=1/1", "--trace=retain-on-failure", `--output=${path.join(directory, `${key}-artifacts`)}`];
   } else throw new Error(`unknown runner: ${group.runner}`);
   let head = null;
   try { head = execFileSync("git", ["rev-parse", "--verify", "HEAD"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); }
@@ -132,7 +144,7 @@ export async function executeGroup(group, { root, runId, output, inputs, paths }
     listing = { path: collectionPath, sha256: fs.existsSync(path.join(root, collectionPath)) ? digest(read(collectionPath)) : null, exitCode: listCode, argv: [executable, ...listArgs] };
   }
   const exitCode = listing && listing.exitCode !== 0 ? listing.exitCode : await invoke(executable, args, { cwd, env, log: path.join(directory, `${key}.log`) });
-  const report = { schemaVersion: 2, runId, runner: group.runner, head, file: group.runner === "node" ? files[0] : undefined, root: slash(root), testRoot: group.runner === "playwright" ? "frontend/tests/e2e" : undefined, startedAt, endedAt: kstNow(), argv: [executable, ...args], cwd: slash(path.relative(root, cwd)) || ".", exitCode, snapshot, raw: { path: rawPath, sha256: fs.existsSync(rawAbsolute) ? digest(read(rawPath)) : null }, environment: { kind: "unit", versions: { node: process.version, python: execFileSync("python", ["--version"], { encoding: "utf8", windowsHide: true }).trim() } }, conditions: [] };
+  const report = { schemaVersion: 2, runId, runner: group.runner, head, file: group.runner === "node" ? files[0] : undefined, root: slash(root), testRoot: group.runner === "playwright" ? "frontend/tests/e2e" : undefined, startedAt, endedAt: kstNow(), argv: [executable, ...args], cwd: slash(path.relative(root, cwd)) || ".", exitCode, snapshot, runtime, raw: { path: rawPath, sha256: fs.existsSync(rawAbsolute) ? digest(read(rawPath)) : null }, environment: { kind: "unit", versions: { node: process.version, python: execFileSync("python", ["--version"], { encoding: "utf8", windowsHide: true }).trim() } }, conditions: [] };
   if (["pytest", "vitest"].includes(group.runner)) report.collection = { path: collectionPath, sha256: fs.existsSync(path.join(root, collectionPath)) ? digest(read(collectionPath)) : null };
   if (listing) report.collection = listing;
   if (group.runner === "playwright") {
@@ -216,7 +228,7 @@ export function promoteRun(model, paths, directory, root = ROOT) {
   for (const file of files) {
     const executionBytes = read(`${directory}/${file}`);
     const report = JSON.parse(executionBytes);
-    if (report.runId !== runId || report.exitCode !== 0 || report.verificationError || !report.conditions?.length) throw new Error("failed/empty/mismatched run cannot be promoted");
+    if ((report.aggregationRunId ?? report.runId) !== runId || report.exitCode !== 0 || report.verificationError || !report.conditions?.length) throw new Error("failed/empty/mismatched run cannot be promoted");
     for (const proof of report.conditions) {
       const row = model.cases.find((entry) => entry.id === proof.caseId);
       const condition = row?.assertions.find((entry) => entry.id === proof.conditionId);
@@ -229,6 +241,14 @@ export function promoteRun(model, paths, directory, root = ROOT) {
     const originalFile = `${destination}/original-${file}`;
     stagedFiles.set(originalFile, executionBytes);
     promoted.runReceipt = { path: receiptFile, sha256: digest(receiptBytes), originalExecution: { path: originalFile, sha256: digest(executionBytes) } };
+    if (promoted.reusedFrom) for (const reference of Object.values(promoted.reusedFrom)) {
+      const originalPath = relativePath(reference.path);
+      if (!originalPath.startsWith(`${directory}/`) || originalPath.slice(directory.length + 1).includes("/")) throw new Error("reuse provenance outside run directory");
+      const bytes = read(originalPath);
+      if (digest(bytes) !== reference.sha256) throw new Error("reuse provenance hash changed");
+      reference.path = `${destination}/${path.posix.basename(originalPath)}`;
+      stagedFiles.set(reference.path, bytes);
+    }
     for (const artifact of [promoted.raw, promoted.collection, promoted.environmentFile, ...(promoted.screenshots ?? [])].filter(Boolean)) {
       const originalPath = relativePath(artifact.path);
       if (!originalPath.startsWith(`${directory}/`) || originalPath.slice(directory.length + 1).includes("/")) throw new Error("evidence outside its run directory");
@@ -270,6 +290,75 @@ export function promoteRun(model, paths, directory, root = ROOT) {
   return { runId, promotedConditions: updates.size, evidenceDirectory: destination, globalPass: false };
 }
 
+/** Validate a completed parent's declarations before starting any replacement child. */
+function readResume(root, file, model) {
+  relativePath(file);
+  if (!new RegExp(`^${RUNTIME}/[A-Za-z0-9_-]+/run\\.json$`).test(file)) throw new Error("resume requires a runtime receipt path");
+  const directory = path.posix.dirname(file);
+  if (path.dirname(fs.realpathSync(path.join(root, directory))) !== fs.realpathSync(path.join(root, RUNTIME))) throw new Error("resume directory path escapes runtime");
+  const safeRead = (entry) => {
+    relativePath(entry);
+    if (!entry.startsWith(`${directory}/`) || entry.slice(directory.length + 1).includes("/")) throw new Error("resume artifact path outside run");
+    const absolute = path.join(root, entry), resolvedDirectory = fs.realpathSync(path.join(root, directory));
+    if (path.dirname(fs.realpathSync(absolute)) !== resolvedDirectory) throw new Error("resume artifact path escapes run");
+    return fs.readFileSync(absolute);
+  };
+  const bytes = safeRead(file), receipt = JSON.parse(bytes);
+  if (receipt.schemaVersion !== 1 || receipt.kind !== "mes-expectation-run" || receipt.runId !== path.posix.basename(directory) || !["PASS", "FAIL"].includes(receipt.status) || !Array.isArray(receipt.failures) || !Number.isFinite(Date.parse(receipt.completedAt)) || !receipt.caseIds?.length || new Set(receipt.caseIds).size !== receipt.caseIds.length) throw new Error("resume completion receipt incomplete");
+  const plan = buildRunPlan(model, receipt.selection ?? { ids: receipt.caseIds });
+  if (JSON.stringify(plan.caseIds) !== JSON.stringify(receipt.caseIds) || receipt.reports !== plan.groups.length || receipt.groups?.length !== plan.groups.length) throw new Error("resume receipt selection/group count mismatch");
+  const expectedFiles = new Set(plan.groups.map((group) => `${groupKey(group)}-execution.json`));
+  if (fs.readdirSync(path.join(root, directory)).some((name) => name.endsWith("-execution.json") && !expectedFiles.has(name))) throw new Error("resume receipt unexpected execution file");
+  const shape = (declaration) => ({ ...declaration, conditions: declaration.conditions.map(({ fingerprint: _fingerprint, ...condition }) => condition) });
+  const sources = plan.groups.map((group, index) => {
+    const entry = receipt.groups[index];
+    if (JSON.stringify(shape(entry.declaration)) !== JSON.stringify(shape(groupDeclaration(group))) || entry.execution?.path !== `${directory}/${groupKey(group)}-execution.json`) throw new Error("resume receipt selection mismatch");
+    let executionBytes;
+    try { executionBytes = safeRead(entry.execution.path); }
+    catch (error) { if (error.code === "ENOENT") return { reason: "execution missing" }; throw error; }
+    if (digest(executionBytes) !== entry.execution.sha256) throw new Error("resume execution hash mismatch");
+    const report = JSON.parse(executionBytes);
+    if ((report.aggregationRunId ?? report.runId) !== receipt.runId || report.snapshot?.sha256 !== entry.snapshotSha256 || JSON.stringify(artifacts(report)) !== JSON.stringify(entry.artifacts)) throw new Error("resume receipt artifacts/identity mismatch");
+    let missing = false;
+    for (const artifact of entry.artifacts) {
+      try { if (digest(safeRead(artifact.path)) !== artifact.sha256) throw new Error("resume artifact hash mismatch"); }
+      catch (error) { if (error.code === "ENOENT") missing = true; else throw error; }
+    }
+    if (missing) return { reason: "artifact missing" };
+    if (report.reusedFrom) verifyReusedExecution(report, safeRead);
+    else if (report.aggregationRunId) throw new Error("resume provenance missing");
+    return { report, bytes: executionBytes, receiptBytes: bytes, safeRead };
+  });
+  return { plan, sources, receipt };
+}
+
+/** Copy immutable native evidence into a self-contained aggregation directory. */
+function reuseGroup(source, group, { root, output, runId }) {
+  const key = groupKey(group), report = structuredClone(source.report);
+  let original = source.bytes, receipt = source.receiptBytes;
+  if (report.reusedFrom) {
+    original = source.safeRead(report.reusedFrom.execution.path);
+    receipt = source.safeRead(report.reusedFrom.receipt.path);
+  }
+  const refs = {};
+  for (const [name, bytes] of [["execution", original], ["receipt", receipt]]) {
+    const file = `${output}/${key}-origin-${name === "execution" ? "native" : name}.json`;
+    fs.writeFileSync(path.join(root, file), bytes, { flag: "wx" });
+    refs[name] = { path: file, sha256: digest(bytes) };
+  }
+  for (const artifact of [report.raw, report.collection, report.environmentFile, ...(report.screenshots ?? [])].filter(Boolean)) {
+    const bytes = source.safeRead(artifact.path);
+    artifact.path = `${output}/${path.posix.basename(artifact.path)}`;
+    const target = path.join(root, artifact.path);
+    if (fs.existsSync(target)) { if (digest(fs.readFileSync(target)) !== artifact.sha256) throw new Error("reuse artifact collision"); }
+    else fs.writeFileSync(target, bytes, { flag: "wx" });
+  }
+  report.aggregationRunId = runId;
+  report.reusedFrom = refs;
+  writeJson(path.join(root, output, `${key}-execution.json`), report);
+  return report;
+}
+
 /** CLI execution stays in an ignored run directory until explicit promotion. */
 export async function runCli(argv = process.argv.slice(2), root = ROOT) {
   if (argv[0] === "--record-browser-environment") {
@@ -277,24 +366,53 @@ export async function runCli(argv = process.argv.slice(2), root = ROOT) {
     return recordBrowserEnvironment(JSON.parse(argv[1]));
   }
   const value = (flag) => { const index = argv.indexOf(flag); if (index < 0) return null; if (!argv[index + 1] || argv[index + 1].startsWith("--")) throw new Error(`missing ${flag}`); return argv[index + 1]; };
+  const resumePath = value("--resume");
+  if (resumePath && ["--tier", "--ids", "--promote", "--plan"].some((flag) => argv.includes(flag))) throw new Error("cannot combine --resume with selection/promotion/plan flags");
   const { model, paths } = readLedger(root);
-  if (value("--promote")) return promoteRun(model, paths, slash(value("--promote")), root);
-  const plan = buildRunPlan(model, { ids: (value("--ids") ?? "").split(",").filter(Boolean), tier: value("--tier") ?? (value("--ids") ? null : "smoke") });
+  if (value("--promote")) {
+    const target = slash(value("--promote"));
+    return promoteRun(model, paths, path.posix.basename(target) === "run.json" ? path.posix.dirname(target) : target, root);
+  }
+  const selection = { ids: (value("--ids") ?? "").split(",").filter(Boolean), tier: value("--tier") ?? (value("--ids") ? null : "smoke") };
+  const plan = resumePath ? null : buildRunPlan(model, selection);
   if (argv.includes("--plan")) return plan;
   const runId = value("--run-id") ?? `${new Date().toISOString().replaceAll(/[:.]/g, "-")}-${crypto.randomUUID().slice(0, 8)}`;
   if (!/^[A-Za-z0-9_-]+$/.test(runId)) throw new Error("invalid run ID");
   const output = `${RUNTIME}/${runId}`;
   if (fs.existsSync(path.join(root, output))) throw new Error("run ID already exists");
+  const resume = resumePath ? readResume(root, slash(resumePath), model) : null;
+  const currentPlan = resume?.plan ?? plan;
+  const runtime = resume ? runtimeIdentity(root) : null;
+  const read = (file) => fs.readFileSync(path.join(root, relativePath(file)));
+  let reusedGroups = 0;
   const reports = [];
-  for (const group of plan.groups) {
+  fs.mkdirSync(path.join(root, output), { recursive: true });
+  for (const [index, group] of currentPlan.groups.entries()) {
+    const source = resume?.sources[index], inputs = requiredInputs(group.conditions.flatMap((entry) => entry.bindings), paths);
+    let invalid = source?.reason;
+    if (source?.report) {
+      if (source.report.exitCode !== 0 || source.report.verificationError) invalid = "failed native execution";
+      else if (JSON.stringify(source.report.runtime) !== JSON.stringify(runtime)) invalid = "runtime/environment changed";
+      else {
+        const errors = group.conditions.flatMap(({ row, condition, bindings }) => verifyExecution(source.report, row, condition, { read, paths, requiredInputs: inputs, bindings, evidenceKind: group.runner === "playwright" ? "browser" : "test" }));
+        if (errors.length) invalid = errors.join("; ");
+      }
+      if (!invalid) {
+        console.log(`Reusing ${group.runner}: ${group.files.join(", ")} (native run ${source.report.runId})`);
+        reports.push(reuseGroup(source, group, { root, output, runId })); reusedGroups++;
+        continue;
+      }
+    }
+    if (resume) console.log(`Rerun reason: ${invalid}`);
     console.log(`Running ${group.runner}: ${group.files.join(", ")}`);
-    reports.push(await executeGroup(group, { root, runId, output, paths, inputs: requiredInputs(group.conditions.flatMap((entry) => entry.bindings), paths) }));
+    reports.push(await executeGroup(group, { root, runId, output, paths, inputs }));
+    console.log(`Checkpoint ${index + 1}/${currentPlan.groups.length}: exit=${reports.at(-1).exitCode}, error=${reports.at(-1).verificationError ?? "none"}`);
   }
   const failed = reports.filter((report) => report.exitCode !== 0 || report.verificationError);
-  const result = { schemaVersion: 1, kind: "mes-expectation-run", runId, completedAt: kstNow(), caseIds: plan.caseIds, reports: reports.length,
+  const result = { schemaVersion: 1, kind: "mes-expectation-run", runId, completedAt: kstNow(), selection: resume ? resume.receipt.selection ?? { ids: resume.receipt.caseIds } : selection, caseIds: currentPlan.caseIds, reports: reports.length, reusedGroups, executedGroups: reports.length - reusedGroups,
     groups: reports.map((report, index) => {
-      const executionPath = `${output}/${groupKey(plan.groups[index])}-execution.json`;
-      return { declaration: groupDeclaration(plan.groups[index]), snapshotSha256: report.snapshot.sha256, execution: { path: executionPath, sha256: digest(fs.readFileSync(path.join(root, executionPath))) }, artifacts: artifacts(report) };
+      const executionPath = `${output}/${groupKey(currentPlan.groups[index])}-execution.json`;
+      return { declaration: groupDeclaration(currentPlan.groups[index]), snapshotSha256: report.snapshot.sha256, execution: { path: executionPath, sha256: digest(fs.readFileSync(path.join(root, executionPath))) }, artifacts: artifacts(report) };
     }),
     status: failed.length ? "FAIL" : "PASS", failures: failed.map((report) => ({ runner: report.runner, exitCode: report.exitCode, error: report.verificationError })), globalPass: false };
   writeJson(path.join(root, output, "run.json"), result);

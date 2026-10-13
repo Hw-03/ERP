@@ -104,7 +104,7 @@ test("실제 실패 runner는 보고서를 보존하고 PASS로 승격하지 않
   } finally { removeFixture(root); }
 });
 
-async function promotionFixture(multipleAssertions = false) {
+async function promotionFixture(multipleAssertions = false, withFailure = false) {
   const { runCli } = await load();
   const { normalizeExpectations, sourceSha256 } = await import("./normalize-mes-expectations.mjs");
   const { digest } = await import("./mes-expectation-evidence.mjs");
@@ -115,6 +115,13 @@ async function promotionFixture(multipleAssertions = false) {
   fs.mkdirSync(path.join(root, "scripts/dev"), { recursive: true });
   for (const entry of paths) fs.writeFileSync(path.join(root, entry), entry === file ? source : "// fixture version\n");
   const registry = { assertions: [{ caseId: "CASE", conditionId: "c", bindings: [{ file, selector: "saves", sourceHash: sourceSha256(source), assertion: "assert.equal(1 + 1, 2);" }] }] };
+  if (withFailure) {
+    const failedFile = "scripts/dev/recover.test.mjs";
+    const failedSource = 'import test from "node:test";\nimport assert from "node:assert/strict";\nimport fs from "node:fs";\ntest("recovers", () => { assert.ok(!fs.existsSync("failure-marker")); });\n';
+    fs.writeFileSync(path.join(root, failedFile), failedSource); paths.push(failedFile);
+    fs.writeFileSync(path.join(root, "failure-marker"), "fail");
+    registry.assertions[0].bindings.push({ file: failedFile, selector: "recovers", sourceHash: sourceSha256(failedSource), assertion: 'assert.ok(!fs.existsSync("failure-marker"));' });
+  }
   if (multipleAssertions) registry.assertions[0].bindings.push({ file, selector: "saves", sourceHash: sourceSha256(source), assertion: "assert.ok(true);" });
   const model = normalizeExpectations({ audit: { cases: [{ id: "CASE", expected: "saves" }] }, feedback: { reviews: {} }, policy: { schemaVersion: 2, cases: [{ id: "CASE", conditions: [{ id: "c", expected: "saves", requiredEvidence: ["test"] }] }] }, registry });
   const directory = "_attic/runtime/mes-expectations/promote-fixture";
@@ -129,12 +136,129 @@ async function promotionFixture(multipleAssertions = false) {
   fs.writeFileSync(path.join(root, `${base}.decisions.json`), JSON.stringify({ schemaVersion: 2, cases: [{ id: "CASE", verificationTags: ["smoke"], conditions: [{ id: "c", expected: "saves", requiredEvidence: ["test"] }] }] }));
   fs.writeFileSync(path.join(root, `${base}.assertions.json`), JSON.stringify(registry));
   const receipt = await runCli(["--ids", "CASE", "--run-id", "promote-fixture"], root);
-  assert.equal(receipt.status, "PASS");
+  assert.equal(receipt.status, withFailure ? "FAIL" : "PASS");
+  if (withFailure) process.exitCode = 0;
   const execution = fs.readdirSync(path.join(root, directory)).find((entry) => entry.endsWith("-execution.json"));
   const report = JSON.parse(fs.readFileSync(path.join(root, directory, execution)));
   assert.equal(report.verificationError, undefined);
   return { root, paths, model, directory, report, registry };
 }
+
+test("재개는 성공 그룹의 원래 실행을 보존하고 새 집계를 승격한다", async () => {
+  const { runCli } = await load();
+  const fixture = await promotionFixture();
+  try {
+    const oldPath = `${fixture.directory}/run.json`, before = fs.readFileSync(path.join(fixture.root, oldPath));
+    const reportBefore = JSON.stringify(fixture.report);
+    const resumed = await runCli(["--resume", oldPath, "--run-id", "resumed"], fixture.root);
+    assert.equal(resumed.status, "PASS");
+    assert.equal(resumed.reusedGroups, 1);
+    assert.equal(resumed.executedGroups, 0);
+    assert.deepEqual(fs.readFileSync(path.join(fixture.root, oldPath)), before);
+    const report = JSON.parse(fs.readFileSync(path.join(fixture.root, resumed.groups[0].execution.path)));
+    assert.equal(report.runId, fixture.report.runId);
+    assert.equal(report.startedAt, fixture.report.startedAt);
+    assert.equal(report.endedAt, fixture.report.endedAt);
+    assert.equal(report.aggregationRunId, "resumed");
+    assert.equal(JSON.stringify(fixture.report), reportBefore);
+    const result = await runCli(["--promote", "_attic/runtime/mes-expectations/resumed/run.json"], fixture.root);
+    assert.equal(result.promotedConditions, 1);
+    const registry = JSON.parse(fs.readFileSync(path.join(fixture.root, "docs/superpowers/specs/2026-10-07-mes-expectations.assertions.json")));
+    const model = structuredClone(fixture.model);
+    model.cases[0].assertions[0].execution = registry.assertions[0].execution;
+    model.cases[0].currentVerification = "PASS";
+    const read = (file) => fs.readFileSync(path.join(fixture.root, file));
+    const { verifyExecution, requiredInputs } = await import("./mes-expectation-evidence.mjs");
+    const evidence = registry.assertions[0].execution.evidence[0];
+    const promoted = JSON.parse(read(evidence.evidenceFile));
+    fs.rmSync(path.join(fixture.root, "_attic/runtime"), { recursive: true });
+    assert.deepEqual(verifyExecution(promoted, model.cases[0], model.cases[0].assertions[0], { read, paths: fixture.paths, requiredInputs: requiredInputs(model.cases[0].assertions[0].bindings, fixture.paths) }), []);
+  } finally { removeFixture(fixture.root); }
+});
+
+test("실패한 부모에서 성공 그룹만 재사용하고 실패 그룹은 실제 재실행한다", async () => {
+  const { runCli, promoteRun } = await load();
+  const fixture = await promotionFixture(false, true);
+  try {
+    const oldPath = `${fixture.directory}/run.json`, original = fs.readFileSync(path.join(fixture.root, oldPath));
+    fs.rmSync(path.join(fixture.root, "failure-marker"));
+    const result = await runCli(["--resume", oldPath, "--run-id", "fixed"], fixture.root);
+    assert.equal(result.status, "PASS");
+    assert.equal(result.reusedGroups, 1); assert.equal(result.executedGroups, 1);
+    assert.deepEqual(fs.readFileSync(path.join(fixture.root, oldPath)), original);
+    const again = await runCli(["--resume", "_attic/runtime/mes-expectations/fixed/run.json", "--run-id", "again"], fixture.root);
+    assert.equal(again.reusedGroups, 2); assert.equal(again.executedGroups, 0);
+    assert.equal(promoteRun(fixture.model, fixture.paths, "_attic/runtime/mes-expectations/again", fixture.root).promotedConditions, 1);
+  } finally { removeFixture(fixture.root); }
+});
+
+test("재개는 제품·설정·런타임 변경 또는 누락 근거를 현재 실행으로 갱신한다", async () => {
+  const { runCli } = await load();
+  const previous = process.env.NODE_OPTIONS;
+  for (const change of ["source", "runtime", "missing"]) {
+    const fixture = await promotionFixture();
+    try {
+      if (change === "source") fs.appendFileSync(path.join(fixture.root, "scripts/dev/normalize-mes-expectations.mjs"), "// changed\n");
+      if (change === "runtime") process.env.NODE_OPTIONS = "--no-warnings";
+      if (change === "missing") fs.rmSync(path.join(fixture.root, fixture.report.raw.path));
+      const result = await runCli(["--resume", `${fixture.directory}/run.json`, "--run-id", "refreshed"], fixture.root);
+      assert.equal(result.status, "PASS"); assert.equal(result.reusedGroups, 0); assert.equal(result.executedGroups, 1);
+      const report = JSON.parse(fs.readFileSync(path.join(fixture.root, result.groups[0].execution.path)));
+      assert.equal(report.runId, "refreshed"); assert.equal(report.reusedFrom, undefined);
+    } finally {
+      if (previous === undefined) delete process.env.NODE_OPTIONS; else process.env.NODE_OPTIONS = previous;
+      removeFixture(fixture.root);
+    }
+  }
+});
+
+test("재개는 QA 인증 PIN 변경을 재사용하지 않으며 비밀 원문을 보존하지 않는다", async () => {
+  const { runCli } = await load();
+  const previous = process.env.E2E_ADMIN_PIN;
+  let fixture;
+  try {
+    delete process.env.E2E_ADMIN_PIN;
+    fixture = await promotionFixture();
+    process.env.E2E_ADMIN_PIN = "changed-qa-pin";
+    const result = await runCli(["--resume", `${fixture.directory}/run.json`, "--run-id", "new-pin"], fixture.root);
+    assert.equal(result.reusedGroups, 0);
+    assert.equal(result.executedGroups, 1);
+    assert.equal(result.status, "PASS");
+    const report = JSON.parse(fs.readFileSync(path.join(fixture.root, result.groups[0].execution.path)));
+    assert.equal(report.runId, "new-pin");
+    assert.notEqual(report.runtime.environmentSha256, fixture.report.runtime.environmentSha256);
+    assert.ok(!JSON.stringify(report.runtime).includes("changed-qa-pin"));
+  } finally {
+    if (previous === undefined) delete process.env.E2E_ADMIN_PIN; else process.env.E2E_ADMIN_PIN = previous;
+    if (fixture) removeFixture(fixture.root);
+  }
+});
+
+test("재개는 원문 변조와 잘못된 대상·완료 영수증을 실행 전에 거부한다", async () => {
+  const { runCli } = await load();
+  const fixture = await promotionFixture();
+  try {
+    const oldPath = `${fixture.directory}/run.json`, absolute = path.join(fixture.root, oldPath);
+    const original = fs.readFileSync(absolute);
+    for (const change of [
+      (receipt) => receipt.groups = [],
+      (receipt) => receipt.groups.push(receipt.groups[0]),
+      (receipt) => receipt.groups[0].declaration.conditions[0].targets[0].selector = "wrong",
+      (receipt) => delete receipt.completedAt,
+      (receipt) => receipt.caseIds = ["UNKNOWN"],
+    ]) {
+      const receipt = JSON.parse(original); change(receipt); fs.writeFileSync(absolute, JSON.stringify(receipt));
+      await assert.rejects(runCli(["--resume", oldPath, "--run-id", "rejected"], fixture.root), /receipt|selection|unknown/i);
+      assert.equal(fs.existsSync(path.join(fixture.root, "_attic/runtime/mes-expectations/rejected")), false);
+    }
+    fs.writeFileSync(absolute, original);
+    fs.appendFileSync(path.join(fixture.root, fixture.report.raw.path), "changed");
+    await assert.rejects(runCli(["--resume", oldPath, "--run-id", "tampered"], fixture.root), /hash/);
+    for (const flag of ["--ids", "--tier", "--promote"]) await assert.rejects(runCli(["--resume", oldPath, flag, "full", "--run-id", "bad"], fixture.root), /combine/);
+    await assert.rejects(runCli(["--resume", "../run.json", "--run-id", "bad"], fixture.root), /path/);
+    await assert.rejects(runCli(["--resume", oldPath, "--run-id", "promote-fixture"], fixture.root), /exists/);
+  } finally { removeFixture(fixture.root); }
+});
 
 test("검증된 raw와 manifest만 영구 보존하고 조건별 실행을 갱신한다", async () => {
   const { promoteRun } = await load();

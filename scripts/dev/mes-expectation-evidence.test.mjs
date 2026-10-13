@@ -106,6 +106,36 @@ test("schema 2는 raw runner·조건 지문·제품 snapshot을 함께 검증한
   assert.deepEqual(verifyExecution(fixture.report, fixture.row, fixture.condition, { read: fixture.read, paths: Object.keys(fixture.files), requiredInputs: fixture.inputs }), []);
 });
 
+test("재사용 근거는 실패한 부모의 성공 그룹을 보존하고 변조·순환·재시도를 거부한다", async () => {
+  const { captureSnapshot, conditionFingerprint, verifyExecution, digest } = await load();
+  const fixture = evidenceFixture(captureSnapshot, conditionFingerprint);
+  const original = structuredClone(fixture.report);
+  fixture.files["origin.json"] = JSON.stringify(original);
+  const declaration = { runner: original.runner, files: [fixture.condition.bindings[0].file], conditions: original.conditions.map((proof) => ({ ...proof, targets: proof.targets.map(({ file, selector }) => ({ file, selector })) })) };
+  fixture.files["receipt.json"] = JSON.stringify({ schemaVersion: 1, kind: "mes-expectation-run", runId: original.runId, completedAt: original.endedAt, status: "FAIL", failures: [{ exitCode: 1 }], groups: [{ declaration, execution: { path: "origin.json", sha256: digest(fixture.files["origin.json"]) }, snapshotSha256: original.snapshot.sha256, artifacts: [original.raw, original.collection] }] });
+  fixture.report.aggregationRunId = "aggregate";
+  fixture.report.reusedFrom = { receipt: { path: "receipt.json", sha256: digest(fixture.files["receipt.json"]) }, execution: { path: "origin.json", sha256: digest(fixture.files["origin.json"]) } };
+  const verify = () => verifyExecution(fixture.report, fixture.row, fixture.condition, { read: fixture.read, paths: Object.keys(fixture.files), requiredInputs: fixture.inputs });
+  assert.deepEqual(verify(), []);
+  const pristine = structuredClone(fixture.report);
+  for (const change of [
+    (report) => report.startedAt = "2026-10-08T12:00:00+09:00",
+    (report) => report.environment.versions.node = "99",
+    (report) => report.reusedFrom.receipt.sha256 = "wrong",
+    (report) => report.aggregationRunId = report.runId,
+    (report) => delete report.aggregationRunId,
+  ]) {
+    fixture.report = structuredClone(pristine); change(fixture.report);
+    assert.ok(verify().length > 0);
+  }
+  fixture.report = pristine;
+  const native = JSON.parse(fixture.files["origin.json"]);
+  native.reusedFrom = pristine.reusedFrom;
+  fixture.files["origin.json"] = JSON.stringify(native);
+  fixture.report.reusedFrom.execution.sha256 = digest(fixture.files["origin.json"]);
+  assert.ok(verify().some((error) => /cyclic/.test(error)));
+});
+
 test("제품 변경·raw 변조·exit 실패·다른 조건·입력 축소·옛 요약 PASS를 거부한다", async () => {
   const { captureSnapshot, conditionFingerprint, verifyExecution } = await load();
   for (const mutate of [
