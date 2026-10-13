@@ -1,0 +1,1145 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-12T04:38:50.943287+00:00",
+  "head": "b23a43a63562c8f8fbdbb2b465a499fdfcb073ee",
+  "branch": "codex/mes-expectation-closure",
+  "selected_current_read_correctness_status": "PASS",
+  "relative_latency_findings_preserved": true,
+  "further_optimization_performed": false,
+  "historical_absolute_caps_status": "FAIL_PRESERVED_CURRENT_IMPROVEMENT_ACCEPTED",
+  "asgi": {
+    "schemaVersion": 1,
+    "scope": "approved 30-user mixed read subset, real and synthetic_20000; absolute caps excluded by user decision",
+    "method": "ASGI HTTP; no lifespan; read-only SQLite; full integrity; fetched rows exclude query plans",
+    "baseline_ref": "2d79cd2848900fb66f99443af411fcec347877cd",
+    "source_unchanged": true,
+    "current_protocol_complete": true,
+    "original_complete_protocol": false,
+    "original_complete_matrix": false,
+    "original_matrix_pass": false,
+    "datasets": {
+      "real": {
+        "base": {
+          "endpoints": {
+            "history_list": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 3950.7958000758663,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "b9111e6cd6b544945b6e0a34458c744f3353a09d4bdc4daa1d6e950c57c1df12",
+                "b9111e6cd6b544945b6e0a34458c744f3353a09d4bdc4daa1d6e950c57c1df12",
+                "b9111e6cd6b544945b6e0a34458c744f3353a09d4bdc4daa1d6e950c57c1df12"
+              ]
+            },
+            "history_groups": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 51488.081800052896,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "8ccaa72a1f306e023a8e664ac4eddcb1020863c95339ace1dac209529f569e7d",
+                "8ccaa72a1f306e023a8e664ac4eddcb1020863c95339ace1dac209529f569e7d",
+                "8ccaa72a1f306e023a8e664ac4eddcb1020863c95339ace1dac209529f569e7d"
+              ]
+            },
+            "history_search": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 3294.5671000052243,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "a4d270d93c4cbf07407c51c1e76b8563e68a08558c60a46686a5ce85c64130b6",
+                "a4d270d93c4cbf07407c51c1e76b8563e68a08558c60a46686a5ce85c64130b6",
+                "a4d270d93c4cbf07407c51c1e76b8563e68a08558c60a46686a5ce85c64130b6"
+              ]
+            },
+            "hot_item": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 2190.8556000562385,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "a4d270d93c4cbf07407c51c1e76b8563e68a08558c60a46686a5ce85c64130b6",
+                "a4d270d93c4cbf07407c51c1e76b8563e68a08558c60a46686a5ce85c64130b6",
+                "a4d270d93c4cbf07407c51c1e76b8563e68a08558c60a46686a5ce85c64130b6"
+              ]
+            },
+            "general_item": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 481.49590007960796,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "6f2f043f95638a757e30a6f29f9361e79dbc6865f158f4ff45ca11bdb00fbea4",
+                "6f2f043f95638a757e30a6f29f9361e79dbc6865f158f4ff45ca11bdb00fbea4",
+                "6f2f043f95638a757e30a6f29f9361e79dbc6865f158f4ff45ca11bdb00fbea4"
+              ]
+            },
+            "history_detail": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 811.6843000752851,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "23e3369a65b5e5fbe10776760f0aa8fe68a338f9736dc5102bae93d36f868f25",
+                "23e3369a65b5e5fbe10776760f0aa8fe68a338f9736dc5102bae93d36f868f25",
+                "23e3369a65b5e5fbe10776760f0aa8fe68a338f9736dc5102bae93d36f868f25"
+              ]
+            },
+            "daily": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 6429.691800032742,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "eab24ad5897f190fc2742e52e284400a396b0d4c73cdfeda6a3e4512a3e0f74c",
+                "eab24ad5897f190fc2742e52e284400a396b0d4c73cdfeda6a3e4512a3e0f74c",
+                "eab24ad5897f190fc2742e52e284400a396b0d4c73cdfeda6a3e4512a3e0f74c"
+              ]
+            },
+            "inventory": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 1384.801600011997,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "2ae391d25be66844774a01104a66caf60434f22728f1d88c63c8f019435f561d",
+                "2ae391d25be66844774a01104a66caf60434f22728f1d88c63c8f019435f561d",
+                "2ae391d25be66844774a01104a66caf60434f22728f1d88c63c8f019435f561d"
+              ]
+            },
+            "integrity": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 122688.69460001588,
+              "errors": 20,
+              "timeouts": 20,
+              "cold_errors": 0,
+              "body_stable_per_variant": false,
+              "cold_response_hashes": [
+                "b48e22b986e6893ee713521617a348ec9f5d8c229962c4c1f04a19d8235748fc",
+                "b48e22b986e6893ee713521617a348ec9f5d8c229962c4c1f04a19d8235748fc",
+                "b48e22b986e6893ee713521617a348ec9f5d8c229962c4c1f04a19d8235748fc"
+              ]
+            },
+            "operation_detail": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 435.449399985373,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "e44e10383e29c990f2e2420a155e00b60056c8bc85b42045ad267638c5bf5786",
+                "e44e10383e29c990f2e2420a155e00b60056c8bc85b42045ad267638c5bf5786",
+                "e44e10383e29c990f2e2420a155e00b60056c8bc85b42045ad267638c5bf5786"
+              ]
+            }
+          },
+          "observed_peaks": [
+            30,
+            30,
+            30
+          ],
+          "db_unchanged": true,
+          "no_remaining_requests": true
+        },
+        "current": {
+          "endpoints": {
+            "history_list": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 2342.419199994765,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "0e9b481ca0acdd392a5b5cb64c7111093a81a8690d2295582fbb655e819b26b7",
+                "0e9b481ca0acdd392a5b5cb64c7111093a81a8690d2295582fbb655e819b26b7",
+                "0e9b481ca0acdd392a5b5cb64c7111093a81a8690d2295582fbb655e819b26b7"
+              ]
+            },
+            "history_groups": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 15619.25730004441,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "6215adf9e3d0b276d04eac8c6594d4a7661111599d881e24df8650050017f8fe",
+                "6215adf9e3d0b276d04eac8c6594d4a7661111599d881e24df8650050017f8fe",
+                "6215adf9e3d0b276d04eac8c6594d4a7661111599d881e24df8650050017f8fe"
+              ]
+            },
+            "history_search": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 4105.318000074476,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "5dffd8da1deee482e711faaf125368c35ac0c266466e6edbb53f3b1cfa01a0fa",
+                "5dffd8da1deee482e711faaf125368c35ac0c266466e6edbb53f3b1cfa01a0fa",
+                "5dffd8da1deee482e711faaf125368c35ac0c266466e6edbb53f3b1cfa01a0fa"
+              ]
+            },
+            "hot_item": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 2439.022900070995,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "5dffd8da1deee482e711faaf125368c35ac0c266466e6edbb53f3b1cfa01a0fa",
+                "5dffd8da1deee482e711faaf125368c35ac0c266466e6edbb53f3b1cfa01a0fa",
+                "5dffd8da1deee482e711faaf125368c35ac0c266466e6edbb53f3b1cfa01a0fa"
+              ]
+            },
+            "general_item": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 845.5253000138327,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "1665b1ffaef77c608c3f8d92ea09993745beb05f88cab83dbe5e49d3020d0e0d",
+                "1665b1ffaef77c608c3f8d92ea09993745beb05f88cab83dbe5e49d3020d0e0d",
+                "1665b1ffaef77c608c3f8d92ea09993745beb05f88cab83dbe5e49d3020d0e0d"
+              ]
+            },
+            "history_detail": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 635.8241999987513,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "341009c78e13dc055bd84af39c7f823ce0dc1292341abdf25d3341b15b31c086",
+                "341009c78e13dc055bd84af39c7f823ce0dc1292341abdf25d3341b15b31c086",
+                "341009c78e13dc055bd84af39c7f823ce0dc1292341abdf25d3341b15b31c086"
+              ]
+            },
+            "daily": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 3536.844399990514,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "9857d100b5348adcce6f019ac1496f7bd36716ca2f0cf18c0d972f68ed813363",
+                "9857d100b5348adcce6f019ac1496f7bd36716ca2f0cf18c0d972f68ed813363",
+                "9857d100b5348adcce6f019ac1496f7bd36716ca2f0cf18c0d972f68ed813363"
+              ]
+            },
+            "inventory": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 1467.0544000109658,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "2ae391d25be66844774a01104a66caf60434f22728f1d88c63c8f019435f561d",
+                "2ae391d25be66844774a01104a66caf60434f22728f1d88c63c8f019435f561d",
+                "2ae391d25be66844774a01104a66caf60434f22728f1d88c63c8f019435f561d"
+              ]
+            },
+            "integrity": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 53544.835299951956,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "b48e22b986e6893ee713521617a348ec9f5d8c229962c4c1f04a19d8235748fc",
+                "b48e22b986e6893ee713521617a348ec9f5d8c229962c4c1f04a19d8235748fc",
+                "b48e22b986e6893ee713521617a348ec9f5d8c229962c4c1f04a19d8235748fc"
+              ]
+            },
+            "operation_detail": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 889.4319999963045,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "33a878dd681ffc5251a5d3bd20ad0b28f652a0ad47dc05653ff7cbd0d30a3015",
+                "33a878dd681ffc5251a5d3bd20ad0b28f652a0ad47dc05653ff7cbd0d30a3015",
+                "33a878dd681ffc5251a5d3bd20ad0b28f652a0ad47dc05653ff7cbd0d30a3015"
+              ]
+            }
+          },
+          "observed_peaks": [
+            30,
+            30,
+            30
+          ],
+          "db_unchanged": true,
+          "no_remaining_requests": true,
+          "subset_pass": true
+        },
+        "baseline_comparison_valid": false
+      },
+      "synthetic_20000": {
+        "base": {
+          "endpoints": {
+            "history_list": {
+              "samples_per_group": [
+                30
+              ],
+              "p95_ms": 44546.5181999607,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "bb820bd11633047b8f700a771aa1e8dbd3e3dffce311b0fbff04b5ae76801200"
+              ]
+            },
+            "history_groups": {
+              "samples_per_group": [
+                30
+              ],
+              "p95_ms": 124209.74769990426,
+              "errors": 4,
+              "timeouts": 4,
+              "cold_errors": 0,
+              "body_stable_per_variant": false,
+              "cold_response_hashes": [
+                "3cc8c3862e2e09afebb1a117bf89503950776b58a92a24f105dc16cdf0b987e5"
+              ]
+            },
+            "history_search": {
+              "samples_per_group": [
+                30
+              ],
+              "p95_ms": 45821.05339993723,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "25e0287d3dcd757f9baa4272265d38026efc4ed38f49ebc8466c5f5d8fddbb9f"
+              ]
+            },
+            "hot_item": {
+              "samples_per_group": [
+                30
+              ],
+              "p95_ms": 42683.304300066084,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "25e0287d3dcd757f9baa4272265d38026efc4ed38f49ebc8466c5f5d8fddbb9f"
+              ]
+            },
+            "general_item": {
+              "samples_per_group": [
+                30
+              ],
+              "p95_ms": 2330.2597999572754,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "3ecbedfd360f38b3fb966868101612ba57bccc6ad0bebf91323d65b38442d513"
+              ]
+            },
+            "history_detail": {
+              "samples_per_group": [
+                30
+              ],
+              "p95_ms": 44497.17360001523,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "2cc94a972260bc9cb9c83ff6da3485d6894d2451fcef2fd9c62e9f2bdcd3feeb"
+              ]
+            },
+            "daily": {
+              "samples_per_group": [
+                30
+              ],
+              "p95_ms": 59916.5961999679,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "3790ef82fb1802d348864e37f607b10c6ce45ef25789b6a4e37365a1ed0c82cf"
+              ]
+            },
+            "inventory": {
+              "samples_per_group": [
+                30
+              ],
+              "p95_ms": 1841.9074999401346,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "e15b2395dc9b36158e8580854dc4ff3eaf043c43c29259c1a35e5d35aaa1a9d9"
+              ]
+            },
+            "integrity": {
+              "samples_per_group": [
+                30
+              ],
+              "p95_ms": 467196.8860999914,
+              "errors": 30,
+              "timeouts": 30,
+              "cold_errors": 0,
+              "body_stable_per_variant": false,
+              "cold_response_hashes": [
+                "b48e22b986e6893ee713521617a348ec9f5d8c229962c4c1f04a19d8235748fc"
+              ]
+            },
+            "operation_detail": {
+              "samples_per_group": [
+                30
+              ],
+              "p95_ms": 42498.36409999989,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "f044b1bdeda0442763d534d4f08f281de5964d8404f0d6fea9bce87573c6530c"
+              ]
+            }
+          },
+          "observed_peaks": [
+            30
+          ],
+          "db_unchanged": true,
+          "no_remaining_requests": true
+        },
+        "current": {
+          "endpoints": {
+            "history_list": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 6102.934999973513,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "306ae026acfcec510cf07c05e6696c6964caf23687af0e57216139e28d6cbf34",
+                "306ae026acfcec510cf07c05e6696c6964caf23687af0e57216139e28d6cbf34",
+                "306ae026acfcec510cf07c05e6696c6964caf23687af0e57216139e28d6cbf34"
+              ]
+            },
+            "history_groups": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 6977.6555999414995,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "0cdc419fda4bf5c0813a9e8f4db99a1c12a0999599ed64cf867adf7d7d686e36",
+                "0cdc419fda4bf5c0813a9e8f4db99a1c12a0999599ed64cf867adf7d7d686e36",
+                "0cdc419fda4bf5c0813a9e8f4db99a1c12a0999599ed64cf867adf7d7d686e36"
+              ]
+            },
+            "history_search": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 10971.036599949002,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "f79e82e4452b95ac7f4d7882dd1aa0405fcfa6a26e4588607041e077efaf30b9",
+                "f79e82e4452b95ac7f4d7882dd1aa0405fcfa6a26e4588607041e077efaf30b9",
+                "f79e82e4452b95ac7f4d7882dd1aa0405fcfa6a26e4588607041e077efaf30b9"
+              ]
+            },
+            "hot_item": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 5603.825800004415,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "f79e82e4452b95ac7f4d7882dd1aa0405fcfa6a26e4588607041e077efaf30b9",
+                "f79e82e4452b95ac7f4d7882dd1aa0405fcfa6a26e4588607041e077efaf30b9",
+                "f79e82e4452b95ac7f4d7882dd1aa0405fcfa6a26e4588607041e077efaf30b9"
+              ]
+            },
+            "general_item": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 2828.9743000641465,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "b85c8e86067bee783f77eaa849ecdb24097c055bfa4e65fbaf976ce5cd02fb05",
+                "b85c8e86067bee783f77eaa849ecdb24097c055bfa4e65fbaf976ce5cd02fb05",
+                "b85c8e86067bee783f77eaa849ecdb24097c055bfa4e65fbaf976ce5cd02fb05"
+              ]
+            },
+            "history_detail": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 4638.047099928372,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "312ba3a68efcce9337eaf2ecca8cb2aa9d6b90236378babc1a04ff87427a9e04",
+                "312ba3a68efcce9337eaf2ecca8cb2aa9d6b90236378babc1a04ff87427a9e04",
+                "312ba3a68efcce9337eaf2ecca8cb2aa9d6b90236378babc1a04ff87427a9e04"
+              ]
+            },
+            "daily": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 21520.790499984287,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "55594d530aebf12754c9785b1b0f284f3f8136620d864b2492fafa9653eaba79",
+                "55594d530aebf12754c9785b1b0f284f3f8136620d864b2492fafa9653eaba79",
+                "55594d530aebf12754c9785b1b0f284f3f8136620d864b2492fafa9653eaba79"
+              ]
+            },
+            "inventory": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 2410.305800032802,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "e15b2395dc9b36158e8580854dc4ff3eaf043c43c29259c1a35e5d35aaa1a9d9",
+                "e15b2395dc9b36158e8580854dc4ff3eaf043c43c29259c1a35e5d35aaa1a9d9",
+                "e15b2395dc9b36158e8580854dc4ff3eaf043c43c29259c1a35e5d35aaa1a9d9"
+              ]
+            },
+            "integrity": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 54467.071200022474,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "b48e22b986e6893ee713521617a348ec9f5d8c229962c4c1f04a19d8235748fc",
+                "b48e22b986e6893ee713521617a348ec9f5d8c229962c4c1f04a19d8235748fc",
+                "b48e22b986e6893ee713521617a348ec9f5d8c229962c4c1f04a19d8235748fc"
+              ]
+            },
+            "operation_detail": {
+              "samples_per_group": [
+                30,
+                30,
+                30
+              ],
+              "p95_ms": 3951.63559995126,
+              "errors": 0,
+              "timeouts": 0,
+              "cold_errors": 0,
+              "body_stable_per_variant": true,
+              "cold_response_hashes": [
+                "2852c49beaa9dc3c0aa5e5de5403c01652a8f7ac4d073e93b111dc6c3da73bd8",
+                "2852c49beaa9dc3c0aa5e5de5403c01652a8f7ac4d073e93b111dc6c3da73bd8",
+                "2852c49beaa9dc3c0aa5e5de5403c01652a8f7ac4d073e93b111dc6c3da73bd8"
+              ]
+            }
+          },
+          "observed_peaks": [
+            30,
+            30,
+            30
+          ],
+          "db_unchanged": true,
+          "no_remaining_requests": true,
+          "subset_pass": true
+        },
+        "baseline_comparison_valid": false
+      }
+    },
+    "observed_latency_comparisons": {
+      "real/mixed/users=30": {
+        "history_list": {
+          "base_p95_ms": 3950.7958000758663,
+          "current_p95_ms": 2342.419199994765,
+          "delta_ms": -1608.376600081101,
+          "ratio": 0.5928980687763676,
+          "regression": false,
+          "absolute_pass": false,
+          "limit_ms": 2000,
+          "successful": true,
+          "metrics": {
+            "base": {
+              "queries": 8,
+              "rows": 690,
+              "bytes": 92504
+            },
+            "current": {
+              "queries": 15,
+              "rows": 299,
+              "bytes": 100713
+            }
+          },
+          "samples_per_variant": 90,
+          "samples_per_group": {
+            "base": [
+              30,
+              30,
+              30
+            ],
+            "current": [
+              30,
+              30,
+              30
+            ]
+          },
+          "samples_complete": true,
+          "same_log_population": true,
+          "detail_equivalent": true,
+          "integrity_equivalent": true,
+          "pass": false
+        },
+        "history_groups": {
+          "base_p95_ms": 51488.081800052896,
+          "current_p95_ms": 15619.25730004441,
+          "delta_ms": -35868.824500008486,
+          "ratio": 0.30335675274716417,
+          "regression": false,
+          "absolute_pass": false,
+          "limit_ms": 2000,
+          "successful": true,
+          "metrics": {
+            "base": {
+              "queries": 10,
+              "rows": 17646,
+              "bytes": 505023
+            },
+            "current": {
+              "queries": 17,
+              "rows": 3159,
+              "bytes": 548975
+            }
+          },
+          "samples_per_variant": 90,
+          "samples_per_group": {
+            "base": [
+              30,
+              30,
+              30
+            ],
+            "current": [
+              30,
+              30,
+              30
+            ]
+          },
+          "samples_complete": true,
+          "same_log_population": true,
+          "detail_equivalent": true,
+          "integrity_equivalent": true,
+          "pass": false
+        },
+        "history_search": {
+          "base_p95_ms": 3294.5671000052243,
+          "current_p95_ms": 4105.318000074476,
+          "delta_ms": 810.7509000692517,
+          "ratio": 1.2460872325435308,
+          "regression": true,
+          "absolute_pass": false,
+          "limit_ms": 2000,
+          "successful": true,
+          "metrics": {
+            "base": {
+              "queries": 8,
+              "rows": 327,
+              "bytes": 89151
+            },
+            "current": {
+              "queries": 15,
+              "rows": 301,
+              "bytes": 97442
+            }
+          },
+          "samples_per_variant": 90,
+          "samples_per_group": {
+            "base": [
+              30,
+              30,
+              30
+            ],
+            "current": [
+              30,
+              30,
+              30
+            ]
+          },
+          "samples_complete": true,
+          "same_log_population": true,
+          "detail_equivalent": true,
+          "integrity_equivalent": true,
+          "pass": false
+        },
+        "hot_item": {
+          "base_p95_ms": 2190.8556000562385,
+          "current_p95_ms": 2439.022900070995,
+          "delta_ms": 248.16730001475662,
+          "ratio": 1.1132741473278231,
+          "regression": false,
+          "absolute_pass": false,
+          "limit_ms": 2000,
+          "successful": true,
+          "metrics": {
+            "base": {
+              "queries": 8,
+              "rows": 327,
+              "bytes": 89151
+            },
+            "current": {
+              "queries": 15,
+              "rows": 301,
+              "bytes": 97442
+            }
+          },
+          "samples_per_variant": 90,
+          "samples_per_group": {
+            "base": [
+              30,
+              30,
+              30
+            ],
+            "current": [
+              30,
+              30,
+              30
+            ]
+          },
+          "samples_complete": true,
+          "same_log_population": true,
+          "detail_equivalent": true,
+          "integrity_equivalent": true,
+          "pass": false
+        },
+        "general_item": {
+          "base_p95_ms": 481.49590007960796,
+          "current_p95_ms": 845.5253000138327,
+          "delta_ms": 364.0293999342248,
+          "ratio": 1.7560384208339845,
+          "regression": true,
+          "absolute_pass": true,
+          "limit_ms": 2000,
+          "successful": true,
+          "metrics": {
+            "base": {
+              "queries": 8,
+              "rows": 25,
+              "bytes": 9743
+            },
+            "current": {
+              "queries": 15,
+              "rows": 30,
+              "bytes": 10613
+            }
+          },
+          "samples_per_variant": 90,
+          "samples_per_group": {
+            "base": [
+              30,
+              30,
+              30
+            ],
+            "current": [
+              30,
+              30,
+              30
+            ]
+          },
+          "samples_complete": true,
+          "same_log_population": true,
+          "detail_equivalent": true,
+          "integrity_equivalent": true,
+          "pass": false
+        },
+        "history_detail": {
+          "base_p95_ms": 811.6843000752851,
+          "current_p95_ms": 635.8241999987513,
+          "delta_ms": -175.86010007653385,
+          "ratio": 0.7833392859018925,
+          "regression": false,
+          "absolute_pass": true,
+          "limit_ms": 2000,
+          "successful": true,
+          "metrics": {
+            "base": {
+              "queries": 4,
+              "rows": 86,
+              "bytes": 1742
+            },
+            "current": {
+              "queries": 11,
+              "rows": 11,
+              "bytes": 1931
+            }
+          },
+          "samples_per_variant": 90,
+          "samples_per_group": {
+            "base": [
+              30,
+              30,
+              30
+            ],
+            "current": [
+              30,
+              30,
+              30
+            ]
+          },
+          "samples_complete": true,
+          "same_log_population": true,
+          "detail_equivalent": true,
+          "integrity_equivalent": true,
+          "pass": true
+        },
+        "daily": {
+          "base_p95_ms": 6429.691800032742,
+          "current_p95_ms": 3536.844399990514,
+          "delta_ms": -2892.8474000422284,
+          "ratio": 0.5500799276214924,
+          "regression": false,
+          "absolute_pass": false,
+          "limit_ms": 2000,
+          "successful": true,
+          "metrics": {
+            "base": {
+              "queries": 5,
+              "rows": 1301,
+              "bytes": 243532
+            },
+            "current": {
+              "queries": 8,
+              "rows": 328,
+              "bytes": 278217
+            }
+          },
+          "samples_per_variant": 90,
+          "samples_per_group": {
+            "base": [
+              30,
+              30,
+              30
+            ],
+            "current": [
+              30,
+              30,
+              30
+            ]
+          },
+          "samples_complete": true,
+          "same_log_population": true,
+          "detail_equivalent": true,
+          "integrity_equivalent": true,
+          "pass": false
+        },
+        "inventory": {
+          "base_p95_ms": 1384.801600011997,
+          "current_p95_ms": 1467.0544000109658,
+          "delta_ms": 82.25279999896884,
+          "ratio": 1.0593968117875199,
+          "regression": false,
+          "absolute_pass": true,
+          "limit_ms": 2000,
+          "successful": true,
+          "metrics": {
+            "base": {
+              "queries": 6,
+              "rows": 360,
+              "bytes": 42346
+            },
+            "current": {
+              "queries": 6,
+              "rows": 360,
+              "bytes": 42346
+            }
+          },
+          "samples_per_variant": 90,
+          "samples_per_group": {
+            "base": [
+              30,
+              30,
+              30
+            ],
+            "current": [
+              30,
+              30,
+              30
+            ]
+          },
+          "samples_complete": true,
+          "same_log_population": true,
+          "detail_equivalent": true,
+          "integrity_equivalent": true,
+          "pass": true
+        },
+        "integrity": {
+          "base_p95_ms": 122688.69460001588,
+          "current_p95_ms": 53544.835299951956,
+          "delta_ms": -69143.85930006392,
+          "ratio": 0.43642843763654343,
+          "regression": false,
+          "absolute_pass": false,
+          "limit_ms": 10000,
+          "successful": false,
+          "metrics": {
+            "base": {
+              "queries": 599,
+              "rows": 20548,
+              "bytes": 1664
+            },
+            "current": {
+              "queries": 226,
+              "rows": 18153,
+              "bytes": 1664
+            }
+          },
+          "samples_per_variant": 90,
+          "samples_per_group": {
+            "base": [
+              30,
+              30,
+              30
+            ],
+            "current": [
+              30,
+              30,
+              30
+            ]
+          },
+          "samples_complete": true,
+          "same_log_population": true,
+          "detail_equivalent": true,
+          "integrity_equivalent": true,
+          "pass": false
+        },
+        "operation_detail": {
+          "base_p95_ms": 435.449399985373,
+          "current_p95_ms": 889.4319999963045,
+          "delta_ms": 453.9826000109315,
+          "ratio": 2.042561087525166,
+          "regression": true,
+          "absolute_pass": true,
+          "limit_ms": 2000,
+          "successful": true,
+          "metrics": {
+            "base": {
+              "queries": 19,
+              "rows": 21,
+              "bytes": 5431
+            },
+            "current": {
+              "queries": 26,
+              "rows": 20,
+              "bytes": 5741
+            }
+          },
+          "samples_per_variant": 90,
+          "samples_per_group": {
+            "base": [
+              30,
+              30,
+              30
+            ],
+            "current": [
+              30,
+              30,
+              30
+            ]
+          },
+          "samples_complete": true,
+          "same_log_population": true,
+          "detail_equivalent": true,
+          "integrity_equivalent": true,
+          "pass": false
+        }
+      }
+    },
+    "latency_verdict_not_promoted": true,
+    "original_status": "INTERRUPTED_AFTER_BASELINE_TIMEOUTS",
+    "partial_comparisons_sha256": "b18cf600d85055354319de8778319550f3aa9d95bd25c5fe1a13839cc90968e4"
+  },
+  "actual_http": {
+    "status": "PASS",
+    "native_exit": 0,
+    "cohort_requests": 30,
+    "observed_peak_requests": 30,
+    "remaining_active_requests": 0,
+    "all_http_200": true,
+    "all_results_equal": true,
+    "database_rows_unchanged": true,
+    "p95_ms": 7332.90720009245,
+    "proxy_port": 3042,
+    "backend_port": 8042,
+    "ports_released": true
+  },
+  "evidence": {
+    "fixtures-v3/manifest.json": "70be82b6c7fc4cc6f3300888b0380d86a1b9e879e1d251ff53b08299a93140bf",
+    "u30-subset.json": "f418c85e24fca1ac770a7dc0b8398e09a0d8237919637f0893fa85799d321f9b",
+    "http-u30.json": "2f92b228eb13679f2246ce89a4fc5fdb20f7e4752efa31cd665dc959dad522f5",
+    "baseline-stop.json": "147c249346e7d6be64c35ac6082849308d993eb1dd473eae43fa66593ec68141",
+    "current-completion-receipt.json": "ea8e3312f5ff19f364bb89f1cfad8b126249827246ca21a52e6d54fb2f918f35",
+    "u30-current-completion/g1-native-exit.txt": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354"
+  },
+  "excluded_material": "Database copies, SQL diagnostics, credentials and personal row values stay in ignored runtime",
+  "main_integrated": false,
+  "employee_deployed": false
+}

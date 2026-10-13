@@ -12,7 +12,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 from collections import Counter
-from contextlib import closing
+from contextlib import AsyncExitStack, closing
 from contextvars import ContextVar
 from datetime import datetime, timedelta
 import hashlib
@@ -322,8 +322,10 @@ async def _measure(config: dict) -> dict:
         with Session(engine, autoflush=False) as session:
             yield session
 
+    previous_overrides = dict(app.dependency_overrides)
     app.dependency_overrides[get_db] = get_read_db
     evaluate_integrity = inventory_integrity.evaluate_inventory_integrity
+    previous_sample_limit = inventory_integrity_engine.SAMPLE_LIMIT
     if "sample_limit" in inspect.signature(evaluate_integrity).parameters:
         inventory_integrity.evaluate_inventory_integrity = lambda *args, **kwargs: evaluate_integrity(
             *args, **{**kwargs, "sample_limit": None}
@@ -332,21 +334,41 @@ async def _measure(config: dict) -> dict:
         # Older code uses samples[:SAMPLE_LIMIT]; [:None] retains every finding.
         inventory_integrity_engine.SAMPLE_LIMIT = None
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
-    async with httpx.AsyncClient(transport=transport, base_url="http://benchmark.invalid", headers={"X-Admin-Pin": "0000"}, timeout=120) as client:
+    async with AsyncExitStack() as cleanup:
+        def restore_overrides() -> None:
+            """Leave a failed measurement unable to redirect later DB consumers."""
+            app.dependency_overrides.clear()
+            app.dependency_overrides.update(previous_overrides)
+        cleanup.callback(restore_overrides)
+        cleanup.callback(engine.dispose)
+        cleanup.callback(setattr, inventory_integrity, "evaluate_inventory_integrity", evaluate_integrity)
+        cleanup.callback(setattr, inventory_integrity_engine, "SAMPLE_LIMIT", previous_sample_limit)
+        client = await cleanup.enter_async_context(httpx.AsyncClient(
+            transport=transport, base_url="http://benchmark.invalid",
+            headers={"X-Admin-Pin": "0000"}, timeout=120))
         async def request(url: str, diagnostic: bool = False) -> dict:
             metrics = {"queries": 0, "rows": 0, "sql": [], "diagnostic": diagnostic}
             token = MEASUREMENT.set(metrics)
             try:
                 start = time.perf_counter()
+                started_at = time.time()
                 response = await asyncio.wait_for(client.get(url), timeout=120)
                 duration = (time.perf_counter() - start) * 1000
             except TimeoutError:
                 return {"ms": (time.perf_counter() - start) * 1000, "status": 0, "bytes": 0,
+                        "started_at": started_at, "ended_at": time.time(),
                         "queries": metrics["queries"], "rows": metrics["rows"], "error": "120s timeout"}
             finally:
                 MEASUREMENT.reset(token)
             result = {"ms": duration, "status": response.status_code, "bytes": len(response.content),
-                      "queries": metrics["queries"], "rows": metrics["rows"]}
+                      "queries": metrics["queries"], "rows": metrics["rows"],
+                      "started_at": started_at, "ended_at": time.time()}
+            if response.status_code == 200:
+                payload = response.json()
+                if isinstance(payload, dict):
+                    payload.pop("generated_at", None)
+                result["response_sha256"] = hashlib.sha256(json.dumps(
+                    payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
             if diagnostic:
                 plans = []
                 with closing(read_connection(path)) as connection:
@@ -379,10 +401,18 @@ async def _measure(config: dict) -> dict:
 
         endpoints = {}
         semaphore = asyncio.Semaphore(config["users"])
+        active_requests = 0
+        observed_peak = 0
 
         async def bounded(name: str, url: str) -> tuple[str, dict]:
+            nonlocal active_requests, observed_peak
             async with semaphore:
-                return name, await request(url)
+                active_requests += 1
+                observed_peak = max(observed_peak, active_requests)
+                try:
+                    return name, await request(url)
+                finally:
+                    active_requests -= 1
 
         for name, url in config["endpoints"].items():
             cold = await request(url, True)
@@ -398,13 +428,13 @@ async def _measure(config: dict) -> dict:
                 for _ in range(config["calls"]) for name, url in routes))
             for name, sample in samples:
                 endpoints[name]["samples"].append(sample)
-    app.dependency_overrides.clear()
-    engine.dispose()
     after_hash = hashlib.sha256(path.read_bytes()).hexdigest()
     if before_hash != after_hash:
         raise RuntimeError("Read workload changed database bytes")
     return {"endpoints": endpoints, "db_unchanged": True, "db_sha256": before_hash,
-            "users": config["users"], "calls": config["calls"], "runtime": sys.version}
+            "users": config["users"], "observed_peak_requests": observed_peak,
+            "remaining_active_requests": active_requests,
+            "calls": config["calls"], "runtime": sys.version}
 
 
 def worker(config: dict) -> dict:

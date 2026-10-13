@@ -173,6 +173,7 @@ def test_mixed_workload_measures_each_endpoint_thirty_times(
 
     async def read(request: Request) -> list[object]:
         calls[request.url.path] += 1
+        await asyncio.sleep(0.001)
         return []
 
     endpoints = {f"read_{number}": f"/read/{number}" for number in range(10)}
@@ -187,10 +188,46 @@ def test_mixed_workload_measures_each_endpoint_thirty_times(
     result = asyncio.run(module._measure({"db": str(database), "endpoints": endpoints,
                                          "warmup": 1, "calls": 30, "users": users, "workload": "mixed"}))
     assert result["db_unchanged"]
+    assert result["observed_peak_requests"] == users
+    assert result["remaining_active_requests"] == 0
     assert {key: len(row["samples"]) for key, row in result["endpoints"].items()} == {
         key: 30 for key in endpoints
     }
     assert calls == Counter({url: 32 for url in endpoints.values()})
+    assert all(row["ended_at"] >= row["started_at"] for endpoint in result["endpoints"].values()
+               for row in endpoint["samples"])
+
+
+def test_measurement_failure_restores_overrides_and_integrity_hook(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Failed reads cannot leak the measurement's DB session into later checks."""
+    from fastapi import FastAPI
+    from app import main as main_module
+    from app.database import get_db
+    from app.services import inventory_integrity
+    import httpx
+
+    module = _module()
+    app = FastAPI()
+    app.add_api_route("/read", lambda: [])
+    def prior() -> None:
+        """Represent a dependency owned by the caller before measurement."""
+    app.dependency_overrides[get_db] = prior
+    original = inventory_integrity.evaluate_inventory_integrity
+    monkeypatch.setattr(main_module, "app", app)
+    async def broken(*args: object, **kwargs: object) -> None:
+        """Fail the transport before it can produce a response."""
+        raise RuntimeError("connection interrupted")
+    monkeypatch.setattr(httpx.AsyncClient, "get", broken)
+    database = tmp_path / "fixture.db"
+    with sqlite3.connect(database) as connection:
+        connection.execute("CREATE TABLE records (id INTEGER)")
+    with pytest.raises(RuntimeError, match="interrupted"):
+        asyncio.run(module._measure({"db": str(database), "endpoints": {"read": "/read"},
+                                    "warmup": 1, "calls": 30, "users": 30, "workload": "mixed"}))
+    assert app.dependency_overrides[get_db] is prior
+    assert inventory_integrity.evaluate_inventory_integrity is original
 
 
 @pytest.mark.parametrize("sample_counts", [(3, 3, 3), (29, 31, 30), (30, 30, 30)])
