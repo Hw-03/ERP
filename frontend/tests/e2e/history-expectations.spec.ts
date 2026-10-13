@@ -3,7 +3,8 @@ import { spawnSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import type { APIRequestContext, Page } from "@playwright/test";
-import { test, expect, loginUi } from "./_common-expectations";
+import { expect, loginUi } from "./_common-expectations";
+import { test, fetchWithoutIdleReuse } from "./_isolated-api-expectations";
 
 type RawHistoryRows = { itemIds: string[]; logIds: string[]; locationIds: string[] };
 const rawHistoryRows: RawHistoryRows[] = [];
@@ -291,7 +292,7 @@ test("HISTORY03 늦은 이전 검색 응답은 최신 목록과 마지막 선택
   const waiting = new Promise<void>((resolve) => { started = resolve; });
   await page.route("**/api/inventory/transactions/display-groups?**", async (route) => {
     if (new URL(route.request().url()).searchParams.get("search") === older.name) {
-      const response = await route.fetch(); started(); await held; await route.fulfill({ response });
+      const response = await fetchWithoutIdleReuse(route); started(); await held; await route.fulfill({ response });
     } else await route.continue();
   });
   const search = page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모");

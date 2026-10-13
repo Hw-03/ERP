@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import type { APIRequestContext, Page } from "@playwright/test";
-import { test, expect, loginUi, type CommonActors } from "./_common-expectations";
+import { expect, loginUi, type CommonActors } from "./_common-expectations";
+import { test } from "./_isolated-api-expectations";
 import { readSeed } from "./_helpers";
 
 const ADMIN = { "X-Admin-Pin": process.env.E2E_ADMIN_PIN ?? "0000" };

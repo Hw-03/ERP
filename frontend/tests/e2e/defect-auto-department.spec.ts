@@ -1,7 +1,8 @@
 import { randomUUID } from "crypto";
 import type { APIRequestContext } from "@playwright/test";
 import type { Item } from "../../lib/api";
-import { test, expect, changeEmployee, loginUi } from "./_common-expectations";
+import { expect, changeEmployee, loginUi } from "./_common-expectations";
+import { test } from "./_isolated-api-expectations";
 
 async function read(request: APIRequestContext, url: string) {
   const response = await request.get(url);
