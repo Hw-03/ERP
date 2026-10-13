@@ -66,6 +66,7 @@ $runtimeScripts = @(
 . (Join-Path $DevRoot "scripts\dev\checked-command.ps1")
 . (Join-Path $DevRoot "scripts\dev\runtime-task-control.ps1")
 . (Join-Path $DevRoot "scripts\dev\runtime-control.ps1")
+. (Join-Path $DevRoot "scripts\dev\frontend-cache-policy.ps1")
 
 if ($PreflightOnly -and ($DryRun -or $Force -or $AllowSchemaChange -or $AutoSchema)) {
     Write-Host "SYNC_PREPARE_RESULT=BLOCKED"
@@ -178,6 +179,22 @@ function Test-SyncFileDifferent {
     return (Get-SyncFileSha256 -Path $Source) -ne (Get-SyncFileSha256 -Path $Target)
 }
 
+$cacheSession = $null
+$cacheConfirmed = $false
+$previousCacheSession = $env:MES_FRONTEND_CACHE_SESSION
+try {
+if (-not $DryRun) {
+    try {
+        $cacheSession = Start-FrontendCacheSession -RepoRoot $DevRoot -EmployeeRoot $EmpRoot
+        $env:MES_FRONTEND_CACHE_SESSION = $cacheSession
+    }
+    catch {
+        Write-Host 'SYNC_PREPARE_RESULT=BLOCKED'
+        Write-Host 'SYNC_FAILURE_PHASE=PRE_STOP'
+        Write-Host $_.Exception.Message
+        exit 9
+    }
+}
 Write-Host "===================================================="
 
 $pending = Invoke-FrontendRelease -Command 'check-pending' -Arguments @('--employee-root', $EmpRoot)
@@ -750,6 +767,8 @@ if (-not $confirmRelease.Success) {
     Write-CheckedCommandResult -Label 'confirm-release' -Result $confirmRelease
     exit 6
 }
+$cacheConfirmed = Save-FrontendInstalledCache -RepoRoot $DevRoot -EmployeeRoot $EmpRoot `
+    -Release $preparedFrontend -Record $script:FrontendRollbackRecord
 
 Write-Host "===================================================="
 Write-Host " 동기화 완료"
@@ -763,3 +782,22 @@ Write-Host " DB 백업               : $backupPath"
 Write-Host " 접속 주소             : http://192.168.0.63:3000"
 Write-Host "===================================================="
 exit 0
+}
+finally {
+    $released = $false
+    try {
+        if ($cacheSession) {
+            $released = Stop-FrontendCacheSession -RepoRoot $DevRoot -EmployeeRoot $EmpRoot -Session $cacheSession
+        }
+    }
+    catch {
+        Write-Warning "Frontend cache session release failed: $($_.Exception.Message)"
+    }
+    finally {
+        $env:MES_FRONTEND_CACHE_SESSION = $previousCacheSession
+    }
+    if ($cacheConfirmed -and $released -and $env:MES_FRONTEND_CACHE_DEFER -ne '1') {
+        $cleanup = Invoke-FrontendPreparationCleanup -RepoRoot $DevRoot -EmployeeRoot $EmpRoot
+        Write-Host "FRONTEND_CACHE_CLEANUP=$($cleanup.Status)"
+    }
+}

@@ -46,7 +46,7 @@ def _fake_toolchain(tmp_path: Path) -> Path:
     return node
 
 
-def _prepare(module, tmp_path: Path, monkeypatch, *, fail: str = ""):
+def _prepare(module, tmp_path: Path, monkeypatch, *, fail: str = "", runtime: Path | None = None):
     source = _source(tmp_path)
     node = _fake_toolchain(tmp_path)
     monkeypatch.setattr(module, "node_version", lambda _node: "v20.20.2")
@@ -68,8 +68,27 @@ def _prepare(module, tmp_path: Path, monkeypatch, *, fail: str = ""):
         _write(log, label + " passed")
 
     monkeypatch.setattr(module, "run_command", command)
-    release = module.prepare(source, tmp_path / "runtime", node)
+    release = module.prepare(source, runtime or tmp_path / "runtime", node)
     return source, node, release, events
+
+
+def test_managed_prepare_pins_archived_copy_and_blocks_unknown_child(tmp_path, monkeypatch):
+    module = _module()
+    cache = module.frontend_cache
+    policy = cache.CachePolicy(tmp_path / "repo", tmp_path / "employee")
+    with policy.operation():
+        source, node, release, _ = _prepare(module, tmp_path, monkeypatch, runtime=policy.roots[0])
+        state = cache.read_json(policy.preparation_path(release))
+        assert cache.timestamp(state["expires_at"]) > policy.now()
+        _write(release / "frontend/.next-prod/BUILD_ID", "invalid artifact")
+        rebuilt = module.prepare(source, policy.roots[0], node)
+        assert rebuilt == release
+        archived, = policy.roots[0].glob("*.invalid-*")
+        assert policy.protected_preparation(archived)
+        state["child"] = {"status": "STARTING"}
+        policy.save_preparation(release, state)
+        with pytest.raises(cache.CacheBusy):
+            module.prepare(source, policy.roots[0], node)
 
 
 def test_preparation_isolated_excludes_secrets_and_builds_matching_dependencies(tmp_path, monkeypatch):

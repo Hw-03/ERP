@@ -234,6 +234,21 @@ def _prepare_sync_sandbox(tmp_path: Path, overrides: dict[str, str]) -> tuple[Pa
     _write(dev_root / "scripts" / "dev" / "checked-command.ps1", checked_command)
     _write(emp_root / "scripts" / "dev" / "checked-command.ps1", checked_command)
     _write(dev_root / "scripts" / "ops" / "employee_frontend_release.py", _fake_frontend_release_tool())
+    shutil.copyfile(ROOT / "scripts/dev/frontend-cache-policy.ps1", dev_root / "scripts/dev/frontend-cache-policy.ps1")
+    _write(dev_root / "scripts/ops/frontend_preparation_cache.py", textwrap.dedent('''
+        import os, sys
+        command = sys.argv[1]
+        if os.environ.get("FAKE_CACHE_TRACE") == "1":
+            with open(os.environ["SYNC_EVENT_LOG"], "a", encoding="utf-8") as out:
+                out.write("cache-" + command + "\\n")
+        if command == "session-begin":
+            print("FRONTEND_CACHE_SESSION=" + "a" * 32)
+        elif command == "installed":
+            print("FRONTEND_CACHE_INSTALLED=CONFIRMED")
+        elif command == "cleanup":
+            print("FRONTEND_CACHE_RESULT=COMPLETED")
+        raise SystemExit(int(os.environ.get("FAKE_CACHE_" + command.upper().replace("-", "_") + "_EXIT", "0")))
+    '''))
     for script_name in RUNTIME_SCRIPTS:
         _write(dev_root / "scripts" / "dev" / script_name, "# fake runtime script\n")
         _write(emp_root / "scripts" / "dev" / script_name, "# fake runtime script\n")
@@ -1760,6 +1775,34 @@ def test_employee_sync_success_uses_migrate_then_read_only_head_check(tmp_path: 
         "start-backend",
         "start-frontend",
         "frontend-confirm",    ]
+
+
+@pytest.mark.parametrize("overrides,expected_cleanup", [
+    ({}, True),
+    ({"MES_FRONTEND_CACHE_DEFER": "1"}, False),
+    ({"FAKE_CACHE_INSTALLED_EXIT": "9"}, False),
+    ({"FAKE_CACHE_CLEANUP_EXIT": "9"}, True),
+])
+def test_cache_hook_runs_after_confirmation_and_session_release(tmp_path, overrides, expected_cleanup):
+    sync_path, environment, event_log = _prepare_sync_sandbox(
+        tmp_path, {"FAKE_CACHE_TRACE": "1", **overrides})
+    result = _run_sync(sync_path, environment)
+    assert result.returncode == 0, result.stdout + result.stderr
+    events = _event_kinds(event_log)
+    expected = ["cache-session-begin", "cache-installed", "cache-session-end"]
+    if expected_cleanup:
+        expected.append("cache-cleanup")
+    assert [event for event in events if event.startswith("cache-")] == expected
+    assert events.index("frontend-confirm") < events.index("cache-installed")
+
+
+def test_failed_deployment_releases_session_without_cleanup(tmp_path):
+    sync_path, environment, event_log = _prepare_sync_sandbox(
+        tmp_path, {"FAKE_CACHE_TRACE": "1", "FAKE_SNAPSHOT_PREFLIGHT_EXIT": "20"})
+    result = _run_sync(sync_path, environment)
+    assert result.returncode == 10, result.stdout + result.stderr
+    assert [event for event in _event_kinds(event_log) if event.startswith("cache-")] == [
+        "cache-session-begin", "cache-session-end"]
 
 
 def test_employee_sync_snapshot_preflight_failure_stops_before_employee_mutation(

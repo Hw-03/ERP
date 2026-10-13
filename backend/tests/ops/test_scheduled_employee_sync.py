@@ -19,6 +19,18 @@ def _prepare(tmp_path: Path, **overrides: str) -> tuple[Path, dict[str, str]]:
     """Run only disposable child scripts; never invoke a live sync or service."""
     scripts = tmp_path / "scripts/dev"
     scripts.mkdir(parents=True)
+    shutil.copyfile(ROOT / "scripts/dev/checked-command.ps1", scripts / "checked-command.ps1")
+    helper = ROOT / "scripts/dev/frontend-cache-policy.ps1"
+    shutil.copyfile(helper, scripts / helper.name)
+    ops = tmp_path / "scripts/ops"
+    ops.mkdir()
+    (ops / "frontend_preparation_cache.py").write_text(
+        'import os,sys\n'
+        'with open(os.environ["SYNC_TEST_EVENTS"],"a") as f: f.write("CACHE:" + os.environ.get("MES_FRONTEND_CACHE_DEFER", "") + "\\n")\n'
+        'print("FRONTEND_CACHE_RESULT=COMPLETED")\n'
+        'raise SystemExit(int(os.environ.get("SYNC_TEST_CACHE_EXIT", "0")))\n',
+        encoding="utf-8",
+    )
     for name, stage in (
         ("auto-sync-to-employee.ps1", "CODE"),
         ("sync-to-employee.ps1", "CODE"),
@@ -87,7 +99,7 @@ def test_code_success_always_runs_data_once_even_when_caller_output_is_lost(
     result = _run(script, env, discard_output=True)
     assert result.returncode == 0, result.stderr
     assert (tmp_path / "events.log").read_text(encoding="utf-8-sig").splitlines() == [
-        "CODE:", "DATA:-Apply",
+        "CODE:", "DATA:-Apply", "CACHE:",
     ]
     receipt = _receipt(tmp_path)
     assert receipt["result"] == "COMPLETED"
@@ -148,7 +160,7 @@ def test_duplicate_entry_is_blocked_without_second_sync(tmp_path: Path) -> None:
         second = _run(script, env)
         assert second.returncode == 20, second.stderr
         assert first.wait(timeout=25) == 0
-    assert (tmp_path / "events.log").read_text(encoding="utf-8-sig").splitlines() == ["CODE:", "DATA:-Apply"]
+    assert (tmp_path / "events.log").read_text(encoding="utf-8-sig").splitlines() == ["CODE:", "DATA:-Apply", "CACHE:"]
     assert _receipt(tmp_path)["result"] == "COMPLETED"
 
 
@@ -201,8 +213,20 @@ def test_transient_receipt_replace_lock_is_retried_before_data_handoff(tmp_path:
 
     assert result.returncode == 0, result.stderr
     assert (tmp_path / "events.log").read_text(encoding="utf-8-sig").splitlines() == [
-        "CODE:", "DATA:-Apply",
+        "CODE:", "DATA:-Apply", "CACHE:",
     ]
     receipt = _receipt(tmp_path)
     assert receipt["result"] == "COMPLETED"
     assert receipt["code"]["status"] == receipt["data"]["status"] == "COMPLETED"
+
+
+def test_cleanup_failure_does_not_retry_sync_or_change_deployment_success(tmp_path: Path) -> None:
+    script, env = _prepare(tmp_path, SYNC_TEST_CACHE_EXIT="9")
+    result = _run(script, env)
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / "events.log").read_text(encoding="utf-8-sig").splitlines() == [
+        "CODE:", "DATA:-Apply", "CACHE:",
+    ]
+    receipt = _receipt(tmp_path)
+    assert receipt["result"] == "COMPLETED"
+    assert receipt["cleanup"]["status"] == "WARNING"

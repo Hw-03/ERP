@@ -146,6 +146,22 @@ scripts\ops\cleanup_backups.bat 20     rem 정식 백업 최신 20개 유지
 
 미버전 SQLite DB는 검토·고정된 개발/직원 스키마 지문과 정확히 일치할 때만 등록한다. 등록 전 검증 백업을 만들고 업무 데이터 지문을 전후 비교하며, 알 수 없는 구조·데이터 변경·Alembic revision과 상태표 불일치는 모두 서버 시작 전에 중단한다. 임의의 `alembic stamp`로 이 검사를 우회하지 않는다.
 
+## 프론트엔드 배포 캐시 자동 정리
+
+수동 동기화는 설치 확정과 배포 잠금 해제 뒤 정리한다. 기존 일일 동기화는 코드·데이터 단계가 모두 성공한 뒤 한 번 정리하며, 코드 변경이 없는 날도 포함한다. 일일 호출에서는 수동 정리 훅을 유예한다. 정리 실패는 경고와 별도 보고서로 남기며 성공한 배포 결과를 바꾸지 않는다.
+
+대상은 `C:\ERP\_attic\runtime` 아래 `sync-preparation\frontend`, `rb-release`, `r42-9e70509d`, `r42-43fd1361`로 한정한다. 오래된 준비본의 `frontend/node_modules`, `.next`, `.next-prod`만 제거하며, 준비본 폴더와 소스·설정·DB·원본 자료·검증 기록·공유 폴더는 보존한다. 네 곳의 `npm-cache/_cacache` 합계가 512MiB를 넘으면 과거 캐시부터 비우고, 필요하면 사용이 끝난 공용 캐시도 초기화한다. npm `_logs`는 보존한다.
+
+최신 설치본은 `CONFIRMED` journal, 준비본 receipt의 artifact manifest, 직원 환경의 소스·빌드 식별자가 일치해야 인정한다. 날짜만으로 선택하지 않는다. 신규 준비본은 24시간 보호하며, 배포 세션·npm/Node 자식이 사용 중이거나 상태가 불명확하면 만료 후에도 보호한다. 복구 중인 설치 기록, 손상된 상태, 외부 연결, 보호 파일, 잠금 충돌도 정리를 막는다. 부모가 비정상 종료해 자식 프로세스 트리의 종료를 증명할 수 없으면 해당 준비본을 계속 보존한다.
+
+별도 운영 상태와 정리 보고서는 `_attic/runtime/frontend-cache-policy/`에 저장한다. 기존 journal·receipt·검증 로그는 수정하지 않는다. 미리보기 명령은 다음과 같으며, 실제 삭제에는 명시적으로 `--apply`가 필요하다.
+
+의존성 패키지 내부의 `data`·`shared` 동명 폴더는 준비본 artifact manifest에 등록된 생성 파일의 해시까지 일치할 때만 허용한다. 미등록 파일·원본 파일·외부 연결은 보호한다.
+
+```powershell
+py scripts/ops/frontend_preparation_cache.py cleanup
+```
+
 ## 재시작 절차
 
 1. **재시작**: 루트에서 `stop.bat`가 성공한 것을 확인한 뒤 `start.bat` 실행

@@ -27,6 +27,7 @@ PACKAGES = ("next", "react", "react-dom")
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+from scripts.ops import frontend_preparation_cache as frontend_cache
 EMPLOYEE_RUNTIME_ROOT = Path(r"C:\ERP-dev")
 EMPLOYEE_BACKEND_PORT = 8010
 EMPLOYEE_FRONTEND_PORT = 3000
@@ -143,6 +144,12 @@ def _toolchain(node: Path) -> dict:
 
 def run_command(argv: list[str], cwd: Path, environment: dict[str, str], log: Path) -> None:
     """Keep dependency/build output local; report only the failed log path."""
+    policy = frontend_cache.CURRENT.get()
+    if policy is not None and cwd.parent.parent in policy.roots:
+        code = policy.run_command(argv, cwd, environment, log)
+        if code:
+            raise ReleaseError(f"Command exited {code}; see {log}")
+        return
     with log.open("w", encoding="utf-8") as output:
         result = subprocess.run(argv, cwd=cwd, env=environment, stdout=output, stderr=subprocess.STDOUT,
                                 check=False, creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
@@ -174,14 +181,24 @@ def prepare(source: Path, runtime: Path, node: Path) -> Path:
                    "preparation_tool": hashlib.sha256(Path(__file__).read_bytes()).hexdigest()})
     runtime.mkdir(parents=True, exist_ok=True)
     release = _inside(runtime / key, runtime)
+    policy = frontend_cache.CURRENT.get()
+    managed = policy is not None and runtime in policy.roots
+    if managed:
+        policy.pin(release)
     if (release / "receipt.json").is_file():
         try:
             verify(release, source, node)
             return release
         except (ReleaseError, OSError, ValueError, KeyError):
-            release.rename(_inside(runtime / (key + ".invalid-" + uuid.uuid4().hex), runtime))
+            archived = _inside(runtime / (key + ".invalid-" + uuid.uuid4().hex), runtime)
+            release.rename(archived)
+            if managed:
+                policy.pin(archived)
     elif release.exists():
-        release.rename(_inside(runtime / (key + ".incomplete-" + uuid.uuid4().hex), runtime))
+        archived = _inside(runtime / (key + ".incomplete-" + uuid.uuid4().hex), runtime)
+        release.rename(archived)
+        if managed:
+            policy.pin(archived)
     release.mkdir()
     frontend = release / "frontend"
     _copy_files(source, frontend, source_files)
@@ -916,7 +933,7 @@ def _confirm_from_cli(record: Path, employee: Path) -> None:
     mark(bound_record, employee, "CONFIRMED")
 
 
-def main() -> int:
+def _run_cli() -> int:
     from scripts.ops.friday_profile_cutover import CutoverAdmissionError
 
     parser = argparse.ArgumentParser(description=__doc__)
@@ -971,6 +988,17 @@ def main() -> int:
         print(f"FRONTEND_PREPARE_RESULT=BLOCKED\nFRONTEND_PREPARE_ERROR={error}", file=sys.stderr)
         return 9
     return 0
+
+
+def main() -> int:
+    """Serialize every deployment command with cleanup and whole-session leases."""
+    try:
+        policy = frontend_cache.CachePolicy(frontend_cache.ROOT, frontend_cache.EMPLOYEE)
+        with policy.operation(session=os.environ.get(frontend_cache.SESSION_ENV)):
+            return _run_cli()
+    except (frontend_cache.CacheBusy, OSError, ValueError, KeyError, TypeError) as error:
+        print(f"FRONTEND_PREPARE_RESULT=BLOCKED\nFRONTEND_PREPARE_ERROR={error}", file=sys.stderr)
+        return 9
 
 
 if __name__ == "__main__":

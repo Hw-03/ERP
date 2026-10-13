@@ -10,6 +10,7 @@ $script:Receipt = $null
 $script:ReceiptPath = $null
 $lockHandle = $null
 $exitCode = 1
+$previousCacheDefer = $env:MES_FRONTEND_CACHE_DEFER
 
 function Save-SyncReceipt {
     # Replace atomically so a reader never mistakes a partial JSON file for a result.
@@ -124,6 +125,8 @@ try {
     }
     Save-SyncReceipt
     Write-Host "SCHEDULED_SYNC_RECEIPT=$($script:ReceiptPath)"
+    # Defer the manual hook until the code and data stages both succeed.
+    $env:MES_FRONTEND_CACHE_DEFER = '1'
     $exitCode = Invoke-SyncStage -Stage "code" -ScriptPath (Join-Path $RepoRoot "scripts\dev\auto-sync-to-employee.ps1")
     if ($exitCode -ne 0) {
         $script:Receipt.result = "CODE_FAILED"
@@ -140,6 +143,16 @@ try {
         }
         else {
             $script:Receipt.result = "COMPLETED"
+            $env:MES_FRONTEND_CACHE_DEFER = $previousCacheDefer
+            try {
+                . (Join-Path $RepoRoot 'scripts\dev\frontend-cache-policy.ps1')
+                $cleanup = Invoke-FrontendPreparationCleanup -RepoRoot $RepoRoot
+                $script:Receipt['cleanup'] = [ordered] @{ status = $cleanup.Status; report = $cleanup.Report }
+            }
+            catch {
+                $script:Receipt['cleanup'] = [ordered] @{ status = 'WARNING'; error = $_.Exception.Message }
+                Write-Warning "Frontend cleanup failed after successful sync: $($_.Exception.Message)"
+            }
         }
     }
 }
@@ -152,6 +165,7 @@ catch {
     Write-Host "SCHEDULED_SYNC_ERROR=$($_.Exception.Message)"
 }
 finally {
+    $env:MES_FRONTEND_CACHE_DEFER = $previousCacheDefer
     try {
         if ($null -ne $script:Receipt) {
             $script:Receipt.completedAt = (Get-Date).ToString("o")
