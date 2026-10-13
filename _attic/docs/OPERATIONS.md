@@ -4,9 +4,35 @@
 
 > **품질 감사/worktree 안전 범위:** 이 문서의 실행·중지·백업·직원 동기화·배포·작업 등록 절차는 운영자 또는 통합 checkout용이다. 격리된 코드 품질 작업에서는 해당 명령을 실행하거나 development/employee URL·port·DB를 조회하지 않는다. 정적 검증은 [`verify_local.ps1`](../../scripts/dev/verify_local.ps1)의 plan/gate 계약을 따르고, 브라우저 회귀 실행이 별도로 승인된 때만 [합성 DB E2E 격리 계약](../../frontend/tests/e2e/README.md)을 따른다. 과거 실환경 관찰은 현재 상태로 재확인하지 않는다.
 
-> **2026-10-08 작업본 상태:** 정식 성능·전체 백엔드·정식 기대값·실제 공동복구·CI는 아직 완료 전이며 직원 환경 배포는 실행하지 않았다. 아래는 승인된 배포 시 따를 절차이고 이번 작업의 실행 완료 기록이 아니다. 현재 근거와 미완료 범위는 [최종 검증 결과](../../docs/superpowers/specs/2026-10-08-mes-safe-closure-results.md)를 따른다.
+> **2026-10-08 당시 작업본 상태:** 당시 정식 성능·전체 백엔드·정식 기대값·실제 공동복구·CI는 완료 전이었다. 이 문장은 역사적 기록이며 최신 상태는 아래 후속 검증 기록을 따른다. 직원 환경 배포는 실행하지 않았다. 아래 배포 절차는 승인된 적용 시 사용할 안내이며 실제 배포 완료 기록이 아니다. 당시 근거는 [최종 검증 결과](../../docs/superpowers/specs/2026-10-08-mes-safe-closure-results.md)에 보존한다.
 
 ## 표준 실행 경로
+
+### 격리 기대값 검증과 재개
+
+작업 브랜치의 기대값 검증은 원장에서 대상과 필수 조건을 계산한다. 먼저 전용 합성 QA 환경과 격리 PostgreSQL을 준비하고 Node 20으로 전체 실행 계획을 확인한다. 이 절차는 main 반영이나 직원 배포를 수행하지 않는다.
+
+production 빌드가 필요하면 먼저 완료한 뒤 국소 E2E 등 전용 개발 서버 기동으로 자동 생성 타입 경로를 안정화하고 검증 입력을 고정한다. `next-env.d.ts`는 빌드·개발 서버 전환으로 바뀔 수 있으므로 실행 전후 해시를 확인한다. 이 파일을 수동 수정하거나 snapshot에서 제외해 통과시키지 않는다. 원장 승격과 엄격 완료가 끝날 때까지 빌드·타입 생성기를 다시 실행하지 않는다.
+
+```powershell
+node scripts/dev/normalize-mes-expectations.mjs --check
+node scripts/dev/run-mes-expectations.mjs --tier full --plan
+node scripts/dev/run-mes-expectations.mjs --tier full --run-id <새-실행-ID>
+node scripts/dev/run-mes-expectations.mjs --resume _attic/runtime/mes-expectations/<이전-ID>/run.json --run-id <새-집계-ID>
+node scripts/dev/run-mes-expectations.mjs --promote _attic/runtime/mes-expectations/<새-집계-ID>/run.json
+node scripts/dev/normalize-mes-expectations.mjs
+node scripts/dev/normalize-mes-expectations.mjs --check --require-complete
+```
+
+재개는 완료 영수증이 있는 실행만 사용하며 `--tier`, `--ids`, `--promote`와 동시에 지정하지 않는다. 성공 그룹도 현재 소스·설정·의존성·런타임·조건·선택자와 원문 근거가 일치해야 재사용한다. 실패·누락·입력 변경 그룹은 실제 다시 실행하며 변조나 잘못된 대상은 거부한다. 원래 실행 시각과 ID·종료 코드·해시는 보존하고 새 집계 ID를 새 실행으로 표시하지 않는다. 강제 종료로 완료 영수증이 없으면 새 실행이 필요하다. 승격과 엄격 완료 전에는 현재 전체 원장을 PASS로 표시하지 않는다.
+
+QA 인증 PIN 변경도 재사용 환경 해시를 바꾼다. PIN 원문을 영수증에 넣지 않는다. 브라우저는 재시도 0에서도 최초 실패 trace를 남기며, 기대값 실행기의 출력은 run·그룹별 ignored 폴더로 분리된다. API 단절이 재현되면 해당 실행의 trace·서버 로그·소켓 순서를 함께 보존한다. 반복 통과를 근본 원인 해결로 표시하지 않는다.
+
+사용 중인 원본 DB는 실제 업무·화면 감사 저장으로 파일 해시가 바뀔 수 있다. QA의 절대 경로·전용 포트·프로세스 소유권과 작업본 DB 불변 검사를 유지하고, 원본 변화는 저장 기록과 관찰 시각으로 별도 조사한다. 해시 변화만으로 테스트 오염을 확정하거나 원본을 이전 사본으로 덮어쓰지 않는다. 이번 조사도 모든 바이트 변화의 유일 원인이나 원본 호출자 프로세스까지 입증한 것은 아니다.
+
+2026-10-12 당시 실행은 [후속 검증 기록](../../docs/superpowers/specs/2026-10-12-mes-deferred-verification-results.md), 그 이후 소스·재사용 가드 변경 및 새 검증 상태는 [2026-10-13 조사 기록](../../docs/superpowers/specs/2026-10-13-mes-api-db-audit-results.md)을 따른다. 새 001의 실패는 보존했고 002는 실패 그룹 1개를 재실행하고 유효한 8그룹을 재사용해 집계 PASS다. 2026-10-13 12:49:58 KST 승격·정규화·엄격 완료·PostgreSQL 종료를 실제 종료 코드 0으로 확인했으며 현재 원장 대상 345항목·1,058조건 완료, 제외 6항목은 유지한다. 성능의 선택한 읽기 검증, 기존 시간 상한 미달, 과거 묶음의 복구 및 현재 전체 기대값 검증은 각각 구분한다.
+
+기능별 로컬 커밋 6개와 종료 문서 7개의 커밋 대상 분리·푸시 준비는 완료했으며 실제 문서 커밋·푸시 성공은 별도 상태다. 작업 브랜치에 대한 푸시 결과와 새 CI 링크·시작 상태는 Git 결과 및 최종 보고로 확인하며, 사용자의 지시에 따라 전체 CI 완료는 기다리지 않는다. 최신 main의 다른 세션 변경은 이번 작업 브랜치에 통합하지 않았고 직원 환경도 미적용이다.
 
 ### 직원 등급 제거 마이그레이션
 
