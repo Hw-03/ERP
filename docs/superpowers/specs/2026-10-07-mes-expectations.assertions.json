@@ -798,7 +798,7 @@
           "file": "scripts/dev/mes-expectation-evidence.test.mjs",
           "selector": "0매칭·파라미터 일부·중복·SKIP·다른 선언 위치는 PASS가 아니다",
           "assertion": "assert.throws(() => matchInstances(parseReport(\"vitest\", vitest(rows), { root: \"/repo\" }), binding, [\"suite case A\", \"suite case B\"]));",
-          "sourceHash": "f56c8ba54e1d6e087fbcded47952dad00c6d7a809f89edb32e172fc1ec59ea01"
+          "sourceHash": "51c441c022e0003423d2b738109c6769363f46b4005e2ab48557d1db1e9d9f7e"
         }
       ],
       "execution": {
@@ -824,7 +824,7 @@
           "file": "scripts/dev/mes-expectation-evidence.test.mjs",
           "selector": "제품 변경·raw 변조·exit 실패·다른 조건·입력 축소·옛 요약 PASS를 거부한다",
           "assertion": "assert.ok(verifyExecution(fixture.report, fixture.row, fixture.condition, { read: fixture.read, paths: Object.keys(fixture.files), requiredInputs: fixture.inputs }).length > 0);",
-          "sourceHash": "f56c8ba54e1d6e087fbcded47952dad00c6d7a809f89edb32e172fc1ec59ea01"
+          "sourceHash": "51c441c022e0003423d2b738109c6769363f46b4005e2ab48557d1db1e9d9f7e"
         }
       ],
       "execution": {
@@ -850,7 +850,7 @@
           "file": "scripts/dev/mes-expectation-evidence.test.mjs",
           "selector": "브라우저 성공 화면은 원본 첨부와 연결된 바이트 근거가 있어야 한다",
           "assertion": "assert.ok(verify().some((error) => /collection/.test(error)), \"미실행 파라미터를 성공 목록에서 숨길 수 없다\");",
-          "sourceHash": "f56c8ba54e1d6e087fbcded47952dad00c6d7a809f89edb32e172fc1ec59ea01"
+          "sourceHash": "51c441c022e0003423d2b738109c6769363f46b4005e2ab48557d1db1e9d9f7e"
         }
       ],
       "execution": {
