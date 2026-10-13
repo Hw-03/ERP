@@ -57,7 +57,7 @@ describe.each([["desktop", DefectProcessPanel], ["mobile", MobileDefectProcessPa
 
   it("튜브 정상 복귀는 기존 격리 해제 요청을 유지한다", async () => {
     render(<Panel location={location} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />);
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "검사 통과" } });
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "정상 복귀 →" }));
     fireEvent.click(await screen.findByRole("button", { name: "즉시 복귀" }));
     await waitFor(() => expect(mocks.unquarantine).toHaveBeenCalledWith(expect.objectContaining({ record_id: "record-1", dept: "튜브" })));

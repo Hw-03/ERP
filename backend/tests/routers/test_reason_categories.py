@@ -1,8 +1,54 @@
 """사유 마스터의 직원 관리·중복·예약 항목 계약."""
 import uuid
+import pytest
 
 from app.models import AdminAuditLog, Employee
 from sqlalchemy.exc import IntegrityError
+
+
+@pytest.mark.parametrize("mode,quantity,memo", [("partial", 1, None), ("full", 3, "검사 완료"), ("bulk", 3, "  ")])
+def test_restore_without_category_preserves_occurrence_statistics(client, db_session, make_item, mode, quantity, memo):
+    """사유 없는 복귀는 원건과 발생 통계를 보존하고 복귀 거래만 추가한다."""
+    from datetime import date, datetime, UTC
+    from decimal import Decimal
+    from app.models import DefectQuarantineRecord, TransactionLog, TransactionTypeEnum
+    from app.schemas.defect_statistics import DefectStatisticsFilters
+    from app.services.defect_statistics import get_defect_statistics, get_defect_statistics_report
+
+    actor = _actor(db_session)["requester_employee_id"]
+    item = make_item(warehouse_qty=Decimal("6"))
+    for qty in ([1, 2] if mode == "bulk" else [3]):
+        response = client.post("/api/defects/quarantine", json={"actor_employee_id": actor, "item_id": str(item.item_id), "qty": qty, "source": "warehouse", "target_dept": "창고", "reason_category": "외관 불량"})
+        assert response.status_code == 200
+    records = db_session.query(DefectQuarantineRecord).all()
+    for record in records:
+        record.quarantined_at = datetime(2026, 9, 3, 3)
+    db_session.commit()
+    snapshots = [(record.reason_category, record.reason_category_id, record.original_quantity) for record in records]
+    filters = DefectStatisticsFilters(item_id=item.item_id, reason_category_id=records[0].reason_category_id)
+    query = dict(period="month", anchor=date(2026, 9, 3), filters=filters)
+    before = get_defect_statistics(db_session, **query).model_dump()
+    report_before = get_defect_statistics_report(db_session, **query, now=datetime(2026, 10, 1, tzinfo=UTC)).model_dump()
+    assert before["summary"]["quantity"] == report_before["summary"]["quantity"] == 3
+    assert before["summary"]["record_count"] == len(records)
+    payload = {"actor_employee_id": actor, "reason_category": None, "reason_category_id": None, "reason_memo": memo}
+    if mode == "bulk":
+        payload["lines"] = [{"record_id": str(record.record_id), "item_id": str(item.item_id), "department": "창고", "quantity": int(record.remaining_quantity)} for record in records]
+        url = "/api/defects/unquarantine/bulk"
+    else:
+        payload.update(record_id=str(records[0].record_id), item_id=str(item.item_id), qty=quantity, dept="창고")
+        url = "/api/defects/unquarantine"
+    response = client.post(url, json=payload)
+    assert response.status_code == 200, response.text
+    db_session.expire_all()
+    assert [(record.reason_category, record.reason_category_id, record.original_quantity) for record in records] == snapshots
+    assert sum(record.remaining_quantity for record in records) == 3 - quantity
+    assert get_defect_statistics(db_session, **query).model_dump() == before
+    assert get_defect_statistics_report(db_session, **query, now=datetime(2026, 10, 1, tzinfo=UTC)).model_dump() == report_before
+    logs = db_session.query(TransactionLog).filter_by(transaction_type=TransactionTypeEnum.UNMARK_DEFECTIVE).all()
+    assert len(logs) == len(records)
+    assert all(log.reason_category is None and log.reason_category_id is None for log in logs)
+    assert all(log.reason_memo == ((memo or "").strip() or None) for log in logs)
 
 
 def _actor(db_session):

@@ -81,7 +81,6 @@ describe("DefectProcessPanel batch processing", () => {
 
     expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
     expect(screen.getByText("선택한 격리 기록 2건")).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "기타" } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "공통 메모" } });
     fireEvent.click(screen.getByRole("button", { name: "정상 복귀 →" }));
     const dialog = await screen.findByRole("dialog");
@@ -91,8 +90,8 @@ describe("DefectProcessPanel batch processing", () => {
     expect(apiMocks.unquarantine).not.toHaveBeenCalled();
     expect(apiMocks.unquarantineBulk).toHaveBeenCalledWith({
       actor_employee_id: "employee-1",
-      reason_category: "기타",
-      reason_category_id: "reason-기타",
+      reason_category: null,
+      reason_category_id: null,
       reason_memo: "공통 메모",
       lines: [
         { record_id: "record-1", item_id: "item-1", department: "조립", quantity: 2 },
@@ -109,7 +108,6 @@ describe("DefectProcessPanel batch processing", () => {
     apiMocks.unquarantineBulk.mockRejectedValue(new ApiError("수량이 변경되었습니다", 422));
     render(<DefectProcessPanel locations={locations} currentEmployee={employee}
       onDone={onDone} onCancel={vi.fn()} onInvalidated={onInvalidated} />);
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "외관 불량" } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "검사 완료" } });
     fireEvent.click(screen.getByRole("button", { name: "정상 복귀 →" }));
     fireEvent.click(await screen.findByRole("button", { name: "즉시 복귀" }));
@@ -141,9 +139,9 @@ describe("DefectProcessPanel batch processing", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: /전체 폐기/ }));
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "외관 불량" } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "폐기 사유" } });
-    fireEvent.click(screen.getByRole("button", { name: /전체 폐기/ }));
     fireEvent.click(screen.getByRole("button", { name: "즉시 폐기 →" }));
     await screen.findByRole("dialog");
     expect(screen.getByText("확인하면 즉시 재고에 반영됩니다.")).toBeInTheDocument();
@@ -172,9 +170,9 @@ describe("DefectProcessPanel batch processing", () => {
     );
 
     expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /전체 폐기/ }));
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "외관 불량" } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "폐기 사유" } });
-    fireEvent.click(screen.getByRole("button", { name: /전체 폐기/ }));
     fireEvent.click(screen.getByRole("button", { name: "즉시 폐기 →" }));
     await screen.findByRole("dialog");
     fireEvent.click(screen.getByRole("button", { name: "즉시 폐기" }));
@@ -197,9 +195,9 @@ describe("DefectProcessPanel batch processing", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: /재작업/ }));
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "외관 불량" } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "재작업 사유" } });
-    fireEvent.click(screen.getByRole("button", { name: /재작업/ }));
     fireEvent.click(screen.getByRole("button", { name: "다음 →" }));
     expect(screen.getByLabelText("재작업 합계")).toHaveTextContent("5");
     fireEvent.click(screen.getByRole("button", { name: "결정 추가" }));

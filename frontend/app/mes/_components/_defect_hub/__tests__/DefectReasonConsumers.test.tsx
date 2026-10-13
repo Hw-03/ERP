@@ -38,30 +38,54 @@ beforeEach(() => {
   api.getItems.mockResolvedValue([{ item_id: "item-1", item_name: "정상 품목", mes_code: "9-TR-0001", warehouse_qty: 10, locations: [], unit: "EA" }]);
 });
 
+describe.each([["PC", DefectProcessPanel], ["mobile", MobileDefectProcessPanel]] as const)("%s 정상 복귀 전환", (_name, Panel) => {
+  it("작업 전환 때 입력을 보존하지만 복귀 요청에는 숨긴 카테고리를 보내지 않는다", async () => {
+    render(<Panel location={{ ...location, has_bom: true }} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />);
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    const memo = screen.getByRole("textbox");
+    fireEvent.click(screen.getByRole("button", { name: /^전체 폐기/ }));
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "기타" } });
+    expect(screen.getByRole("button", { name: "즉시 폐기 →" })).toBeDisabled();
+    fireEvent.change(memo, { target: { value: "전환 메모" } });
+    fireEvent.click(screen.getByRole("button", { name: /^정상 복귀[^→]*$/ }));
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox")).toBe(memo);
+    fireEvent.click(screen.getByRole("button", { name: /^재작업/ }));
+    expect(screen.getByRole("combobox")).toHaveValue("기타");
+    fireEvent.click(screen.getByRole("button", { name: /^정상 복귀[^→]*$/ }));
+    fireEvent.click(screen.getByRole("button", { name: "정상 복귀 →" }));
+    fireEvent.click(screen.getByRole("button", { name: "즉시 복귀", exact: true }));
+    await waitFor(() => expect(api.unquarantine).toHaveBeenCalledWith(expect.objectContaining({ reason_category: null, reason_category_id: null, reason_memo: "전환 메모" })));
+  });
+});
+
 describe.each(singleConsumers)("%s 사유 마스터 연결", (_name, Component, submitLabel) => {
   it("작업자와 선택 ID를 공통 폼·정상 복귀 요청으로 전파한다", async () => {
     render(<Component location={location} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />);
     const restoreRadio = screen.queryByDisplayValue("unquarantine");
     if (restoreRadio) fireEvent.click(restoreRadio);
     expect(screen.getByTestId("reason-master")).toHaveAttribute("data-employee-id", employee.employee_id);
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "검사 통과" } });
+    const memoOnly = _name === "PC 처리" || _name === "모바일 처리";
+    if (!memoOnly) fireEvent.change(screen.getByRole("combobox"), { target: { value: "검사 통과" } });
     fireEvent.click(screen.getByRole("button", { name: submitLabel }));
     const confirm = screen.queryByRole("button", { name: "즉시 복귀", exact: true });
     if (confirm) fireEvent.click(confirm);
-    await waitFor(() => expect(api.unquarantine).toHaveBeenCalledWith(expect.objectContaining({ reason_category: "검사 통과", reason_category_id: "reason-검사 통과", actor_employee_id: employee.employee_id })));
+    await waitFor(() => expect(api.unquarantine).toHaveBeenCalledWith(expect.objectContaining({ reason_category: memoOnly ? null : "검사 통과", reason_category_id: memoOnly ? null : "reason-검사 통과", actor_employee_id: employee.employee_id })));
   });
 
   it("메모만으로 진행하지 않고 기타 선택에는 메모를 요구한다", () => {
     render(<Component location={location} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />);
     const restoreRadio = screen.queryByDisplayValue("unquarantine");
     if (restoreRadio) fireEvent.click(restoreRadio);
+    if (_name === "PC 처리" || _name === "모바일 처리") fireEvent.click(screen.getByRole("button", { name: /^전체 폐기/ }));
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "메모만 입력" } });
-    expect(screen.getByRole("button", { name: submitLabel })).toBeDisabled();
+    const reasonSubmit = _name === "PC 처리" || _name === "모바일 처리" ? "즉시 폐기 →" : submitLabel;
+    expect(screen.getByRole("button", { name: reasonSubmit })).toBeDisabled();
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "기타" } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "   " } });
-    expect(screen.getByRole("button", { name: submitLabel })).toBeDisabled();
+    expect(screen.getByRole("button", { name: reasonSubmit })).toBeDisabled();
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "상세 사유" } });
-    expect(screen.getByRole("button", { name: submitLabel })).toBeEnabled();
+    expect(screen.getByRole("button", { name: reasonSubmit })).toBeEnabled();
   });
 });
 

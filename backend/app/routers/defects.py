@@ -327,12 +327,12 @@ def _find_client_request_log(db: Session, client_request_id: str) -> Optional[Tr
     )
 
 
-def _resolve_request_reason(db: Session, payload: BaseModel) -> None:
+def _resolve_request_reason(db: Session, payload: BaseModel, *, required: bool = True) -> None:
     """새 불량 작업의 활성 카테고리를 확인하고 표시명 스냅샷을 채운다."""
     try:
         payload.reason_category_id, payload.reason_category, payload.reason_memo = resolve_reason_category(
             db, reason_category_id=payload.reason_category_id, reason_category=payload.reason_category,
-            reason_memo=payload.reason_memo,
+            reason_memo=payload.reason_memo, required=required,
         )
     except ValueError as exc:
         raise http_error(422, ErrorCode.VALIDATION_ERROR, str(exc))
@@ -962,7 +962,7 @@ def quarantine_bulk(
 @router.post("/unquarantine", response_model=DefectActionResult)
 def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Session = Depends(get_db)):
     payload.submission_id = payload.submission_id or _new_submission_id()
-    _resolve_request_reason(db, payload)
+    _resolve_request_reason(db, payload, required=False)
     """정상 복귀 (즉시, 결재 없음). unmark_defective 래퍼."""
     actor = db.query(Employee).filter(Employee.employee_id == payload.actor_employee_id).first()
     if actor is None:
@@ -1015,7 +1015,7 @@ def unquarantine_bulk(
     db: Session = Depends(get_db),
 ):
     """선택한 동일 품목·부서 격리 기록을 전부 정상 복귀한다."""
-    _resolve_request_reason(db, payload)
+    _resolve_request_reason(db, payload, required=False)
     payload.submission_id = payload.submission_id or _new_submission_id()
     actor = db.query(Employee).filter(
         Employee.employee_id == payload.actor_employee_id

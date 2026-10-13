@@ -16,17 +16,36 @@ const reasons = [
   { category_id: "hidden", name: "지난 사유", is_active: false, is_other: false },
 ];
 
-function Form() {
+function Form({ showCategory = true }: { showCategory?: boolean }) {
   const [category, setCategory] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [memo, setMemo] = useState("");
   return <>
     <ReasonFormFields employeeId="employee" category={category} categoryId={categoryId}
       memo={memo} onCategoryChange={(name, id) => { setCategory(name); setCategoryId(id ?? null); }}
-      onMemoChange={setMemo} required />
+      onMemoChange={setMemo} required showCategory={showCategory} animateCategory />
     <output aria-label="선택 사유 번호">{categoryId}</output>
   </>;
 }
+
+it("hides the category and closes its dialog without remounting or clearing the memo", async () => {
+  api.listReasonCategories.mockResolvedValue(reasons);
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const view = (showCategory: boolean) => <QueryClientProvider client={client}><Form showCategory={showCategory} /></QueryClientProvider>;
+  const { rerender } = render(view(true));
+  const memo = screen.getByRole("textbox", { name: "메모" });
+  fireEvent.change(memo, { target: { value: "보존할 메모" } });
+  fireEvent.click(screen.getByRole("button", { name: "사유 카테고리 선택" }));
+  expect(screen.getByRole("dialog")).toBeInTheDocument();
+  rerender(view(false));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "사유 카테고리 선택" })).not.toBeInTheDocument();
+  expect(screen.getByRole("textbox", { name: "메모" })).toBe(memo);
+  expect(memo).toHaveValue("보존할 메모");
+  rerender(view(true));
+  expect(screen.getByRole("button", { name: "사유 카테고리 선택" })).toBeInTheDocument();
+  expect(memo).toHaveValue("보존할 메모");
+});
 
 function mount() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });

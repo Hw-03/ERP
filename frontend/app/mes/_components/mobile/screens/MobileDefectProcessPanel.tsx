@@ -58,7 +58,7 @@ export function MobileDefectProcessPanel({
   const [category, setCategory] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [memo, setMemo] = useState("");
-  const hasReason = hasDefectReason(category, memo);
+  const hasReason = action === "unquarantine" || hasDefectReason(category, memo);
   const [decisions, setDecisions] = useState<ChildDecision[]>([]);
   const [decisionParentQty, setDecisionParentQty] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -151,8 +151,8 @@ export function MobileDefectProcessPanel({
           item_id: location.item_id,
           qty: boundedProcessQty,
           dept: location.department,
-          reason_category: category || null,
-          reason_category_id: categoryId,
+          reason_category: null,
+          reason_category_id: null,
           reason_memo: memo || null,
           actor_employee_id: currentEmployee.employee_id,
         });
@@ -393,6 +393,8 @@ export function MobileDefectProcessPanel({
         onCategoryChange={(name, id) => { setCategory(name); setCategoryId(id ?? null); }}
         onMemoChange={setMemo}
         required
+        showCategory={action !== "unquarantine"}
+        animateCategory
         mobilePresentation
       />
 

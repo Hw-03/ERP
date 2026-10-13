@@ -25,6 +25,8 @@ export interface ReasonFormFieldsProps {
   required?: boolean;
   requireAny?: boolean;
   mobilePresentation?: boolean;
+  showCategory?: boolean;
+  animateCategory?: boolean;
   /** 격리 화면만 수량·분류·삭제를 사유 입력과 함께 배치한다. */
   quarantineControls?: { quantity: ReactNode; management: ReactNode; remove: ReactNode; add?: ReactNode };
 }
@@ -32,14 +34,14 @@ export interface ReasonFormFieldsProps {
 /** 선택기는 마스터를 공유하고, 개별 이력에 저장된 사유 이름은 보존한다. */
 export function ReasonFormFields({
   employeeId, category, categoryId, memo, onCategoryChange, onMemoChange,
-  required = true, mobilePresentation = false, quarantineControls,
+  required = true, mobilePresentation = false, quarantineControls, showCategory = true, animateCategory = false,
 }: ReasonFormFieldsProps): ReactElement {
   const queryClient = useQueryClient();
   const revision = useRealtimeRevision();
   const queryKey = ["defect-reason-categories", employeeId, revision];
   const query = useQuery({
     queryKey, queryFn: () => defectsApi.listReasonCategories(employeeId, true),
-    enabled: Boolean(employeeId), staleTime: 30_000,
+    enabled: Boolean(employeeId) && showCategory, staleTime: 30_000,
   });
   const [open, setOpen] = useState(false);
   const dialogId = useId();
@@ -50,7 +52,7 @@ export function ReasonFormFields({
   const hideStatusRef = useRef<HTMLParagraphElement>(null);
   const focusFrameRef = useRef<number | null>(null);
   const savingRef = useRef(false);
-  const dialogRef = useFocusTrap<HTMLDivElement>(open && !hideTarget, { initialFocusRef: searchRef });
+  const dialogRef = useFocusTrap<HTMLDivElement>(open && showCategory && !hideTarget, { initialFocusRef: searchRef });
   const [search, setSearch] = useState("");
   const [showInactive, setShowInactive] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -63,7 +65,7 @@ export function ReasonFormFields({
   const needle = search.trim().normalize("NFKC").toLocaleLowerCase();
   const matches = (entry: DefectReasonCategory): boolean => matchesSearchText(entry.name.normalize("NFKC"), needle);
   const visible = categories.filter((entry) => (entry.is_active || showInactive) && matches(entry));
-  const otherMissingMemo = Boolean(selected?.is_other && !memo.trim());
+  const otherMissingMemo = Boolean(showCategory && selected?.is_other && !memo.trim());
   const nameTaken = categories.some((entry) => entry.name.normalize("NFKC").trim().toLocaleLowerCase() === needle);
   const hiddenNameTaken = categories.some((entry) => !entry.is_active && entry.name.normalize("NFKC").trim().toLocaleLowerCase() === needle);
   const canCreate = Boolean(search.trim() && !nameTaken);
@@ -71,6 +73,12 @@ export function ReasonFormFields({
   useEffect(() => () => {
     if (focusFrameRef.current !== null) cancelAnimationFrame(focusFrameRef.current);
   }, []);
+
+  useEffect(() => {
+    if (showCategory) return;
+    setOpen(false);
+    setHideTarget(null);
+  }, [showCategory]);
 
   /** 중첩 팝업의 포커스 복원 이후 선택창의 올바른 조작으로 돌아간다. */
   function closeHideConfirmation(toSearch: boolean = false): void {
@@ -117,13 +125,13 @@ export function ReasonFormFields({
   }, [open, busy, hideTarget]);
 
   useEffect(() => {
-    if (!query.data || !category) return;
+    if (!showCategory || !query.data || !category) return;
     const current = query.data.find((entry) => categoryId ? entry.category_id === categoryId : entry.name === category);
     if (!current?.is_active) onCategoryChange("", null);
     else if (current.name !== category || (categoryId !== undefined && current.category_id !== categoryId)) {
       onCategoryChange(current.name, current.category_id);
     }
-  }, [query.data, category, categoryId, onCategoryChange]);
+  }, [showCategory, query.data, category, categoryId, onCategoryChange]);
 
   async function save(changes: { name?: string; is_active?: boolean }, id?: string): Promise<boolean> {
     if (savingRef.current || !employeeId) return false;
@@ -165,7 +173,7 @@ export function ReasonFormFields({
     </div>;
   const memoField = <div className="flex min-w-0 flex-col gap-1">
       <label className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-        메모 {selected?.is_other ? <span style={{ color: LEGACY_COLORS.red }}>*</span> : !mobilePresentation && "(선택)"}
+        메모 {showCategory && selected?.is_other ? <span style={{ color: LEGACY_COLORS.red }}>*</span> : !mobilePresentation && "(선택)"}
       </label>
       <textarea aria-label="메모" value={memo} onChange={(event) => onMemoChange(event.target.value)} placeholder="예: 스크래치 다수 / 우측 끝단" rows={2}
         className="w-full resize-none rounded-[10px] border px-3 py-2 text-sm outline-none focus-visible:ring-2"
@@ -173,7 +181,7 @@ export function ReasonFormFields({
       {otherMissingMemo && <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>기타를 선택하면 메모를 입력하세요.</span>}
     </div>;
 
-  return <div className="flex min-w-0 flex-col gap-3">
+  return <div className={`flex min-w-0 flex-col ${animateCategory && !quarantineControls ? "gap-0" : "gap-3"}`}>
     {quarantineControls ? mobilePresentation ? <div className={styles.mobileFields}>
       <div className={styles.mobileTop}>
         {quarantineControls.quantity}
@@ -201,8 +209,13 @@ export function ReasonFormFields({
           {quarantineControls.management}
         </div>
       </div>
-    </div> : <>{categoryField}{memoField}</>}
-    {open && createPortal(<div className="fixed inset-0 z-[500] flex items-end justify-center bg-black/30 p-3 backdrop-blur-sm md:items-center"
+    </div> : <>
+      {animateCategory ? <div className={`${styles.categoryReveal} ${showCategory ? styles.categoryExpanded : ""}`} aria-hidden={!showCategory} inert={!showCategory}>
+        <div className={styles.categoryClip}><div className={styles.categorySpacing}>{categoryField}</div></div>
+      </div> : showCategory && categoryField}
+      {memoField}
+    </>}
+    {open && showCategory && createPortal(<div className="fixed inset-0 z-[500] flex items-end justify-center bg-black/30 p-3 backdrop-blur-sm md:items-center"
       onClick={(event) => { if (event.target === event.currentTarget && !busy && !hideTarget) setOpen(false); }}>
       <div ref={dialogRef} id={dialogId} role="dialog" aria-modal={!hideTarget || undefined} aria-hidden={Boolean(hideTarget)} inert={Boolean(hideTarget)} aria-labelledby={`${dialogId}-title`}
         className="flex h-[min(76dvh,600px)] w-full max-w-[430px] min-h-0 min-w-0 flex-col gap-3 rounded-[24px] border p-4 md:max-w-[560px] md:p-5"
@@ -298,7 +311,7 @@ export function ReasonFormFields({
         </div>
       </div>
     </div>, document.body)}
-    <ConfirmModal open={Boolean(hideTarget)} title={`“${hideTarget?.name ?? ""}” 사유를 숨길까요?`}
+    <ConfirmModal open={showCategory && Boolean(hideTarget)} title={`“${hideTarget?.name ?? ""}” 사유를 숨길까요?`}
       className="!z-[600]" tone="caution" confirmLabel="숨기기" busy={busy}
       onClose={() => closeHideConfirmation()}
       onConfirm={async () => { if (hideTarget && await save({ is_active: false }, hideTarget.category_id)) closeHideConfirmation(true); }}>

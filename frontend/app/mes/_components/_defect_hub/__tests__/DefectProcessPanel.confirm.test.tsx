@@ -39,17 +39,13 @@ const location: DefectLocation = {
 };
 
 describe("DefectProcessPanel normal recovery", () => {
-  it.each(["", "   "])("사유가 %j이면 진행을 막고 메모만으로 진행을 허용하지 않는다", (memo) => {
+  it.each(["", "   ", "검사 완료"])("카테고리 없이 선택 메모 %j로 정상 복귀 확인을 연다", (memo) => {
     render(<DefectProcessPanel location={location} currentEmployee={{ employee_id: "emp-1", name: "Kim", department: "Assembly" }} onDone={() => {}} onCancel={() => {}} />);
     const submit = screen.getByRole("button", { name: "정상 복귀 →" });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: memo } });
     fireEvent.click(submit);
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(submit).toBeDisabled();
-    fireEvent.change(screen.getByRole("textbox"), { target: { value: "검사 완료" } });
-    expect(submit).toBeDisabled();
-    fireEvent.change(screen.getByRole("textbox"), { target: { value: "" } });
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: screen.getAllByRole("option")[1].getAttribute("value") } });
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     expect(submit).toBeEnabled();
   });
 
@@ -86,7 +82,6 @@ describe("DefectProcessPanel normal recovery", () => {
     );
 
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "검사 완료" } });
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "검사 통과" } });
     fireEvent.click(Array.from(container.querySelectorAll("button")).at(-1)!);
 
     expect(defectsApi.unquarantine).not.toHaveBeenCalled();
@@ -95,7 +90,7 @@ describe("DefectProcessPanel normal recovery", () => {
 
     await waitFor(() => expect(defectsApi.unquarantine).toHaveBeenCalledTimes(1));
     expect(defectsApi.unquarantine).toHaveBeenCalledWith(
-      expect.objectContaining({ record_id: "record-1", qty: 3 }),
+      expect.objectContaining({ record_id: "record-1", qty: 3, reason_category: null, reason_category_id: null, reason_memo: "검사 완료" }),
     );
     expect(onDone).toHaveBeenCalledTimes(1);
   });

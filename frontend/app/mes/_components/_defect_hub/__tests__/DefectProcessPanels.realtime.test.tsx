@@ -114,17 +114,16 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
     const props = { currentEmployee: employee, onDone: vi.fn(), onCancel: vi.fn() };
     const { rerender } = render(<Panel {...props} location={location} />);
     fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "4" } });
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: REASON_CATEGORIES[0] } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "Unsaved memo" } });
 
     rerender(<Panel {...props} location={{ ...location, quantity: 12, available_quantity: 12 }} />);
     expect(screen.getByRole("spinbutton")).toHaveValue(4);
-    expect(screen.getByRole("combobox")).toHaveValue(REASON_CATEGORIES[0]);
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     expect(screen.getByRole("textbox")).toHaveValue("Unsaved memo");
 
     rerender(<Panel {...props} location={{ ...location, quantity: 3, available_quantity: 3 }} />);
     await waitFor(() => expect(screen.getByRole("spinbutton")).toHaveValue(3));
-    expect(screen.getByRole("combobox")).toHaveValue(REASON_CATEGORIES[0]);
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     expect(screen.getByRole("textbox")).toHaveValue("Unsaved memo");
 
     const submitButtons = screen.getAllByRole("button", { name: /정상 복귀/ });
@@ -136,7 +135,7 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
         record_id: "record-1",
         item_id: "item-1",
         qty: 3,
-        reason_category: REASON_CATEGORIES[0],
+        reason_category: null,
         reason_memo: "Unsaved memo",
       }));
     });
@@ -145,11 +144,10 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
   it("preserves the decision draft when realtime quantity changes but effective parent quantity does not", async () => {
     const props = { currentEmployee: employee, onDone: vi.fn(), onCancel: vi.fn() };
     const { container, rerender } = render(<Panel {...props} location={location} />);
+    fireEvent.click(screen.getByRole("button", { name: /재작업/ }));
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "외관 불량" } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "재작업 사유" } });
     fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "4" } });
-    const rework = screen.getByRole("button", { name: /재작업/ });
-    fireEvent.click(rework);
     fireEvent.click(Array.from(container.querySelectorAll("button")).at(-1)!);
     fireEvent.click(await screen.findByRole("button", { name: "Add decision" }));
     expect(screen.getByTestId("decision-count")).toHaveTextContent("1");
@@ -163,9 +161,9 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
   it("invalidates the decision draft when realtime clamping changes the effective parent quantity", async () => {
     const props = { currentEmployee: employee, onDone: vi.fn(), onCancel: vi.fn() };
     const { container, rerender } = render(<Panel {...props} location={location} />);
+    fireEvent.click(screen.getByRole("button", { name: /재작업/ }));
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "외관 불량" } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "재작업 사유" } });
-    fireEvent.click(screen.getByRole("button", { name: /재작업/ }));
     fireEvent.click(Array.from(container.querySelectorAll("button")).at(-1)!);
     fireEvent.click(await screen.findByRole("button", { name: "Add decision" }));
     expect(screen.getByTestId("decision-count")).toHaveTextContent("1");
@@ -184,6 +182,7 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
     const props = { currentEmployee: employee, onDone: vi.fn(), onCancel: vi.fn() };
     const { rerender } = render(<Panel {...props} location={location} />);
     fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "4" } });
+    fireEvent.click(screen.getByRole("button", { name: /전체 폐기/ }));
     fireEvent.change(screen.getByRole("combobox"), { target: { value: REASON_CATEGORIES[0] } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "Old draft" } });
 
@@ -195,7 +194,7 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
     );
 
     await waitFor(() => expect(screen.getByRole("spinbutton")).toHaveValue(7));
-    expect(screen.getByRole("combobox")).toHaveValue("");
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     expect(screen.getByRole("textbox")).toHaveValue("");
   });
 
@@ -209,9 +208,9 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
     );
 
     expect(screen.getByRole("spinbutton")).toHaveValue(6);
+    fireEvent.click(screen.getByRole("button", { name: /전체 폐기/ }));
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "외관 불량" } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "폐기 사유" } });
-    fireEvent.click(screen.getByRole("button", { name: /전체 폐기/ }));
     fireEvent.click(screen.getByRole("button", { name: "즉시 폐기 →" }));
 
     const dialog = await screen.findByRole("dialog");
@@ -231,10 +230,10 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
   it("requires supplier selection before defect return and sends the supplier id", async () => {
     const props = { currentEmployee: employee, onDone: vi.fn(), onCancel: vi.fn() };
     render(<Panel {...props} location={{ ...location, department: "창고" }} />);
+    fireEvent.click(screen.getByRole("button", { name: /반품/ }));
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "외관 불량" } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "반품 사유" } });
 
-    fireEvent.click(screen.getByRole("button", { name: /반품/ }));
     fireEvent.click(screen.getByRole("button", { name: "공급업체 선택 →" }));
     expect(await screen.findByRole("heading", { name: _name === "mobile" ? "공급업체 선택" : "반품 공급업체 선택" })).toBeInTheDocument();
     expect(apiMocks.createStockRequest).not.toHaveBeenCalled();

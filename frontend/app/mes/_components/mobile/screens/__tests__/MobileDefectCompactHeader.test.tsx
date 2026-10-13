@@ -86,8 +86,8 @@ vi.mock("../../../_defect_hub/DefectItemPicker", () => ({
 }));
 
 vi.mock("../../../_defect_hub/ReasonFormFields", () => ({
-  ReasonFormFields: ({ memo, onCategoryChange, onMemoChange, quarantineControls }: { memo: string; onCategoryChange: (category: string, id?: string) => void; onMemoChange: (memo: string) => void; quarantineControls?: { quantity: ReactNode; management: ReactNode; remove: ReactNode } }) => (
-    <>{quarantineControls && <div data-testid="quarantine-controls">{quarantineControls.quantity}<span>관리 분류</span>{quarantineControls.remove}{quarantineControls.management}</div>}<button type="button" onClick={() => onCategoryChange("외관 불량", "surface-id")}>사유 선택</button><textarea aria-label="품목 메모" value={memo} onChange={(event) => onMemoChange(event.target.value)} /></>
+  ReasonFormFields: ({ memo, onCategoryChange, onMemoChange, quarantineControls, showCategory = true }: { memo: string; onCategoryChange: (category: string, id?: string) => void; onMemoChange: (memo: string) => void; showCategory?: boolean; quarantineControls?: { quantity: ReactNode; management: ReactNode; remove: ReactNode } }) => (
+    <>{quarantineControls && <div data-testid="quarantine-controls">{quarantineControls.quantity}<span>관리 분류</span>{quarantineControls.remove}{quarantineControls.management}</div>}{showCategory && <button type="button" onClick={() => onCategoryChange("외관 불량", "surface-id")}>사유 선택</button>}<textarea aria-label="품목 메모" value={memo} onChange={(event) => onMemoChange(event.target.value)} /></>
   ),
 }));
 
@@ -662,7 +662,7 @@ describe("mobile defect compact headers", () => {
       />,
     );
 
-    fireEvent.click(container.querySelectorAll("button")[6]);
+    fireEvent.click(screen.getByRole("button", { name: "재작업", exact: true }));
     fireEvent.click(screen.getByRole("button", { name: "사유 선택" }));
     fireEvent.click(Array.from(container.querySelectorAll("button")).at(-1)!);
 
@@ -762,7 +762,6 @@ describe("mobile defect compact headers", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "사유 선택" }));
     fireEvent.click(Array.from(container.querySelectorAll("button")).at(-1)!);
 
     expect(defectsApi.unquarantine).not.toHaveBeenCalled();
@@ -784,7 +783,7 @@ describe("mobile defect compact headers", () => {
       />,
     );
 
-    fireEvent.click(container.querySelectorAll("button")[6]);
+    fireEvent.click(screen.getByRole("button", { name: "재작업", exact: true }));
     fireEvent.click(screen.getByRole("button", { name: "사유 선택" }));
     fireEvent.click(Array.from(container.querySelectorAll("button")).at(-1)!);
     fireEvent.click(screen.getByRole("button", { name: "set tree decision" }));
