@@ -160,6 +160,7 @@ class LineInput:
         "to_bucket",
         "to_department",
         "record_id",
+        "pool_id",
     )
 
     def __init__(
@@ -172,6 +173,7 @@ class LineInput:
         to_bucket: RequestBucketEnum,
         to_department: Optional[DepartmentEnum],
         record_id: Optional[uuid.UUID] = None,
+        pool_id: Optional[uuid.UUID] = None,
     ) -> None:
         self.item_id = item_id
         self.quantity = Decimal(str(quantity))
@@ -180,6 +182,7 @@ class LineInput:
         self.to_bucket = to_bucket
         self.to_department = to_department
         self.record_id = record_id
+        self.pool_id = pool_id
 
 
 # ---------------------------------------------------------------------------
@@ -277,6 +280,8 @@ def validate_line_shape_for_request_type(
     실패 시 ValueError. 호출자(create_request)가 DB row 생성 전에 호출해야 한다.
     이 검증을 통과하지 못하면 StockRequest row 도, pending_quantity 변경도 발생하지 않는다.
     """
+    if line.pool_id is not None and line.from_bucket != RequestBucketEnum.DEFECTIVE:
+        raise ValueError("공동재고 식별자는 격리 재고 출발 라인에만 사용할 수 있습니다.")
     if request_type not in _ALLOWED_SHAPES:
         # 새 request_type 이 추가됐는데 사양표에 없으면 명시적으로 거부 (안전 우선).
         raise ValueError(f"지원하지 않는 요청 유형: {request_type}")
@@ -422,6 +427,13 @@ def _preflight_defective_check(
     인 라인이 격리되지 않은 항목을 폐기/반품/분해 하려는 케이스 차단.
     """
     from app.services import defect_records as defect_records_svc
+    from app.services import defect_pool
+
+    if defect_pool.is_pool_mode(db):
+        defect_pool.validate_lines(db, lines_input)
+        return
+    if any(line.pool_id is not None for line in lines_input):
+        raise ValueError("공동재고 전환 전에는 pool_id를 사용할 수 없습니다.")
 
     needed: dict[tuple, Decimal] = {}
     record_needed: dict[uuid.UUID, Decimal] = {}

@@ -18,7 +18,7 @@ _TRANSACTION_FAILURE_KEY = "_mes_transactional_failure"
 
 
 @contextmanager
-def transactional(db: Session) -> Iterator[None]:
+def transactional(db: Session, *, control_exclusive: bool = False) -> Iterator[None]:
     """상위 업무 명령을 원자적으로 마감한다.
 
     중첩 호출은 가장 바깥 경계만 commit/rollback하며, 내부 예외는 원형 그대로
@@ -30,6 +30,9 @@ def transactional(db: Session) -> Iterator[None]:
         db.info.pop(_TRANSACTION_FAILURE_KEY, None)
     db.info[_TRANSACTION_DEPTH_KEY] = depth + 1
     try:
+        if outermost or control_exclusive:
+            from app.services.stocktake_guard import lock_control
+            lock_control(db, exclusive=control_exclusive)
         yield
     except Exception as exc:
         db.info.setdefault(_TRANSACTION_FAILURE_KEY, exc)

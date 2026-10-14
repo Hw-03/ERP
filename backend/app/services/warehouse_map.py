@@ -65,6 +65,20 @@ def is_box_tracking_enabled(db: Session) -> bool:
 
 def set_box_tracking_enabled(db: Session, enabled: bool) -> None:
     """박스 추적 플래그 설정. 호출 측에서 commit 책임."""
+    from app.models import StocktakeGate
+    from app.services.stocktake_guard import lock_control
+    from app.services.inventory_conflicts import InventoryConflict
+
+    control = lock_control(db, exclusive=True)
+    if enabled and control is not None and control.active_round_id is not None:
+        occupied = db.query(StocktakeGate).filter(
+            StocktakeGate.scope_key == "warehouse",
+            StocktakeGate.round_id == control.active_round_id,
+            StocktakeGate.round_epoch == control.epoch,
+            StocktakeGate.active_count_id.is_not(None),
+        ).first()
+        if occupied is not None:
+            raise InventoryConflict("STOCKTAKE_CELL_LOCKED", "창고 계수 중에는 BOX 추적을 켤 수 없습니다.", status_code=423)
     value = "true" if enabled else "false"
     setting = (
         db.query(SystemSetting)
@@ -111,10 +125,12 @@ def lock_warehouse_map_rows(
     reads stable even when concurrent admins edit different items. SQLite keeps
     its existing ``BEGIN IMMEDIATE`` serialization and needs no row locks.
     """
+    ordered_item_ids = _sorted_unique_ids(item_ids)
+    from app.services.stocktake_guard import prepare_items
+    prepare_items(db, ordered_item_ids)
     if db.get_bind().dialect.name != "postgresql":
         return
 
-    ordered_item_ids = _sorted_unique_ids(item_ids)
     if ordered_item_ids:
         db.execute(
             select(Inventory)

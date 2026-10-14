@@ -13,6 +13,7 @@ from app.database import _is_sqlite
 from app.models import (
     DepartmentEnum,
     DefectQuarantineRecord,
+    DefectStockPool,
     Employee,
     Item,
     InventoryOperation,
@@ -28,6 +29,7 @@ from app.models import (
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
 from app.services import inventory_operations as operation_svc
+from app.services import defect_pool
 from app.services.dept_hierarchy import can_approve_department
 from app.services.inv_transfer import department_for_item, lock_items_for_department_routing
 from app.services.sr_validation import (
@@ -400,7 +402,7 @@ def _handle_defect_disassemble(
         reason_memo=reason_memo_val,
         actor=approver.name,
         actor_employee_id=approver.employee_id,
-        defect_quarantine_record_id=line.defect_quarantine_record_id,
+        defect_quarantine_record_id=(None if defect_pool.is_pool_mode(db) else line.defect_quarantine_record_id),
         operation=operation,
     )
     return -qty
@@ -479,7 +481,16 @@ def _execute_line(
     item_id = line.item_id
     rt = request.request_type
     record = None
-    if line.from_bucket == RequestBucketEnum.DEFECTIVE:
+    pool = None
+    if line.from_bucket == RequestBucketEnum.DEFECTIVE and defect_pool.is_pool_mode(db):
+        pool = defect_pool.resolve_source(
+            db, pool_id=line.pool_id, record_id=line.defect_quarantine_record_id,
+            item_id=item_id, department=line.from_department,
+            defect_only=rt in {StockRequestTypeEnum.DEFECT_SCRAP, StockRequestTypeEnum.DEFECT_RETURN,
+                              StockRequestTypeEnum.DEFECT_DISASSEMBLE},
+        )
+        defect_pool.ensure_available(pool, qty)
+    elif line.from_bucket == RequestBucketEnum.DEFECTIVE:
         from app.services import defect_records as defect_records_svc
 
         record = defect_records_svc.get_record_for_action(
@@ -552,6 +563,8 @@ def _execute_line(
             memo=request.reason_memo,
         )
 
+    if pool is not None:
+        defect_pool.apply_delta(db, pool=pool, delta=-qty, operation=operation, reason=rt.value)
     if record is not None:
         defect_records_svc.decrement_record(
             db,
@@ -704,7 +717,13 @@ def _execute_all_lines(
     elif request.request_type == StockRequestTypeEnum.SCRAP_NORMAL:
         # 개별 handler가 부서를 읽기 전에 모든 대상 Item을 전역 순서로 선잠금한다.
         lock_items_for_department_routing(db, (line.item_id for line in lines))
-    if requires_exact_defect_selection(
+    pool_mode = defect_pool.is_pool_mode(db)
+    if pool_mode:
+        inventory_svc.ensure_and_lock_inventories(
+            db, touched_inventory_item_ids or _request_inventory_item_ids(db, request, lines),
+        )
+        defect_pool.validate_lines(db, lines)
+    if not pool_mode and requires_exact_defect_selection(
         request.request_type,
         len(lines),
         request.client_request_id,
@@ -804,8 +823,17 @@ def _execute_all_lines(
 def _prepare_defect_disassemble_sources(
     db: Session,
     lines: list[StockRequestLine],
-) -> list[tuple[StockRequestLine, DefectQuarantineRecord]]:
+) -> list[tuple[StockRequestLine, DefectQuarantineRecord | DefectStockPool]]:
     """다중 재작업 source를 잠그고 단일 품목·부서·건별 수량을 선검증한다."""
+    if defect_pool.is_pool_mode(db):
+        if len({(line.item_id, str(line.from_department)) for line in lines}) != 1:
+            raise ValueError("다중 재작업은 같은 품목·부서만 처리할 수 있습니다.")
+        if any(line.from_bucket != RequestBucketEnum.DEFECTIVE for line in lines):
+            raise ValueError("다중 재작업은 격리 재고 라인만 처리할 수 있습니다.")
+        defect_pool.validate_lines(db, lines, defect_only=True)
+        return [(line, defect_pool.resolve_source(db, pool_id=line.pool_id,
+            record_id=line.defect_quarantine_record_id, item_id=line.item_id,
+            department=line.from_department, defect_only=True)) for line in lines]
     record_ids = [line.defect_quarantine_record_id for line in lines]
     if any(record_id is None for record_id in record_ids):
         raise ValueError("다중 재작업은 모든 라인에 격리 기록이 필요합니다.")
@@ -847,7 +875,7 @@ def _prepare_defect_disassemble_sources(
 def _execute_defect_disassemble_sources(
     db: Session,
     request: StockRequest,
-    sources: list[tuple[StockRequestLine, DefectQuarantineRecord]],
+    sources: list[tuple[StockRequestLine, DefectQuarantineRecord | DefectStockPool]],
     *,
     approver: Employee,
     operation: InventoryOperation | None,
@@ -871,6 +899,10 @@ def _execute_defect_disassemble_sources(
     )
     for line, record in sources:
         quantity = Decimal(str(line.quantity or 0))
+        if isinstance(record, DefectStockPool):
+            defect_pool.apply_delta(db, pool=record, delta=-quantity, operation=operation,
+                reason="DEFECT_DISASSEMBLE")
+            continue
         defect_records_svc.decrement_record(
             db,
             record,

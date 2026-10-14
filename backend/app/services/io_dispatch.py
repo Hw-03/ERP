@@ -31,6 +31,7 @@ from app.models import (
     TransactionTypeEnum,
 )
 from app.services import inventory as inventory_svc
+from app.services.inventory_conflicts import InventoryConflict
 from app.services import inv_effect
 from app.services import inventory_operations as operation_svc
 from app.services import stock_requests as stock_request_svc
@@ -496,6 +497,7 @@ def _submit_internal_use_approvals(
             kind = "department"
         grouped.setdefault(kind, []).append(line)
 
+    _prelock_line_inventories(db, lines)
     requests: list[StockRequest] = []
     for kind in ("warehouse", "as_research", "department"):
         group_lines = grouped.get(kind)
@@ -551,6 +553,8 @@ def _submit_internal_use_approvals(
                 requests=requests,
                 actor=requester,
             )
+    except InventoryConflict:
+        raise
     except Exception as exc:
         raise internal_use_approval.InternalUseSubmissionSettlementError(
             batch_id=batch.batch_id,
@@ -1268,6 +1272,10 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
         work_type=batch.work_type,
         sub_type=batch.sub_type,
     )
+    if batch.sub_type == INTERNAL_USE_SUB_TYPE:
+        from app.services import internal_use_approval
+        requester = internal_use_approval.lock_and_refresh_employee(db, requester.employee_id)
+    _prelock_line_inventories(db, [line for bundle in batch.bundles for line in bundle.lines])
     # An old draft token proves the original BOM/inclusion intent.  Validate it
     # and rotate it for the live route before stock-exempt handling reads it.
     normalize_automatic_routes_with_bom_token_refresh(

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, aliased
 
 from app.models import (
     InventoryOperation, InventoryOperationEffect, InventoryOperationEffectKindEnum,
-    InventoryOperationKindEnum, ShippingRequest,
+    InventoryOperationKindEnum, ShippingRequest, BusinessCorrectionSource, StocktakeControl,
 )
 
 
@@ -41,6 +41,12 @@ def latest_operation(
         query = query.filter(~db.query(reversal.operation_id).filter(
             reversal.reverses_operation_id == InventoryOperation.operation_id,
         ).exists())
+        control = db.get(StocktakeControl, 1)
+        if control is not None and control.inventory_mode == "POOL":
+            query = query.filter(~db.query(BusinessCorrectionSource.source_id).filter(
+                BusinessCorrectionSource.source_kind.in_(["operation", "workflow_operation"]),
+                BusinessCorrectionSource.source_id == InventoryOperation.operation_id,
+            ).exists())
     return query.order_by(InventoryOperation.effective_at.desc(), InventoryOperation.created_at.desc(), InventoryOperation.operation_id.desc()).first()
 
 

@@ -68,6 +68,7 @@ def test_pickup_consumption_prelocks_sorted_unique_inventories(
             item_id=second.item_id,
             quantity=1,
             reference_no="companion-second",
+            department=DepartmentEnum.SHIPPING.value,
             status="RESERVED",
             consumed_at=None,
         ),
@@ -76,6 +77,7 @@ def test_pickup_consumption_prelocks_sorted_unique_inventories(
             item_id=first.item_id,
             quantity=1,
             reference_no="companion-first",
+            department=DepartmentEnum.SHIPPING.value,
             status="RESERVED",
             consumed_at=None,
         ),
@@ -1208,8 +1210,9 @@ def test_component_change_prelocks_all_mutated_items_in_sorted_order(
 
     assert events[0] == sorted({source_pa.item_id, target_pa.item_id, added.item_id})
 
+@pytest.mark.parametrize("pool_mode", [False, True])
 def test_prepare_cancel_reverses_prepare_logs_and_releases_allocations(
-    db_session, make_item, make_bom, make_location, monkeypatch
+    db_session, make_item, make_bom, make_location, monkeypatch, pool_mode
 ):
     af = make_item(name="AF body", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=1)
     carton = make_item(name="Carton", process_type_code="PR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
@@ -1265,6 +1268,14 @@ def test_prepare_cancel_reverses_prepare_logs_and_releases_allocations(
         lock_inventories,
     )
 
+    if pool_mode:
+        from app.models import InventoryScope, StocktakeControl
+        db_session.add_all([
+            StocktakeControl(id=1, inventory_mode="POOL"),
+            InventoryScope(scope_key="shipping", physical_department=DepartmentEnum.SHIPPING.value),
+            InventoryScope(scope_key="warehouse", physical_department=DepartmentEnum.WAREHOUSE.value),
+        ])
+        db_session.commit()
     shipping_svc.prepare_cancel(db_session, req.request_id, reason="change")
 
     assert lock_calls == [legacy_item_ids]

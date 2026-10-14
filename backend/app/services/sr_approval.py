@@ -21,9 +21,12 @@ from app.services import inventory as inventory_svc
 from app.services.dept_hierarchy import can_approve_department
 from app.services.io_persist import ensure_stock_request_batch_is_mutable, sync_batch_from_stock_request
 from app.services.pin_auth import verify_pin
+from app.services.inventory_conflicts import InventoryConflict
+from app.services.stocktake_guard import prepare_items
 from app.services.sr_execution import (
     _execute_all_lines,
     _request_inventory_item_ids,
+    _request_department_routing_item_ids,
     release_reservation,
     reroute_and_preflight_dept_to_warehouse,
 )
@@ -56,6 +59,8 @@ def _settle_internal_use_or_fail(
                 requests=requests,
                 actor=actor,
             )
+    except InventoryConflict:
+        raise
     except Exception as exc:
         raise FailedApprovalError(str(exc)) from exc
 
@@ -121,6 +126,7 @@ def approve_request(
     ):
         return request
 
+    prepare_items(db, _request_department_routing_item_ids(db, request, request.lines))
     try:
         release_reservation(db, request)
         reroute_and_preflight_dept_to_warehouse(db, request)
@@ -225,6 +231,7 @@ def approve_request_department(
     # stock_requests 는 다시 sr_approval 을 re-export → 정적 import 시 순환 ImportError.
     from app.services.io_dispatch import execute_batch_after_dept_approval
 
+    prepare_items(db, _request_department_routing_item_ids(db, request, request.lines))
     try:
         release_reservation(db, request)
         reroute_and_preflight_dept_to_warehouse(db, request)

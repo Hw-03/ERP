@@ -35,6 +35,7 @@ from app.models import (
 from app.repositories import item_repository
 from app.services import inv_effect
 from app.services import stock_availability
+from app.services import stocktake_guard
 from app.services import inventory_operations as operation_svc
 from app.services import inventory_operation_cancellation as cancellation_svc
 from app.services import inventory as inventory_svc
@@ -147,6 +148,10 @@ def _cancel_shipping_operation(
     resolved_actor = _resolve_cancellation_actor(db, operation, actor)
     plan = cancellation_svc.preview_cancellation(db, operation.operation_id)
     if not plan.can_cancel:
+        if plan.blocker_code:
+            from app.services.inventory_conflicts import InventoryConflict
+            raise InventoryConflict(plan.blocker_code, plan.blockers[0],
+                                    status_code=409 if plan.blocker_code in {"STOCKTAKE_OBSERVED_EFFECT", "BUSINESS_CORRECTED"} else 422)
         raise ShippingError(plan.blockers[0])
     try:
         cancellation_svc.cancel_operation(
@@ -1655,6 +1660,8 @@ def _reserve_pickup_items(
         item_id: inventory_svc.department_for_item(item_by_id[item_id])
         for item_id in ordered_item_ids
     }
+    for item_id in ordered_item_ids:
+        stocktake_guard.record_change(db, item_id, departments[item_id], kind="reservation", delta=required_by_item[item_id])
     cells = [
         stock_availability.AvailabilityCell.location(
             item_id,
@@ -1724,7 +1731,10 @@ def _reserve_pickup_items(
 
 def _release_pickup_allocations(db: Session, req: ShippingRequest, reason: str | None) -> None:
     now = datetime.utcnow()
-    for allocation in _active_allocations_for_request(db, req):
+    allocations = _active_allocations_for_request(db, req)
+    stocktake_guard.prepare_items(db, [allocation.item_id for allocation in allocations])
+    for allocation in allocations:
+        stocktake_guard.record_change(db, allocation.item_id, allocation.department, kind="reservation", delta=-allocation.quantity)
         allocation.status = ALLOCATION_RELEASED
         allocation.released_at = now
         allocation.released_reason = reason or "출하 준비 취소"
@@ -1785,6 +1795,7 @@ def _consume_pickup_allocations(
                 actor=actor,
                 operation=operation,
             )
+            stocktake_guard.record_change(db, allocation.item_id, allocation.department, kind="reservation", delta=-allocation.quantity)
             allocation.status = ALLOCATION_CONSUMED
             allocation.consumed_at = now
             if operation is not None:
@@ -1821,6 +1832,7 @@ def _consume_pickup_allocations(
             actor=actor,
             operation=operation,
         )
+        stocktake_guard.record_change(db, allocation.item_id, allocation.department, kind="reservation", delta=-allocation.quantity)
         allocation.status = ALLOCATION_CONSUMED
         allocation.consumed_at = now
         if operation is not None:
@@ -1929,10 +1941,14 @@ def prepare_cancel(
         .all()
     )
     legacy_logs = [log for log in logs if log.operation_batch_id is None]
+    allocation_item_ids = {row.item_id for row in _active_allocations_for_request(db, req)}
+    stocktake_guard.prepare_items(db, {log.item_id for log in legacy_logs} | allocation_item_ids)
     inventory_svc.lock_inventories(
         db,
         sorted({log.item_id for log in legacy_logs}),
     )
+    from app.services.stocktake_observation import assert_unobserved
+    assert_unobserved(db, legacy_logs, [])
     _release_pickup_allocations(db, req, reason)
     for log in legacy_logs:
         inv_effect.apply_effect_reverse(db, log.item_id, log.inventory_effect)
@@ -2080,6 +2096,8 @@ def pickup_cancel(
         db,
         sorted({log.item_id for log in pickup_logs}),
     )
+    from app.services.stocktake_observation import assert_unobserved
+    assert_unobserved(db, pickup_logs, [])
     now = datetime.utcnow()
     for log in pickup_logs:
         inv_effect.apply_effect_reverse(db, log.item_id, log.inventory_effect)
@@ -2100,6 +2118,7 @@ def pickup_cancel(
     )
     if consumed_allocations:
         for allocation in consumed_allocations:
+            stocktake_guard.record_change(db, allocation.item_id, allocation.department, kind="reservation", delta=allocation.quantity)
             allocation.status = ALLOCATION_RESERVED
             allocation.consumed_at = None
     else:

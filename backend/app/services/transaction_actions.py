@@ -490,6 +490,10 @@ def cancel_transaction(
                 payload_summary=f"{canceller.name}: {reason}",
             )
             return log
+        from app.services import defect_pool
+        from app.services.inventory_conflicts import InventoryConflict
+        if defect_pool.is_pool_mode(db):
+            raise InventoryConflict("POOL_LEDGER_REQUIRED", "공동재고 상태에서는 활성 원장 경로로 취소해야 합니다.")
         batch_logs = _claim_cancel_logs(db, log.log_id)
 
         inventory_svc.lock_inventories(

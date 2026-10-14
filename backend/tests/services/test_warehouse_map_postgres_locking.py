@@ -15,7 +15,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 
-from app.models import WarehouseBox, WarehouseBoxItem
+from app.models import StocktakeControl, WarehouseBox, WarehouseBoxItem
 from app.routers.warehouse_map import boxes as boxes_router
 from app.schemas import WarehouseBoxMove
 from app.services import warehouse_map as warehouse_map_service
@@ -52,6 +52,18 @@ class _RecordingQuery:
     def all(self):
         return self._rows
 
+    def filter_by(self, **kwargs):
+        return self
+
+    def with_for_update(self, **kwargs):
+        return self
+
+    def populate_existing(self):
+        return self
+
+    def one_or_none(self):
+        return self._rows[0] if self._rows else None
+
 
 class _RecordingSession:
     def __init__(
@@ -68,6 +80,11 @@ class _RecordingSession:
         self.depletion_rows = list(depletion_rows)
         self.statements = []
         self.flush_count = 0
+        self.info = {}
+        self.transaction = object()
+
+    def get_transaction(self):
+        return self.transaction
 
     def get_bind(self):
         return self._bind
@@ -90,6 +107,8 @@ class _RecordingSession:
         return _ScalarResult()
 
     def query(self, *entities):
+        if entities == (StocktakeControl,):
+            return _RecordingQuery([])
         assert entities == (WarehouseBoxItem,)
         return _RecordingQuery(self.depletion_rows)
 
@@ -235,6 +254,7 @@ def test_postgres_concurrent_admin_moves_serialize_target_capacity_and_stack_ord
             setup.execute(text(f"CREATE SCHEMA {quoted_schema}"))
             schema_created = True
             setup.execute(text(f"SET LOCAL search_path TO {quoted_schema}"))
+            StocktakeControl.__table__.create(setup)
             setup.execute(
                 text(
                     """
@@ -457,6 +477,7 @@ def test_postgres_outbound_blocks_actual_admin_move_until_commit(monkeypatch):
             setup.execute(text(f"CREATE SCHEMA {quoted_schema}"))
             schema_created = True
             setup.execute(text(f"SET LOCAL search_path TO {quoted_schema}"))
+            StocktakeControl.__table__.create(setup)
             setup.execute(
                 text(
                     """

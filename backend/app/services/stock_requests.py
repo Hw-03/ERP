@@ -185,6 +185,7 @@ def _build_request_and_lines(
             to_department=li.to_department,
             status=status,
             defect_quarantine_record_id=li.record_id,
+            pool_id=li.pool_id,
         )
         db.add(line)
     db.flush()
@@ -264,7 +265,8 @@ def create_request(
         StockRequestTypeEnum.DEFECT_RETURN,
         StockRequestTypeEnum.DEFECT_DISASSEMBLE,
     }
-    exact_defect_selection = requires_exact_defect_selection(
+    from app.services import defect_pool
+    exact_defect_selection = not defect_pool.is_pool_mode(db) and requires_exact_defect_selection(
         request_type,
         len(lines_input),
         client_request_id,

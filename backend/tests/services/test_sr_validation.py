@@ -10,6 +10,8 @@ from app.services.sr_validation import LineInput, _preflight_defective_check
 
 
 def test_exact_defect_preflight_locks_records_in_deterministic_order(monkeypatch) -> None:
+    from app.services import defect_pool
+    monkeypatch.setattr(defect_pool, "is_pool_mode", lambda _db: False)
     first_id = uuid.UUID("00000000-0000-0000-0000-000000000001")
     second_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
     item_id = uuid.uuid4()

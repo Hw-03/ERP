@@ -179,9 +179,17 @@ def _reconciled_release_quantity(
 def reserve_lines(db: Session, lines: Iterable, *, employee=None) -> None:
     lines = list(lines)
     from app.services import defect_records as defect_records_svc
+    from app.services import defect_pool
+
+    pool_mode = defect_pool.is_pool_mode(db)
+    if pool_mode:
+        _prelock_inventories(db, aggregate_reservations(lines))
+        defect_pool.reserve_lines(db, lines)
 
     record_groups: dict[uuid.UUID, tuple[object, Decimal]] = {}
     for line in lines:
+        if pool_mode:
+            continue
         record_id = getattr(
             line,
             "defect_quarantine_record_id",
@@ -240,6 +248,7 @@ def release_lines(
     *,
     request_id: uuid.UUID | None = None,
 ) -> None:
+    lines = list(lines)
     groups = aggregate_reservations(lines)
     _prelock_inventories(db, groups)
     other_reserved = (
@@ -255,6 +264,10 @@ def release_lines(
         )
         if quantity > 0:
             _release_group(db, group, quantity)
+    from app.services import defect_pool
+
+    if defect_pool.is_pool_mode(db):
+        defect_pool.release_lines(db, lines, request_id=request_id)
 
 
 def release_lines_best_effort(
@@ -264,6 +277,11 @@ def release_lines_best_effort(
     request_id: uuid.UUID | None = None,
 ) -> None:
     """Release safe source excess independently, tolerating legacy gaps."""
+    from app.services import defect_pool
+
+    if defect_pool.is_pool_mode(db):
+        release_lines(db, lines, request_id=request_id)
+        return
     groups = aggregate_reservations(lines)
     _prelock_inventories(db, groups)
     other_reserved = (

@@ -9,6 +9,12 @@ from sqlalchemy.orm import Session
 from app.services._tx import transactional
 
 
+@pytest.fixture(autouse=True)
+def isolate_transaction_boundary(monkeypatch):
+    """Real lock acquisition is covered with real sessions in stocktake guard tests."""
+    monkeypatch.setattr("app.services.stocktake_guard.lock_control", lambda db, **kwargs: None)
+
+
 def _session() -> Mock:
     db = Mock(spec=Session)
     db.info = {}
