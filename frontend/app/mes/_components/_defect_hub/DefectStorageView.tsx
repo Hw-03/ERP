@@ -53,7 +53,7 @@ export function DefectStorageView({
   locations: DefectLocation[];
   currentEmployee: { employee_id: string; name: string; department: string };
   onBack: () => void;
-  onUpdated: (recordId: string, category: DefectManagementCategory) => void;
+  onUpdated: () => void;
   onRestore: (location: DefectLocation) => void;
   onMemoUpdated?: (recordId: string, memo: string) => void;
   items?: Item[];
@@ -65,6 +65,7 @@ export function DefectStorageView({
   const [filter, setFilter] = useDesktopQueryState<StorageFilter>("defect-storage-filter", "ALL");
   const [search, setSearch] = useDesktopQueryState("defect-storage-search", "");
   const [selected, setSelected] = useState<DefectLocation | null>(null);
+  const poolMode = locations.some((location) => location.pool_id);
   const {
     scope, actorScope, sort, filterLocked, setScope, setActorScope, setSort, setFilterLocked,
     selectedDepartments, selectedModels, selectedProcessSteps, setSelectedDepartments, setSelectedModels,
@@ -76,9 +77,9 @@ export function DefectStorageView({
     let result = locations.filter((location) => ["B_GRADE", "OBSOLETE"].includes(categoryOf(location)));
     if (scope === "my") result = result.filter((location) => location.department === currentEmployee.department);
     if (scope === "production") result = result.filter((location) => ["튜브", "고압", "진공", "튜닝", "조립", "출하"].includes(location.department));
-    if (actorScope === "mine") result = result.filter((location) => location.quarantined_by_employee_id === currentEmployee.employee_id);
+    if (actorScope === "mine" && !poolMode) result = result.filter((location) => location.quarantined_by_employee_id === currentEmployee.employee_id);
     return filterDefectLocations(result, items, productModels, { departments: selectedDepartments, models: selectedModels, processSteps: selectedProcessSteps });
-  }, [locations, scope, actorScope, currentEmployee.department, currentEmployee.employee_id, items, productModels, selectedDepartments, selectedModels, selectedProcessSteps]);
+  }, [locations, scope, actorScope, poolMode, currentEmployee.department, currentEmployee.employee_id, items, productModels, selectedDepartments, selectedModels, selectedProcessSteps]);
   const searched = useMemo(() => scoped.filter((location) => matchesDefectSearch(location, search)), [scoped, search]);
   const storage = useMemo(() => searched.filter((location) => {
     const category = categoryOf(location);
@@ -102,9 +103,9 @@ export function DefectStorageView({
     </header>
     {!mobilePresentation && loading && locations.length === 0 ? <div role="status" className="flex min-h-40 items-center justify-center gap-2 rounded-[14px] border px-6 py-8 text-sm font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}><LoaderCircle className="h-5 w-5 animate-spin" />B급·구형 자재를 불러오는 중...</div> : !mobilePresentation && loadError && locations.length === 0 ? <LoadFailureCard prefix="B급·구형 보관 목록을 불러오지 못했습니다" message={loadError} retryLabel="다시 동기화" onRetry={onRetry} /> : <>
     <div className={`grid gap-2 ${mobilePresentation ? "grid-cols-3" : "sm:grid-cols-3"}`} role="group" aria-label="보관 분류 필터">
-      {(["ALL", "B_GRADE", "OBSOLETE"] as StorageFilter[]).map((value) => <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)} className="rounded-[14px] border px-4 py-3 text-left" style={{ background: filter === value ? tint(value === "B_GRADE" ? LEGACY_COLORS.purple : value === "OBSOLETE" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.blue, 12) : LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}><span className="block text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{value === "ALL" ? "전체 보관" : categoryLabel[value]}</span><span className="mt-1 block text-2xl font-black" style={{ color: LEGACY_COLORS.muted2 }}>{mobilePresentation && loading && !hasData ? <SkeletonBlock className="h-8 w-14" /> : <span className={mobilePresentation ? dataRevealClassName : undefined}>{counts[value]}건</span>}</span></button>)}
+      {(["ALL", "B_GRADE", "OBSOLETE"] as StorageFilter[]).map((value) => <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)} className="rounded-[14px] border px-4 py-3 text-left" style={{ background: filter === value ? tint(value === "B_GRADE" ? LEGACY_COLORS.purple : value === "OBSOLETE" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.blue, 12) : LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}><span className="block text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{value === "ALL" ? "전체 보관" : categoryLabel[value]}</span><span className="mt-1 block text-2xl font-black" style={{ color: LEGACY_COLORS.muted2 }}>{mobilePresentation && loading && !hasData ? <SkeletonBlock className="h-8 w-14" /> : <span className={mobilePresentation ? dataRevealClassName : undefined}>{counts[value]}{poolMode ? "종" : "건"}</span>}</span></button>)}
     </div>
-    <DefectFilterBar mobilePresentation={mobilePresentation} scope={scope} actorScope={actorScope} sort={sort} filterLocked={filterLocked} onScopeChange={setScope} onActorScopeChange={setActorScope} onSortChange={setSort} onFilterLockedChange={setFilterLocked} currentDept={currentEmployee.department} departments={departmentOptions} selectedDepartments={selectedDepartments} onDepartmentsChange={setSelectedDepartments} models={modelOptions} selectedModels={selectedModels} onModelsChange={setSelectedModels} selectedProcessSteps={selectedProcessSteps} onProcessStepsChange={setSelectedProcessSteps} onResetCategoryFilters={resetCategoryFilters} />
+    <DefectFilterBar mobilePresentation={mobilePresentation} scope={scope} actorScope={actorScope} poolMode={poolMode} sort={sort} filterLocked={filterLocked} onScopeChange={setScope} onActorScopeChange={setActorScope} onSortChange={setSort} onFilterLockedChange={setFilterLocked} currentDept={currentEmployee.department} departments={departmentOptions} selectedDepartments={selectedDepartments} onDepartmentsChange={setSelectedDepartments} models={modelOptions} selectedModels={selectedModels} onModelsChange={setSelectedModels} selectedProcessSteps={selectedProcessSteps} onProcessStepsChange={setSelectedProcessSteps} onResetCategoryFilters={resetCategoryFilters} />
     <input aria-label="B급·구형 검색" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="품목명 · 품목 코드 · 사유 검색" className="min-h-11 rounded-[10px] border px-3 text-sm font-bold outline-none" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }} />
     {loadError && <LoadFailureCard prefix="최신 B급·구형 보관 목록을 동기화하지 못했습니다" message={loadError} retryLabel="다시 동기화" onRetry={onRetry} />}
     {mobilePresentation && loading && !hasData ? <ReadLoading label="B급·구형 자재 불러오는 중" skeleton={<DefectListSkeleton />} /> : mobilePresentation && loadError && !hasData ? null : storage.length === 0 ? <EmptyState
@@ -115,7 +116,7 @@ export function DefectStorageView({
       description=""
     /> : <div className={mobilePresentation ? dataRevealClassName : "contents"}><DefectDepartmentList mobilePresentation={mobilePresentation} storageMode locations={storage} currentEmployee={currentEmployee} onProcess={onRestore} onMoveToStorage={setSelected} onMemoUpdated={onMemoUpdated} searchActive={search.trim().length > 0} /></div>}
     </>}
-    {selected && <ManagementCategoryModal location={selected} currentEmployee={currentEmployee} onClose={() => setSelected(null)} onUpdated={(category) => { onUpdated(selected.record_id, category); setSelected(null); }} />}
+    {selected && <ManagementCategoryModal location={selected} currentEmployee={currentEmployee} onClose={() => setSelected(null)} onUpdated={() => { onUpdated(); setSelected(null); }} />}
   </div>;
 }
 
@@ -135,24 +136,39 @@ export function ManagementCategoryModal({
   const [category, setCategory] = useState(initialCategory);
   const [memo, setMemo] = useState("");
   const [pin, setPin] = useState("");
+  const maxMoveQty = Number(location.available_quantity);
+  const [moveQty, setMoveQty] = useState(String(maxMoveQty));
+  const validMoveQty = Number.isInteger(Number(moveQty)) && Number(moveQty) > 0 && Number(moveQty) <= maxMoveQty;
   const [saving, setSaving] = useState(false);
-  useDesktopWorkGuard("defect-management", category !== initialCategory || !!memo || !!pin, saving);
+  useDesktopWorkGuard("defect-management", category !== initialCategory || !!memo || !!pin || moveQty !== String(maxMoveQty), saving);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => setMounted(true), []);
 
   async function save() {
-    if (pin.length !== PIN_LENGTH || saving || category === initialCategory) return;
+    if (pin.length !== PIN_LENGTH || saving || category === initialCategory || (location.pool_id && !validMoveQty)) return;
     setSaving(true);
     setError(null);
     try {
-      await defectsApi.updateManagementCategory(location.record_id, {
-        management_category: category,
-        expected_management_category: initialCategory,
-        memo: memo || null,
-        actor_employee_id: currentEmployee.employee_id,
-        pin,
-      });
+      if (location.pool_id) {
+        if (location.version == null) throw new Error("공동재고 버전이 없습니다. 목록을 새로고침해 주세요.");
+        await defectsApi.movePoolCategory(location.pool_id, {
+          management_category: category,
+          quantity: Number(moveQty),
+          expected_version: location.version,
+          memo: memo || null,
+          actor_employee_id: currentEmployee.employee_id,
+          pin,
+        });
+      } else if (location.record_id) {
+        await defectsApi.updateManagementCategory(location.record_id, {
+          management_category: category,
+          expected_management_category: initialCategory,
+          memo: memo || null,
+          actor_employee_id: currentEmployee.employee_id,
+          pin,
+        });
+      } else throw new Error("분류를 변경할 재고 식별자가 없습니다.");
       onUpdated(category);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "분류 변경에 실패했습니다.");
@@ -207,6 +223,11 @@ export function ManagementCategoryModal({
           />
         </div>
 
+        {location.pool_id && <label className="mt-3 block text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
+          이동 수량
+          <input aria-label="이동 수량" type="number" min={1} max={maxMoveQty} step={1} value={moveQty} onChange={(event) => setMoveQty(event.target.value)} className="mt-1 min-h-11 w-full rounded-[12px] border px-3" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }} />
+        </label>}
+
         <textarea
           aria-label="분류 변경 메모"
           value={memo}
@@ -235,7 +256,7 @@ export function ManagementCategoryModal({
         <div className="mt-3 flex gap-2">
           <button
             type="submit"
-            disabled={pin.length !== PIN_LENGTH || saving || category === initialCategory}
+            disabled={pin.length !== PIN_LENGTH || saving || category === initialCategory || (Boolean(location.pool_id) && !validMoveQty)}
             className="standard-hover min-h-11 rounded-[12px] px-4 text-sm font-black text-white disabled:opacity-40"
             style={{ background: LEGACY_COLORS.purpleSolid }}
           >

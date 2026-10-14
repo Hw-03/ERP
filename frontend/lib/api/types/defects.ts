@@ -8,13 +8,16 @@ export interface DefectLocation {
   return_supplier_scope?: "warehouse" | "tube";
   process_type_code?: string | null;
   reason_category_id?: string | null;
-  record_id: string;
+  record_id: string | null;
+  pool_id?: string | null;
+  source_kind?: "RECORD" | "POOL";
+  version?: number | null;
   item_id: string;
   item_name: string;
   mes_code: string | null;
   department: string;
   quantity: number | string;
-  original_quantity: number | string;
+  original_quantity: number | string | null;
   pending_quantity: number | string;
   available_quantity: number | string;
   defective_at: string | null; // ISO 8601 datetime string. 레거시 데이터로 NULL 가능 — UI 방어 필수.
@@ -56,7 +59,8 @@ export interface DefectManagementCategoryRevision {
 
 export interface DefectKpi {
   quarantined: number;
-  over_one_year: number;
+  over_one_year: number | null;
+  basis?: "RECORD" | "POOL";
 }
 
 export interface QuarantinePayload {
@@ -90,7 +94,8 @@ export interface BulkQuarantineResult {
 export interface UnquarantinePayload {
   reason_category_id?: string | null;
   submission_id?: string | null;
-  record_id: string;
+  record_id?: string;
+  pool_id?: string;
   item_id: string;
   qty: number;
   dept: string;
@@ -106,7 +111,8 @@ export interface BulkUnquarantinePayload {
   reason_category?: string | null;
   reason_memo?: string | null;
   lines: Array<{
-    record_id: string;
+    record_id?: string;
+    pool_id?: string;
     item_id: string;
     department: string;
     quantity: number;

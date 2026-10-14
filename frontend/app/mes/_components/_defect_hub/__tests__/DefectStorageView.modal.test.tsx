@@ -8,6 +8,7 @@ import { DefectStorageView, ManagementCategoryModal } from "../DefectStorageView
 vi.mock("@/lib/api/defects", () => ({
   defectsApi: {
     updateManagementCategory: vi.fn(),
+    movePoolCategory: vi.fn(),
     getManagementCategoryHistory: vi.fn(),
   },
 }));
@@ -86,6 +87,26 @@ describe("ManagementCategoryModal", () => {
       });
     });
     expect(onUpdated).toHaveBeenCalledWith("OBSOLETE");
+  });
+
+  it("moves a selected POOL quantity with its version and PIN", async () => {
+    vi.mocked(defectsApi.movePoolCategory).mockResolvedValue({ management_category: "OBSOLETE", target_pool_id: "target-pool" });
+    render(<ManagementCategoryModal location={{ ...location, record_id: null, pool_id: "pool-1", source_kind: "POOL", version: 4, quantity: 5, available_quantity: 3, pending_quantity: 2, original_quantity: null }} currentEmployee={{ employee_id: "employee-1" }} onClose={() => {}} onUpdated={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "구형" }));
+    fireEvent.change(screen.getByRole("spinbutton", { name: "이동 수량" }), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("직원 PIN"), { target: { value: "0000" } });
+    fireEvent.click(screen.getByRole("button", { name: "변경 저장" }));
+    await waitFor(() => expect(defectsApi.movePoolCategory).toHaveBeenCalledWith("pool-1", expect.objectContaining({ management_category: "OBSOLETE", quantity: 2, expected_version: 4, actor_employee_id: "employee-1", pin: "0000" })));
+    expect(defectsApi.updateManagementCategory).not.toHaveBeenCalled();
+  });
+
+  it("does not move more POOL stock than the available quantity", () => {
+    render(<ManagementCategoryModal location={{ ...location, record_id: null, pool_id: "pool-1", source_kind: "POOL", version: 4, quantity: 5, available_quantity: 3, pending_quantity: 2, original_quantity: null }} currentEmployee={{ employee_id: "employee-1" }} onClose={() => {}} onUpdated={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "구형" }));
+    fireEvent.change(screen.getByRole("spinbutton", { name: "이동 수량" }), { target: { value: "4" } });
+    fireEvent.change(screen.getByLabelText("직원 PIN"), { target: { value: "0000" } });
+    expect(screen.getByRole("button", { name: "변경 저장" })).toBeDisabled();
+    expect(defectsApi.movePoolCategory).not.toHaveBeenCalled();
   });
 });
 

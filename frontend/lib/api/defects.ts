@@ -90,6 +90,18 @@ export const defectsApi = {
       payload,
     ),
 
+  movePoolCategory: (poolId: string, payload: {
+    management_category: "DEFECT" | "B_GRADE" | "OBSOLETE";
+    quantity: number;
+    expected_version: number;
+    memo?: string | null;
+    actor_employee_id: string;
+    pin: string;
+  }) =>
+    putJson<{ management_category: "DEFECT" | "B_GRADE" | "OBSOLETE"; target_pool_id: string }>(
+      toApiUrl(`/api/defects/pools/${poolId}/management-category`), payload,
+    ),
+
   getManagementCategoryHistory: (recordId: string) =>
     fetcher<DefectManagementCategoryRevision[]>(
       toApiUrl(`/api/defects/records/${recordId}/management-category-history`),

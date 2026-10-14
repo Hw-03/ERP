@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { defectsApi } from "@/lib/api/defects";
+import { defectSource } from "@/lib/api/defect-source";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import type { Department } from "@/lib/api/types/shared";
@@ -81,7 +82,7 @@ export function PaPfDefectWizard({
     try {
       if (action === "unquarantine") {
         await defectsApi.unquarantine({
-          record_id: location.record_id,
+          ...defectSource(location),
           item_id: location.item_id,
           qty: processQty,
           dept: location.department,
@@ -100,7 +101,7 @@ export function PaPfDefectWizard({
           notes: memo || null,
           lines: [
             {
-              record_id: location.record_id,
+              ...defectSource(location),
               item_id: location.item_id,
               quantity: processQty,
               from_bucket: "defective",
@@ -121,7 +122,7 @@ export function PaPfDefectWizard({
           notes: JSON.stringify({ child_decisions: childDecisions }),
           lines: [
             {
-              record_id: location.record_id,
+              ...defectSource(location),
               item_id: location.item_id,
               quantity: processQty,
               from_bucket: "defective",

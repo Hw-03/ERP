@@ -3,13 +3,14 @@
  *
  * 검증 항목:
  *  1. PRODUCTION + DEFECTIVE 행 모두 포함 시 색상 띠에 두 segment 가 렌더링됨
- *  2. DEFECTIVE segment 색상이 #ef4444 인지 (style 검증)
+ *  2. DEFECTIVE segment 색상이 공통 불량 토큰인지 (style 검증)
  *  3. aria-label 에 "[불량]" 텍스트 포함 여부
  *  4. DEFECTIVE 수량 0 인 부서는 segment 에 포함 안 됨
  */
 import { describe, it, expect, vi } from "vitest";
 import { render } from "@testing-library/react";
 import type { Item } from "@/lib/api";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 // next/image mock
 vi.mock("next/image", () => ({
@@ -68,7 +69,7 @@ describe("InventoryItemRow — DEFECTIVE 게이지 세그먼트", () => {
     expect(gauge.getAttribute("aria-label")).toContain("[불량]");
   });
 
-  it("DEFECTIVE segment 는 #ef4444 배경색으로 렌더링", () => {
+  it("DEFECTIVE segment 는 공통 불량 색상 토큰으로 렌더링", () => {
     const item = makeItem({
       quantity: 10,
       warehouse_qty: 0,
@@ -87,13 +88,7 @@ describe("InventoryItemRow — DEFECTIVE 게이지 세그먼트", () => {
     );
 
     const gauge = getByRole("img");
-    const segments = gauge.querySelectorAll("div");
-    // JSDOM 은 hex → rgb 로 변환함: #ef4444 = rgb(239, 68, 68)
-    const redSegment = Array.from(segments).find((el) => {
-      const bg = (el as HTMLElement).style.backgroundColor;
-      return bg === "#ef4444" || bg === "rgb(239, 68, 68)";
-    });
-    expect(redSegment).toBeDefined();
+    expect(gauge.querySelector('[data-stock-category="DEFECT"]')).toHaveStyle({ backgroundColor: LEGACY_COLORS.red });
   });
 
   it("DEFECTIVE 수량 0 이면 게이지에 불량 구간 없음", () => {
@@ -116,12 +111,7 @@ describe("InventoryItemRow — DEFECTIVE 게이지 세그먼트", () => {
 
     const gauge = getByRole("img");
     expect(gauge.getAttribute("aria-label")).not.toContain("[불량]");
-    const segments = gauge.querySelectorAll("div");
-    const redSegment = Array.from(segments).find((el) => {
-      const bg = (el as HTMLElement).style.backgroundColor;
-      return bg === "#ef4444" || bg === "rgb(239, 68, 68)";
-    });
-    expect(redSegment).toBeUndefined();
+    expect(gauge.querySelector('[data-stock-category="DEFECT"]')).toBeNull();
   });
 
   it("PRODUCTION 만 있는 품목은 기존 동작 유지 (불량 segment 없음)", () => {

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { defectsApi } from "@/lib/api/defects";
+import { defectSource } from "@/lib/api/defect-source";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import type { Department } from "@/lib/api/types/shared";
@@ -55,7 +56,7 @@ export function PaPfDefectWizardPanel({
     setErrorMsg(null);
     setBusy(false);
     setConfirmOpen(false);
-  }, [location.record_id, location.available_quantity]);
+  }, [location.record_id, location.pool_id, location.available_quantity]);
 
   // action 변경 시 decisions 초기화
   useEffect(() => {
@@ -80,7 +81,7 @@ export function PaPfDefectWizardPanel({
     try {
       if (action === "unquarantine") {
         await defectsApi.unquarantine({
-          record_id: location.record_id,
+          ...defectSource(location),
           item_id: location.item_id,
           qty: processQty,
           dept: location.department,
@@ -99,7 +100,7 @@ export function PaPfDefectWizardPanel({
           notes: memo || null,
           lines: [
             {
-              record_id: location.record_id,
+              ...defectSource(location),
               item_id: location.item_id,
               quantity: processQty,
               from_bucket: "defective",
@@ -120,7 +121,7 @@ export function PaPfDefectWizardPanel({
           notes: JSON.stringify({ child_decisions: childDecisions }),
           lines: [
             {
-              record_id: location.record_id,
+              ...defectSource(location),
               item_id: location.item_id,
               quantity: processQty,
               from_bucket: "defective",

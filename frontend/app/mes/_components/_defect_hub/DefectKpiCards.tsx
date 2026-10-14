@@ -24,7 +24,7 @@ export function DefectKpiCards({ kpi, scopeLabel, activeFilter, onCardClick, mob
         loading={loading}
         label="격리 중"
         value={unavailable ? "—" : kpi.quarantined}
-        unit="건"
+        unit={kpi.basis === "POOL" ? "종" : "건"}
         hint={scopeLabel ? `${scopeLabel} 기준` : "현재 DEFECTIVE 상태"}
         tone={LEGACY_COLORS.red}
         headerCompact={mobilePresentation}
@@ -32,12 +32,12 @@ export function DefectKpiCards({ kpi, scopeLabel, activeFilter, onCardClick, mob
       <KpiCard
         loading={loading}
         label="1년 이상 ⚠"
-        value={unavailable ? "—" : kpi.over_one_year}
-        unit="건"
-        hint="격리 후 365일 초과"
+        value={unavailable || kpi.over_one_year === null ? "—" : kpi.over_one_year}
+        unit={kpi.over_one_year === null ? undefined : "건"}
+        hint={kpi.over_one_year === null ? "공동재고는 발생일을 집계하지 않음" : "격리 후 365일 초과"}
         tone={LEGACY_COLORS.red}
-        active={activeFilter === "over_one_year"}
-        onClick={() => onCardClick("over_one_year")}
+        active={kpi.over_one_year !== null && activeFilter === "over_one_year"}
+        onClick={kpi.over_one_year === null ? undefined : () => onCardClick("over_one_year")}
         headerCompact={mobilePresentation}
       />
       {mobilePresentation && scopeLabel && (

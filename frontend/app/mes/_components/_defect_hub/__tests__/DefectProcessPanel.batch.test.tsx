@@ -102,6 +102,30 @@ describe("DefectProcessPanel batch processing", () => {
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
+  it("restores selected POOL rows by their distinct pool ids", async () => {
+    const pools = locations.map((row, index) => ({ ...row, record_id: null, pool_id: `pool-${index + 1}`, source_kind: "POOL" as const, version: 1, original_quantity: null }));
+    render(<DefectProcessPanel locations={pools} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "정상 복귀 →" }));
+    fireEvent.click(await screen.findByRole("button", { name: "즉시 복귀" }));
+    await waitFor(() => expect(apiMocks.unquarantineBulk).toHaveBeenCalledTimes(1));
+    expect(apiMocks.unquarantineBulk.mock.calls[0][0].lines).toEqual([
+      expect.objectContaining({ pool_id: "pool-1", quantity: 2 }),
+      expect.objectContaining({ pool_id: "pool-2", quantity: 3 }),
+    ]);
+  });
+
+  it("sends the selected POOL source for scrap requests", async () => {
+    const pool = { ...locations[0], record_id: null, pool_id: "pool-1", source_kind: "POOL" as const, version: 1, original_quantity: null };
+    render(<DefectProcessPanel location={pool} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: /전체 폐기/ }));
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "외관 불량" } });
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "폐기 사유" } });
+    fireEvent.click(screen.getByRole("button", { name: "즉시 폐기 →" }));
+    fireEvent.click(await screen.findByRole("button", { name: "즉시 폐기" }));
+    await waitFor(() => expect(apiMocks.createStockRequest).toHaveBeenCalledTimes(1));
+    expect(apiMocks.createStockRequest.mock.calls[0][0].lines[0]).toEqual(expect.objectContaining({ pool_id: "pool-1", quantity: 2 }));
+  });
+
   it("invalidates the batch after server validation changes without reporting success", async () => {
     const onInvalidated = vi.fn();
     const onDone = vi.fn();

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import presentation from "../mobile/mobilePresentation.module.css";
 import { defectsApi } from "@/lib/api/defects";
+import { defectLocationId } from "@/lib/api/defect-source";
 import type { DefectKpi, DefectLocation } from "@/lib/api/types/defects";
 /** DefectHubPanel 이 필요한 최소 직원 필드 */
 export interface DefectHubEmployee {
@@ -138,7 +139,7 @@ export function DefectHubPanel({
   const activeProcessingLocations = useMemo(
     () => processingLocations
       .map((selected) => locations.find(
-        (location) => location.record_id === selected.record_id && Number(location.available_quantity) > 0,
+        (location) => defectLocationId(location) === defectLocationId(selected) && Number(location.available_quantity) > 0,
       ))
       .filter((location): location is DefectLocation => location !== undefined),
     [locations, processingLocations],
@@ -200,6 +201,7 @@ export function DefectHubPanel({
   );
 
   // 부서·모델·공정과 격리 처리자 범위를 합성 — KPI 집계와 목록이 공유하는 모집단
+  const poolMode = locations.some((location) => location.pool_id);
   const scopedLocations = useMemo(() => {
     let result = locations.filter((location) => (location.management_category ?? "DEFECT") === "DEFECT");
 
@@ -212,7 +214,7 @@ export function DefectHubPanel({
     }
     // scope === "all" → 필터 없음
 
-    if (actorScope === "mine") {
+    if (actorScope === "mine" && !poolMode) {
       result = result.filter(
         (loc) => loc.quarantined_by_employee_id === currentEmployee.employee_id,
       );
@@ -223,25 +225,26 @@ export function DefectHubPanel({
       models: selectedModels,
       processSteps: selectedProcessSteps,
     });
-  }, [locations, scope, actorScope, defectDeptFilter, currentEmployee.department, currentEmployee.employee_id, items, productModels, selectedDepartments, selectedModels, selectedProcessSteps]);
+  }, [locations, scope, actorScope, poolMode, defectDeptFilter, currentEmployee.department, currentEmployee.employee_id, items, productModels, selectedDepartments, selectedModels, selectedProcessSteps]);
 
   const kpi = useMemo<DefectKpi>(
     () => ({
       quarantined: scopedLocations.length,
-      over_one_year: scopedLocations.filter(
+      basis: poolMode ? "POOL" : "RECORD",
+      over_one_year: poolMode ? null : scopedLocations.filter(
         (loc) =>
           loc.defective_at != null &&
           Date.now() - new Date(loc.defective_at).getTime() > ONE_YEAR_MS,
       ).length,
     }),
-    [scopedLocations],
+    [scopedLocations, poolMode],
   );
 
   const filteredLocations = useMemo(() => {
     let result = scopedLocations;
 
     // KPI 카드 클릭 필터. defective_at NULL 인 행은 비교 불가 → 제외(보수적).
-    if (kpiFilter === "over_one_year") {
+    if (kpiFilter === "over_one_year" && !poolMode) {
       result = result.filter(
         (loc) => loc.defective_at != null && Date.now() - new Date(loc.defective_at).getTime() > ONE_YEAR_MS,
       );
@@ -258,7 +261,7 @@ export function DefectHubPanel({
     result = result.filter((loc) => matchesDefectSearch(loc, search));
 
     return result;
-  }, [scopedLocations, sort, kpiFilter, search]);
+  }, [scopedLocations, sort, kpiFilter, search, poolMode]);
 
   const departmentScopeLabel = selectedDepartments.length > 0
     ? selectedDepartments.join(" · ")
@@ -267,7 +270,7 @@ export function DefectHubPanel({
       : scope === "production"
       ? "생산 전체"
       : "전체 부서";
-  const scopeLabel = `${departmentScopeLabel} · ${actorScope === "mine" ? "내가 격리" : "격리자 전체"}`;
+  const scopeLabel = poolMode ? `${departmentScopeLabel} · 공동재고` : `${departmentScopeLabel} · ${actorScope === "mine" ? "내가 격리" : "격리자 전체"}`;
 
   // [처리] 버튼 클릭 → 데스크톱과 동일한 통합 처리 패널(전폭 view)로 전환.
   function handleProcess(location: DefectLocation) {
@@ -416,7 +419,7 @@ export function DefectHubPanel({
 
   function handleMemoUpdated(recordId: string, memo: string) {
     setLocations((current) => current.map((location) =>
-      location.record_id === recordId ? { ...location, reason_memo: memo } : location,
+      location.record_id === recordId && recordId != null ? { ...location, reason_memo: memo } : location,
     ));
   }
 
@@ -488,7 +491,7 @@ export function DefectHubPanel({
   }
 
   if (view === "storage") {
-    return <DefectStorageView mobilePresentation={mobilePresentation} hasData={hasLoadedRef.current} locations={locations} items={items} productModels={productModels} currentEmployee={currentEmployee} loading={loading} loadError={error ?? refreshError} onRetry={() => setReloadNonce((value) => value + 1)} onBack={() => window.history.back()} onUpdated={(recordId, managementCategory) => setLocations((current) => current.map((location) => location.record_id === recordId ? { ...location, management_category: managementCategory } : location))} onMemoUpdated={(recordId, memo) => setLocations((current) => current.map((location) => location.record_id === recordId ? { ...location, reason_memo: memo } : location))} onRestore={handleRestore} />;
+    return <DefectStorageView mobilePresentation={mobilePresentation} hasData={hasLoadedRef.current} locations={locations} items={items} productModels={productModels} currentEmployee={currentEmployee} loading={loading} loadError={error ?? refreshError} onRetry={() => setReloadNonce((value) => value + 1)} onBack={() => window.history.back()} onUpdated={() => setReloadNonce((value) => value + 1)} onMemoUpdated={(recordId, memo) => setLocations((current) => current.map((location) => location.record_id === recordId && recordId != null ? { ...location, reason_memo: memo } : location))} onRestore={handleRestore} />;
   }
 
   if (view === "statistics") {
@@ -520,6 +523,7 @@ export function DefectHubPanel({
         mobilePresentation={mobilePresentation}
         scope={scope}
         actorScope={actorScope}
+        poolMode={poolMode}
         sort={sort}
         filterLocked={filterLocked}
         onScopeChange={(next) => {
@@ -561,7 +565,7 @@ export function DefectHubPanel({
       <DefectSearchInput value={search} onChange={setSearch} />
 
       {/* KPI 필터 활성 표시 */}
-      {kpiFilter && (
+      {kpiFilter && !(poolMode && kpiFilter === "over_one_year") && (
         <div
           className="flex items-center justify-between rounded-[10px] border px-4 py-2"
           style={{ background: LEGACY_COLORS.errorBg, borderColor: tint(LEGACY_COLORS.red, 30) }}
@@ -608,7 +612,7 @@ export function DefectHubPanel({
             searchActive={search.trim().length > 0}
             onMoveToStorage={setManagementLocation}
           />
-          {managementLocation && <ManagementCategoryModal location={managementLocation} currentEmployee={currentEmployee} onClose={() => setManagementLocation(null)} onUpdated={(managementCategory) => { setLocations((current) => current.map((location) => location.record_id === managementLocation.record_id ? { ...location, management_category: managementCategory } : location)); setManagementLocation(null); }} />}
+          {managementLocation && <ManagementCategoryModal location={managementLocation} currentEmployee={currentEmployee} onClose={() => setManagementLocation(null)} onUpdated={() => { setReloadNonce((value) => value + 1); setManagementLocation(null); }} />}
         </div>
       )}
     </>

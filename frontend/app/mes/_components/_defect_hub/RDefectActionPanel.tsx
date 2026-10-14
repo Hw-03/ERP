@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactElement } from "react";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { defectsApi } from "@/lib/api/defects";
+import { defectSource } from "@/lib/api/defect-source";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import { ReasonFormFields } from "./ReasonFormFields";
@@ -57,7 +58,7 @@ export function RDefectActionPanel({
     setMemo("");
     setError(null);
     setBusy(false);
-  }, [location.record_id]);
+  }, [location.record_id, location.pool_id]);
 
   const canSubmit = hasDefectReason(category, memo) && !busy;
 
@@ -69,7 +70,7 @@ export function RDefectActionPanel({
     try {
       if (action === "unquarantine") {
         await defectsApi.unquarantine({
-          record_id: location.record_id,
+          ...defectSource(location),
           item_id: location.item_id,
           qty: Number(location.available_quantity),
           dept: location.department,
@@ -90,7 +91,7 @@ export function RDefectActionPanel({
           notes: memo || null,
           lines: [
             {
-              record_id: location.record_id,
+              ...defectSource(location),
               item_id: location.item_id,
               quantity: Number(location.available_quantity),
               from_bucket: "defective",

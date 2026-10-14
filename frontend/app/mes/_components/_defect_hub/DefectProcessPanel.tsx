@@ -7,6 +7,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import { defectsApi } from "@/lib/api/defects";
+import { defectLocationId, defectSource } from "@/lib/api/defect-source";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import type { Department } from "@/lib/api/types/shared";
@@ -79,11 +80,11 @@ export function DefectProcessPanel({
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [supplierListReady, setSupplierListReady] = useState(false);
   useDesktopWorkGuard("defect-process", processQty !== availableQty || !!category || !!memo || decisions.length > 0 || selectedSupplier !== null, busy);
-  const locationIdentity = processingLocations.map((current) => current.record_id).join(":");
+  const locationIdentity = processingLocations.map(defectLocationId).join(":");
   const locationIdentityRef = useRef(locationIdentity);
   const batchRequestIdsRef = useRef<Partial<Record<ProcessAction, string>>>({});
   const batchSnapshot = processingLocations.map((current) =>
-    `${current.record_id}:${current.available_quantity}:${current.pending_quantity}`,
+    `${defectLocationId(current)}:${current.available_quantity}:${current.pending_quantity}`,
   ).join("|");
   const batchSnapshotRef = useRef(batchSnapshot);
   const batchInvalidatedRef = useRef(false);
@@ -174,7 +175,7 @@ export function DefectProcessPanel({
             reason_category_id: null,
             reason_memo: memo || null,
             lines: processingLocations.map((current) => ({
-              record_id: current.record_id,
+              ...defectSource(current),
               item_id: current.item_id,
               department: current.department,
               quantity: Number(current.available_quantity),
@@ -182,7 +183,7 @@ export function DefectProcessPanel({
           });
         } else {
           await defectsApi.unquarantine({
-            record_id: location.record_id,
+            ...defectSource(location),
             item_id: location.item_id,
             qty: boundedProcessQty,
             dept: location.department,
@@ -202,7 +203,7 @@ export function DefectProcessPanel({
           reason_memo: memo || null,
           notes: memo || null,
           lines: processingLocations.map((current) => ({
-            record_id: current.record_id,
+            ...defectSource(current),
             item_id: current.item_id,
             quantity: isBatch ? Number(current.available_quantity) : boundedProcessQty,
             from_bucket: "defective" as const,
@@ -221,7 +222,7 @@ export function DefectProcessPanel({
           reason_memo: memo || null,
           notes: memo || null,
           lines: processingLocations.map((current) => ({
-            record_id: current.record_id,
+            ...defectSource(current),
             item_id: current.item_id,
             quantity: isBatch ? Number(current.available_quantity) : boundedProcessQty,
             from_bucket: "defective" as const,
@@ -240,7 +241,7 @@ export function DefectProcessPanel({
           reason_memo: memo || null,
           notes: JSON.stringify({ child_decisions: childDecisions }),
           lines: processingLocations.map((current) => ({
-            record_id: current.record_id,
+            ...defectSource(current),
             item_id: current.item_id,
             quantity: isBatch ? Number(current.available_quantity) : boundedProcessQty,
             from_bucket: "defective" as const,

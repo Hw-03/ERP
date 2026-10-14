@@ -16,6 +16,7 @@ interface Props {
   /** @deprecated 기존 호출부 호환용. 새 목록 필터는 selectedDepartments를 사용한다. */
   scope: DefectScope;
   actorScope: DefectActorScope;
+  poolMode?: boolean;
   sort: DefectSort;
   filterLocked: boolean;
   /** @deprecated 기존 호출부 호환용. 새 목록 필터는 onDepartmentsChange를 사용한다. */
@@ -61,6 +62,7 @@ export function DefectFilterBar({
   mobilePresentation = false,
   scope,
   actorScope,
+  poolMode = false,
   sort,
   filterLocked,
   onScopeChange,
@@ -84,7 +86,7 @@ export function DefectFilterBar({
     activeDepartments.length ? `부서 ${shortSelection(activeDepartments)}` : null,
     selectedModels?.length ? `모델 ${shortSelection(selectedModels)}` : null,
     selectedProcessSteps.length ? `공정 ${shortSelection(selectedProcessSteps.map((step) => PROCESS_LABELS[step]))}` : null,
-    actorScope === "mine" ? "내가 격리" : null,
+    !poolMode && actorScope === "mine" ? "내가 격리" : null,
   ].filter(Boolean);
   const summary = [
     ...(activeConditions.length ? activeConditions : ["전체"]),
@@ -143,9 +145,11 @@ export function DefectFilterBar({
       />
 
       <div className="flex flex-wrap items-center gap-2 rounded-[16px] border px-3 py-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-        <span className="mr-1 text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>격리자</span>
-        <FilterChip label="전체" active={actorScope === "all"} onClick={() => onActorScopeChange("all")} size="sm" className="min-h-11" />
-        <FilterChip label="내가 격리" active={actorScope === "mine"} onClick={() => onActorScopeChange("mine")} size="sm" className="min-h-11" />
+        {!poolMode && <>
+          <span className="mr-1 text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>격리자</span>
+          <FilterChip label="전체" active={actorScope === "all"} onClick={() => onActorScopeChange("all")} size="sm" className="min-h-11" />
+          <FilterChip label="내가 격리" active={actorScope === "mine"} onClick={() => onActorScopeChange("mine")} size="sm" className="min-h-11" />
+        </>}
         <span className="ml-1 text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>정렬</span>
         <select aria-label="정렬" value={sort} onChange={(event) => onSortChange(event.target.value as DefectSort)} className="min-h-11 rounded-[12px] border px-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] focus-visible:ring-offset-2" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
           <option value="oldest">오래된 순</option>

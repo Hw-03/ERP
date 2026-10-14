@@ -7,6 +7,7 @@ import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import { TYPO } from "../tokens";
 import { defectsApi } from "@/lib/api/defects";
+import { defectLocationId, defectSource } from "@/lib/api/defect-source";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import type { Department } from "@/lib/api/types/shared";
@@ -66,26 +67,27 @@ export function MobileDefectProcessPanel({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [supplierListReady, setSupplierListReady] = useState(false);
-  const locationIdentityRef = useRef(location.record_id);
+  const locationIdentity = defectLocationId(location);
+  const locationIdentityRef = useRef(locationIdentity);
   const reworkSessionRef = useRef<MobileReworkMemory | null>(null);
   const boundedProcessQty = Math.max(1, Math.min(maxQty, processQty));
 
   useEffect(() => {
-    window.history.replaceState({ defect: "process", recordId: location.record_id, step: 1 }, "");
+    window.history.replaceState({ defect: "process", recordId: locationIdentity, step: 1 }, "");
     function onPop(event: PopStateEvent): void {
       const state = event.state;
-      if (state?.defect !== "process" || state.recordId !== location.record_id) return;
+      if (state?.defect !== "process" || state.recordId !== locationIdentity) return;
       setConfirmOpen(false);
       if (state.step === 2) setAction("disassemble");
       setStep(state.step === 2 ? 2 : 1);
     }
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [location.record_id]);
+  }, [locationIdentity]);
 
   useEffect(() => {
-    if (locationIdentityRef.current === location.record_id) return;
-    locationIdentityRef.current = location.record_id;
+    if (locationIdentityRef.current === locationIdentity) return;
+    locationIdentityRef.current = locationIdentity;
     setStep(1);
     setAction("unquarantine");
     setProcessQty(Math.max(1, Number(location.available_quantity) || 1));
@@ -99,7 +101,7 @@ export function MobileDefectProcessPanel({
     setConfirmOpen(false);
     setSelectedSupplier(null);
     setSupplierListReady(false);
-  }, [location.record_id, location.available_quantity]);
+  }, [locationIdentity, location.available_quantity]);
 
   useEffect(() => {
     const freshMax = Math.max(1, Number(location.available_quantity) || 1);
@@ -147,7 +149,7 @@ export function MobileDefectProcessPanel({
     try {
       if (action === "unquarantine") {
         await defectsApi.unquarantine({
-          record_id: location.record_id,
+          ...defectSource(location),
           item_id: location.item_id,
           qty: boundedProcessQty,
           dept: location.department,
@@ -167,7 +169,7 @@ export function MobileDefectProcessPanel({
           notes: memo || null,
           lines: [
             {
-              record_id: location.record_id,
+              ...defectSource(location),
               item_id: location.item_id,
               quantity: boundedProcessQty,
               from_bucket: "defective",
@@ -187,7 +189,7 @@ export function MobileDefectProcessPanel({
           notes: JSON.stringify({ child_decisions: childDecisions }),
           lines: [
             {
-              record_id: location.record_id,
+              ...defectSource(location),
               item_id: location.item_id,
               quantity: boundedProcessQty,
               from_bucket: "defective",
@@ -265,7 +267,7 @@ export function MobileDefectProcessPanel({
     return (
       <div className="flex h-full min-h-0 flex-col">
         <MobileReworkWorkspace
-          sessionId={location.record_id}
+          sessionId={locationIdentity}
           parentItemId={location.item_id}
           parentItemName={location.item_name}
           parentMesCode={location.mes_code ?? ""}

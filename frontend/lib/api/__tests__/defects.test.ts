@@ -27,6 +27,21 @@ describe("defectsApi management category", () => {
       expect.objectContaining({ management_category: "OBSOLETE" }),
     );
   });
+
+  it("moves an explicit POOL quantity with the expected version", () => {
+    defectsApi.movePoolCategory("pool-1", {
+      management_category: "OBSOLETE",
+      quantity: 2,
+      expected_version: 4,
+      memo: "분류 이동",
+      actor_employee_id: "employee-1",
+      pin: "0000",
+    });
+    expect(putJson).toHaveBeenCalledWith(
+      "/api/defects/pools/pool-1/management-category",
+      expect.objectContaining({ quantity: 2, expected_version: 4, pin: "0000" }),
+    );
+  });
 });
 
 describe("defectsApi report statistics", () => {

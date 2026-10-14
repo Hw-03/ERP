@@ -516,6 +516,23 @@ describe("DefectDepartmentList", () => {
     ]);
   });
 
+  it("keeps POOL rows distinct and leaves reserved units out of batch processing", () => {
+    const onBatchProcess = vi.fn();
+    render(<DefectDepartmentList locations={[
+      makeLocation({ record_id: null, pool_id: "pool-a", source_kind: "POOL", version: 1, original_quantity: null, defective_at: null, quarantined_by: null, quarantined_by_employee_id: null, quantity: 2, available_quantity: 1, pending_quantity: 1 }),
+      makeLocation({ record_id: null, pool_id: "pool-b", source_kind: "POOL", version: 1, original_quantity: null, defective_at: null, quarantined_by: null, quarantined_by_employee_id: null }),
+    ]} currentEmployee={currentEmployee} onProcess={vi.fn()} onBatchProcess={onBatchProcess} />);
+    fireEvent.click(screen.getByRole("button", { name: "여러 건 선택" }));
+    const checkboxes = screen.getAllByRole("checkbox");
+    expect(checkboxes).toHaveLength(2);
+    expect(checkboxes[0]).toBeEnabled();
+    fireEvent.click(checkboxes[0]);
+    fireEvent.click(screen.getByRole("button", { name: "선택 처리 1건" }));
+    expect(onBatchProcess).toHaveBeenCalledWith([expect.objectContaining({ pool_id: "pool-a" })]);
+    expect(screen.queryByRole("button", { name: "메모 수정" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "이력 보기" })).not.toBeInTheDocument();
+  });
+
   it("keeps batch selection active for only one item group", () => {
     render(
       <DefectDepartmentList

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { defectsApi } from "@/lib/api/defects";
+import { defectLocationId } from "@/lib/api/defect-source";
 import type { DefectKpi, DefectLocation } from "@/lib/api/types/defects";
 import { isWarehouseStaff } from "./_warehouse_steps";
 import { useWarehouseData } from "./_warehouse_hooks/useWarehouseData";
@@ -176,7 +177,7 @@ function DefectViewInner({
             const freshLocations = currentView.locations
               .map((selected) => locData.find(
                 (location) =>
-                  location.record_id === selected.record_id &&
+                  defectLocationId(location) === defectLocationId(selected) &&
                   Number(location.available_quantity) > 0,
               ))
               .filter((location): location is DefectLocation => location !== undefined);
@@ -211,6 +212,7 @@ function DefectViewInner({
   );
 
   // 부서·모델·공정과 격리 처리자 범위를 합성 — KPI 집계와 목록이 공유하는 모집단
+  const poolMode = locations.some((location) => location.pool_id);
   const scopedLocations = useMemo(() => {
     let result = locations.filter((location) => (location.management_category ?? "DEFECT") === "DEFECT");
     if (scope === "my") {
@@ -219,7 +221,7 @@ function DefectViewInner({
     } else if (scope === "production") {
       result = result.filter((loc) => PRODUCTION_LINES.has(loc.department));
     }
-    if (actorScope === "mine") {
+    if (actorScope === "mine" && !poolMode) {
       result = result.filter(
         (loc) => loc.quarantined_by_employee_id === operator.employee_id,
       );
@@ -229,26 +231,27 @@ function DefectViewInner({
       models: selectedModels,
       processSteps: selectedProcessSteps,
     });
-  }, [locations, scope, actorScope, defectDeptFilter, operator.department, operator.employee_id, items, productModels, selectedDepartments, selectedModels, selectedProcessSteps]);
+  }, [locations, scope, actorScope, poolMode, defectDeptFilter, operator.department, operator.employee_id, items, productModels, selectedDepartments, selectedModels, selectedProcessSteps]);
 
   // KPI — 현재 부서 범위 기준으로 집계해 목록과 항상 일치 (서버 /kpi 대신 클라 계산)
   const kpi = useMemo<DefectKpi>(
     () => ({
       quarantined: scopedLocations.length,
-      over_one_year: scopedLocations.filter(
+      basis: poolMode ? "POOL" : "RECORD",
+      over_one_year: poolMode ? null : scopedLocations.filter(
         (loc) =>
           loc.defective_at != null &&
           Date.now() - new Date(loc.defective_at).getTime() > ONE_YEAR_MS,
       ).length,
     }),
-    [scopedLocations],
+    [scopedLocations, poolMode],
   );
 
   // 화면 목록 — 범위 + KPI 필터(1년 이상) + 정렬
   const filteredLocations = useMemo(() => {
     let result = scopedLocations;
 
-    if (kpiFilter === "over_one_year") {
+    if (kpiFilter === "over_one_year" && !poolMode) {
       result = result.filter(
         (loc) =>
           loc.defective_at != null &&
@@ -262,7 +265,7 @@ function DefectViewInner({
       const tb = b.defective_at ? new Date(b.defective_at).getTime() : 0;
       return sort === "oldest" ? ta - tb : tb - ta;
     });
-  }, [scopedLocations, sort, kpiFilter, search]);
+  }, [scopedLocations, sort, kpiFilter, search, poolMode]);
 
   // KPI 집계 범위 라벨 — 숫자가 어느 범위인지 카드 부제로 노출
   const departmentScopeLabel = selectedDepartments.length > 0
@@ -272,7 +275,7 @@ function DefectViewInner({
       : scope === "production"
       ? "생산 전체"
       : "전체 부서";
-  const scopeLabel = `${departmentScopeLabel} · ${actorScope === "mine" ? "내가 격리" : "격리자 전체"}`;
+  const scopeLabel = poolMode ? `${departmentScopeLabel} · 공동재고` : `${departmentScopeLabel} · ${actorScope === "mine" ? "내가 격리" : "격리자 전체"}`;
 
   const employee = {
     employee_id: operator.employee_id,
@@ -376,14 +379,14 @@ function DefectViewInner({
 
   function handleMemoUpdated(recordId: string, memo: string) {
     setLocations((current) => current.map((location) =>
-      location.record_id === recordId ? { ...location, reason_memo: memo } : location,
+      location.record_id === recordId && recordId != null ? { ...location, reason_memo: memo } : location,
     ));
   }
 
   const isFullWidthWork = view.kind !== "list" && view.kind !== "hub" && view.kind !== "storage";
 
   if (view.kind === "storage") {
-    return <div className="animate-desktop-navigation-enter flex min-h-0 min-w-0 flex-1 overflow-y-auto rounded-[28px] border p-4" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}><DefectStorageView locations={locations} items={items} productModels={productModels} currentEmployee={employee} loading={loading} loadError={error ?? refreshError} onRetry={() => setReloadNonce((value) => value + 1)} onBack={() => window.history.back()} onUpdated={(recordId, managementCategory) => setLocations((current) => current.map((location) => location.record_id === recordId ? { ...location, management_category: managementCategory } : location))} onMemoUpdated={handleMemoUpdated} onRestore={handleRestoreRow} /></div>;
+    return <div className="animate-desktop-navigation-enter flex min-h-0 min-w-0 flex-1 overflow-y-auto rounded-[28px] border p-4" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}><DefectStorageView locations={locations} items={items} productModels={productModels} currentEmployee={employee} loading={loading} loadError={error ?? refreshError} onRetry={() => setReloadNonce((value) => value + 1)} onBack={() => window.history.back()} onUpdated={() => setReloadNonce((value) => value + 1)} onMemoUpdated={handleMemoUpdated} onRestore={handleRestoreRow} /></div>;
   }
 
   function handleRestoreRow(loc: DefectLocation) {
@@ -521,6 +524,7 @@ function DefectViewInner({
             <DefectFilterBar
               scope={scope}
               actorScope={actorScope}
+              poolMode={poolMode}
               sort={sort}
               filterLocked={filterLocked}
               onScopeChange={(next) => {
@@ -590,7 +594,7 @@ function DefectViewInner({
                   searchActive={search.trim().length > 0}
                   onMoveToStorage={setManagementLocation}
                 />
-                {managementLocation && <ManagementCategoryModal location={managementLocation} currentEmployee={employee} onClose={() => setManagementLocation(null)} onUpdated={(managementCategory) => { setLocations((current) => current.map((location) => location.record_id === managementLocation.record_id ? { ...location, management_category: managementCategory } : location)); setManagementLocation(null); }} />}
+                {managementLocation && <ManagementCategoryModal location={managementLocation} currentEmployee={employee} onClose={() => setManagementLocation(null)} onUpdated={() => { setReloadNonce((value) => value + 1); setManagementLocation(null); }} />}
               </>
             )}
           </div>

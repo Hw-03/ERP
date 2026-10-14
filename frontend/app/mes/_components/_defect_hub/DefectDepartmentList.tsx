@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, ChevronDown, ChevronUp, Clock3, History, Pencil } from "lucide-react";
 import { defectsApi } from "@/lib/api/defects";
+import { defectLocationId } from "@/lib/api/defect-source";
 import type { DefectLocation, DefectManagementCategory, DefectManagementCategoryRevision, DefectMemoRevision } from "@/lib/api/types/defects";
 import { PIN_LENGTH } from "@/lib/auth/constants";
 import { LEGACY_COLORS, getDepartmentFallbackColor } from "@/lib/mes/color";
@@ -200,7 +201,7 @@ export function DefectDepartmentList({
                       onToggleBatchRecord={(recordId) => toggleBatchRecord(itemKey, recordId)}
                       onBatchProcess={() => {
                         if (!batchSelection || batchSelection.groupKey !== itemKey) return;
-                        onBatchProcess?.(records.filter((record) => batchSelection.recordIds.has(record.record_id)));
+                        onBatchProcess?.(records.filter((record) => batchSelection.recordIds.has(defectLocationId(record))));
                       }}
                     />
                   );
@@ -252,8 +253,8 @@ function DefectItemGroup({
   if (mobilePresentation) {
     const latestRecord = findLatestRecord(records);
     const totalQuantity = records.reduce((total, record) => total + Number(record.quantity), 0);
-    const fullDate = formatDateTime(latestRecord.defective_at);
-    const shortDate = fullDate === "기록 없음" ? fullDate : fullDate.slice(2, 10).replaceAll("-", ".");
+    const fullDate = latestRecord.pool_id ? "공동재고" : formatDateTime(latestRecord.defective_at);
+    const shortDate = latestRecord.pool_id || fullDate === "기록 없음" ? fullDate : fullDate.slice(2, 10).replaceAll("-", ".");
     const selectedCount = batchSelection?.size ?? 0;
 
     return (
@@ -292,7 +293,7 @@ function DefectItemGroup({
             )}
             {records.map((record) => (
               <DefectRecordRow
-                key={record.record_id}
+                key={defectLocationId(record)}
                 mobilePresentation
                 location={record}
                 currentEmployee={currentEmployee}
@@ -301,8 +302,8 @@ function DefectItemGroup({
                 storageMode={storageMode}
                 onProcess={onProcess}
                 selectionMode={batchSelection !== null && records.length > 1}
-                selected={batchSelection?.has(record.record_id) ?? false}
-                onToggleSelected={() => onToggleBatchRecord(record.record_id)}
+                selected={batchSelection?.has(defectLocationId(record)) ?? false}
+                onToggleSelected={() => onToggleBatchRecord(defectLocationId(record))}
               />
             ))}
           </>
@@ -351,8 +352,8 @@ function DefectItemGroup({
             style={{ borderColor: LEGACY_COLORS.border }}
           >
             <p className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted }}>최근 격리</p>
-            <p className="mt-1 break-words text-sm font-bold leading-5" style={{ color: LEGACY_COLORS.muted2 }}>{formatDateTime(latestRecord.defective_at)}</p>
-            <p className="mt-1 break-words text-base font-black leading-6" style={{ color: LEGACY_COLORS.text }}>{quarantinedByName(latestRecord)}</p>
+            <p className="mt-1 break-words text-sm font-bold leading-5" style={{ color: LEGACY_COLORS.muted2 }}>{latestRecord.pool_id ? "공동재고" : formatDateTime(latestRecord.defective_at)}</p>
+            <p className="mt-1 break-words text-base font-black leading-6" style={{ color: LEGACY_COLORS.text }}>{latestRecord.pool_id ? "발생별 이력 없음" : quarantinedByName(latestRecord)}</p>
           </div>
           <div className="flex min-w-0 flex-col justify-center gap-2 border-t pt-3 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0" style={{ borderColor: LEGACY_COLORS.border }}>
             <div
@@ -395,7 +396,7 @@ function DefectItemGroup({
 
       {expanded && records.map((record) => (
         <DefectRecordRow
-          key={record.record_id}
+          key={defectLocationId(record)}
           location={record}
           hideItemIdentity
           currentEmployee={currentEmployee}
@@ -404,8 +405,8 @@ function DefectItemGroup({
           storageMode={storageMode}
           onProcess={onProcess}
           selectionMode={batchSelection !== null}
-          selected={batchSelection?.has(record.record_id) ?? false}
-          onToggleSelected={() => onToggleBatchRecord(record.record_id)}
+          selected={batchSelection?.has(defectLocationId(record)) ?? false}
+          onToggleSelected={() => onToggleBatchRecord(defectLocationId(record))}
         />
       ))}
     </>
@@ -454,7 +455,7 @@ function DefectRecordRow({
     const nextMemo = memoText(location.reason_memo);
     setMemo(nextMemo);
     setDraftMemo(nextMemo);
-  }, [location.record_id, location.reason_memo]);
+  }, [location.record_id, location.pool_id, location.reason_memo]);
 
   useLayoutEffect(() => {
     const textarea = memoTextareaRef.current;
@@ -463,10 +464,10 @@ function DefectRecordRow({
     textarea.style.height = `${textarea.scrollHeight}px`;
   }, [draftMemo, editing]);
 
-  const canEditMemo = currentEmployee !== undefined;
+  const canEditMemo = currentEmployee !== undefined && location.record_id !== null;
   const pendingQty = Number(location.pending_quantity);
   const availableQty = Number(location.available_quantity);
-  const selectionDisabledReason = pendingQty > 0
+  const selectionDisabledReason = pendingQty > 0 && !location.pool_id
     ? "처리 대기"
     : location.is_legacy && location.legacy_origin !== "reconstructed"
       ? "기존 합산"
@@ -485,7 +486,7 @@ function DefectRecordRow({
   );
 
   async function saveMemo() {
-    if (!currentEmployee || editPin.length !== PIN_LENGTH) return;
+    if (!currentEmployee || !location.record_id || editPin.length !== PIN_LENGTH) return;
     setSaving(true);
     setSaveError(null);
     try {
@@ -525,6 +526,7 @@ function DefectRecordRow({
   }
 
   async function loadHistory() {
+    if (!location.record_id) return;
     setHistoryLoading(true);
     setHistoryError(null);
     try {
@@ -555,12 +557,12 @@ function DefectRecordRow({
             <div data-testid="defect-mobile-record-header" className="flex min-h-11 min-w-0 items-start gap-2">
               {selectionMode && (
                 <label className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center has-[:disabled]:cursor-not-allowed">
-                  <input type="checkbox" aria-label={`${location.item_name} ${formatDateTime(location.defective_at)} ${selectionDisabledReason ? `${selectionDisabledReason} · 선택 불가` : "선택"}`} checked={selected} disabled={selectionDisabledReason !== null} onChange={onToggleSelected} className="h-5 w-5 accent-[var(--c-blue)]" />
+                  <input type="checkbox" aria-label={`${location.item_name} ${location.pool_id ? "공동재고" : formatDateTime(location.defective_at)} ${selectionDisabledReason ? `${selectionDisabledReason} · 선택 불가` : "선택"}`} checked={selected} disabled={selectionDisabledReason !== null} onChange={onToggleSelected} className="h-5 w-5 accent-[var(--c-blue)]" />
                 </label>
               )}
               <div data-testid="defect-quarantine-summary" className="min-w-0 flex-1">
-                <p className="break-words text-xs font-bold leading-5" style={{ color: LEGACY_COLORS.muted2 }}>{formatDateTime(location.defective_at)}</p>
-                <p className="break-words text-sm font-black leading-5" style={{ color: LEGACY_COLORS.text }}>{quarantinedBy}</p>
+                <p className="break-words text-xs font-bold leading-5" style={{ color: LEGACY_COLORS.muted2 }}>{location.pool_id ? "공동재고" : formatDateTime(location.defective_at)}</p>
+                <p className="break-words text-sm font-black leading-5" style={{ color: LEGACY_COLORS.text }}>{location.pool_id ? "발생별 이력 없음" : quarantinedBy}</p>
               </div>
               <div data-testid="defect-remaining-quantity" className="shrink-0 text-right">
                 <p className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted }}>격리 수량</p>
@@ -586,8 +588,8 @@ function DefectRecordRow({
               className="flex min-w-0 flex-col justify-center border-t pt-3 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0"
               style={{ borderColor: LEGACY_COLORS.border }}
             >
-              <p className="break-words text-sm font-bold leading-5" style={{ color: LEGACY_COLORS.muted2 }}>{formatDateTime(location.defective_at)}</p>
-              <p className="mt-1 break-words text-base font-black leading-6" style={{ color: LEGACY_COLORS.text }}>{quarantinedBy}</p>
+              <p className="break-words text-sm font-bold leading-5" style={{ color: LEGACY_COLORS.muted2 }}>{location.pool_id ? "공동재고" : formatDateTime(location.defective_at)}</p>
+              <p className="mt-1 break-words text-base font-black leading-6" style={{ color: LEGACY_COLORS.text }}>{location.pool_id ? "발생별 이력 없음" : quarantinedBy}</p>
               <div className="mt-2 flex flex-wrap gap-1.5">{statusBadges}</div>
             </div>
           </>
@@ -654,13 +656,13 @@ function DefectRecordRow({
                 <SmallActionButton label="취소" onClick={() => { setDraftMemo(memo); setEditPin(""); setSaveError(null); setEditing(false); }} disabled={saving} />
               </div>
             ) : null}
-            <SmallActionButton
+            {location.record_id && <SmallActionButton
               label={historyOpen ? "이력 닫기" : "이력 보기"}
               icon={<History className="h-3.5 w-3.5" />}
               onClick={() => void toggleHistory()}
               uniformWidth={storageMode && !mobilePresentation}
               fullWidth={mobilePresentation}
-            />
+            />}
             {mobilePresentation && !editing && canEditMemo && (
               <SmallActionButton label="메모 수정" icon={<Pencil className="h-3.5 w-3.5" />} onClick={() => { setDraftMemo(memo); setEditPin(""); setSaveError(null); setEditing(true); }} fullWidth />
             )}
@@ -734,7 +736,7 @@ function DefectItemIdentity({
         >
           <input
             type="checkbox"
-            aria-label={`${location.item_name} ${formatDateTime(location.defective_at)} 선택`}
+            aria-label={`${location.item_name} ${location.pool_id ? "공동재고" : formatDateTime(location.defective_at)} 선택`}
             checked={selected}
             disabled={selectionDisabled}
             onChange={onToggleSelected}

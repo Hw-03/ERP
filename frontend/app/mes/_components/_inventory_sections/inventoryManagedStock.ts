@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { Item } from "@/lib/api";
+import type { StocktakeInventorySummary } from "@/lib/api/types/stocktake";
 import type { DefectManagementCategory } from "@/lib/api/types/defects";
 import type { DefectiveStockBreakdown } from "@/lib/api/types/items";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -15,7 +15,7 @@ export const STOCK_CATEGORY_STYLES: Record<DefectManagementCategory, {
 }> = {
   DEFECT: {
     label: "불량",
-    color: "#ef4444",
+    color: LEGACY_COLORS.red,
     pattern: {
       backgroundImage: `repeating-linear-gradient(135deg, ${PATTERN_COLOR} 0 2px, transparent 2px 12px)`,
     },
@@ -41,7 +41,7 @@ export const STOCK_CATEGORY_STYLES: Record<DefectManagementCategory, {
 };
 
 /** 새 집계를 우선하며, 이전 API의 격리 위치는 불량으로 호환한다. */
-export function getManagedStockBreakdown(item: Item): DefectiveStockBreakdown[] {
+export function getManagedStockBreakdown(item: Pick<StocktakeInventorySummary, "defective_breakdown" | "locations">): DefectiveStockBreakdown[] {
   return (item.defective_breakdown ?? (item.locations ?? [])
     .filter((location) => location.status === "DEFECTIVE")
     .map((location) => ({

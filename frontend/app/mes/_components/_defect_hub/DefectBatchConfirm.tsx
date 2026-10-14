@@ -6,6 +6,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import { defectsApi } from "@/lib/api/defects";
+import { defectLocationId, defectSource } from "@/lib/api/defect-source";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
 import { makeClientRequestId } from "@/lib/uuid";
 import type { Department } from "@/lib/api/types/shared";
@@ -42,7 +43,7 @@ interface Props {
   onCancel: () => void;
 }
 
-const keyOf = (loc: DefectLocation) => loc.record_id;
+const keyOf = defectLocationId;
 
 /**
  * 단순 격리 항목(정상복귀/폐기/반품) 일괄 처리 확인 전폭 화면.
@@ -100,7 +101,7 @@ export function DefectBatchConfirm({
     const qty = action === "unquarantine" ? Number(r.qty) : Number(loc.available_quantity);
     if (action === "unquarantine") {
       await defectsApi.unquarantine({
-        record_id: loc.record_id,
+        ...defectSource(loc),
         item_id: loc.item_id,
         qty,
         dept: loc.department,
@@ -122,7 +123,7 @@ export function DefectBatchConfirm({
       notes: r.memo || null,
       lines: [
         {
-          record_id: loc.record_id,
+          ...defectSource(loc),
           item_id: loc.item_id,
           quantity: qty,
           from_bucket: "defective",

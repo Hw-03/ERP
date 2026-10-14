@@ -6,6 +6,7 @@ import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { useFocusTrap } from "@/lib/mes/useFocusTrap";
 import { defectsApi } from "@/lib/api/defects";
+import { defectSource } from "@/lib/api/defect-source";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import { ReasonFormFields } from "./ReasonFormFields";
@@ -95,7 +96,7 @@ export function RDefectActionModal({
     try {
       if (action === "unquarantine") {
         await defectsApi.unquarantine({
-          record_id: location.record_id,
+          ...defectSource(location),
           item_id: location.item_id,
           qty: Number(location.available_quantity),
           dept: location.department,
@@ -116,7 +117,7 @@ export function RDefectActionModal({
           notes: memo || null,
           lines: [
             {
-              record_id: location.record_id,
+              ...defectSource(location),
               item_id: location.item_id,
               quantity: Number(location.available_quantity),
               from_bucket: "defective",
