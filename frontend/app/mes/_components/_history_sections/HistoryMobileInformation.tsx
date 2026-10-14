@@ -9,6 +9,7 @@ import { buildReworkItemSummaries } from "./reworkSummary";
 import { buildHistoryDetailSummary, type HistoryDetailSummary } from "./historyDetailSummary";
 import { formatHistoryDateTimeLong } from "./historyFormat";
 import styles from "./HistoryMobileDetail.module.css";
+import { HistoryItemStockCard } from "./HistoryItemStockCard";
 
 /** PC의 요청 순 재고와 실제 영향을 거래별로 보존한다. */
 export function HistoryMobileStockDetails({ logs, batch = null, onSelectLog }: {
@@ -42,26 +43,13 @@ export function HistoryMobileStockDetails({ logs, batch = null, onSelectLog }: {
         || toInventoryEffectRows(log.inventory_effect, {itemId:log.item_id,itemName:log.item_name,unit:log.item_unit}).length > 0;
       const missingStockQuantity = !hasStockChange ? log.quantity_change !== 0 ? getHistoryLogSignedQuantity(log).parts[0]?.label
         : log.transfer_qty ? `${formatQty(Math.abs(log.transfer_qty))} ${log.item_unit}` : null : null;
-      return <div key={log.log_id} className="rounded-[16px] border p-3" style={{borderColor:LEGACY_COLORS.border,background:LEGACY_COLORS.s2}}>
-        <div className={styles.compositionRow}>
-          <button type="button" onClick={() => onSelectLog(log)} className={styles.informationRow}
-            aria-label={`${roleLabel} ${log.item_name} ${log.mes_code ?? ""} 상세`}>
-            <span className="min-w-0 text-left">
-              <span className={`${styles.name}${log.cancelled ? " line-through opacity-55" : ""}`}>{log.item_name}</span>
-              <span className={styles.itemMetadata} style={{color:LEGACY_COLORS.muted2}}>
-                <span className="text-xs font-medium">{roleLabel}</span>
-                {log.mes_code && <span className={styles.code}>{log.mes_code}</span>}
-              </span>
-              {resultLabel && <span className="block text-xs font-medium" style={{color:LEGACY_COLORS.muted2}}>{resultLabel}</span>}
-            </span>
-          </button>
-          <div className={styles.stockChange}>
+      return <HistoryItemStockCard key={log.log_id} itemName={log.item_name} mesCode={log.mes_code} role={roleLabel} cancelled={log.cancelled} onSelect={() => onSelectLog(log)} stock={<>
             {missingStockQuantity && <div className="text-sm font-bold" style={{color:LEGACY_COLORS.muted2}}>처리 수량 {missingStockQuantity}</div>}
             <HistoryMobileLogStock log={log} />
-          </div>
-        </div>
+          </>}>
+        {resultLabel && <span className="block text-xs font-medium" style={{color:LEGACY_COLORS.muted2}}>{resultLabel}</span>}
         {log.cancelled && <div className="mt-1 text-xs" style={{color:LEGACY_COLORS.red}}>취소됨{log.cancel_reason ? ` · ${log.cancel_reason}` : ""}</div>}
-      </div>;
+      </HistoryItemStockCard>;
     })}
   </section>;
 }

@@ -27,6 +27,7 @@ export function HistoryKeyPointSummary({
   impactStatus = "ready",
   onRetryImpact,
   fillHeight = false,
+  compactMetadata = false,
   stocktakeOperation,
 }: {
   summary: HistoryDetailSummary;
@@ -34,6 +35,7 @@ export function HistoryKeyPointSummary({
   impactStatus?: "ready" | "loading" | "error";
   onRetryImpact?: () => void;
   fillHeight?: boolean;
+  compactMetadata?: boolean;
   stocktakeOperation?: InventoryOperation;
 }) {
   const statusColor = STATUS_COLORS[summary.status.tone];
@@ -119,7 +121,7 @@ export function HistoryKeyPointSummary({
             <div
               key={`${participant.label}:${participant.name}:${participant.at}`}
               data-testid="history-participant-row"
-              className="grid min-w-0 gap-2 sm:grid-cols-[4rem_minmax(0,1fr)_auto] sm:items-center"
+              className={`grid min-w-0 gap-2 ${compactMetadata ? "grid-cols-[4rem_minmax(0,1fr)]" : "sm:grid-cols-[4rem_minmax(0,1fr)_auto] sm:items-center"}`}
             >
               <span className="font-bold">
                 {participants.length === 1 && (participant.label === "요청자" || participant.label === "담당자") ? "작업자" : participant.label}
@@ -130,7 +132,7 @@ export function HistoryKeyPointSummary({
                   {participant.name}
                 </span>
               </div>
-              <div className="flex min-w-0 items-center gap-2">
+              <div className={`flex min-w-0 items-center gap-2${compactMetadata ? " col-start-2" : ""}`}>
                 <Clock3 className="h-4 w-4 shrink-0" />
                 <span className="whitespace-nowrap font-medium leading-snug">{formatHistoryDateTimeLong(participant.at)}</span>
               </div>

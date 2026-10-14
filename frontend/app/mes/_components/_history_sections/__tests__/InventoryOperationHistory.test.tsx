@@ -81,10 +81,10 @@ describe("InventoryOperationHistory", () => {
     state.detail.mockResolvedValue(observation);
     mount();
     fireEvent.click(await screen.findByRole("button", { name: /실사 반영 상세/ }));
-    expect(await screen.findByText("실사 관측 · 차이 0")).toBeInTheDocument();
+    expect(await screen.findByText("실사 결과 · 수량 변동 없음")).toBeInTheDocument();
     expect(screen.getByRole("table", { name: "시험 품목 실사 관측" })).toHaveTextContent("정상7703");
     expect(screen.getByText("B급")).toBeInTheDocument();
-    expect(screen.getByText("불용")).toBeInTheDocument();
+    expect(screen.getByText("구형")).toBeInTheDocument();
     expect(screen.queryByText("수량 로그 없음")).not.toBeInTheDocument();
   });
 

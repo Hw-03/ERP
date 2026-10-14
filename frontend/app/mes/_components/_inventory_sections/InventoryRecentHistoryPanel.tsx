@@ -17,6 +17,7 @@ import mobileStyles from "./InventoryRecentHistoryPanel.module.css";
 import { historyDisplayLogs } from "../_history_sections/stocktakeHistory";
 import { historyOperationColor } from "../_history_sections/historyOperationSource";
 import { InventoryOperationDetail, operationSummary } from "../_history_sections/InventoryOperationDetail";
+import { inventoryOperationLabel } from "../_history_sections/inventoryOperationPresentation";
 
 type RecentEntry = { key: string; effectiveAt: string; createdAt: string } & (
   { log: TransactionLog; operation?: never } | { log?: never; operation: InventoryOperation }
@@ -103,7 +104,7 @@ function HistoryRows({ entries, mobilePresentation, onSelect }: { entries: Recen
       {entries.map((entry) => {
         const operation = entry.operation;
         if (operation) return <li key={entry.key} data-cancelled={operation.effectiveStatus === "cancelled" || undefined}>
-        <div className="inventory-recent-main"><strong>{normalizeHistoryLabel(operation.displayLabel)}</strong><time dateTime={entry.effectiveAt}>{formatHistoryDate(entry.effectiveAt)}</time></div>
+        <div className="inventory-recent-main"><strong>{inventoryOperationLabel(operation)}</strong><time dateTime={entry.effectiveAt}>{formatHistoryDate(entry.effectiveAt)}</time></div>
         <div className="inventory-recent-body">
           <p>{operationSummary(operation)}</p>
           <div className="inventory-recent-meta">{[operation.department, operation.actorName].filter(Boolean).join(" · ")}</div>

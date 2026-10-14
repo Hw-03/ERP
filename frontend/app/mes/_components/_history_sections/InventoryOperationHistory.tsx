@@ -7,6 +7,7 @@ import { Button } from "@/lib/ui/Button";
 import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
 import { InventoryOperationDetail, operationSummary } from "./InventoryOperationDetail";
 import { formatHistoryDate } from "./historyFormat";
+import { inventoryOperationLabel } from "./inventoryOperationPresentation";
 
 /** 기존 거래 목록과 독립적으로 수량 없는 관측·업무 정정까지 조회한다. */
 export function InventoryOperationHistory(): ReactElement {
@@ -37,13 +38,13 @@ export function InventoryOperationHistory(): ReactElement {
             <li key={operation.operationId}>
               <button
                 type="button"
-                aria-label={`${operation.displayLabel} 상세`}
+                aria-label={`${inventoryOperationLabel(operation)} 상세`}
                 onClick={() => setSelectedId(operation.operationId)}
                 className="min-h-11 w-full rounded-[20px] border p-4 text-left focus-visible:outline focus-visible:outline-2"
                 style={{ background: C.s1, borderColor: C.border }}
               >
                 <span className="flex flex-wrap justify-between gap-2">
-                  <strong>{operation.displayLabel}</strong>
+                  <strong>{inventoryOperationLabel(operation)}</strong>
                   <time className="text-xs" style={{ color: C.muted }} dateTime={operation.effectiveAt}>{formatHistoryDate(operation.effectiveAt)}</time>
                 </span>
                 <span className="mt-2 block">{operationSummary(operation)}</span>
