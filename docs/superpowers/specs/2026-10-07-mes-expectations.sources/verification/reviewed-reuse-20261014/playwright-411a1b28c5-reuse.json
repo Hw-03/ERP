@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 3,
+  "kind": "reviewed-reuse",
+  "original": {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/not-run-closure-20261013-003/playwright-411a1b28c5-execution.json",
+    "sha256": "c8122095c30e3d8d08f39cbc618c6cc61081f8ea4ce4009a62693c1f9e39f4b1"
+  },
+  "review": {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/review.json",
+    "sha256": "072b01dc77907ae53c722ad93708c73f34a0603c0680ffac54a9f1d2920055b7"
+  }
+}

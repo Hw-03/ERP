@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 3,
+  "kind": "reviewed-reuse",
+  "original": {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/not-run-closure-20261013-003/vitest-d4c81f0c18-execution.json",
+    "sha256": "75a6b54764a12d92caf7f0e9ce709559acac22a8a325d4715f9dbae6ffd0e1b6"
+  },
+  "review": {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/review.json",
+    "sha256": "072b01dc77907ae53c722ad93708c73f34a0603c0680ffac54a9f1d2920055b7"
+  }
+}
