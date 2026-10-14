@@ -5,16 +5,18 @@ import { Download, FileSpreadsheet, FileText } from "lucide-react";
 import { api } from "@/lib/api";
 import { fetchBlob } from "@/lib/api-core";
 import { adminApi } from "@/lib/api/admin";
+import { productionApi } from "@/lib/api/production";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
 import { FilterChip } from "../common/FilterChip";
 import { AdminActivityAuditControls } from "./AdminActivityAuditControls";
 import { AdminAuditCsvControls } from "./AdminAuditCsvControls";
+import { toDateKey } from "../_history_sections/historyFormat";
 
 type RangePreset = "today" | "7d" | "30d" | "90d";
 type DataScope = "all" | "items" | "transactions" | "employees" | "bom";
 type ExportFormat = "csv" | "xlsx";
-type ExportMode = "general" | "audit";
+type ExportMode = "general" | "audit" | "operations";
 type AuditKind = "inventory" | "activity";
 type ExportFeedback = { kind: "success" | "error"; message: string };
 
@@ -37,6 +39,15 @@ function presetRange(preset: RangePreset): { start: string; end: string } {
   const startDate = new Date(today);
   startDate.setDate(today.getDate() - days);
   return { start: startDate.toISOString().slice(0, 10), end };
+}
+
+/** 통합 작업의 날짜 필터는 서버와 같은 한국 달력 날짜로 보낸다. */
+function operationPresetRange(preset: RangePreset): { start: string; end: string } {
+  const end = toDateKey(new Date().toISOString());
+  const start = new Date(`${end}T00:00:00Z`);
+  const days = preset === "today" ? 0 : preset === "7d" ? 7 : preset === "30d" ? 30 : 90;
+  start.setUTCDate(start.getUTCDate() - days);
+  return { start: start.toISOString().slice(0, 10), end };
 }
 
 function csvEscape(value: unknown): string {
@@ -181,6 +192,7 @@ export function AdminExportSection() {
   const [f705DownloadError, setF705DownloadError] = useState<string | null>(null);
 
   const range = useMemo(() => presetRange(preset), [preset]);
+  const operationRange = useMemo(() => operationPresetRange(preset), [preset]);
   const includesTransactions = scope === "all" || scope === "transactions";
   const includesEmployees = scope === "all" || scope === "employees";
   const supportsExcel = scope === "items" || scope === "transactions";
@@ -260,6 +272,21 @@ export function AdminExportSection() {
         kind: "error",
         message: exportErrorMessage(error),
       });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleOperationExport(): Promise<void> {
+    if (busy) return;
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const blob = await fetchBlob(productionApi.getInventoryOperationsExportUrl(format, { start_date: operationRange.start, end_date: operationRange.end }));
+      downloadBinaryBlob(blob, `inventory_operations_${timestamp()}.${format}`);
+      setFeedback({ kind: "success", message: "통합 작업 다운로드를 시작했습니다." });
+    } catch (error) {
+      setFeedback({ kind: "error", message: exportErrorMessage(error) });
     } finally {
       setBusy(false);
     }
@@ -373,9 +400,18 @@ export function AdminExportSection() {
               size="sm"
               className="min-h-11"
             />
+            <FilterChip active={mode === "operations"} label="통합 작업" onClick={() => { setMode("operations"); setFeedback(null); }} size="sm" className="min-h-11" />
           </div>
 
-          {mode === "general" ? (
+          {mode === "operations" ? (
+            <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+              <p className="text-sm" style={{ color: LEGACY_COLORS.muted }}>수량 기록, 차이 0 실사 관측, 업무 정정과 원업무 연결을 함께 내보냅니다.</p>
+              <div role="group" aria-label="통합 작업 기간"><Label>기간 선택</Label><p className="text-sm tabular-nums">{operationRange.start} ~ {operationRange.end}</p><div className="mt-2 flex flex-wrap gap-2">{(["today", "7d", "30d", "90d"] as RangePreset[]).map((option) => <FilterChip key={option} active={preset === option} label={option === "today" ? "오늘" : option === "7d" ? "7일" : option === "30d" ? "30일" : "90일"} onClick={() => setPreset(option)} size="sm" className="min-h-11" />)}</div></div>
+              <div role="group" aria-label="파일 형식" className="flex gap-2"><FilterChip active={format === "csv"} label="CSV" onClick={() => setFormat("csv")} className="min-h-11" /><FilterChip active={format === "xlsx"} label="Excel" onClick={() => setFormat("xlsx")} className="min-h-11" /></div>
+              {feedback && <p role={feedback.kind === "error" ? "alert" : "status"} className="text-sm" style={{ color: feedback.kind === "error" ? LEGACY_COLORS.red : LEGACY_COLORS.green }}>{feedback.message}</p>}
+              <Button className="mt-auto min-h-11" loading={busy} iconLeft={<Download />} onClick={() => void handleOperationExport()}>통합 작업 {format === "csv" ? "CSV" : "Excel"} 다운로드</Button>
+            </div>
+          ) : mode === "general" ? (
             <div data-testid="general-export-controls" className="flex min-h-0 flex-1 flex-col">
             <div data-testid="export-control-panel" className="mt-4 min-h-0 flex-1 xl:overflow-y-auto xl:pr-1">
               <div className="flex flex-col gap-4">

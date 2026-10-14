@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
   getItemsExportUrl: vi.fn(),
   getTransactions: vi.fn(),
   getTransactionsExportUrl: vi.fn(),
+  getInventoryOperationsExportUrl: vi.fn(),
   updateCurrentAuditTerminal: vi.fn(),
   useActivityAuditListQuery: vi.fn(),
   useAuditCsvListQuery: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock("@/lib/api", () => ({
 }));
 
 vi.mock("@/lib/api-core", () => ({ fetchBlob: state.fetchBlob }));
+vi.mock("@/lib/api/production", () => ({ productionApi: { getInventoryOperationsExportUrl: state.getInventoryOperationsExportUrl } }));
 
 vi.mock("@/lib/api/admin", () => ({
   adminApi: {
@@ -91,6 +93,31 @@ describe("AdminExportSection", () => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it("통합 작업 CSV는 전용 서버 내보내기를 사용하고 기존 수량 CSV를 호출하지 않는다", async () => {
+    stubObjectUrl();
+    state.getInventoryOperationsExportUrl.mockReturnValue("/api/inventory/operations/export.csv");
+    render(<AdminExportSection />);
+    fireEvent.click(screen.getByRole("button", { name: "통합 작업" }));
+    fireEvent.click(screen.getByRole("button", { name: "통합 작업 CSV 다운로드" }));
+    await waitFor(() => expect(state.fetchBlob).toHaveBeenCalledWith("/api/inventory/operations/export.csv"));
+    expect(state.getInventoryOperationsExportUrl).toHaveBeenCalledWith("csv", { start_date: expect.any(String), end_date: expect.any(String) });
+    expect(state.getTransactions).not.toHaveBeenCalled();
+  });
+
+  it("통합 작업 Excel의 오늘 범위는 한국 날짜를 사용한다", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-05T18:00:00Z"));
+    stubObjectUrl();
+    state.getInventoryOperationsExportUrl.mockReturnValue("/api/inventory/operations/export.xlsx");
+    render(<AdminExportSection />);
+    fireEvent.click(screen.getByRole("button", { name: "통합 작업" }));
+    fireEvent.click(screen.getByRole("button", { name: "오늘" }));
+    fireEvent.click(screen.getByRole("button", { name: "Excel" }));
+    fireEvent.click(screen.getByRole("button", { name: "통합 작업 Excel 다운로드" }));
+    await waitFor(() => expect(state.getInventoryOperationsExportUrl).toHaveBeenCalledWith("xlsx", { start_date: "2026-10-06", end_date: "2026-10-06" }));
+    expect(state.getTransactionsExportUrl).not.toHaveBeenCalled();
   });
 
   it("F704·F705와 두 모드를 가진 데이터 내보내기 카드만 표시한다", () => {
