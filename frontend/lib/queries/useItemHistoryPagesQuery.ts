@@ -36,7 +36,7 @@ export function useItemHistoryPagesQuery(itemId: string): UseInfiniteQueryResult
   return useInfiniteQuery({
     queryKey: queryKeys.transactions.itemHistoryPages(itemId),
     queryFn: ({ pageParam, signal }) => productionApi.getTransactionDisplayGroups({
-      itemId, limit: ITEM_HISTORY_PAGE_SIZE, cursor: pageParam,
+      itemId, includeOperationOnly: true, limit: ITEM_HISTORY_PAGE_SIZE, cursor: pageParam,
     }, { signal }),
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.hasMore ? page.nextCursor ?? undefined : undefined,

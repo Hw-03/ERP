@@ -69,6 +69,41 @@ describe("productionApi", () => {
     expect(String(fetchSpy.mock.calls[0][0])).not.toContain("requester_employee_id");
   });
 
+  it("품목 작업 전용 응답을 기존 작업 상세와 동일하게 매핑한다", async () => {
+    globalThis.fetch = vi.fn(async () => makeResponse({ groups: [{ type: "operation", key: "operation-1", logs: [], operation: inventoryOperationWire({ business_correction: { correction_id: "c", source_type: "InventoryOperation", source_id: "o", source_operation_id: "o", source_operation_ids: ["o"] } }) }], next_cursor: null, has_more: false })) as typeof fetch;
+    const page = await productionApi.getTransactionDisplayGroups({ itemId: "item-1", includeOperationOnly: true });
+    expect(page.groups[0].operation).toMatchObject({ operationId: "operation-1", actorName: "김현우", businessCorrection: { sourceOperationIds: ["o"] } });
+    expect(globalThis.fetch).toHaveBeenCalledWith(expect.stringContaining("include_operation_only=true"), expect.anything());
+  });
+  it("maps calendar category counts while preserving day and month keys", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({
+      days: { "2026-10-12": { total: 91, warehouse_count: 0, dept_count: 0, adjust_count: 91, other_count: 0 } },
+      months: { "2026-10": 342 },
+    })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const result = await productionApi.getTransactionDisplayCalendar({ year: 2026, month: 10, search: "애노드", department: "튜브" });
+    expect(result.days["2026-10-12"]).toMatchObject({ total: 91, adjustCount: 91, otherCount: 0 });
+    expect(result.months["2026-10"]).toBe(342);
+    expect(fetchSpy).toHaveBeenCalledWith(expect.stringContaining("display-calendar?"), expect.any(Object));
+  });
+  it("maps zero-difference observations and every correction source without quantity logs", async () => {
+    globalThis.fetch = vi.fn(async () => makeResponse(inventoryOperationWire({
+      observation_lines: [{ row_type: "STOCKTAKE_OBSERVATION", application_id: "a1", count_id: "c1", confirmation_revision_id: "r1", item_id: "i1", item_name: "품목", mes_code: "M1", scope_key: "warehouse", before_quantities: { normal: 7, defect: 0, b_grade: 0, obsolete: 0 }, after_quantities: { normal: 7, defect: 0, b_grade: 0, obsolete: 0 }, reservations: { normal: 2, defect: 0, b_grade: 0, obsolete: 0 }, observation_epoch_before: 2, observation_epoch_after: 3 }],
+      matching_observation_lines: [],
+      business_correction: { correction_id: "bc1", source_type: "ShippingRequest", source_id: "s1", source_operation_id: null, source_operation_ids: ["prepare", "pickup"] },
+    }))) as typeof fetch;
+    const result = await productionApi.getInventoryOperation("work/1");
+    expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain("/operations/work%2F1");
+    expect(result.lines).toEqual([]);
+    expect(result.observationLines?.[0]).toMatchObject({ countId: "c1", beforeQuantities: { normal: 7 }, afterQuantities: { normal: 7 }, observationEpochAfter: 3 });
+    expect(result.businessCorrection?.sourceOperationIds).toEqual(["prepare", "pickup"]);
+  });
+
+  it("exports integrated work separately with the exact selected dates", () => {
+    expect(productionApi.getInventoryOperationsExportUrl("csv", { start_date: "2026-10-01", end_date: "2026-10-06" })).toContain("/operations/export.csv?start_date=2026-10-01&end_date=2026-10-06");
+    expect(productionApi.getInventoryOperationsExportUrl("xlsx", { start_date: "2026-10-01", end_date: "2026-10-06" })).toContain("/operations/export.xlsx?");
+  });
+
   it("productionReceipt POST /api/production/receipt", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;

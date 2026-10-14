@@ -1,13 +1,14 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Item, TransactionLog } from "@/lib/api";
+import type { InventoryOperation, Item, TransactionLog } from "@/lib/api";
 import { productionApi, type TransactionDisplayGroupPage } from "@/lib/api/production";
 import { queryKeys } from "@/lib/queries/keys";
 import { InventoryRecentHistoryPanel } from "../InventoryRecentHistoryPanel";
 
 const clients: QueryClient[] = [];
 const getPage = vi.spyOn(productionApi, "getTransactionDisplayGroups");
+const getDetail = vi.spyOn(productionApi, "getInventoryOperation");
 const realtimeState = vi.hoisted(() => ({ revision: null as number | null }));
 vi.mock("@/lib/queries/realtime", () => ({ useRealtimeRevision: () => realtimeState.revision }));
 
@@ -40,10 +41,107 @@ function renderPanel(item = makeItem(), mobilePresentation = false) {
   };
 }
 
-beforeEach(() => { realtimeState.revision = null; getPage.mockReset().mockResolvedValue(makePage([])); });
+beforeEach(() => { realtimeState.revision = null; getPage.mockReset().mockResolvedValue(makePage([])); getDetail.mockReset(); });
 afterEach(() => { clients.splice(0).forEach((client) => client.clear()); });
 
 describe("InventoryRecentHistoryPanel", () => {
+  it.each([false, true])("다품목 묶음의 최근 목록은 현재 품목만 표시하고 상세는 전체 작업을 유지한다 mobile=%s", async (mobile) => {
+    const quantities = { normal: 7, defect: 0, b_grade: 0, obsolete: 0 };
+    const observations = ["item-1", "item-2"].map((itemId, index) => ({
+      rowType: "STOCKTAKE_OBSERVATION" as const, applicationId: "application", countId: `count-${index}`, confirmationRevisionId: `revision-${index}`,
+      itemId, itemName: index === 0 ? "현재 관측 품목" : "다른 관측 품목", mesCode: `M${index}`, scopeKey: "warehouse", beforeQuantities: quantities,
+      afterQuantities: quantities, reservations: { ...quantities, normal: 0 }, observationEpochBefore: 1, observationEpochAfter: 2, unit: "EA",
+    }));
+    const logs = [makeLog({ produced_by: "현재 거래", operation_id: "batch-operation" }), makeLog({ log_id: "other-log", item_id: "item-2", produced_by: "다른 거래", operation_id: "batch-operation" })];
+    getPage.mockResolvedValue({ groups: [
+      { type: "operation", key: "observation", logs: [], stocktake: { operationId: "observation", createdAt: "2026-10-06T00:00:00Z", actorName: "실사 담당", department: "창고", itemCount: 2, matchedItemCount: 1, matchedItemIds: ["item-1"], changedItemCount: 0, unchangedItemCount: 2, observations } },
+      { type: "batch", key: "batch", logs },
+    ], nextCursor: null, hasMore: false });
+    const base = { operationId: "observation", kind: "BUSINESS", domain: "inventory", action: "apply", displayLabel: "전체 작업", effectiveStatus: "active", actorEmployeeId: null, actorName: "실사 담당", department: "창고", reason: null, effectiveAt: "2026-10-06T00:00:00Z", reversesOperationId: null, reversalOperationId: null, canCancel: false, cancelBlockers: [], lines: [], matchingLines: [], effects: [] } as InventoryOperation;
+    getDetail.mockImplementation(async (id) => id === "observation" ? { ...base, observationLines: observations } : {
+      ...base, operationId: id, lines: logs.map((log, index) => ({ logId: log.log_id, itemId: log.item_id, itemName: index === 0 ? "현재 거래 품목" : "다른 거래 품목", quantityBefore: 1, quantityAfter: 2, quantityChange: 1 } as InventoryOperation["lines"][number])),
+    });
+    renderPanel(makeItem(), mobile);
+    await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(2));
+    expect(screen.getByText("조립 · 현재 거래")).toBeVisible();
+    expect(screen.queryByText("조립 · 다른 거래")).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "작업 상세 보기" })[0]);
+    expect(await screen.findByRole("table", { name: "현재 관측 품목 실사 관측" })).toBeVisible();
+    expect(screen.getByRole("table", { name: "다른 관측 품목 실사 관측" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "목록으로" }));
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    fireEvent.click(screen.getAllByRole("button", { name: "작업 상세 보기" })[1]);
+    expect(await screen.findByText("현재 거래 품목")).toBeVisible();
+    expect(screen.getByText("다른 거래 품목")).toBeVisible();
+    expect(getDetail).toHaveBeenCalledWith("batch-operation", expect.anything());
+  });
+
+  it.each([false, true])("상세에서 돌아오면 읽은 페이지를 보존한다 mobile=%s", async (mobile) => {
+    getPage.mockResolvedValueOnce(makePage([makeLog()], "next"))
+      .mockResolvedValueOnce(makePage([makeLog({ log_id: "second", operation_id: "op-second" })]));
+    getDetail.mockRejectedValueOnce(new Error("상세 조회 실패"));
+    const { container } = renderPanel(makeItem(), mobile);
+    await screen.findByRole("button", { name: "작업 상세 보기" });
+    fireEvent.click(screen.getByRole("button", { name: "더 보기" }));
+    await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(2));
+    fireEvent.click(screen.getAllByRole("button", { name: "작업 상세 보기" })[1]);
+    expect(await screen.findByRole("alert")).toHaveTextContent("상세 조회 실패");
+    expect(container.firstChild).toHaveClass("inventory-recent-panel");
+    fireEvent.click(screen.getByRole("button", { name: "목록으로" }));
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(getPage).toHaveBeenCalledTimes(2);
+  });
+
+  it("품목 A에서 B를 거쳐 A로 돌아와도 실제 상세 선택을 초기화한다", async () => {
+    getPage.mockImplementation(async (params) => makePage([makeLog({ item_id: params?.itemId })]));
+    getDetail.mockRejectedValue(new Error("상세 오류"));
+    const view = renderPanel();
+    fireEvent.click(await screen.findByRole("button", { name: "작업 상세 보기" }));
+    await screen.findByRole("alert");
+    view.changeItem(makeItem("item-2"));
+    await screen.findByRole("button", { name: "작업 상세 보기" });
+    view.changeItem(makeItem());
+    expect(await screen.findByRole("button", { name: "작업 상세 보기" })).toBeVisible();
+    expect(screen.queryByRole("region", { name: "통합 작업 상세" })).not.toBeInTheDocument();
+  });
+
+  it("작업 전용 정정을 목록에 표시하고 실제 작업 ID로 상세를 연다", async () => {
+    const operation = { operationId: "correction", displayLabel: "업무 정정", effectiveAt: "2026-10-06T00:00:00Z", actorName: "김작업", department: "조립", effectiveStatus: "active", lines: [], matchingLines: [], effects: [], businessCorrection: { correctionId: "c", sourceType: "InventoryOperation", sourceId: "original", sourceOperationIds: ["original"] } } as unknown as InventoryOperation;
+    getPage.mockResolvedValue({ groups: [{ type: "operation", key: "correction", logs: [], operation }], hasMore: false, nextCursor: null });
+    getDetail.mockRejectedValue(new Error("정정 상세 오류"));
+    renderPanel();
+    expect(await screen.findByText("업무 정정 · 수량 변동 없음")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "작업 상세 보기" }));
+    await screen.findByRole("alert");
+    expect(getDetail).toHaveBeenCalledWith("correction", expect.objectContaining({ signal: expect.any(AbortSignal) }));
+  });
+
+  it("거래 없는 실사 관측도 관측 작업 ID로 상세를 연다", async () => {
+    const quantities = { normal: 7, defect: 0, b_grade: 0, obsolete: 0 };
+    getPage.mockResolvedValue({ groups: [{ type: "operation", key: "observation", logs: [], stocktake: {
+      operationId: "observation", createdAt: "2026-10-06T00:00:00Z", actorName: "실사 담당", department: "창고",
+      itemCount: 1, matchedItemCount: 1, matchedItemIds: ["item-1"], changedItemCount: 0, unchangedItemCount: 1,
+      observations: [{ rowType: "STOCKTAKE_OBSERVATION", applicationId: "a", countId: "c", confirmationRevisionId: "r", itemId: "item-1", itemName: "실사 품목", mesCode: "M1", scopeKey: "warehouse", beforeQuantities: quantities, afterQuantities: quantities, reservations: { ...quantities, normal: 0 }, observationEpochBefore: 1, observationEpochAfter: 2, unit: "EA" }],
+    } }], hasMore: false, nextCursor: null });
+    getDetail.mockRejectedValue(new Error("관측 상세"));
+    renderPanel();
+    fireEvent.click(await screen.findByRole("button", { name: "작업 상세 보기" }));
+    await screen.findByRole("alert");
+    expect(getDetail).toHaveBeenCalledWith("observation", expect.anything());
+  });
+
+  it("상세를 보는 동안에도 목록 쿼리 관측자를 유지해 갱신 결과로 돌아온다", async () => {
+    getPage.mockResolvedValue(makePage([makeLog()]));
+    getDetail.mockRejectedValue(new Error("상세 오류"));
+    const { client } = renderPanel();
+    fireEvent.click(await screen.findByRole("button", { name: "작업 상세 보기" }));
+    await screen.findByRole("alert");
+    getPage.mockResolvedValue(makePage([makeLog({ produced_by: "상세 중 갱신" })]));
+    await act(async () => { await client.invalidateQueries({ queryKey: queryKeys.transactions.all }); });
+    fireEvent.click(screen.getByRole("button", { name: "목록으로" }));
+    expect(await screen.findByText("조립 · 상세 중 갱신")).toBeVisible();
+    expect(getPage).toHaveBeenCalledTimes(2);
+  });
   it("첫 조회 중 실시간 변경이 발생하면 변경 전 응답을 최신 내역으로 확정하지 않는다", async () => {
     let finish!: (page: TransactionDisplayGroupPage) => void;
     getPage.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
@@ -91,7 +189,7 @@ describe("InventoryRecentHistoryPanel", () => {
     renderPanel(makeItem(), mobile);
     await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(10));
     expect(screen.queryByText(/^(현재|전체) \d+건 표시$/)).not.toBeInTheDocument();
-    expect(getPage.mock.calls[0][0]).toEqual({ itemId: "item-1", limit: 10, cursor: null });
+    expect(getPage.mock.calls[0][0]).toEqual({ itemId: "item-1", includeOperationOnly: true, limit: 10, cursor: null });
     fireEvent.click(screen.getByRole("button", { name: "더 보기" }));
     await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(16));
     expect(screen.queryByRole("button", { name: "더 보기" })).not.toBeInTheDocument();
@@ -166,7 +264,7 @@ describe("InventoryRecentHistoryPanel", () => {
     await act(async () => finish(makePage([makeLog({ log_id: "late", produced_by: "늦은 응답" })])));
     expect(screen.queryByText("조립 · 이전 품목")).not.toBeInTheDocument();
     expect(screen.queryByText("조립 · 늦은 응답")).not.toBeInTheDocument();
-    expect(getPage.mock.calls[2][0]).toEqual({ itemId: "item-2", limit: 10, cursor: null });
+    expect(getPage.mock.calls[2][0]).toEqual({ itemId: "item-2", includeOperationOnly: true, limit: 10, cursor: null });
   });
 
   it("신규 작업 무효화 후 조회한 페이지를 새 커서로 갱신하고 실패 시 기존 이력을 유지한다", async () => {

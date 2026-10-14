@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
-import type { Item, TransactionLog, TransactionType } from "@/lib/api";
+import { useMemo, useState, type ReactNode } from "react";
+import type { InventoryOperation, Item, TransactionLog, TransactionType } from "@/lib/api";
 import type { TransactionDisplayGroupPage } from "@/lib/api/production";
 import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -14,19 +14,34 @@ import { getHistoryListOperationLabel } from "../_history_sections/historyPresen
 import { FlowBadge, StockSnapshotContent } from "../_history_sections/historyTableHelpers";
 import { isReworkOperation } from "../_history_sections/transactionTaxonomy";
 import mobileStyles from "./InventoryRecentHistoryPanel.module.css";
+import { historyDisplayLogs } from "../_history_sections/stocktakeHistory";
+import { historyOperationColor } from "../_history_sections/historyOperationSource";
+import { InventoryOperationDetail, operationSummary } from "../_history_sections/InventoryOperationDetail";
 
-/** 작업의 모든 거래를 보존하고 화면에는 중복 없이 입출고 내역과 같은 날짜순으로 표시한다. */
-function getRecentLogs(pages: TransactionDisplayGroupPage[]): TransactionLog[] {
+type RecentEntry = { key: string; effectiveAt: string; createdAt: string } & (
+  { log: TransactionLog; operation?: never } | { log?: never; operation: InventoryOperation }
+);
+
+/** 전체 작업 중 현재 품목의 행만 중복 없이 날짜순으로 표시한다. */
+function getRecentEntries(pages: TransactionDisplayGroupPage[], itemId: string): RecentEntry[] {
   const logs = new Map<string, TransactionLog>();
+  const operations = new Map<string, InventoryOperation>();
   for (const page of pages) {
-    for (const group of page.groups) {
-      for (const log of group.logs) logs.set(log.log_id, log);
+    for (const log of historyDisplayLogs(page.groups)) {
+      if (log.item_id === itemId) logs.set(log.log_id, log);
     }
+    for (const group of page.groups) if (group.operation) operations.set(group.operation.operationId, group.operation);
   }
-  return [...logs.values()].sort((left, right) =>
-    parseUtc(right.requested_at ?? right.created_at).getTime() - parseUtc(left.requested_at ?? left.created_at).getTime()
-    || parseUtc(right.created_at).getTime() - parseUtc(left.created_at).getTime()
-    || right.log_id.localeCompare(left.log_id),
+  const representedIds = new Set([...logs.values()].map(log => log.operation_id));
+  const entries: RecentEntry[] = [
+    ...[...logs.values()].map(log => ({ key: log.log_id, effectiveAt: log.requested_at ?? log.created_at, createdAt: log.created_at, log })),
+    ...[...operations.values()].filter(operation => !representedIds.has(operation.operationId))
+      .map(operation => ({ key: operation.operationId, effectiveAt: operation.effectiveAt, createdAt: operation.effectiveAt, operation })),
+  ];
+  return entries.sort((left, right) =>
+    parseUtc(right.effectiveAt).getTime() - parseUtc(left.effectiveAt).getTime()
+    || parseUtc(right.createdAt).getTime() - parseUtc(left.createdAt).getTime()
+    || right.key.localeCompare(left.key),
   );
 }
 
@@ -52,6 +67,7 @@ function RecentLine({
   effectiveAt,
   cancelled,
   mobilePresentation = false,
+  onSelect,
 }: {
   type: TransactionType;
   label: string;
@@ -60,8 +76,9 @@ function RecentLine({
   effectiveAt: string;
   cancelled: boolean;
   mobilePresentation?: boolean;
+  onSelect: (id: string) => void;
 }): ReactNode {
-  const color = log && isReworkOperation(log) ? LEGACY_COLORS.red : transactionColor(type);
+  const color = log && isReworkOperation(log) ? LEGACY_COLORS.red : log ? historyOperationColor(log, type) : transactionColor(type);
   return (
     <li data-cancelled={cancelled || undefined}>
       <div className="inventory-recent-main">
@@ -74,17 +91,31 @@ function RecentLine({
           {cancelled && <span className="inventory-recent-cancelled">취소된 작업</span>}
         </div>
         <StockSnapshotContent log={log} emptyLogLabel="기록 없음" variant="panel" expandableUnavailableReason={mobilePresentation} />
+        {log?.operation_id && <Button variant="ghost" className="min-h-11 text-sm" onClick={() => onSelect(log.operation_id!)}>작업 상세 보기</Button>}
       </div>
     </li>
   );
 }
 
-function HistoryRows({ logs, mobilePresentation }: { logs: TransactionLog[]; mobilePresentation: boolean }): ReactNode {
+function HistoryRows({ entries, mobilePresentation, onSelect }: { entries: RecentEntry[]; mobilePresentation: boolean; onSelect: (id: string) => void }): ReactNode {
   return (
     <ul className="inventory-recent">
-      {logs.map((log) => (
+      {entries.map((entry) => {
+        const operation = entry.operation;
+        if (operation) return <li key={entry.key} data-cancelled={operation.effectiveStatus === "cancelled" || undefined}>
+        <div className="inventory-recent-main"><strong>{normalizeHistoryLabel(operation.displayLabel)}</strong><time dateTime={entry.effectiveAt}>{formatHistoryDate(entry.effectiveAt)}</time></div>
+        <div className="inventory-recent-body">
+          <p>{operationSummary(operation)}</p>
+          <div className="inventory-recent-meta">{[operation.department, operation.actorName].filter(Boolean).join(" · ")}</div>
+          {operation.effectiveStatus === "cancelled" && <span className="inventory-recent-cancelled">취소된 작업</span>}
+          <Button variant="ghost" className="min-h-11 text-sm" onClick={() => onSelect(operation.operationId)}>작업 상세 보기</Button>
+        </div>
+      </li>;
+        const log = entry.log!;
+        return (
         <RecentLine
           key={log.log_id}
+          onSelect={onSelect}
           mobilePresentation={mobilePresentation}
           type={log.transaction_type}
           label={getHistoryLabel(log)}
@@ -95,30 +126,36 @@ function HistoryRows({ logs, mobilePresentation }: { logs: TransactionLog[]; mob
           effectiveAt={log.requested_at ?? log.created_at}
           cancelled={log.cancelled || log.operation_effective_status === "cancelled"}
         />
-      ))}
+      ); })}
     </ul>
   );
 }
 
 export function InventoryRecentHistoryPanel({ item, mobilePresentation = false }: { item: Item; mobilePresentation?: boolean }): ReactNode {
   const query = useItemHistoryPagesQuery(item.item_id);
-  const logs = useMemo(() => getRecentLogs(query.data?.pages ?? []), [query.data]);
+  const [selection, setSelection] = useState<{ itemId: string; operationId: string | null }>({ itemId: item.item_id, operationId: null });
+  // 품목이 바뀌면 선택 자체를 지워 A→B→A에서도 이전 상세가 다시 열리지 않는다.
+  if (selection.itemId !== item.item_id) setSelection({ itemId: item.item_id, operationId: null });
+  const selectOperation = (operationId: string | null): void => setSelection({ itemId: item.item_id, operationId });
+  const entries = useMemo(() => getRecentEntries(query.data?.pages ?? [], item.item_id), [query.data, item.item_id]);
   const errorMessage = query.error?.message || "잠시 후 다시 시도해 주세요.";
   const loadMore = (): void => {
     if (query.hasNextPage && !query.isFetching) void query.fetchNextPage({ cancelRefetch: false });
   };
 
   let content: ReactNode;
-  if (query.isPending) {
+  if (selection.itemId === item.item_id && selection.operationId) {
+    content = <InventoryOperationDetail operationId={selection.operationId} onBack={() => selectOperation(null)} onNavigate={selectOperation} />;
+  } else if (query.isPending) {
     content = <LoadingSkeleton rows={3} />;
   } else if (query.isError && !query.data) {
     content = <LoadFailureCard prefix="최근 입출고 내역을 불러오지 못했습니다" message={errorMessage} comfortable retryLabel="다시 시도" onRetry={() => void query.refetch()} />;
-  } else if (logs.length === 0 && !query.isError) {
+  } else if (entries.length === 0 && !query.isError) {
     content = <EmptyState compact illustrated className="inventory-recent-empty" title="최근 입출고 내역이 없습니다." description="" />;
   } else {
     content = (
       <div className="inventory-recent-groups">
-        <HistoryRows logs={logs} mobilePresentation={mobilePresentation} />
+        <HistoryRows entries={entries} mobilePresentation={mobilePresentation} onSelect={selectOperation} />
         {query.isError && <LoadFailureCard
           prefix={query.isFetchNextPageError ? "다음 내역을 불러오지 못했습니다" : "내역을 새로고침하지 못했습니다"}
           message={errorMessage} comfortable retryLabel="다시 시도"

@@ -39,6 +39,8 @@ export interface HistoryBatchProjection {
 }
 
 export interface TransactionLog {
+  /** Read-only observation projection; its ID is never a physical transaction ID. */
+  stocktake_history?: { work: import("../production").StocktakeHistoryWork; line: InventoryObservationLine & { unit?: string }; selection: "work" | "item" };
   log_id: string;
   item_id: string;
   mes_code: string | null;
@@ -78,6 +80,8 @@ export interface TransactionLog {
   operation_id?: string | null;
   operation_role?: string | null;
   operation_kind?: "BUSINESS" | "CANCELLATION" | null;
+  operation_domain?: string | null;
+  operation_action?: string | null;
   operation_display_label?: string | null;
   operation_effective_status?: "active" | "cancelled" | "cancellation" | null;
   reversal_operation_id?: string | null;
@@ -126,6 +130,47 @@ export interface InventoryOperationEffect {
   reversesEffectId: string | null;
 }
 
+export type InventoryObservationQuantities = Record<"normal" | "defect" | "b_grade" | "obsolete", number>;
+
+export interface InventoryObservationLine {
+  rowType: "STOCKTAKE_OBSERVATION";
+  applicationId: string;
+  countId: string;
+  confirmationRevisionId: string;
+  itemId: string;
+  itemName: string | null;
+  mesCode: string | null;
+  scopeKey: string;
+  beforeQuantities: InventoryObservationQuantities;
+  afterQuantities: InventoryObservationQuantities;
+  reservations: InventoryObservationQuantities;
+  observationEpochBefore: number;
+  observationEpochAfter: number;
+}
+
+export interface InventoryBusinessCorrection {
+  correctionId: string;
+  sourceType: string;
+  sourceId: string;
+  sourceOperationId: string | null;
+  sourceOperationIds: string[];
+}
+
+export interface InventoryPoolMovement {
+  movementId: string;
+  poolId: string;
+  itemId: string;
+  itemName?: string | null;
+  mesCode?: string | null;
+  physicalDepartment?: string | null;
+  scopeKey: string;
+  category: string;
+  delta: number;
+  beforeQuantity: number;
+  afterQuantity: number;
+  reason: string | null;
+}
+
 export interface InventoryOperation {
   operationId: string;
   kind: "BUSINESS" | "CANCELLATION";
@@ -145,6 +190,10 @@ export interface InventoryOperation {
   lines: InventoryOperationLine[];
   matchingLines: InventoryOperationLine[];
   effects: InventoryOperationEffect[];
+  observationLines?: InventoryObservationLine[];
+  matchingObservationLines?: InventoryObservationLine[];
+  businessCorrection?: InventoryBusinessCorrection | null;
+  poolMovements?: InventoryPoolMovement[];
 }
 
 export interface InventoryOperationPage {
@@ -172,6 +221,8 @@ export interface InventoryOperationCancellationPreview {
   cells: InventoryOperationCancellationCell[];
   defectRecords: Array<Record<string, unknown>>;
   effects: Array<Record<string, unknown>>;
+  poolEffects?: Array<Record<string, unknown>>;
+  blockerCode?: string | null;
 }
 
 /** 거래 수정 이력 (3차 메타 수정 + 4차 수량 보정 공통). */

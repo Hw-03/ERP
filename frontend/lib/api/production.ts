@@ -1,10 +1,5 @@
 /**
- * Production / History (transactions) / Exports — `@/lib/api/production`.
- *
- * Round-6 (R6-D7) 분리. 9 메소드:
- *   Production: productionReceipt / checkProduction / getProductionCapacity
- *   Transactions: getTransactions / metaEditTransaction / getTransactionEdits / quantityCorrectTransaction
- *   Exports: getItemsExportUrl / getTransactionsExportUrl
+ * 생산, 수량 이력, 통합 작업과 내보내기 — `@/lib/api/production`.
  */
 
 import { fetcher, postJson, toApiUrl } from "../api-core";
@@ -19,6 +14,10 @@ import type {
   InventoryOperationLine,
   InventoryOperationPage,
   InventoryOperationCancellationPreview,
+  InventoryObservationLine,
+  InventoryObservationQuantities,
+  InventoryBusinessCorrection,
+  InventoryPoolMovement,
 } from "./types";
 
 /** 입출고 내역 KPI 응답 — 카운트 4개. */
@@ -74,6 +73,16 @@ export interface TransactionDisplayGroup {
   logs: TransactionLog[];
   matchedLogIds?: string[] | null;
   workGroups?: TransactionDisplayGroup[];
+  stocktake?: StocktakeHistoryWork | null;
+  operation?: InventoryOperation | null;
+}
+
+export interface StocktakeHistoryWork {
+  operationId: string; createdAt: string; actorName: string; department: string;
+  itemCount: number; matchedItemCount: number; matchedItemIds: string[];
+  filteredMembers?: boolean;
+  changedItemCount: number; unchangedItemCount: number;
+  observations: (InventoryObservationLine & { unit: string })[];
 }
 
 export interface TransactionDisplayGroupPage {
@@ -82,9 +91,10 @@ export interface TransactionDisplayGroupPage {
   hasMore: boolean;
 }
 
-type TransactionDisplayGroupWire = Omit<TransactionDisplayGroup, "matchedLogIds" | "workGroups"> & {
+type TransactionDisplayGroupWire = Omit<TransactionDisplayGroup, "matchedLogIds" | "workGroups" | "operation"> & {
   matched_log_ids?: string[] | null;
   work_groups?: TransactionDisplayGroupWire[];
+  operation?: InventoryOperationWire | null;
 };
 
 type InventoryOperationLineWire = {
@@ -106,6 +116,22 @@ type InventoryOperationLineWire = {
   history_log?: TransactionLog | null;
 };
 
+type InventoryObservationLineWire = {
+  row_type: "STOCKTAKE_OBSERVATION";
+  application_id: string;
+  count_id: string;
+  confirmation_revision_id: string;
+  item_id: string;
+  item_name: string | null;
+  mes_code: string | null;
+  scope_key: string;
+  before_quantities: InventoryObservationQuantities;
+  after_quantities: InventoryObservationQuantities;
+  reservations: InventoryObservationQuantities;
+  observation_epoch_before: number;
+  observation_epoch_after: number;
+};
+
 type InventoryOperationWire = {
   operation_id: string;
   kind: "BUSINESS" | "CANCELLATION";
@@ -124,6 +150,29 @@ type InventoryOperationWire = {
   cancel_blockers: string[];
   lines: InventoryOperationLineWire[];
   matching_lines: InventoryOperationLineWire[];
+  observation_lines?: InventoryObservationLineWire[];
+  matching_observation_lines?: InventoryObservationLineWire[];
+  business_correction?: {
+    correction_id: string;
+    source_type: string;
+    source_id: string;
+    source_operation_id: string | null;
+    source_operation_ids: string[];
+  } | null;
+  pool_movements?: Array<{
+    movement_id: string;
+    pool_id: string;
+    item_id: string;
+    item_name?: string | null;
+    mes_code?: string | null;
+    physical_department?: string | null;
+    scope_key: string;
+    category: string;
+    delta: number;
+    before_quantity: number;
+    after_quantity: number;
+    reason: string | null;
+  }>;
   effects: Array<{
     effect_id: string;
     effect_kind: string;
@@ -154,6 +203,8 @@ type InventoryOperationCancellationPreviewWire = {
   }>;
   defect_records: Array<Record<string, unknown>>;
   effects: Array<Record<string, unknown>>;
+  pool_effects?: Array<Record<string, unknown>>;
+  blocker_code?: string | null;
 };
 
 function mapWire<T>(wire: object): T {
@@ -166,7 +217,14 @@ function mapWire<T>(wire: object): T {
 }
 
 function mapDisplayGroup(group: TransactionDisplayGroupWire): TransactionDisplayGroup {
-  return { ...mapWire<TransactionDisplayGroup>(group), workGroups: (group.work_groups ?? []).map(mapDisplayGroup) };
+  const result = { ...mapWire<TransactionDisplayGroup>(group), workGroups: (group.work_groups ?? []).map(mapDisplayGroup) };
+  if (group.stocktake) {
+    const work = mapWire<StocktakeHistoryWork>(group.stocktake);
+    work.observations = (group.stocktake as unknown as { observations: object[] }).observations.map(row => mapWire<StocktakeHistoryWork["observations"][number]>(row));
+    result.stocktake = work;
+  }
+  if (group.operation) result.operation = mapInventoryOperation(group.operation);
+  return result;
 }
 
 function apiQuery<T extends object>(path: string, params?: T): string {
@@ -188,6 +246,10 @@ function mapInventoryOperation(operation: InventoryOperationWire): InventoryOper
   mapped.lines = operation.lines.map(mapLine);
   mapped.matchingLines = operation.matching_lines.map(mapLine);
   mapped.effects = operation.effects.map((effect) => mapWire(effect));
+  mapped.observationLines = (operation.observation_lines ?? []).map((line) => mapWire<InventoryObservationLine>(line));
+  mapped.matchingObservationLines = (operation.matching_observation_lines ?? []).map((line) => mapWire<InventoryObservationLine>(line));
+  mapped.businessCorrection = operation.business_correction ? mapWire<InventoryBusinessCorrection>(operation.business_correction) : null;
+  mapped.poolMovements = (operation.pool_movements ?? []).map((movement) => mapWire<InventoryPoolMovement>(movement));
   return mapped;
 }
 
@@ -208,6 +270,12 @@ export const productionApi = {
       apiQuery("/api/inventory/transactions/display-calendar", params), opts?.signal,
     ).then(data => ({ days: Object.fromEntries(Object.entries(data.days).map(([day, counts]) =>
       [day, mapWire<TransactionDisplayCalendarDay>(counts)])), months: data.months })),
+  getInventoryOperation: (operationId: string, opts?: { signal?: AbortSignal }): Promise<InventoryOperation> =>
+    fetcher<InventoryOperationWire>(toApiUrl(`/api/inventory/operations/${encodeURIComponent(operationId)}`), opts?.signal).then(mapInventoryOperation),
+
+  getInventoryOperationsExportUrl: (format: "csv" | "xlsx", params: { start_date: string; end_date: string }): string =>
+    apiQuery(`/api/inventory/operations/export.${format}`, params),
+
   getInventoryOperations: (
     params?: { itemId?: string; limit?: number; cursor?: string | null },
     opts?: { signal?: AbortSignal },
@@ -328,6 +396,7 @@ export const productionApi = {
       dateFrom?: string;
       dateTo?: string;
       includeArchived?: boolean;
+      includeOperationOnly?: boolean;
       limit?: number;
       cursor?: string | null;
     },
