@@ -3449,6 +3449,63 @@
         "title": "DeptAdjSubmitRequest",
         "type": "object"
       },
+      "DisplayCalendarDayResponse": {
+        "description": "Counts whole visible work units, not quantities or physical log rows.",
+        "properties": {
+          "adjust_count": {
+            "default": 0,
+            "title": "Adjust Count",
+            "type": "integer"
+          },
+          "dept_count": {
+            "default": 0,
+            "title": "Dept Count",
+            "type": "integer"
+          },
+          "other_count": {
+            "default": 0,
+            "title": "Other Count",
+            "type": "integer"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          },
+          "warehouse_count": {
+            "default": 0,
+            "title": "Warehouse Count",
+            "type": "integer"
+          }
+        },
+        "title": "DisplayCalendarDayResponse",
+        "type": "object"
+      },
+      "DisplayCalendarResponse": {
+        "description": "KST day counts for the selected month and all twelve month counts.",
+        "properties": {
+          "days": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DisplayCalendarDayResponse"
+            },
+            "title": "Days",
+            "type": "object"
+          },
+          "months": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Months",
+            "type": "object"
+          }
+        },
+        "required": [
+          "days",
+          "months"
+        ],
+        "title": "DisplayCalendarResponse",
+        "type": "object"
+      },
       "EmployeeAppearanceResponse": {
         "properties": {
           "employee_id": {
@@ -20330,6 +20387,187 @@
         ]
       }
     },
+    "/api/inventory/transactions/display-calendar": {
+      "get": {
+        "description": "Aggregate list work metadata in KST without page limits or quantity hydration.",
+        "operationId": "get_transaction_display_calendar_api_inventory_transactions_display_calendar_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "maximum": 2100,
+              "minimum": 2020,
+              "title": "Year",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "maximum": 12,
+              "minimum": 1,
+              "title": "Month",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "transaction_types",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Transaction Types"
+            }
+          },
+          {
+            "in": "query",
+            "name": "operation_keys",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Operation Keys"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "in": "query",
+            "name": "department",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Department"
+            }
+          },
+          {
+            "in": "query",
+            "name": "model",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model"
+            }
+          },
+          {
+            "in": "query",
+            "name": "process_step",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Process Step"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Archived",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "등록·요청 직원 ID로 내역 조회",
+            "in": "query",
+            "name": "requester_employee_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "등록·요청 직원 ID로 내역 조회",
+              "title": "Requester Employee Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisplayCalendarResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Transaction Display Calendar",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
     "/api/inventory/transactions/display-groups": {
       "get": {
         "description": "검색 일치 로그가 속한 작업을 보존하고 완결된 그룹 단위로 반환한다.",
@@ -20541,6 +20779,25 @@
               "default": false,
               "title": "Include Archived",
               "type": "boolean"
+            }
+          },
+          {
+            "description": "등록·요청 직원 ID로 내역 조회",
+            "in": "query",
+            "name": "requester_employee_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "등록·요청 직원 ID로 내역 조회",
+              "title": "Requester Employee Id"
             }
           },
           {
@@ -21009,6 +21266,25 @@
               "title": "Include Archived",
               "type": "boolean"
             }
+          },
+          {
+            "description": "등록·요청 직원 ID로 내역 조회",
+            "in": "query",
+            "name": "requester_employee_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "등록·요청 직원 ID로 내역 조회",
+              "title": "Requester Employee Id"
+            }
           }
         ],
         "responses": {
@@ -21200,6 +21476,25 @@
               "default": false,
               "title": "Include Archived",
               "type": "boolean"
+            }
+          },
+          {
+            "description": "등록·요청 직원 ID로 내역 조회",
+            "in": "query",
+            "name": "requester_employee_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "등록·요청 직원 ID로 내역 조회",
+              "title": "Requester Employee Id"
             }
           }
         ],

@@ -132,6 +132,7 @@ export function DefectFilterBar({
         departments={departments}
         models={models}
         currentDept={currentDept}
+        showMyDepartment={false}
         selectedDepartments={activeDepartments}
         selectedModels={selectedModels}
         selectedProcessSteps={selectedProcessSteps}

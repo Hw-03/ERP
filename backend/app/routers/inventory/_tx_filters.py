@@ -21,6 +21,8 @@ from app.models import (
     IoBundle,
     IoLine,
     InventoryOperation,
+    InventoryOperationEffect,
+    InventoryOperationEffectKindEnum,
     InventoryOperationKindEnum,
     Item,
     ProductSymbol,
@@ -422,6 +424,42 @@ def _operation_keys_filter(operation_keys: Optional[str]) -> Optional[ColumnElem
     return or_(*clauses)
 
 
+def _history_requester_employee_id_expr() -> ColumnElement:
+    """승인자가 아닌 요청 직원을 찾고, 취소는 취소 등록 직원을 우선한다."""
+    operation_actor = select(InventoryOperation.actor_employee_id).where(
+        InventoryOperation.operation_id == TransactionLog.operation_id,
+    ).correlate(TransactionLog).scalar_subquery()
+    operation_kind = select(InventoryOperation.kind).where(
+        InventoryOperation.operation_id == TransactionLog.operation_id,
+    ).correlate(TransactionLog).scalar_subquery()
+    batch_requester = select(StockRequest.requester_employee_id).where(
+        StockRequest.request_id == IoBatch.stock_request_id,
+    ).correlate(IoBatch).scalar_subquery()
+    reference_requester = select(StockRequest.requester_employee_id).where(
+        StockRequest.request_code == TransactionLog.reference_no,
+    ).correlate(TransactionLog).scalar_subquery()
+    workflow_requester = select(func.max(StockRequest.requester_employee_id)).select_from(InventoryOperationEffect).join(
+        StockRequest, StockRequest.request_id == func.replace(InventoryOperationEffect.subject_id, "-", ""),
+    ).where(
+        InventoryOperationEffect.operation_id == TransactionLog.operation_id,
+        InventoryOperationEffect.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW,
+        InventoryOperationEffect.subject_type == "StockRequest",
+        InventoryOperationEffect.role == "EXECUTION_STATUS",
+    ).having(func.count(func.distinct(StockRequest.requester_employee_id)) == 1).correlate(TransactionLog).scalar_subquery()
+    # 구형 재작업의 전용 참조번호 대신 공유 제출 ID를 사용한다. 혼합 작성자는 추정하지 않는다.
+    submission_requester = select(func.max(StockRequest.requester_employee_id)).where(
+        StockRequest.submission_id == TransactionLog.submission_id,
+    ).group_by(StockRequest.submission_id).having(
+        func.count(func.distinct(StockRequest.requester_employee_id)) == 1,
+    ).correlate(TransactionLog).scalar_subquery()
+    return case(
+        (operation_kind == InventoryOperationKindEnum.CANCELLATION, operation_actor),
+        else_=func.coalesce(workflow_requester, batch_requester, reference_requester, IoBatch.requester_employee_id,
+                            submission_requester, operation_actor, TransactionLog.producer_employee_id),
+    )
+
+
+
 def _apply_common_filters(
     query: Query,
     db: Session,
@@ -435,6 +473,7 @@ def _apply_common_filters(
     date_from: Optional[date],
     date_to: Optional[date],
     include_archived: bool,
+    requester_employee_id: uuid.UUID | None = None,
 ) -> Query:
     """list_transactions / get_transactions_summary 공통 필터.
 
@@ -443,6 +482,8 @@ def _apply_common_filters(
     item_id/transaction_type/reference_no 같은 list 전용 필터는 호출부가 직접 처리.
     """
     query = query.filter(_history_visibility_filter())
+    if requester_employee_id is not None:
+        query = query.filter(_history_requester_employee_id_expr() == requester_employee_id)
     if operation_keys:
         _key_f = _operation_keys_filter(operation_keys)
         if _key_f is not None:

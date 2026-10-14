@@ -31,6 +31,32 @@ export interface TransactionSummary {
   departmentCounts: Record<string, number>;
 }
 
+export interface TransactionDisplayCalendarDay {
+  total: number;
+  warehouseCount: number;
+  deptCount: number;
+  adjustCount: number;
+  otherCount: number;
+}
+
+export interface TransactionDisplayCalendar {
+  days: Record<string, TransactionDisplayCalendarDay>;
+  months: Record<string, number>;
+}
+
+export interface TransactionDisplayCalendarParams {
+  requesterEmployeeId?: string;
+  year: number;
+  month: number;
+  search?: string;
+  department?: string;
+  model?: string;
+  processStep?: string;
+  operationKeys?: string;
+  transactionTypes?: string;
+  includeArchived?: boolean;
+}
+
 export interface TransactionReferenceSummary {
   referenceNo: string;
   shippingPhase: string | null;
@@ -174,6 +200,14 @@ function mapInventoryOperationCancellationPreview(
 }
 
 export const productionApi = {
+  getTransactionDisplayCalendar: (
+    params: TransactionDisplayCalendarParams,
+    opts?: { signal?: AbortSignal },
+  ): Promise<TransactionDisplayCalendar> =>
+    fetcher<{ days: Record<string, Record<string, number>>; months: Record<string, number> }>(
+      apiQuery("/api/inventory/transactions/display-calendar", params), opts?.signal,
+    ).then(data => ({ days: Object.fromEntries(Object.entries(data.days).map(([day, counts]) =>
+      [day, mapWire<TransactionDisplayCalendarDay>(counts)])), months: data.months })),
   getInventoryOperations: (
     params?: { itemId?: string; limit?: number; cursor?: string | null },
     opts?: { signal?: AbortSignal },
@@ -256,6 +290,7 @@ export const productionApi = {
   /** 입출고 내역 KPI 카드 — 조건 전체 카운트 (페이지네이션과 무관). */
   getTransactionsSummary: (
     params?: {
+      requesterEmployeeId?: string;
       transactionTypes?: string;
       operationKeys?: string;
       search?: string;
@@ -282,6 +317,7 @@ export const productionApi = {
 
   getTransactionDisplayGroups: (
     params?: {
+      requesterEmployeeId?: string;
       itemId?: string;
       transactionTypes?: string;
       operationKeys?: string;
@@ -313,6 +349,7 @@ export const productionApi = {
   /** 페이지네이션과 무관한 참조번호 묶음별 전체 요약. */
   getTransactionReferenceSummaries: (
     params?: {
+      requesterEmployeeId?: string;
       transactionTypes?: string;
       operationKeys?: string;
       search?: string;

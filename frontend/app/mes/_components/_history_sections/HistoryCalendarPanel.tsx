@@ -1,6 +1,7 @@
 "use client";
 
 import type { TransactionLog } from "@/lib/api";
+import type { TransactionDisplayCalendarDay } from "@/lib/api/production";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { HistoryCalendarStrip } from "./HistoryCalendarStrip";
 import type { SelectedHistoryMonth } from "./historyQuery";
@@ -22,7 +23,8 @@ export interface HistoryCalendarPanelProps {
   onSelectMonth: (month: SelectedHistoryMonth) => void;
   calendarLoading: boolean;
   calendarDays: (number | null)[];
-  calendarDayMap: Map<string, TransactionLog[]>;
+  calendarDayMap?: Map<string, TransactionLog[]>;
+  calendarDayCounts?: Record<string, TransactionDisplayCalendarDay>;
   monthlyCountMap?: Map<number, number>;
   todayKey: string;
   selectedDay: string | null;
@@ -43,6 +45,7 @@ export function HistoryCalendarPanel({
   calendarLoading,
   calendarDays,
   calendarDayMap,
+  calendarDayCounts,
   monthlyCountMap,
   todayKey,
   selectedDay,
@@ -63,6 +66,7 @@ export function HistoryCalendarPanel({
         calendarLoading={calendarLoading}
         calendarDays={calendarDays}
         calendarDayMap={calendarDayMap}
+        calendarDayCounts={calendarDayCounts}
         monthlyCountMap={monthlyCountMap}
         todayKey={todayKey}
         selectedDay={selectedDay}

@@ -9,15 +9,18 @@ import json
 import logging
 from time import perf_counter
 import uuid
-from datetime import date, datetime
+from calendar import monthrange
+from dataclasses import dataclass
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from io import StringIO
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import String, and_, case, cast, func, literal, or_, select
 from sqlalchemy.orm import Session
+from sqlalchemy.engine import Row
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.database import get_db
@@ -51,6 +54,7 @@ from app.services.pin_auth import verify_pin
 from app.utils.search import build_normalized_search_filter
 from app._actor import set_actor
 from app.routers.inventory._tx_filters import (
+    KST,
     _SUMMARY_WAREHOUSE_TYPES,
     _SUMMARY_DEPT_TYPES,
     _SUMMARY_ADJUST_TYPES,
@@ -99,6 +103,36 @@ class TransactionSummaryResponse(BaseModel):
     adjust_count: int
     # 전 거래의 실제 부서 또는 창고별 카운트 {라벨: 건수}.
     department_counts: dict[str, int] = {}
+
+
+
+class DisplayCalendarDayResponse(BaseModel):
+    """Counts whole visible work units, not quantities or physical log rows."""
+    total: int = 0
+    warehouse_count: int = 0
+    dept_count: int = 0
+    adjust_count: int = 0
+    other_count: int = 0
+
+
+
+class DisplayCalendarResponse(BaseModel):
+    """KST day counts for the selected month and all twelve month counts."""
+    days: dict[str, DisplayCalendarDayResponse]
+    months: dict[str, int]
+
+
+
+@dataclass
+class _DisplayWorkQuery:
+    """Shared lightweight grouping pass; only the list hydrates detail rows."""
+    groups: list[DisplayGroup[DisplayGroupRecord]]
+    rows: list[Row[Any]]
+    batch_map: dict[uuid.UUID, Any]
+    stock_request_map: dict[str, Any]
+    operation_map: dict[uuid.UUID, Any]
+    queried_at: float
+    matched_log_ids: Optional[set[uuid.UUID]]
 
 
 class ReferenceSummaryResponse(BaseModel):
@@ -428,30 +462,16 @@ def list_transactions(
     return result
 
 
-@router.get(
-    "/transactions/display-groups",
-    response_model=TransactionDisplayGroupPageResponse,
-)
-def list_transaction_display_groups(
-    item_id: Optional[uuid.UUID] = Query(None),
-    operation_batch_id: Optional[uuid.UUID] = Query(None),
-    transaction_type: Optional[TransactionTypeEnum] = Query(None),
-    transaction_types: Optional[str] = Query(None),
-    operation_keys: Optional[str] = Query(None, description=OPERATION_KEYS_DESCRIPTION),
-    reference_no: Optional[str] = Query(None),
-    search: Optional[str] = Query(None),
-    department: Optional[str] = Query(None),
-    model: Optional[str] = Query(None),
-    process_step: Optional[str] = Query(None),
-    date_from: Optional[date] = Query(None),
-    date_to: Optional[date] = Query(None),
-    include_archived: bool = Query(False),
-    cursor: Optional[str] = Query(None),
-    limit: int = Query(DISPLAY_GROUP_PAGE_SIZE, ge=1, le=DISPLAY_GROUP_PAGE_SIZE),
-    db: Session = Depends(get_db),
-) -> TransactionDisplayGroupPageResponse:
-    """검색 일치 로그가 속한 작업을 보존하고 완결된 그룹 단위로 반환한다."""
-    started = perf_counter()
+def _load_display_work_groups(
+    db: Session, *, item_id: Optional[uuid.UUID] = None,
+    operation_batch_id: Optional[uuid.UUID] = None, transaction_type: Optional[TransactionTypeEnum] = None,
+    transaction_types: Optional[str] = None, operation_keys: Optional[str] = None,
+    reference_no: Optional[str] = None, search: Optional[str] = None, department: Optional[str] = None,
+    model: Optional[str] = None, process_step: Optional[str] = None,
+    date_from: Optional[date] = None, date_to: Optional[date] = None, include_archived: bool = False,
+    requester_employee_id: Optional[uuid.UUID] = None,
+) -> _DisplayWorkQuery:
+    """Keep list and calendar work identity and search membership identical."""
     query = (
         db.query(TransactionLog)
         .join(Item, TransactionLog.item_id == Item.item_id)
@@ -478,6 +498,7 @@ def list_transaction_display_groups(
         date_from=date_from,
         date_to=date_to,
         include_archived=include_archived,
+        requester_employee_id=requester_employee_id,
     )
     search_filter = _history_search_filter(search)
     matched_log_ids = (
@@ -494,6 +515,8 @@ def list_transaction_display_groups(
         TransactionLog.produced_by, TransactionLog.department,
         TransactionLog.reason_category, TransactionLog.reason_memo,
         requested_at_order.label("request_order_at"),
+        IoBatch.sub_type.label("batch_sub_type"), IoBatch.work_type.label("batch_work_type"),
+        _department_label_expr().label("history_department"),
     ).order_by(
         requested_at_order.desc(), TransactionLog.created_at.desc(), TransactionLog.log_id.desc(),
     ).all()
@@ -528,6 +551,44 @@ def list_transaction_display_groups(
     groups = group_display_records(records, include_submissions=True)
     if matched_log_ids is not None:
         groups = [group for group in groups if any(log.log_id in matched_log_ids for log in group.logs)]
+    return _DisplayWorkQuery(groups, rows, batch_map, stock_request_map, operation_map, queried_at, matched_log_ids)
+
+
+
+@router.get(
+    "/transactions/display-groups",
+    response_model=TransactionDisplayGroupPageResponse,
+)
+def list_transaction_display_groups(
+    item_id: Optional[uuid.UUID] = Query(None),
+    operation_batch_id: Optional[uuid.UUID] = Query(None),
+    transaction_type: Optional[TransactionTypeEnum] = Query(None),
+    transaction_types: Optional[str] = Query(None),
+    operation_keys: Optional[str] = Query(None, description=OPERATION_KEYS_DESCRIPTION),
+    reference_no: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    department: Optional[str] = Query(None),
+    model: Optional[str] = Query(None),
+    process_step: Optional[str] = Query(None),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    include_archived: bool = Query(False),
+    requester_employee_id: Optional[uuid.UUID] = Query(None, description="등록·요청 직원 ID로 내역 조회"),
+    cursor: Optional[str] = Query(None),
+    limit: int = Query(DISPLAY_GROUP_PAGE_SIZE, ge=1, le=DISPLAY_GROUP_PAGE_SIZE),
+    db: Session = Depends(get_db),
+) -> TransactionDisplayGroupPageResponse:
+    """검색 일치 로그가 속한 작업을 보존하고 완결된 그룹 단위로 반환한다."""
+    started = perf_counter()
+    data = _load_display_work_groups(db, item_id=item_id, operation_batch_id=operation_batch_id,
+        transaction_type=transaction_type, transaction_types=transaction_types, operation_keys=operation_keys,
+        reference_no=reference_no, search=search, department=department, model=model, process_step=process_step,
+        date_from=date_from, date_to=date_to, include_archived=include_archived,
+        requester_employee_id=requester_employee_id)
+    groups, rows = data.groups, data.rows
+    batch_map, stock_request_map, operation_map = data.batch_map, data.stock_request_map, data.operation_map
+    queried_at, matched_log_ids = data.queried_at, data.matched_log_ids
+    requested_at_order = _history_request_date_expr()
     if cursor:
         cursor_value = _decode_display_group_cursor(cursor)
         groups = [group for group in groups if _is_after_display_group_cursor(group, cursor_value)]
@@ -616,6 +677,7 @@ def list_reference_summaries(
     date_from: Optional[date] = Query(None, description="포함 시작일 YYYY-MM-DD"),
     date_to: Optional[date] = Query(None, description="포함 종료일 YYYY-MM-DD"),
     include_archived: bool = Query(False),
+    requester_employee_id: Optional[uuid.UUID] = Query(None, description="등록·요청 직원 ID로 내역 조회"),
     db: Session = Depends(get_db),
 ):
     """페이지네이션과 무관하게 참조번호 묶음의 전체 수량을 반환한다."""
@@ -636,6 +698,7 @@ def list_reference_summaries(
         date_from=date_from,
         date_to=date_to,
         include_archived=include_archived,
+        requester_employee_id=requester_employee_id,
     ).filter(
         TransactionLog.operation_batch_id.is_(None),
         TransactionLog.reference_no.isnot(None),
@@ -670,6 +733,78 @@ def list_reference_summaries(
     ]
 
 
+def _display_work_categories(
+    group: DisplayGroup[DisplayGroupRecord],
+    rows_by_id: dict[uuid.UUID, Row[Any]],
+    operation_map: dict[uuid.UUID, Any],
+) -> set[str]:
+    """Keep existing category membership while counting each work only once per category."""
+    categories: set[str] = set()
+    for log in group.logs:
+        row = rows_by_id[log.log_id]
+        info = operation_map.get(log.operation_id)
+        operation = info.operation if info else None
+        if (log.transaction_type in _SUMMARY_WAREHOUSE_TYPES and row.batch_work_type != "tube_material") or (
+            log.transaction_type == TransactionTypeEnum.ADJUST and (
+                row.batch_sub_type in _WAREHOUSE_ADJUST_SUBTYPES or
+                (operation and operation.domain == "inventory_io" and operation.action in _WAREHOUSE_ADJUST_SUBTYPES)
+            )
+        ):
+            categories.add("warehouse_count")
+        if row.batch_work_type == "tube_material" or log.transaction_type in _SUMMARY_DEPT_TYPES or (operation and operation.domain == "department_inventory") or (
+            log.transaction_type == TransactionTypeEnum.ADJUST and row.batch_sub_type in _DEPARTMENT_IO_SUBTYPES
+        ):
+            categories.add("dept_count")
+        if log.transaction_type in _SUMMARY_ADJUST_TYPES and row.batch_sub_type not in _DEPARTMENT_IO_SUBTYPES and (
+            operation is None or operation.domain != "department_inventory"
+        ):
+            categories.add("adjust_count")
+    return categories
+
+
+
+@router.get("/transactions/display-calendar", response_model=DisplayCalendarResponse)
+def get_transaction_display_calendar(
+    year: int = Query(..., ge=2020, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    transaction_types: Optional[str] = Query(None),
+    operation_keys: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    department: Optional[str] = Query(None),
+    model: Optional[str] = Query(None),
+    process_step: Optional[str] = Query(None),
+    include_archived: bool = Query(False),
+    requester_employee_id: Optional[uuid.UUID] = Query(None, description="등록·요청 직원 ID로 내역 조회"),
+    db: Session = Depends(get_db),
+) -> DisplayCalendarResponse:
+    """Aggregate list work metadata in KST without page limits or quantity hydration."""
+    data = _load_display_work_groups(db, transaction_types=transaction_types, operation_keys=operation_keys,
+        search=search, department=department, model=model, process_step=process_step,
+        date_from=date(year, 1, 1), date_to=date(year, 12, 31), include_archived=include_archived,
+        requester_employee_id=requester_employee_id)
+    days = {date(year, month, day).isoformat(): DisplayCalendarDayResponse()
+            for day in range(1, monthrange(year, month)[1] + 1)}
+    months = {f"{year:04d}-{number:02d}": 0 for number in range(1, 13)}
+    rows_by_id = {row.log_id: row for row in data.rows}
+    for group in data.groups:
+        stamp = datetime.fromisoformat(_display_group_sort_tuple(group)[0]).replace(tzinfo=UTC).astimezone(KST)
+        key = stamp.date().isoformat()
+        if key[:7] not in months:
+            continue
+        months[key[:7]] += 1
+        if key not in days:
+            continue
+        counts = days[key]
+        counts.total += 1
+        categories = _display_work_categories(group, rows_by_id, data.operation_map)
+        for category in categories:
+            setattr(counts, category, getattr(counts, category) + 1)
+        if not categories:
+            counts.other_count += 1
+    return DisplayCalendarResponse(days=days, months=months)
+
+
+
 @router.get("/transactions/summary", response_model=TransactionSummaryResponse)
 def get_transactions_summary(
     transaction_types: Optional[str] = Query(None, description="쉼표 구분 복수 타입"),
@@ -685,6 +820,7 @@ def get_transactions_summary(
     date_from: Optional[date] = Query(None, description="포함 시작일 YYYY-MM-DD"),
     date_to: Optional[date] = Query(None, description="포함 종료일 YYYY-MM-DD"),
     include_archived: bool = Query(False),
+    requester_employee_id: Optional[uuid.UUID] = Query(None, description="등록·요청 직원 ID로 내역 조회"),
     db: Session = Depends(get_db),
 ):
     """KPI 카드용 카운트 집계. list_transactions 와 동일한 필터를 받지만 row 가 아니라
@@ -715,6 +851,7 @@ def get_transactions_summary(
         date_from=date_from,
         date_to=date_to,
         include_archived=include_archived,
+        requester_employee_id=requester_employee_id,
     )
 
     # 신규 원장은 operation_id, 레거시 묶음은 operation_batch_id를 한 작업으로 센다.

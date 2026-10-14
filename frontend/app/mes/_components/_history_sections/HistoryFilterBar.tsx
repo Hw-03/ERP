@@ -26,6 +26,9 @@ type Props = {
   flatSurface?: boolean;
   disabled?: boolean;
   mobile?: boolean;
+  mineOnly?: boolean;
+  onToggleMine?: () => void;
+  mineDisabled?: boolean;
 };
 
 export function HistoryFilterBar({
@@ -45,6 +48,9 @@ export function HistoryFilterBar({
   flatSurface = false,
   disabled = false,
   mobile = false,
+  mineOnly = false,
+  onToggleMine,
+  mineDisabled = false,
 }: Props) {
   const searchBar = (
         <div
@@ -102,7 +108,7 @@ export function HistoryFilterBar({
         )}
 
         {/* 기간 세그먼트 */}
-        <div className={mobile ? "flex min-w-0 flex-1 overflow-hidden rounded-[12px] border" : "flex shrink-0 overflow-hidden rounded-[12px] border"} style={{ borderColor: LEGACY_COLORS.border }}>
+        <div className={mobile ? "flex min-w-[176px] flex-1 overflow-hidden rounded-[12px] border" : "flex shrink-0 overflow-hidden rounded-[12px] border"} style={{ borderColor: LEGACY_COLORS.border }}>
           {DATE_OPTIONS.map((opt) => {
             const active = !selectedDay && !selectedMonth && dateFilter === opt.value;
             return (
@@ -121,6 +127,21 @@ export function HistoryFilterBar({
             );
           })}
         </div>
+
+        <button
+          type="button"
+          aria-pressed={mineOnly}
+          disabled={disabled || mineDisabled}
+          onClick={onToggleMine}
+          className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-[12px] border px-3 py-2 text-xs font-bold transition-colors active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] disabled:opacity-50${mobile ? "" : " lg:min-h-0"}`}
+          style={{
+            background: mineOnly ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)` : LEGACY_COLORS.s2,
+            borderColor: mineOnly ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+            color: mineOnly ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
+          }}
+        >
+          내 내역
+        </button>
 
         {/* 필터 토글 */}
         <button

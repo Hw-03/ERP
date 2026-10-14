@@ -7,6 +7,7 @@ import { queryKeys } from "@/lib/queries/keys";
 import { buildGroups } from "../../../_history_sections/historyTableHelpers";
 import type { TransactionDisplayGroup } from "@/lib/api/production";
 import { MobileHistoryScreen } from "../MobileHistoryScreen";
+import { productionApi } from "@/lib/api/production";
 
 const testState = vi.hoisted(() => ({
   monthlyQuery: vi.fn(() => ({ data: {} })),
@@ -16,7 +17,11 @@ const testState = vi.hoisted(() => ({
   drillTarget: null as any,
   capturedLogUpdated: null as null | ((updated: TransactionLog) => void),
   queryClient: null as QueryClient | null,
+  operator: { employee_id: "employee-a" } as { employee_id: string } | null,
+  historyArgs: null as any,
 }));
+
+vi.mock("../../../login/useCurrentOperator", () => ({ useCurrentOperator: () => testState.operator }));
 
 vi.mock("@tanstack/react-query", async () => {
   const actual = await vi.importActual<typeof import("@tanstack/react-query")>("@tanstack/react-query");
@@ -27,7 +32,7 @@ vi.mock("@tanstack/react-query", async () => {
 });
 
 vi.mock("../../../_hooks/useHistoryGroups", () => ({
-  useHistoryGroups: () => ({ ...testState.historyResult, groups: buildGroups(testState.historyResult!.logs).map((g) => ({
+  useHistoryGroups: (args: any) => { testState.historyArgs = args; return ({ ...testState.historyResult, groups: buildGroups(testState.historyResult!.logs).map((g) => ({
         type: g.type, key: g.type === "solo" ? g.log.log_id : g.type === "operation" ? g.operationId : g.type === "op_batch" ? g.batchId : g.type === "batch" ? g.refKey : g.key,
         logs: g.type === "solo" ? [g.log] : g.type === "defect_lifecycle" ? [g.parent, g.child] : g.logs,
       })),
@@ -36,7 +41,7 @@ vi.mock("../../../_hooks/useHistoryGroups", () => ({
         const next = typeof update === "function" ? update(previous) : update;
         testState.historyResult!.setLogs(next.flatMap((group) => group.logs));
       },
-      refreshLoaded: vi.fn(), }),
+      refreshLoaded: vi.fn(), }); },
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -56,7 +61,7 @@ vi.mock("@/lib/queries/useModelsQuery", () => ({
 }));
 
 vi.mock("@/lib/queries/useTransactionsQuery", () => ({
-  useMonthlyCountsQuery: (...args: any[]) => testState.monthlyQuery(...args),
+  useTransactionDisplayCalendarQuery: (...args: any[]) => testState.monthlyQuery(...args),
 }));
 
 vi.mock("@/lib/ui/BottomSheet", () => ({
@@ -67,8 +72,11 @@ vi.mock("@/lib/ui/BottomSheet", () => ({
   ),
 }));
 
-vi.mock("../../../_history_sections/HistoryStatsBar", () => ({ HistoryStatsBar: () => null }));
-vi.mock("../../../_history_sections/HistoryFilterBar", () => ({ HistoryFilterBar: () => null }));
+vi.mock("../../../_history_sections/HistoryStatsBar", () => ({ HistoryStatsBar: ({ currentSummary }: any) => <output data-testid="mine-current-summary">{currentSummary?.total ?? "loading"}</output> }));
+vi.mock("../../../_history_sections/HistoryFilterBar", () => ({ HistoryFilterBar: ({ mineOnly, onToggleMine, mineDisabled, setDateFilter }: any) => <>
+  <button type="button" aria-pressed={!!mineOnly} onClick={onToggleMine} disabled={mineDisabled}>내 내역</button>
+  <button type="button" onClick={() => setDateFilter("WEEK")}>기간 변경</button>
+</> }));
 vi.mock("../../../_history_sections/HistoryFilterPanel", () => ({ HistoryFilterPanel: () => null }));
 vi.mock("../../../_history_sections/HistoryCalendarPanel", () => ({ HistoryCalendarPanel: () => null }));
 
@@ -238,6 +246,9 @@ function setHistoryResult(logs: TransactionLog[], loading: boolean, error: strin
 }
 
 beforeEach(() => {
+  testState.operator = { employee_id: "employee-a" };
+  testState.historyArgs = null;
+  vi.mocked(productionApi.getTransactionsSummary).mockReset().mockImplementation(() => new Promise(() => {}));
   testState.queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -254,6 +265,53 @@ beforeEach(() => {
 });
 
 describe("MobileHistoryScreen history state", () => {
+  it("does not restore a late global summary after mine is turned on and off", async () => {
+    let resolveOld!: (value: any) => void;
+    const old = new Promise<any>((resolve) => { resolveOld = resolve; });
+    const summary = (total: number) => ({ total, warehouseCount: 0, deptCount: total, adjustCount: 0, departmentCounts: {} });
+    let globalRequestCount = 0;
+    vi.mocked(productionApi.getTransactionsSummary).mockImplementation((params) => {
+      if (!Object.hasOwn(params ?? {}, "operationKeys")) return Promise.resolve(summary(100));
+      if (params?.requesterEmployeeId) return Promise.resolve(summary(2));
+      globalRequestCount += 1;
+      return globalRequestCount === 1 ? old : Promise.resolve(summary(3));
+    });
+    render(<MobileHistoryScreen />);
+    fireEvent.click(screen.getByRole("button", { name: "내 내역" }));
+    await waitFor(() => expect(screen.getByTestId("mine-current-summary")).toHaveTextContent("2"));
+    fireEvent.click(screen.getByRole("button", { name: "내 내역" }));
+    await waitFor(() => expect(screen.getByTestId("mine-current-summary")).toHaveTextContent("3"));
+    await act(async () => resolveOld(summary(1)));
+    expect(screen.getByTestId("mine-current-summary")).toHaveTextContent("3");
+  });
+
+  it("shares mine across mobile list, summary and calendar without changing the period baseline", () => {
+    render(<MobileHistoryScreen />);
+    fireEvent.click(screen.getByRole("button", { name: "기간 변경" }));
+    fireEvent.click(screen.getByRole("button", { name: "모바일 단건 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "내 내역" }));
+    expect(testState.historyArgs).toMatchObject({ requesterEmployeeId: "employee-a", dateFilter: "WEEK" });
+    expect(testState.monthlyQuery.mock.calls.at(-1)?.[0]).toMatchObject({ requesterEmployeeId: "employee-a" });
+    const summaryCalls = vi.mocked(productionApi.getTransactionsSummary).mock.calls;
+    expect(summaryCalls.at(-1)?.[0]).toMatchObject({ requesterEmployeeId: "employee-a" });
+    expect(summaryCalls.some(([params]) => params?.dateFrom && !Object.hasOwn(params, "operationKeys") && !Object.hasOwn(params, "requesterEmployeeId"))).toBe(true);
+    expect(screen.getByTestId("mobile-history-sheet")).toHaveAttribute("data-open", "no");
+  });
+
+  it("resets mine and discards the last detail immediately when employees switch", () => {
+    const { rerender } = render(<MobileHistoryScreen />);
+    fireEvent.click(screen.getByRole("button", { name: "내 내역" }));
+    fireEvent.click(screen.getByRole("button", { name: "모바일 단건 선택" }));
+    expect(screen.getByTestId("mobile-history-sheet")).toHaveAttribute("data-open", "yes");
+    testState.operator = { employee_id: "employee-b" };
+    rerender(<MobileHistoryScreen />);
+    expect(screen.getByRole("button", { name: "내 내역", pressed: false })).toBeInTheDocument();
+    expect(screen.getByTestId("mobile-history-sheet")).toHaveAttribute("data-open", "no");
+    expect(screen.queryByTestId("mobile-log-detail-state")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "내 내역" }));
+    expect(testState.historyArgs.requesterEmployeeId).toBe("employee-b");
+  });
+
   it("회수 거래가 먼저 와도 작업 대표 품목을 PC처럼 선택하고 새 조회 후 유지한다", () => {
     const child = makeLog({log_id:"child",item_id:"child",item_name:"회수 부품",operation_batch_id:null,operation_id:"rework-op",operation_role:"REWORK_CHILD_NORMAL",transaction_type:"RECEIVE"});
     const parent = makeLog({log_id:"parent",item_id:"parent",item_name:"재작업 대상",operation_batch_id:null,operation_id:"rework-op",operation_role:"REWORK_PARENT_DEFECTIVE",transaction_type:"DISASSEMBLE"});
@@ -280,7 +338,7 @@ describe("MobileHistoryScreen history state", () => {
   });
   it("does not query annual counts while the calendar is closed", () => {
     render(<MobileHistoryScreen />);
-    expect(testState.monthlyQuery).toHaveBeenLastCalledWith(expect.any(Number), { enabled: false });
+    expect(testState.monthlyQuery).toHaveBeenLastCalledWith(expect.objectContaining({ year: expect.any(Number), month: expect.any(Number) }), { enabled: false });
   });
   it("keeps selection for failed loads and refreshes or closes it after successful loads", async () => {
     const { rerender } = render(<MobileHistoryScreen />);

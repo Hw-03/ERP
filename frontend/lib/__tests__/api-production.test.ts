@@ -41,6 +41,34 @@ function inventoryOperationWire(overrides: Record<string, unknown> = {}) {
 }
 
 describe("productionApi", () => {
+  it("forwards requester identity with existing history filters to all four projections", async () => {
+    const fetchSpy = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("display-groups")) return makeResponse({ groups: [], next_cursor: null, has_more: false });
+      if (url.includes("display-calendar")) return makeResponse({ days: {}, months: {} });
+      if (url.includes("reference-summaries")) return makeResponse([]);
+      return makeResponse({ total: 0, warehouse_count: 0, dept_count: 0, adjust_count: 0, department_counts: {} });
+    });
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const params = { requesterEmployeeId: "employee-a", department: "조립", model: "DIO", search: "김", operationKeys: "item_conversion" };
+    await productionApi.getTransactionDisplayGroups({ ...params, dateFrom: "2026-10-01", cursor: "next-page" });
+    await productionApi.getTransactionDisplayCalendar({ ...params, year: 2026, month: 10 });
+    await productionApi.getTransactionsSummary({ ...params, dateFrom: "2026-10-01" });
+    await productionApi.getTransactionReferenceSummaries({ ...params, dateFrom: "2026-10-01" });
+    for (const [url] of fetchSpy.mock.calls) {
+      const query = new URL(String(url), "http://localhost").searchParams;
+      expect(query.get("requester_employee_id")).toBe("employee-a");
+      expect(query.get("department")).toBe("조립");
+      expect(query.get("model")).toBe("DIO");
+      expect(query.get("search")).toBe("김");
+      expect(query.get("operation_keys")).toBe("item_conversion");
+    }
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("cursor=next-page");
+    fetchSpy.mockClear();
+    await productionApi.getTransactionsSummary({ dateFrom: "2026-10-01" });
+    expect(String(fetchSpy.mock.calls[0][0])).not.toContain("requester_employee_id");
+  });
+
   it("productionReceipt POST /api/production/receipt", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;

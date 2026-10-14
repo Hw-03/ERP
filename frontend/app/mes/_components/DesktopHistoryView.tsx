@@ -3,7 +3,7 @@ import { useDesktopTabHome } from "./DesktopTabHome";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api, type TransactionLog } from "@/lib/api";
+import type { TransactionLog } from "@/lib/api";
 import type { IoBatch } from "@/lib/api/types/io";
 import { HistoryFilterBar } from "./_history_sections/HistoryFilterBar";
 import { HistoryFilterPanel } from "./_history_sections/HistoryFilterPanel";
@@ -13,8 +13,9 @@ import { HistoryTable } from "./_history_sections/HistoryTable";
 import type { HistoryTableFocusTarget } from "./_history_sections/HistoryTable";
 import { DesktopHistoryRightPanel } from "./_history_sections/DesktopHistoryRightPanel";
 import { useHistoryGroups } from "./_hooks/useHistoryGroups";
+import { useCurrentOperator } from "./login/useCurrentOperator";
 import { useToggleSet } from "./_hooks/useToggleSet";
-import { useMonthlyCountsQuery, useTransactionReferenceSummariesQuery, useTransactionsSummaryQuery } from "@/lib/queries/useTransactionsQuery";
+import { useTransactionDisplayCalendarQuery, useTransactionReferenceSummariesQuery, useTransactionsSummaryQuery } from "@/lib/queries/useTransactionsQuery";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { queryKeys } from "@/lib/queries/keys";
 import { invalidateOperationalQueries, useRealtimeRevision } from "@/lib/queries/realtime";
@@ -39,8 +40,15 @@ function getCurrentKstCalendarMonth(): SelectedHistoryMonth {
 }
 
 export function DesktopHistoryView() {
+  const employeeId = useCurrentOperator()?.employee_id;
+  return <DesktopHistoryContent key={employeeId ?? "anonymous"} employeeId={employeeId} />;
+}
+
+function DesktopHistoryContent({ employeeId }: { employeeId?: string }) {
   const queryClient = useQueryClient();
   const realtimeRevision = useRealtimeRevision();
+  const [mineOnly, setMineOnly] = useState(false);
+  const requesterEmployeeId = mineOnly ? employeeId : undefined;
   // 3차: 상단 KPI 박스는 표시 전용(클릭 필터 폐기). 필터는 "필터" 패널 단일.
   // scope/typeFilter/activeBucket·부서 전개 상태 없음 — 항상 "전체"로 시작.
   // 대시보드식 독립 필터 패널 (부서·모델·거래종류 다중 선택).
@@ -93,9 +101,6 @@ export function DesktopHistoryView() {
 
   // 달력 — 상단 접이식 패널. 기본 접힘. 펼쳤을 때만 월간 fetch.
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [calendarLogs, setCalendarLogs] = useState<TransactionLog[]>([]);
-  const [calendarLoading, setCalendarLoading] = useState(false);
-  const calendarLoadedKeyRef = useRef<string | null>(null);
   const [calendarCursor, setCalendarCursor] = useState<SelectedHistoryMonth>(getCurrentKstCalendarMonth);
   const calendarCursorRef = useRef(calendarCursor);
   calendarCursorRef.current = calendarCursor;
@@ -142,7 +147,8 @@ export function DesktopHistoryView() {
     search: debouncedSearch.trim() || undefined,
     department: deptParam || undefined,
     model: modelParam || undefined,
-  }), [debouncedSearch, deptParam, modelParam, opParam, selectedDateRange]);
+    requesterEmployeeId,
+  }), [debouncedSearch, deptParam, modelParam, opParam, requesterEmployeeId, selectedDateRange]);
   const baselineSummaryParams = useMemo(() => ({
     dateFrom: selectedDateRange.dateFrom,
     dateTo: selectedDateRange.dateTo,
@@ -178,6 +184,7 @@ export function DesktopHistoryView() {
     selectedMonth,
     department: deptParam,
     model: modelParam,
+    requesterEmployeeId,
     realtimeRevision,
   });
   const {
@@ -201,46 +208,6 @@ export function DesktopHistoryView() {
     loadingLogs: loading ? logs : null,
   });
 
-  // 달력 fetch — 패널이 펼쳐진 동안에만. 위 필터(거래종류·부서·모델·검색)와
-  // 무관하게 그 달 전체 거래를 표시 (2차 #4). 보는 "달"만 따라감. 선택 날짜는 조건 아님.
-  useEffect(() => {
-    if (!calendarOpen) return;
-
-    const calendarKey = `${calendarYear}-${calendarMonth}`;
-    const background = calendarLoadedKeyRef.current === calendarKey;
-    if (!background) setCalendarLoading(true);
-    const firstDay = new Date(calendarYear, calendarMonth, 1);
-    const lastDay = new Date(calendarYear, calendarMonth + 1, 0);
-    const ymd = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
-    const ctrl = new AbortController();
-    let active = true;
-    void api
-      .getTransactions(
-        {
-          limit: 2000,
-          skip: 0,
-          dateFrom: ymd(firstDay),
-          dateTo: ymd(lastDay),
-        },
-        { signal: ctrl.signal },
-      )
-      .then((data) => {
-        if (!active) return;
-        calendarLoadedKeyRef.current = calendarKey;
-        setCalendarLogs(data);
-        if (!background) setCalendarLoading(false);
-      })
-      .catch((err) => {
-        if (active && !background && (err as Error)?.name !== "AbortError") setCalendarLoading(false);
-      });
-    return () => {
-      active = false;
-      ctrl.abort();
-    };
-  }, [calendarOpen, calendarYear, calendarMonth, realtimeRevision]);
-
   function prevMonth() {
     moveCalendarMonth(-1);
   }
@@ -248,30 +215,15 @@ export function DesktopHistoryView() {
     moveCalendarMonth(1);
   }
 
-  // 연 뷰(iOS 캘린더 스타일 줌) — 그 해 12개월 거래 건수 집계.
-  // /monthly-counts?year=YYYY 신 endpoint — limit 제한 없이 집계값만 반환.
-  const { data: monthlyCountsRaw } = useMonthlyCountsQuery(calendarYear, { enabled: calendarOpen });
-  const monthlyCountMap = useMemo(() => {
-    const m = new Map<number, number>();
-    if (!monthlyCountsRaw) return m;
-    for (const [key, count] of Object.entries(monthlyCountsRaw)) {
-      // key 형식: "2026-01" → month index 0
-      const month = parseInt(key.split("-")[1], 10) - 1;
-      if (count > 0) m.set(month, count);
-    }
-    return m;
-  }, [monthlyCountsRaw]);
-
-  const calendarDayMap = useMemo(() => {
-    const map = new Map<string, TransactionLog[]>();
-    for (const log of calendarLogs) {
-      const key = toDateKey(log.created_at);
-      if (!key.startsWith(`${calendarYear}-${String(calendarMonth + 1).padStart(2, "0")}-`)) continue;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(log);
-    }
-    return map;
-  }, [calendarLogs, calendarYear, calendarMonth]);
+  const calendarQuery = useTransactionDisplayCalendarQuery({
+    year: calendarYear, month: calendarMonth + 1, search: debouncedSearch || undefined,
+    department: deptParam || undefined, model: modelParam || undefined, operationKeys: opParam || undefined,
+    requesterEmployeeId,
+  }, { enabled: calendarOpen });
+  const calendarDayCounts = calendarQuery.data?.days ?? {};
+  const calendarLoading = calendarQuery.isPending;
+  const monthlyCountMap = useMemo(() => new Map(Object.entries(calendarQuery.data?.months ?? {})
+    .map(([key, count]) => [Number(key.slice(5, 7)) - 1, count])), [calendarQuery.data?.months]);
 
   const calendarDays = useMemo(() => {
     const firstDay = new Date(calendarYear, calendarMonth, 1).getDay();
@@ -537,6 +489,15 @@ export function DesktopHistoryView() {
     setSelectedMonth(null);
   }
 
+  function changeMineFilter(next: boolean): void {
+    setMineOnly(next);
+    setSelection(null);
+    setSelectionStack([]);
+    lastSelectionRef.current = null;
+    setFocusTarget(null);
+    pendingScrollLogIdRef.current = null;
+  }
+
   if (selection) lastSelectionRef.current = selection;
   const displaySelection = selection ?? lastSelectionRef.current;
 
@@ -565,10 +526,13 @@ export function DesktopHistoryView() {
             loading={summaryLoading || baselineLoading}
             loadingDisplay="skeleton"
             periodLabel={periodLabel}
-            hasListFilters={Boolean(debouncedSearch || deptParam || modelParam || opParam)}
+            hasListFilters={Boolean(mineOnly || debouncedSearch || deptParam || modelParam || opParam)}
           />
 
           <HistoryFilterBar
+            mineOnly={mineOnly}
+            onToggleMine={() => changeMineFilter(!mineOnly)}
+            mineDisabled={!employeeId}
             search={search}
             setSearch={setSearch}
             dateFilter={dateFilter}
@@ -606,6 +570,7 @@ export function DesktopHistoryView() {
           {filterPanelOpen && (
             <section className="card" style={{ paddingTop: 12, paddingBottom: 12 }}>
               <HistoryFilterPanel
+                mineOnly={mineOnly}
                 open={filterPanelOpen}
                 departmentCounts={baselineSummary?.departmentCounts ?? {}}
                 selectedDepts={selectedDepts}
@@ -619,6 +584,7 @@ export function DesktopHistoryView() {
                 toggleOp={toggleOp}
                 clearOps={() => setSelectedOps([])}
                 onResetAll={() => {
+                  changeMineFilter(false);
                   setSelectedDepts([]);
                   setSelectedModels([]);
                   setSelectedOps([]);
@@ -638,7 +604,7 @@ export function DesktopHistoryView() {
             onSelectMonth={selectCalendarMonth}
             calendarLoading={calendarLoading}
             calendarDays={calendarDays}
-            calendarDayMap={calendarDayMap}
+            calendarDayCounts={calendarDayCounts}
             monthlyCountMap={monthlyCountMap}
             todayKey={todayKey}
             selectedDay={selectedDay}
@@ -647,8 +613,9 @@ export function DesktopHistoryView() {
           <HistoryTable
             loading={loading}
             hasSearch={!!search.trim()}
-            hasFilters={selectedDepts.length > 0 || selectedModels.length > 0 || selectedOps.length > 0 || dateFilter !== "MONTH" || !!selectedDay || !!selectedMonth}
+            hasFilters={mineOnly || selectedDepts.length > 0 || selectedModels.length > 0 || selectedOps.length > 0 || dateFilter !== "MONTH" || !!selectedDay || !!selectedMonth}
             onResetFilters={() => {
+              changeMineFilter(false);
               setSearch(""); setSelectedDepts([]); setSelectedModels([]); setSelectedOps([]);
               setDateFilter("MONTH"); setSelectedDay(null); setSelectedMonth(null);
             }}

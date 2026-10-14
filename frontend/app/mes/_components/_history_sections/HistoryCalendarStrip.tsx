@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
+import type { TransactionDisplayCalendarDay } from "@/lib/api/production";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { SelectedHistoryMonth } from "./historyQuery";
 import {
@@ -20,7 +21,8 @@ type Props = {
   onSelectMonth: (month: SelectedHistoryMonth) => void;
   calendarLoading: boolean;
   calendarDays: (number | null)[];
-  calendarDayMap: Map<string, TransactionLog[]>;
+  calendarDayMap?: Map<string, TransactionLog[]>;
+  calendarDayCounts?: Record<string, TransactionDisplayCalendarDay>;
   /** 그 해(calendarYear) 월별(0~11) 거래 건수. 없으면 연 뷰 카드는 0 으로 표시. */
   monthlyCountMap?: Map<number, number>;
   todayKey: string;
@@ -57,6 +59,7 @@ export function HistoryCalendarStrip({
   calendarLoading,
   calendarDays,
   calendarDayMap,
+  calendarDayCounts,
   monthlyCountMap,
   todayKey,
   selectedDay,
@@ -215,7 +218,9 @@ export function HistoryCalendarStrip({
               const mm = String(calendarMonth + 1).padStart(2, "0");
               const dd = String(day).padStart(2, "0");
               const key = `${calendarYear}-${mm}-${dd}`;
-              const dayLogs = calendarDayMap.get(key) ?? [];
+              const dayLogs = calendarDayMap?.get(key) ?? [];
+              const counts = calendarDayCounts?.[key];
+              const total = counts?.total ?? dayLogs.length;
               const isToday = key === todayKey;
               const isSelected = key === selectedDay;
               // KPI 와 일치 — 작업 투영과 실제 재고 위치를 포함한 공통 분류를 사용한다.
@@ -231,11 +236,14 @@ export function HistoryCalendarStrip({
                 if (scope === "warehouse_involved") warehouseCount++;
                 if (scope === "department_internal") deptCount++;
               }
-              const otherCount = Math.max(dayLogs.length - warehouseCount - deptCount - adjustCount, 0);
+              warehouseCount = counts?.warehouseCount ?? warehouseCount;
+              deptCount = counts?.deptCount ?? deptCount;
+              adjustCount = counts?.adjustCount ?? adjustCount;
+              const otherCount = counts?.otherCount ?? Math.max(total - warehouseCount - deptCount - adjustCount, 0);
               return (
                 <button
                   key={key}
-                  aria-label={`${calendarYear}년 ${calendarMonth + 1}월 ${day}일 · 총 ${dayLogs.length}건${isSelected ? " (선택됨)" : ""}`}
+                  aria-label={`${calendarYear}년 ${calendarMonth + 1}월 ${day}일 · 총 ${total}건${isSelected ? " (선택됨)" : ""}`}
                   aria-pressed={isSelected}
                   onClick={() => setSelectedDay(selectedDay === key ? null : key)}
                   className="flex min-h-[92px] flex-col items-center rounded-[14px] border p-1.5 transition-colors hover:brightness-110 lg:min-h-[132px]"
@@ -251,12 +259,12 @@ export function HistoryCalendarStrip({
                   <span className="text-sm font-bold" style={{ color: isToday ? LEGACY_COLORS.blue : LEGACY_COLORS.text }}>
                     {day}
                   </span>
-                  {dayLogs.length > 0 && (
+                  {total > 0 && (
                     <span
                       className="mt-1 rounded-full px-1.5 py-0.5 text-xs font-bold"
                       style={{ background: "color-mix(in srgb, var(--c-blue) 20%, transparent)", color: LEGACY_COLORS.blue }}
                     >
-                      총 {dayLogs.length}건
+                      총 {total}건
                     </span>
                   )}
                   <div className="mt-1 flex w-full flex-col gap-0.5 px-1">

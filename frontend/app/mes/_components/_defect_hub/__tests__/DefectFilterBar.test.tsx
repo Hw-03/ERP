@@ -81,7 +81,7 @@ describe("DefectFilterBar", () => {
     const departmentCard = screen.getByRole("group", { name: "부서 구분" });
     const modelCard = screen.getByRole("group", { name: "모델 구분" });
     const processCard = screen.getByRole("group", { name: "공정 구분" });
-    expect(within(departmentCard).getByRole("button", { name: "내 부서" })).toBeInTheDocument();
+    expect(within(departmentCard).queryByRole("button", { name: "내 부서" })).not.toBeInTheDocument();
     expect(within(modelCard).queryByRole("button", { name: "미분류" })).not.toBeInTheDocument();
     expect(within(processCard).getByRole("button", { name: "공정완료" })).toBeInTheDocument();
 
@@ -92,6 +92,21 @@ describe("DefectFilterBar", () => {
     expect(onDepartmentsChange).toHaveBeenCalledWith(["튜브", "조립"]);
     expect(onModelsChange).toHaveBeenCalledWith(["DX-1"]);
     expect(onProcessStepsChange).toHaveBeenCalledWith(["R", "A"]);
+  });
+
+  it.each([false, true])("hides only the department shortcut and keeps department and actor choices (mobile=%s)", (mobilePresentation) => {
+    const onDepartmentsChange = vi.fn();
+    const onActorScopeChange = vi.fn();
+    render(<DefectFilterBar {...baseProps} mobilePresentation={mobilePresentation} departments={["튜브", "조립"]} selectedDepartments={["튜브"]} onDepartmentsChange={onDepartmentsChange} onActorScopeChange={onActorScopeChange} />);
+    if (mobilePresentation) fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
+
+    const departmentCard = screen.getByRole("group", { name: "부서 구분" });
+    expect(within(departmentCard).queryByRole("button", { name: "내 부서" })).not.toBeInTheDocument();
+    expect(within(departmentCard).getAllByRole("button").map((button) => button.textContent)).toEqual(["전체", "튜브", "조립"]);
+    fireEvent.click(within(departmentCard).getByRole("button", { name: "조립" }));
+    expect(onDepartmentsChange).toHaveBeenCalledWith(["튜브", "조립"]);
+    fireEvent.click(screen.getByRole("button", { name: "내가 격리" }));
+    expect(onActorScopeChange).toHaveBeenCalledWith("mine");
   });
 
   it("resets only the three category selections and keeps search out of the filter bar", () => {

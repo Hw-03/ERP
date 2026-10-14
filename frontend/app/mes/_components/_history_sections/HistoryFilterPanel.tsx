@@ -24,6 +24,7 @@ type Props = {
   toggleOp: (v: string) => void;
   clearOps: () => void;
   onResetAll: () => void;
+  mineOnly?: boolean;
 };
 
 export function HistoryFilterPanel({
@@ -40,13 +41,14 @@ export function HistoryFilterPanel({
   toggleOp,
   clearOps,
   onResetAll,
+  mineOnly = false,
 }: Props) {
   if (!open) return null;
   const deptEntries = Object.entries(departmentCounts)
     .filter(([, c]) => c > 0)
     .sort((a, b) => b[1] - a[1]);
   const isAnyFilterActive =
-    selectedDepts.length > 0 || selectedModels.length > 0 || selectedOps.length > 0;
+    mineOnly || selectedDepts.length > 0 || selectedModels.length > 0 || selectedOps.length > 0;
 
   return (
     <div className="grid gap-2.5 xl:grid-cols-3">

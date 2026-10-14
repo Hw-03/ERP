@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api, type TransactionLog } from "@/lib/api";
+import type { TransactionLog } from "@/lib/api";
 import { productionApi, type TransactionSummary } from "@/lib/api/production";
 import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -14,8 +14,9 @@ import { HistoryStatsBar } from "../../_history_sections/HistoryStatsBar";
 import { HistoryDetailPanel } from "../../_history_sections/HistoryDetailPanel";
 import { HistoryBatchDetailPanel } from "../../_history_sections/HistoryBatchDetailPanel";
 import { useHistoryGroups } from "../../_hooks/useHistoryGroups";
+import { useCurrentOperator } from "../../login/useCurrentOperator";
 import { useToggleSet } from "../../_hooks/useToggleSet";
-import { useMonthlyCountsQuery } from "@/lib/queries/useTransactionsQuery";
+import { useTransactionDisplayCalendarQuery } from "@/lib/queries/useTransactionsQuery";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { invalidateOperationalQueries, useRealtimeRevision } from "@/lib/queries/realtime";
 import { toDateKey, formatHistoryDate } from "../../_history_sections/historyFormat";
@@ -53,8 +54,15 @@ function getCurrentKstCalendarMonth(): SelectedHistoryMonth {
  * golden)는 호출만.
  */
 export function MobileHistoryScreen() {
+  const employeeId = useCurrentOperator()?.employee_id;
+  return <MobileHistoryContent key={employeeId ?? "anonymous"} employeeId={employeeId} />;
+}
+
+function MobileHistoryContent({ employeeId }: { employeeId?: string }) {
   const queryClient = useQueryClient();
   const realtimeRevision = useRealtimeRevision();
+  const [mineOnly, setMineOnly] = useState(false);
+  const requesterEmployeeId = mineOnly ? employeeId : undefined;
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const { data: productModels } = useModelsQuery();
   const { selected: selectedModels, toggle: toggleModel, setSelected: setSelectedModels } = useToggleSet();
@@ -94,9 +102,6 @@ export function MobileHistoryScreen() {
   }, [queryClient]);
 
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [calendarLogs, setCalendarLogs] = useState<TransactionLog[]>([]);
-  const [calendarLoading, setCalendarLoading] = useState(false);
-  const calendarLoadedKeyRef = useRef<string | null>(null);
   const [calendarCursor, setCalendarCursor] = useState<SelectedHistoryMonth>(getCurrentKstCalendarMonth);
   const calendarCursorRef = useRef(calendarCursor);
   calendarCursorRef.current = calendarCursor;
@@ -137,6 +142,7 @@ export function MobileHistoryScreen() {
     debouncedSearch.trim() || null,
     deptParam || null,
     modelParam || null,
+    requesterEmployeeId ?? null,
   ]);
   const summaryChanged = summaryConditionsRef.current !== summaryConditionsKey;
   const currentSummary = summaryChanged ? null : summary;
@@ -149,6 +155,7 @@ export function MobileHistoryScreen() {
     selectedMonth,
     department: deptParam,
     model: modelParam,
+    requesterEmployeeId,
     realtimeRevision,
   });
   const {
@@ -172,39 +179,6 @@ export function MobileHistoryScreen() {
     loadingLogs: loading ? logs : null,
   });
 
-  useEffect(() => {
-    if (!calendarOpen) return;
-    const calendarKey = `${calendarYear}-${calendarMonth}`;
-    const background = calendarLoadedKeyRef.current === calendarKey;
-    if (!background) setCalendarLoading(true);
-    const firstDay = new Date(calendarYear, calendarMonth, 1);
-    const lastDay = new Date(calendarYear, calendarMonth + 1, 0);
-    const ymd = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-        d.getDate(),
-      ).padStart(2, "0")}`;
-    const ctrl = new AbortController();
-    let active = true;
-    void api
-      .getTransactions(
-        { limit: 2000, skip: 0, dateFrom: ymd(firstDay), dateTo: ymd(lastDay) },
-        { signal: ctrl.signal },
-      )
-      .then((data) => {
-        if (!active) return;
-        calendarLoadedKeyRef.current = calendarKey;
-        setCalendarLogs(data);
-        if (!background) setCalendarLoading(false);
-      })
-      .catch((err) => {
-        if (active && !background && (err as Error)?.name !== "AbortError") setCalendarLoading(false);
-      });
-    return () => {
-      active = false;
-      ctrl.abort();
-    };
-  }, [calendarOpen, calendarYear, calendarMonth, realtimeRevision]);
-
   function prevMonth() {
     moveCalendarMonth(-1);
   }
@@ -212,29 +186,15 @@ export function MobileHistoryScreen() {
     moveCalendarMonth(1);
   }
 
-  // 연 뷰 — 그 해 12개월 거래 건수 집계.
-  // /monthly-counts?year=YYYY 신 endpoint — limit 제한 없이 집계값만 반환.
-  const { data: monthlyCountsRaw } = useMonthlyCountsQuery(calendarYear, { enabled: calendarOpen });
-  const monthlyCountMap = useMemo(() => {
-    const m = new Map<number, number>();
-    if (!monthlyCountsRaw) return m;
-    for (const [key, count] of Object.entries(monthlyCountsRaw)) {
-      const month = parseInt(key.split("-")[1], 10) - 1;
-      if (count > 0) m.set(month, count);
-    }
-    return m;
-  }, [monthlyCountsRaw]);
-
-  const calendarDayMap = useMemo(() => {
-    const map = new Map<string, TransactionLog[]>();
-    for (const log of calendarLogs) {
-      const key = toDateKey(log.created_at);
-      if (!key.startsWith(`${calendarYear}-${String(calendarMonth + 1).padStart(2, "0")}-`)) continue;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(log);
-    }
-    return map;
-  }, [calendarLogs, calendarYear, calendarMonth]);
+  const calendarQuery = useTransactionDisplayCalendarQuery({
+    year: calendarYear, month: calendarMonth + 1, search: debouncedSearch || undefined,
+    department: deptParam || undefined, model: modelParam || undefined, operationKeys: opParam || undefined,
+    requesterEmployeeId,
+  }, { enabled: calendarOpen });
+  const calendarDayCounts = calendarQuery.data?.days ?? {};
+  const calendarLoading = calendarQuery.isPending;
+  const monthlyCountMap = useMemo(() => new Map(Object.entries(calendarQuery.data?.months ?? {})
+    .map(([key, count]) => [Number(key.slice(5, 7)) - 1, count])), [calendarQuery.data?.months]);
 
   const calendarDays = useMemo(() => {
     const firstDay = new Date(calendarYear, calendarMonth, 1).getDay();
@@ -261,6 +221,7 @@ export function MobileHistoryScreen() {
       searchParam ?? null,
       department ?? null,
       model ?? null,
+      requesterEmployeeId ?? null,
     ]);
     const myKey = JSON.stringify([conditionsKey, realtimeRevision ?? null]);
     const background = summaryConditionsRef.current === conditionsKey && summaryRef.current !== null;
@@ -275,18 +236,18 @@ export function MobileHistoryScreen() {
     const ctrl = new AbortController();
     void productionApi
       .getTransactionsSummary(
-        { operationKeys, dateFrom, dateTo, search: searchParam, department, model },
+        { operationKeys, dateFrom, dateTo, search: searchParam, department, model, requesterEmployeeId },
         { signal: ctrl.signal },
       )
       .then((s) => {
-        if (summaryKeyRef.current !== myKey) return;
+        if (ctrl.signal.aborted || summaryKeyRef.current !== myKey) return;
         summaryRef.current = s;
         setSummary(s);
         if (!background) setSummaryLoading(false);
       })
       .catch((err) => {
         if ((err as Error)?.name === "AbortError") return;
-        if (summaryKeyRef.current !== myKey) return;
+        if (ctrl.signal.aborted || summaryKeyRef.current !== myKey) return;
         setSummaryError("집계를 불러오지 못했습니다.");
         if (!background) {
           summaryRef.current = null;
@@ -295,7 +256,7 @@ export function MobileHistoryScreen() {
         }
       });
     return () => ctrl.abort();
-  }, [debouncedSearch, deptParam, modelParam, opParam, realtimeRevision, selectedDateRange, summaryRetry]);
+  }, [debouncedSearch, deptParam, modelParam, opParam, realtimeRevision, requesterEmployeeId, selectedDateRange, summaryRetry]);
 
   const [baselineSummary, setBaselineSummary] = useState<TransactionSummary | null>(null);
   const [baselineLoading, setBaselineLoading] = useState(false);
@@ -508,6 +469,13 @@ export function MobileHistoryScreen() {
     setSelection(null);
   }
 
+  function changeMineFilter(next: boolean): void {
+    setMineOnly(next);
+    setSelection(null);
+    setSelectionStack([]);
+    lastSelectionRef.current = null;
+  }
+
   if (selection) lastSelectionRef.current = selection;
   const displaySelection = selection ?? lastSelectionRef.current;
   const activeFilterCount =
@@ -551,7 +519,7 @@ export function MobileHistoryScreen() {
             currentSummary={currentSummary}
             currentCount={currentSummary?.total ?? null}
             loading={summaryChanged || baselineChanged || summaryLoading || baselineLoading}
-            hasListFilters={activeFilterCount > 0 || !!debouncedSearch.trim()}
+            hasListFilters={mineOnly || activeFilterCount > 0 || !!debouncedSearch.trim()}
             periodLabel={periodLabel}
           />
 
@@ -559,6 +527,9 @@ export function MobileHistoryScreen() {
             refresh={currentSummary !== null || currentBaseline !== null} onRetry={() => setSummaryRetry((value) => value + 1)} />}
 
           <HistoryFilterBar
+            mineOnly={mineOnly}
+            onToggleMine={() => changeMineFilter(!mineOnly)}
+            mineDisabled={!employeeId}
             mobile
             search={search}
             setSearch={setSearch}
@@ -578,6 +549,7 @@ export function MobileHistoryScreen() {
           {filterPanelOpen && (
             <section className="card" style={{ paddingTop: 12, paddingBottom: 12 }}>
               <HistoryFilterPanel
+                mineOnly={mineOnly}
                 open={filterPanelOpen}
                 departmentCounts={currentBaseline?.departmentCounts ?? {}}
                 selectedDepts={selectedDepts}
@@ -591,6 +563,7 @@ export function MobileHistoryScreen() {
                 toggleOp={toggleOp}
                 clearOps={() => setSelectedOps([])}
                 onResetAll={() => {
+                  changeMineFilter(false);
                   setSelectedDepts([]);
                   setSelectedModels([]);
                   setSelectedOps([]);
@@ -610,7 +583,7 @@ export function MobileHistoryScreen() {
             onSelectMonth={selectCalendarMonth}
             calendarLoading={calendarLoading}
             calendarDays={calendarDays}
-            calendarDayMap={calendarDayMap}
+            calendarDayCounts={calendarDayCounts}
             monthlyCountMap={monthlyCountMap}
             todayKey={todayKey}
             selectedDay={selectedDay}
@@ -621,8 +594,9 @@ export function MobileHistoryScreen() {
           <MobileHistoryList
             loading={loading}
             hasSearch={!!search.trim()}
-            hasFilters={selectedDepts.length > 0 || selectedModels.length > 0 || selectedOps.length > 0 || dateFilter !== "MONTH" || !!selectedDay || !!selectedMonth}
+            hasFilters={mineOnly || selectedDepts.length > 0 || selectedModels.length > 0 || selectedOps.length > 0 || dateFilter !== "MONTH" || !!selectedDay || !!selectedMonth}
             onResetFilters={() => {
+              changeMineFilter(false);
               setSearch(""); setSelectedDepts([]); setSelectedModels([]); setSelectedOps([]);
               setDateFilter("MONTH"); setSelectedDay(null); setSelectedMonth(null);
             }}

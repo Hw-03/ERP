@@ -8,7 +8,7 @@ vi.mock("@/lib/api/production", () => ({
   productionApi: { getTransactionsSummary: () => new Promise(() => {}) },
 }));
 vi.mock("@/lib/queries/useTransactionsQuery", () => ({
-  useMonthlyCountsQuery: () => ({ data: {} }),
+  useTransactionDisplayCalendarQuery: () => ({ data: {} }),
   useTransactionsSummaryQuery: () => ({ data: null, isLoading: false, refetch: vi.fn() }),
   useTransactionReferenceSummariesQuery: () => ({ data: [], isLoading: false }),
 }));

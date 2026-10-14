@@ -3,6 +3,17 @@ import { describe, expect, it, vi } from "vitest";
 import { HistoryFilterPanel } from "../HistoryFilterPanel";
 
 describe("HistoryFilterPanel", () => {
+  it("enables all-filter reset when only mine is selected", () => {
+    const onResetAll = vi.fn();
+    render(<HistoryFilterPanel open departmentCounts={{}} selectedDepts={[]} toggleDept={vi.fn()} clearDepts={vi.fn()}
+      models={[]} selectedModels={[]} toggleModel={vi.fn()} clearModels={vi.fn()} selectedOps={[]}
+      toggleOp={vi.fn()} clearOps={vi.fn()} mineOnly onResetAll={onResetAll} />);
+    const reset = screen.getByRole("button", { name: "전체 초기화" });
+    expect(reset).toBeEnabled();
+    fireEvent.click(reset);
+    expect(onResetAll).toHaveBeenCalledOnce();
+  });
+
   it("shows department names without transaction counts", () => {
     render(
       <HistoryFilterPanel

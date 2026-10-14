@@ -2,7 +2,7 @@
 
 import { memo, useState, type KeyboardEvent } from "react";
 import Image from "next/image";
-import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { AlertTriangle, Archive, CheckCircle2, XCircle } from "lucide-react";
 import type { Item } from "@/lib/api";
 import type { DefectManagementCategory } from "@/lib/api/types/defects";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -12,6 +12,7 @@ import { formatQty } from "@/lib/mes/format";
 import { ImageLightbox } from "@/lib/ui/ImageLightbox";
 import { useDeptColorLookup } from "../DepartmentsContext";
 import { getManagedStockBreakdown, STOCK_CATEGORY_ORDER, STOCK_CATEGORY_STYLES } from "./inventoryManagedStock";
+import { isDisusedInventoryItem } from "./inventoryFilter";
 
 function safeAvailableQty(item: Item) {
   const n = Number(item.available_quantity);
@@ -38,6 +39,9 @@ function InventoryItemRowImpl({ item, selected, detailOpen = true, onSelect, ima
   const minStock = getMinStock(item);
   const qty = safeAvailableQty(item);
   const stock = getStockState(qty, minStock === 0 ? null : minStock);
+  const statusBadge = isDisusedInventoryItem(item)
+    ? { label: "불용", color: LEGACY_COLORS.muted2 }
+    : stock;
   const pendingQty = totalApprovalPending(item);
   const isCritical = qty <= 0 || (minStock > 0 && qty < minStock);
 
@@ -102,7 +106,7 @@ function InventoryItemRowImpl({ item, selected, detailOpen = true, onSelect, ima
     }
   }
 
-  const StockIcon = stock.label === "품절" ? XCircle : stock.label === "부족" ? AlertTriangle : CheckCircle2;
+  const StockIcon = statusBadge.label === "불용" ? Archive : stock.label === "품절" ? XCircle : stock.label === "부족" ? AlertTriangle : CheckCircle2;
   const handleSelect = () => onSelect(selected && detailOpen ? null : item);
   const stockBar = Number(item.quantity) === 0 ? (
     <div className={compact ? "mt-2 h-1 overflow-hidden rounded-full" : "mt-[20px] h-[6px] overflow-hidden rounded-full"} style={{ background: DEFECT_RED }} title="품절" />
@@ -163,10 +167,10 @@ function InventoryItemRowImpl({ item, selected, detailOpen = true, onSelect, ima
       <td className={compact ? "border-b px-2 py-3 text-center align-middle whitespace-nowrap" : "border-b px-4 py-5 text-center align-middle whitespace-nowrap"} style={{ borderColor: LEGACY_COLORS.border }}>
         <span
           className={compact ? "inline-flex w-fit items-center gap-1 rounded-full px-2 py-1 text-xs font-medium" : "inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-sm font-bold"}
-          style={{ color: stock.color, background: `color-mix(in srgb, ${stock.color} 12%, transparent)` }}
+          style={{ color: statusBadge.color, background: `color-mix(in srgb, ${statusBadge.color} 12%, transparent)` }}
         >
           <StockIcon className="h-3.5 w-3.5" aria-hidden="true" />
-          {stock.label}
+          {statusBadge.label}
         </span>
       </td>
       {!compact && (

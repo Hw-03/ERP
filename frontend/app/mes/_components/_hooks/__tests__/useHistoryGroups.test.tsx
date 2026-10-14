@@ -50,6 +50,60 @@ afterEach(() => {
 });
 
 describe("useHistoryGroups", () => {
+  it("isolates employee pages and ignores late load-more results after the mine filter changes", async () => {
+    const oldMore = deferred<Response>();
+    const mine = deferred<Response>();
+    const firstPage = { groups: [makeGroup(0)], next_cursor: "all-next", has_more: true };
+    const minePage = { groups: [makeGroup(2)], next_cursor: null, has_more: false };
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse(firstPage))
+      .mockReturnValueOnce(oldMore.promise)
+      .mockReturnValueOnce(mine.promise);
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result, rerender } = renderHook(
+      ({ requesterEmployeeId }: { requesterEmployeeId?: string }) => useHistoryGroups({ ...baseArgs, requesterEmployeeId }),
+      { initialProps: { requesterEmployeeId: undefined }, wrapper: makeWrapper(client) },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    let loadingMore!: Promise<void>;
+    act(() => { loadingMore = result.current.loadMore(); });
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+    rerender({ requesterEmployeeId: "employee-a" });
+    expect(result.current.groups).toEqual([]);
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(3));
+    expect(String(fetchSpy.mock.calls[2][0])).toContain("requester_employee_id=employee-a");
+    expect(String(fetchSpy.mock.calls[2][0])).not.toContain("cursor=");
+    await act(async () => mine.resolve(makeResponse(minePage)));
+    await waitFor(() => expect(result.current.groups).toEqual(minePage.groups));
+    await act(async () => {
+      oldMore.resolve(makeResponse({ groups: [makeGroup(1)], next_cursor: null, has_more: false }));
+      await loadingMore;
+    });
+    expect(result.current.groups).toEqual(minePage.groups);
+    expect(result.current.loadingMore).toBe(false);
+  });
+
+  it("separates employees' cached pages and late first-page responses", async () => {
+    const employeeA = deferred<Response>();
+    const employeeB = deferred<Response>();
+    const fetchSpy = vi.fn().mockReturnValueOnce(employeeA.promise).mockReturnValueOnce(employeeB.promise);
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result, rerender } = renderHook(
+      ({ requesterEmployeeId }) => useHistoryGroups({ ...baseArgs, requesterEmployeeId }),
+      { initialProps: { requesterEmployeeId: "employee-a" }, wrapper: makeWrapper(client) },
+    );
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+    rerender({ requesterEmployeeId: "employee-b" });
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+    await act(async () => employeeB.resolve(makeResponse({ groups: [makeGroup(2)], next_cursor: null, has_more: false })));
+    await waitFor(() => expect(result.current.groups[0]?.key).toBe("solo:2"));
+    await act(async () => employeeA.resolve(makeResponse({ groups: [makeGroup(1)], next_cursor: null, has_more: false })));
+    expect(result.current.groups[0]?.key).toBe("solo:2");
+    expect(client.getQueryCache().getAll().filter((query) => query.queryKey[1] === "displayGroups")).toHaveLength(2);
+  });
+
   it.each([{ groups: [] }, { groups: [makeGroup(0)] }])("keeps cached data on a failed stale remount", async ({ groups }) => {
     globalThis.fetch = vi.fn().mockResolvedValue(makeResponse({ groups, next_cursor: null, has_more: false })) as unknown as typeof fetch;
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });

@@ -23,6 +23,19 @@ type TransactionParams = Parameters<typeof productionApi.getTransactions>[0];
 type SummaryParams = Parameters<typeof productionApi.getTransactionsSummary>[0];
 type ReferenceSummaryParams = Parameters<typeof productionApi.getTransactionReferenceSummaries>[0];
 
+/** Calendar shares list filters and cancels obsolete requests when conditions change. */
+export function useTransactionDisplayCalendarQuery(
+  params: Parameters<typeof productionApi.getTransactionDisplayCalendar>[0],
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: queryKeys.transactions.displayCalendar(params),
+    queryFn: ({ signal }) => productionApi.getTransactionDisplayCalendar(params, { signal }),
+    enabled: options?.enabled ?? true,
+    staleTime: STALE_TIME.VOLATILE,
+  });
+}
+
 export function useTransactionsQuery(
   params?: TransactionParams,
   options?: { enabled?: boolean },

@@ -40,6 +40,11 @@ function makeLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
 }
 
 describe("HistoryCalendarStrip", () => {
+  it("서버에서 분류한 튜브 부서 건수를 창고 건수로 바꾸지 않는다", () => {
+    render(<HistoryCalendarStrip calendarYear={2026} calendarMonth={6} prevMonth={vi.fn()} nextMonth={vi.fn()} setCalendarYear={vi.fn()} setCalendarMonth={vi.fn()} onSelectMonth={vi.fn()} calendarLoading={false} calendarDays={[1]} calendarDayCounts={{ "2026-07-01": { total: 1, warehouseCount: 0, deptCount: 1, adjustCount: 0, otherCount: 0 } }} todayKey="2026-07-09" selectedDay={null} setSelectedDay={vi.fn()} />);
+    expect(screen.getByText("부서 1건")).toBeInTheDocument();
+    expect(screen.queryByText("창고 1건")).not.toBeInTheDocument();
+  });
   it.each(["RECEIVE", "MATERIAL_OUT"] as const)("튜브 %s는 업체 거래도 창고 대신 부서 건수로 표시한다", (transactionType) => {
     const dayLogs = [makeLog({ transaction_type: transactionType, history_batch: { work_type: "tube_material", sub_type: transactionType === "RECEIVE" ? "tube_receive_supplier" : "tube_outbound_supplier" } })];
     render(<HistoryCalendarStrip calendarYear={2026} calendarMonth={6} prevMonth={vi.fn()} nextMonth={vi.fn()} setCalendarYear={vi.fn()} setCalendarMonth={vi.fn()} onSelectMonth={vi.fn()} calendarLoading={false} calendarDays={[1]} calendarDayMap={new Map([["2026-07-01", dayLogs]])} todayKey="2026-07-09" selectedDay={null} setSelectedDay={vi.fn()} />);

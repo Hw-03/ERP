@@ -23,7 +23,10 @@ const testState = vi.hoisted(() => ({
   nextMonth: null as null | (() => void),
   queryClient: null as QueryClient | null,
   realtimeRevision: null as number | null,
+  operator: { employee_id: "employee-a" } as { employee_id: string } | null,
 }));
+
+vi.mock("../login/useCurrentOperator", () => ({ useCurrentOperator: () => testState.operator }));
 
 vi.mock("@tanstack/react-query", async () => {
   const actual = await vi.importActual<typeof import("@tanstack/react-query")>("@tanstack/react-query");
@@ -62,7 +65,7 @@ vi.mock("@/lib/queries/realtime", async (importOriginal) => ({
 }));
 
 vi.mock("@/lib/queries/useTransactionsQuery", () => ({
-  useMonthlyCountsQuery: (...args: any[]) => testState.monthlyQuery(...args),
+  useTransactionDisplayCalendarQuery: (...args: any[]) => testState.monthlyQuery(...args),
   useTransactionsSummaryQuery: (params: any) => {
     if (Object.hasOwn(params, "operationKeys")) testState.currentSummaryParams.push(params);
     else testState.baselineSummaryParams.push(params);
@@ -88,8 +91,9 @@ vi.mock("../_history_sections/HistoryStatsBar", () => ({
   ),
 }));
 vi.mock("../_history_sections/HistoryFilterBar", () => ({
-  HistoryFilterBar: ({ setDateFilter, selectedMonth, onClearSelectedMonth, onToggleCalendar, calendarOpen }: any) => (
+  HistoryFilterBar: ({ setDateFilter, selectedMonth, onClearSelectedMonth, onToggleCalendar, calendarOpen, mineOnly, onToggleMine, mineDisabled }: any) => (
     <>
+      <button type="button" aria-pressed={!!mineOnly} disabled={mineDisabled} onClick={onToggleMine}>내 내역</button>
       <button type="button" onClick={() => setDateFilter("WEEK")}>기간 변경</button>
       <button type="button" onClick={onToggleCalendar}>달력 토글</button>
       <output data-testid="calendar-open">{calendarOpen ? "open" : "closed"}</output>
@@ -284,6 +288,7 @@ function expectDesktopSummaryRanges(dateFrom: string, dateTo: string): void {
 }
 
 beforeEach(() => {
+  testState.operator = { employee_id: "employee-a" };
   testState.queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -310,6 +315,38 @@ beforeEach(() => {
 });
 
 describe("DesktopHistoryView history state", () => {
+  it("shares mine identity across list, summary, references and calendar while preserving the global period baseline", () => {
+    render(<DesktopHistoryView />);
+    expect(screen.getByRole("button", { name: "내 내역", pressed: false })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "기간 변경" }));
+    fireEvent.click(screen.getByRole("button", { name: "단건 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "내 내역" }));
+    expect(screen.getByRole("button", { name: "내 내역", pressed: true })).toBeInTheDocument();
+    expect(testState.historyArgs).toMatchObject({ requesterEmployeeId: "employee-a", dateFilter: "WEEK" });
+    expect(testState.currentSummaryParams.at(-1)).toMatchObject({ requesterEmployeeId: "employee-a" });
+    expect(testState.referenceSummaryParams.at(-1)).toMatchObject({ requesterEmployeeId: "employee-a" });
+    expect(testState.monthlyQuery.mock.calls.at(-1)?.[0]).toMatchObject({ requesterEmployeeId: "employee-a" });
+    expect(testState.baselineSummaryParams.at(-1)).not.toHaveProperty("requesterEmployeeId");
+    expect(screen.getByTestId("history-right-panel-state")).toHaveAttribute("data-open", "no");
+    fireEvent.click(screen.getByRole("button", { name: "내 내역" }));
+    expect(testState.historyArgs.requesterEmployeeId).toBeUndefined();
+    expect(testState.historyArgs.dateFilter).toBe("WEEK");
+  });
+
+  it("resets mine and the open detail when the logged-in employee changes", () => {
+    const { rerender } = render(<DesktopHistoryView />);
+    fireEvent.click(screen.getByRole("button", { name: "내 내역" }));
+    fireEvent.click(screen.getByRole("button", { name: "단건 선택" }));
+    expect(screen.getByTestId("history-right-panel-state")).toHaveAttribute("data-open", "yes");
+    testState.operator = { employee_id: "employee-b" };
+    rerender(<DesktopHistoryView />);
+    expect(screen.getByRole("button", { name: "내 내역", pressed: false })).toBeInTheDocument();
+    expect(screen.getByTestId("history-right-panel-state")).toHaveAttribute("data-open", "no");
+    expect(testState.historyArgs.requesterEmployeeId).toBeUndefined();
+    fireEvent.click(screen.getByRole("button", { name: "내 내역" }));
+    expect(testState.historyArgs.requesterEmployeeId).toBe("employee-b");
+  });
+
   it.each([["operation", false], ["operation", true], ["op_batch", false]] as const)("제출 카드 선택은 표 행과 같고 뒤로가면 제출로 돌아간다 (%s, cancelled: %s)", (type, cancelled) => {
     const primary = makeLog({ log_id: "work-primary", operation_batch_id: null, operation_id: "work-op",
       operation_role: "PRIMARY", transaction_type: "MARK_DEFECTIVE", cancelled });
@@ -332,9 +369,9 @@ describe("DesktopHistoryView history state", () => {
 
   it("enables monthly counts only while the calendar is open", async () => {
     render(<DesktopHistoryView />);
-    expect(testState.monthlyQuery).toHaveBeenLastCalledWith(expect.any(Number), { enabled: false });
+    expect(testState.monthlyQuery).toHaveBeenLastCalledWith(expect.objectContaining({ year: expect.any(Number), month: expect.any(Number) }), { enabled: false });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "달력 토글" })); });
-    expect(testState.monthlyQuery).toHaveBeenLastCalledWith(expect.any(Number), { enabled: true });
+    expect(testState.monthlyQuery).toHaveBeenLastCalledWith(expect.objectContaining({ year: expect.any(Number), month: expect.any(Number) }), { enabled: true });
   });
   it("applies two rapid next-month actions without losing either move", async () => {
     render(<DesktopHistoryView />);

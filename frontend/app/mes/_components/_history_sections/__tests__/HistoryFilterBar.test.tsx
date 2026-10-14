@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { HistoryFilterBar } from "../HistoryFilterBar";
 
@@ -25,6 +25,27 @@ function renderFilterBar(flatSurface?: boolean, mobile?: boolean) {
 }
 
 describe("HistoryFilterBar", () => {
+  it.each([false, true])("places a pressed mine toggle between period and filter controls (mobile: %s)", (mobile) => {
+    const onToggleMine = vi.fn();
+    render(<HistoryFilterBar search="" setSearch={vi.fn()} dateFilter="MONTH" setDateFilter={vi.fn()}
+      filterPanelOpen={false} onToggleFilterPanel={vi.fn()} activeFilterCount={0}
+      calendarOpen={false} onToggleCalendar={vi.fn()} selectedDay={null} onClearSelectedDay={vi.fn()}
+      selectedMonth={null} onClearSelectedMonth={vi.fn()} mobile={mobile} mineOnly onToggleMine={onToggleMine} />);
+    const mine = screen.getByRole("button", { name: "내 내역", pressed: true });
+    expect(screen.getByRole("button", { name: "전체" }).compareDocumentPosition(mine) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(mine.compareDocumentPosition(screen.getByRole("button", { name: "필터" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(mine).toHaveClass("min-h-11", "min-w-11");
+    if (!mobile) expect(mine).toHaveClass("lg:min-h-0");
+    expect(mine).toHaveStyle({ color: "var(--c-blue)", borderColor: "var(--c-blue)" });
+    fireEvent.click(mine);
+    expect(onToggleMine).toHaveBeenCalledOnce();
+  });
+
+  it("shows mine unpressed by default", () => {
+    renderFilterBar();
+    expect(screen.getByRole("button", { name: "내 내역", pressed: false })).toBeInTheDocument();
+  });
+
   it("places mobile period controls before the search and sticks only the search", () => {
     const { container } = renderFilterBar(false, true);
     const search = screen.getByRole("textbox");

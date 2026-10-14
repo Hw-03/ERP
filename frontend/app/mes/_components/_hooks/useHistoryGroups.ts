@@ -23,6 +23,7 @@ export interface UseHistoryGroupsArgs {
   department: string;
   /** 필터 패널 — 제품 모델명 쉼표 결합. "" / 미지정 = 미적용. */
   model?: string;
+  requesterEmployeeId?: string;
   realtimeRevision?: number | null;
 }
 
@@ -54,6 +55,7 @@ export function useHistoryGroups({
   selectedMonth = null,
   department,
   model = "",
+  requesterEmployeeId,
   realtimeRevision,
 }: UseHistoryGroupsArgs): UseHistoryGroupsResult {
   const queryClient = useQueryClient();
@@ -69,6 +71,7 @@ export function useHistoryGroups({
     search ?? null,
     departmentParam ?? null,
     modelParam ?? null,
+    requesterEmployeeId ?? null,
   ]);
 
   function pageParams(cursor: string | null = null) {
@@ -81,6 +84,7 @@ export function useHistoryGroups({
       search,
       department: departmentParam,
       model: modelParam,
+      requesterEmployeeId,
     };
   }
 
@@ -252,20 +256,21 @@ export function useHistoryGroups({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [operationKeys, dateFrom, dateTo, search, departmentParam, modelParam, queryIdentity, queryClient]);
+  }, [operationKeys, dateFrom, dateTo, search, departmentParam, modelParam, requesterEmployeeId, queryIdentity, queryClient]);
 
+  const queryChanged = queryIdentityRef.current !== queryIdentity;
   return {
-    groups,
+    groups: queryChanged ? [] : groups,
     setGroups,
-    loading,
-    error,
+    loading: queryChanged || loading,
+    error: queryChanged ? null : error,
     retry,
-    refreshError,
+    refreshError: queryChanged ? null : refreshError,
     retryRefresh,
     refreshLoaded,
-    loadingMore,
-    loadMoreError,
-    canLoadMore: !loading && hasMore,
+    loadingMore: !queryChanged && loadingMore,
+    loadMoreError: queryChanged ? null : loadMoreError,
+    canLoadMore: !queryChanged && !loading && hasMore,
     loadMore,
   };
 }

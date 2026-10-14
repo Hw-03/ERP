@@ -84,7 +84,7 @@ vi.mock("@/lib/queries/useModelsQuery", () => ({
 }));
 
 vi.mock("@/lib/queries/useTransactionsQuery", () => ({
-  useMonthlyCountsQuery: () => ({ data: {} }),
+  useTransactionDisplayCalendarQuery: () => ({ data: {} }),
 }));
 
 vi.mock("@/lib/ui/BottomSheet", () => ({
