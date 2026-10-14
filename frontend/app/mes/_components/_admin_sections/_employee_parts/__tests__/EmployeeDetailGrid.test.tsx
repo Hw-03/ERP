@@ -4,6 +4,8 @@ import type { DepartmentMaster, Employee } from "@/lib/api";
 import { EmployeeDetailGrid } from "../EmployeeDetailGrid";
 import type { EmployeeEditForm } from "../../../_admin_hooks/useAdminEmployees";
 import { normalizeEmployeePosition } from "../employeeRoleLabels";
+import { SIDEBAR_TAB_IDS } from "../../../tabAccess";
+import { SIDEBAR_TAB_META } from "../../../sidebarTabMeta";
 
 const employee: Employee = {
   employee_id: "emp-001",
@@ -41,6 +43,56 @@ const departments: DepartmentMaster[] = [
 ];
 
 describe("EmployeeDetailGrid", () => {
+  it("메뉴 카드는 아이콘·이름·체크박스와 선택 상태 및 키보드 포커스를 표시한다", () => {
+    render(
+      <EmployeeDetailGrid employee={employee} form={{ ...form, hidden_sidebar_tabs: ["stocktake"] }} setForm={vi.fn()} departments={departments} productModels={[]} onRequestPinReset={vi.fn()} onToggle={vi.fn()} onRequestDelete={vi.fn()} />,
+    );
+
+    for (const tab of SIDEBAR_TAB_IDS) {
+      const checkbox = screen.getByRole("checkbox", { name: SIDEBAR_TAB_META[tab].label });
+      const card = checkbox.closest("label")!;
+      expect(card).toHaveClass("min-h-11", "border", "focus-within:ring-2");
+      expect(card.querySelector('svg[aria-hidden="true"]')).toBeInTheDocument();
+      expect(checkbox).toHaveProperty("checked", tab !== "stocktake");
+    }
+    expect(screen.getByText(/전수조사 일괄 표시를 바꾸면 이 설정도 함께 바뀌며, 여기서 다시 개별 조정할 수 있습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/부서 결재 정·부는 일괄 변경에서 제외됩니다\./)).toBeInTheDocument();
+    expect(screen.queryByText(/관리자·회차 담당자는 일괄 변경에서 제외/)).not.toBeInTheDocument();
+  });
+
+  it("메뉴 카드 이름 클릭도 입출고·불량 연동 선택 규칙과 다른 권한을 보존한다", () => {
+    const setForm = vi.fn();
+    render(<EmployeeDetailGrid employee={employee} form={form} setForm={setForm} departments={departments} productModels={[]} onRequestPinReset={vi.fn()} onToggle={vi.fn()} onRequestDelete={vi.fn()} />);
+    fireEvent.click(screen.getByText("입출고", { exact: true }));
+    const next = setForm.mock.calls[0][0](form) as EmployeeEditForm;
+    expect(next).toEqual({ ...form, hidden_sidebar_tabs: expect.arrayContaining(["warehouse", "defect"]) });
+  });
+
+  it("전수조사 표시를 독립적으로 숨기고 다시 허용하면 선택 카드 색상도 갱신한다", () => {
+    const setForm = vi.fn();
+    const props = { employee, form, setForm, departments, productModels: [], onRequestPinReset: vi.fn(), onToggle: vi.fn(), onRequestDelete: vi.fn() };
+    const { rerender } = render(<EmployeeDetailGrid {...props} />);
+    const checkbox = screen.getByRole("checkbox", { name: "재고 전수조사" });
+    const card = checkbox.closest("label")!;
+    const selectedStyle = {
+      background: "color-mix(in srgb, var(--c-blue) 10%, var(--c-s1))",
+      borderColor: "color-mix(in srgb, var(--c-blue) 35%, var(--c-border))",
+    };
+    expect(card).toHaveStyle(selectedStyle);
+    fireEvent.click(checkbox);
+    const hidden = setForm.mock.calls[0][0](form) as EmployeeEditForm;
+    expect(hidden).toEqual({ ...form, hidden_sidebar_tabs: ["stocktake"] });
+    rerender(<EmployeeDetailGrid {...props} form={hidden} />);
+    expect(screen.getByRole("checkbox", { name: "재고 전수조사" })).not.toBeChecked();
+    expect(card).toHaveStyle({ background: "var(--c-s1)", borderColor: "var(--c-border)" });
+    fireEvent.click(screen.getByRole("checkbox", { name: "재고 전수조사" }));
+    const shown = setForm.mock.calls[1][0](hidden) as EmployeeEditForm;
+    expect(shown).toEqual(form);
+    rerender(<EmployeeDetailGrid {...props} form={shown} />);
+    expect(checkbox).toBeChecked();
+    expect(card).toHaveStyle(selectedStyle);
+  });
+
   it("직원 편집 화면은 등급 control 없이 창고·부서 정·부와 AS·연구 역할을 독립적으로 유지한다", () => {
     const selectedForm: EmployeeEditForm = {
       ...form,
@@ -127,7 +179,7 @@ describe("EmployeeDetailGrid", () => {
     expect(screen.getByRole("button", { name: "직원 삭제" })).toBeInTheDocument();
   });
 
-  it("xl에서는 기본 정보·권한·PIN 및 위험 작업을 세 번째 열에 배치한다", () => {
+  it("기본 정보·결재 권한·메뉴를 분리하고 담당 모델 다음에 계정 작업을 배치한다", () => {
     render(
       <EmployeeDetailGrid
         employee={employee}
@@ -143,15 +195,21 @@ describe("EmployeeDetailGrid", () => {
 
     const layout = screen.getByText("기본 정보").parentElement?.parentElement?.parentElement;
     const basicCard = screen.getByText("기본 정보").parentElement?.parentElement;
-    const permissionsCard = screen.getByText("권한").parentElement?.parentElement;
+    const permissionsCard = screen.getByText("결재 권한").parentElement?.parentElement;
+    const menuCard = screen.getByText("메뉴 및 추가 권한").parentElement?.parentElement;
+    const assignedModelsCard = screen.getByText("담당 모델 (우선순위 순)").parentElement?.parentElement;
     const dangerCard = screen.getByText("계정 상태 및 위험 작업").parentElement?.parentElement;
     const actionArea = dangerCard?.parentElement;
 
     expect(layout).toHaveClass("xl:grid-cols-3");
     expect(basicCard?.parentElement).toBe(layout);
     expect(permissionsCard?.parentElement).toBe(layout);
+    expect(menuCard?.parentElement).toBe(layout);
+    expect(within(permissionsCard!).queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(within(menuCard!).getByRole("checkbox", { name: "AS·연구 승인 권한" })).toBeInTheDocument();
     expect(actionArea?.parentElement).toBe(layout);
-    expect(actionArea).toHaveClass("xl:col-start-3", "xl:row-start-1");
+    expect(actionArea).toBe(layout?.lastElementChild);
+    expect(assignedModelsCard?.parentElement?.nextElementSibling).toBe(actionArea);
   });
 
   it("조립 부서의 담당 모델 카드는 xl에서 세 열 전체를 사용한다", () => {
@@ -216,7 +274,7 @@ describe("EmployeeDetailGrid", () => {
     expect(header!.nextElementSibling).toBe(screen.getByRole("button", { name: "PIN 초기화 (0000)" }));
   });
 
-  it("데스크톱 카드가 공통 가용 높이를 채우고 위험 작업을 우측 열 하단까지 배치한다", () => {
+  it("계정 작업은 고정 높이 없이 넓을 때 2열·좁을 때 1열의 본문 흐름을 따른다", () => {
     render(
       <EmployeeDetailGrid
         employee={employee}
@@ -232,15 +290,17 @@ describe("EmployeeDetailGrid", () => {
 
     const layout = screen.getByText("기본 정보").parentElement?.parentElement?.parentElement;
     const basicCard = screen.getByText("기본 정보").parentElement?.parentElement;
-    const permissionsCard = screen.getByText("권한").parentElement?.parentElement;
+    const permissionsCard = screen.getByText("결재 권한").parentElement?.parentElement;
     const dangerCard = screen.getByText("계정 상태 및 위험 작업").parentElement?.parentElement;
     const actionArea = dangerCard?.parentElement;
 
-    expect(layout).toHaveClass("h-full", "min-h-0", "xl:items-stretch");
+    expect(layout).toHaveClass("min-h-0", "xl:items-stretch");
+    expect(layout).not.toHaveClass("h-full");
     expect(basicCard).toHaveClass("h-full");
     expect(permissionsCard).toHaveClass("h-full");
-    expect(actionArea).toHaveClass("h-full", "grid-rows-[auto_minmax(0,1fr)]");
-    expect(dangerCard).toHaveClass("h-full");
+    expect(actionArea).toHaveClass("grid", "lg:grid-cols-2", "xl:col-span-3");
+    expect(actionArea).not.toHaveClass("h-full", "grid-rows-[auto_minmax(0,1fr)]");
+    expect(dangerCard).not.toHaveClass("h-full");
   });
 
   it("AS·연구 승인 권한은 정·부 역할과 분리된 checkbox로 변경한다", () => {
@@ -259,8 +319,8 @@ describe("EmployeeDetailGrid", () => {
     );
 
     const toggle = screen.getByRole("checkbox", { name: "AS·연구 승인 권한" });
-    expect(screen.getByText(/AS·연구 사용출고 중 부서 재고의 AR·AA 품목 승인/)).toBeInTheDocument();
-    expect(screen.getByText(/대상 직원은 다음 로그인부터 승인함 탭 반영/)).toBeInTheDocument();
+    expect(screen.getByText(/부서 재고의 AS·연구용 출고를 승인할 수 있습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/저장 후 다음 로그인부터 승인함이 표시됩니다/)).toBeInTheDocument();
     fireEvent.click(toggle);
     expect(setForm.mock.calls[0][0]({ ...form, as_research_approver: false }).as_research_approver).toBe(true);
   });

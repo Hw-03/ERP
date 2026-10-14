@@ -19,19 +19,9 @@ import {
 } from "./employeeRoleLabels";
 import { DetailCardSlot, FieldRow, SelectInput, TextInput } from "./employeeDetailPrimitives";
 import { SIDEBAR_TAB_IDS, setSidebarTabVisible, type SidebarTabId } from "../../tabAccess";
+import { SIDEBAR_TAB_META } from "../../sidebarTabMeta";
 
 
-const SIDEBAR_TAB_LABELS: Record<SidebarTabId, string> = {
-  dashboard: "대시보드",
-  warehouse: "입출고",
-  shipping: "출하",
-  warehouseMap: "창고 지도",
-  defect: "불량",
-  history: "입출고 내역",
-  dailyReport: "일일 작업 일보",
-  weekly: "주간보고",
-  admin: "관리자",
-};
 interface EmployeeDetailGridProps {
   employee: Employee;
   form: ReturnType<typeof useAdminEmployeesContext>["editForm"];
@@ -63,7 +53,7 @@ export function EmployeeDetailGrid({
     }));
   };
   return (
-    <div className="grid h-full min-h-0 gap-3 lg:grid-cols-2 xl:grid-cols-3 xl:items-stretch">
+    <div className="grid min-h-0 gap-3 lg:grid-cols-2 xl:grid-cols-3 xl:items-stretch">
       {/* 카드 1: 기본 정보 */}
       <DetailCardSlot title="기본 정보" className="h-full">
         <div className="grid grid-cols-2 gap-3">
@@ -113,8 +103,8 @@ export function EmployeeDetailGrid({
         </div>
       </DetailCardSlot>
 
-      {/* 카드 2: 권한 */}
-      <DetailCardSlot title="권한" className="h-full">
+      {/* 카드 2: 결재 권한 */}
+      <DetailCardSlot title="결재 권한" className="h-full">
         <div className="flex flex-col gap-3">
           <FieldRow label="창고 결재 역할">
             <SelectInput
@@ -148,8 +138,13 @@ export function EmployeeDetailGrid({
               {deptMeta.hint}
             </div>
           </FieldRow>
+        </div>
+      </DetailCardSlot>
+
+      <DetailCardSlot title="메뉴 및 추가 권한" className="lg:col-span-2 xl:col-span-1">
+        <div className="flex flex-col gap-4">
           <FieldRow label="AS·연구 승인 권한">
-            <label className="flex cursor-pointer items-start gap-2 rounded-[10px] border px-3 py-2" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}>
+            <label className="flex min-h-11 cursor-pointer items-start gap-2 rounded-[10px] border px-3 py-2" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}>
               <input
                 type="checkbox"
                 aria-label="AS·연구 승인 권한"
@@ -162,38 +157,65 @@ export function EmployeeDetailGrid({
                 style={{ accentColor: LEGACY_COLORS.blue, borderColor: LEGACY_COLORS.border }}
               />
               <span className="text-[12px] leading-5" style={{ color: LEGACY_COLORS.muted2 }}>
-                AS·연구 사용출고 중 부서 재고의 AR·AA 품목 승인. 대상 직원은 다음 로그인부터 승인함 탭 반영
+                부서 재고의 AS·연구용 출고를 승인할 수 있습니다. 대상은 AR·AA 품목이며, 저장 후 다음 로그인부터 승인함이 표시됩니다.
               </span>
             </label>
           </FieldRow>
-          <FieldRow label="표시 탭">
-            <div className="grid grid-cols-2 gap-2">
-              {SIDEBAR_TAB_IDS.map((tab) => (
-                <label key={tab} className="inline-flex cursor-pointer items-center gap-2 py-1">
-                  <input
-                    type="checkbox"
-                    checked={!hiddenTabs.has(tab)}
-                    onChange={(e) => toggleSidebarTab(tab, e.target.checked)}
-                    className="h-4 w-4 cursor-pointer rounded border"
+          <FieldRow label="직원에게 보이는 메뉴">
+            <p className="mb-2 text-xs text-[var(--c-muted2)]">
+              직원별 메뉴 표시를 설정합니다. 전수조사 일괄 표시를 바꾸면 이 설정도 함께 바뀌며, 여기서 다시 개별 조정할 수 있습니다. 부서 결재 정·부는 일괄 변경에서 제외됩니다.
+            </p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {SIDEBAR_TAB_IDS.map((tab) => {
+                const { icon: Icon, label, color } = SIDEBAR_TAB_META[tab];
+                const selected = !hiddenTabs.has(tab);
+                return (
+                  <label
+                    key={tab}
+                    className="flex min-h-11 cursor-pointer items-center gap-2 rounded-[10px] border px-3 py-2 transition-colors focus-within:ring-2 focus-within:ring-[var(--c-blue)]"
                     style={{
-                      accentColor: LEGACY_COLORS.blue,
-                      borderColor: LEGACY_COLORS.border,
+                      background: selected
+                        ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, ${LEGACY_COLORS.s1})`
+                        : LEGACY_COLORS.s1,
+                      borderColor: selected
+                        ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 35%, ${LEGACY_COLORS.border})`
+                        : LEGACY_COLORS.border,
                     }}
-                  />
-                  <span className="text-[14px]" style={{ color: LEGACY_COLORS.text }}>
-                    {SIDEBAR_TAB_LABELS[tab]}
-                  </span>
-                </label>
-              ))}
-            </div>
-            <div className="mt-1.5 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-              체크 해제한 탭은 해당 직원의 PC 사이드바와 모바일 메뉴에서 숨겨집니다.
+                  >
+                    <Icon className="h-4 w-4 shrink-0" style={{ color }} aria-hidden="true" />
+                    <span className="min-w-0 flex-1 text-sm text-[var(--c-text)]">{label}</span>
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={(e) => toggleSidebarTab(tab, e.target.checked)}
+                      className="h-4 w-4 shrink-0 cursor-pointer rounded border"
+                      style={{
+                        accentColor: LEGACY_COLORS.blue,
+                        borderColor: LEGACY_COLORS.border,
+                      }}
+                    />
+                  </label>
+                );
+              })}
             </div>
           </FieldRow>
         </div>
       </DetailCardSlot>
 
-      <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3 lg:col-span-2 xl:col-span-1 xl:col-start-3 xl:row-start-1">
+      {/* 조립 담당 모델 다음에 계정 작업을 일반 본문 흐름으로 배치한다. */}
+      {form.department === ASSEMBLY_DEPT ? (
+        <div className="lg:col-span-2 xl:col-span-3">
+          <DetailCardSlot title="담당 모델 (우선순위 순)">
+            <AssignedModelsEditor
+              models={productModels}
+              selected={form.assigned_model_slots}
+              onChange={(next) => setForm((f) => ({ ...f, assigned_model_slots: next }))}
+            />
+          </DetailCardSlot>
+        </div>
+      ) : null}
+
+      <div className="grid gap-3 lg:col-span-2 lg:grid-cols-2 xl:col-span-3">
         <DetailCardSlot
           title="PIN"
           headerAccessory={(
@@ -232,7 +254,7 @@ export function EmployeeDetailGrid({
           </button>
         </DetailCardSlot>
 
-        <DetailCardSlot title="계정 상태 및 위험 작업" className="h-full">
+        <DetailCardSlot title="계정 상태 및 위험 작업">
           <div className="flex flex-col gap-2 sm:flex-row">
             <button
               type="button"
@@ -259,18 +281,6 @@ export function EmployeeDetailGrid({
         </DetailCardSlot>
       </div>
 
-      {/* 카드 5: 담당 모델 — 조립 부서일 때만 노출. 입출고 화면에서 조립 그룹 내 정렬 우선순위로 사용. */}
-      {form.department === ASSEMBLY_DEPT ? (
-        <div className="lg:col-span-2 xl:col-span-3">
-          <DetailCardSlot title="담당 모델 (우선순위 순)">
-            <AssignedModelsEditor
-              models={productModels}
-              selected={form.assigned_model_slots}
-              onChange={(next) => setForm((f) => ({ ...f, assigned_model_slots: next }))}
-            />
-          </DetailCardSlot>
-        </div>
-      ) : null}
     </div>
   );
 }
