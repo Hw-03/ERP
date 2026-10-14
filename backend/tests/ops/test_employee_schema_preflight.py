@@ -58,6 +58,22 @@ def test_changed_migrations_require_declared_auto_deploy_policy(tmp_path: Path) 
         module.load_changed_migration_policies(source, target)
 
 
+def test_stocktake_merge_declares_schema_only_policy(tmp_path: Path) -> None:
+    """The no-op merge must remain eligible without relaxing undeclared-policy guards."""
+    module = _load_preflight_module()
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    source.mkdir()
+    target.mkdir()
+    migration = MIGRATIONS / "20261014_0045_merge_stocktake_main.py"
+    (source / migration.name).write_bytes(migration.read_bytes())
+
+    policies = module.load_changed_migration_policies(source, target)
+
+    assert len(policies) == 1
+    assert policies[0].kind == "schema-only"
+
+
 def test_preflight_allows_docstring_only_model_changes_without_a_migration(
     tmp_path: Path,
 ) -> None:
