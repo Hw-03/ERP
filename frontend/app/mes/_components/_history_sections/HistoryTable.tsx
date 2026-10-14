@@ -103,7 +103,8 @@ const COLUMNS: ColSpec[] = [
 ];
 const HISTORY_TABLE_COLUMN_SPAN = COLUMNS.reduce((total, column) => total + (column.colSpan ?? 1), 0);
 const VISIBLE_FETCH_CONCURRENCY = 4;
-const HISTORY_TABLE_SURFACE_CLASS = "min-w-0 overflow-clip rounded-[24px]";
+// Fixed columns use 796px; leave 204px for the target and let the list viewport scroll.
+const HISTORY_TABLE_SURFACE_CLASS = "min-w-[1000px] overflow-clip rounded-[24px]";
 
 function historyTableHeaderClass(column: (typeof COLUMNS)[number], index: number): string {
   const alignment = column.align === "center" ? "text-center" : column.align === "right" ? "text-right" : "text-left";

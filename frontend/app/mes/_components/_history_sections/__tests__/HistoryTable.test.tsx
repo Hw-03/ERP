@@ -1215,7 +1215,7 @@ describe("HistoryTable hierarchy", () => {
     expect(screen.getByRole("columnheader", { name: "품목코드" })).toBeInTheDocument();
     const surface = screen.getByTestId("history-table-surface");
     expect(surface).toHaveClass(
-      "min-w-0",
+      "min-w-[1000px]",
       "overflow-clip",
       "rounded-[24px]",
     );
