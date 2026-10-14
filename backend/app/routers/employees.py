@@ -16,6 +16,7 @@ from app.schemas import (
     EmployeeAppearanceResponse,
     EmployeeAppearanceUpdate,
     EmployeeCreate,
+    EmployeePinSessionResponse,
     EmployeePinChangeRequest,
     EmployeePinResetRequest,
     EmployeeLoginNotificationPopupUpdate,
@@ -25,12 +26,14 @@ from app.schemas import (
     EmployeeUpdate,
     PinVerifyRequest,
 )
+from app.schemas.operator_session import OperatorSessionIssued
 from app.dependencies.admin import require_admin_pin
 from app.routers.settings import require_admin
 from app.services import rate_limit
 from app.services.audit_actor_session import set_audit_actor_cookie
 from app.services.pin_auth import DEFAULT_PIN_HASH, hash_pin, validate_pin, verify_pin
 from app.services import audit
+from app.services.operator_session import commit_session_without_realtime, issue_session
 from app.services._tx import commit_and_refresh, commit_only
 from app._actor import set_actor
 
@@ -38,6 +41,7 @@ router = APIRouter()
 
 SIDEBAR_TAB_IDS: tuple[str, ...] = (
     "dashboard",
+    "stocktake",
     "warehouse",
     "shipping",
     "warehouseMap",
@@ -522,7 +526,7 @@ def delete_employee(
         return JSONResponse(status_code=200, content={"result": "deleted"})
 
 
-@router.post("/{employee_id}/verify-pin", response_model=EmployeeResponse)
+@router.post("/{employee_id}/verify-pin", response_model=EmployeeResponse | EmployeePinSessionResponse)
 def verify_employee_pin(
     employee_id: uuid.UUID,
     payload: PinVerifyRequest,
@@ -557,7 +561,15 @@ def verify_employee_pin(
     rate_limit.record_success(rl_key)
     set_actor(request, employee)
     set_audit_actor_cookie(response, employee.employee_code)
-    return _to_response(employee, _assigned_slots_for(db, employee.employee_id))
+    employee_response = _to_response(employee, _assigned_slots_for(db, employee.employee_id))
+    if payload.tab_id is None:
+        return employee_response
+    token, operator_row = issue_session(db, employee=employee, tab_id=payload.tab_id)
+    commit_session_without_realtime(db)
+    return EmployeePinSessionResponse(
+        employee=employee_response,
+        operator_session=OperatorSessionIssued(token=token, expires_at=operator_row.expires_at),
+    )
 
 
 @router.post("/{employee_id}/change-pin", status_code=status.HTTP_204_NO_CONTENT)
@@ -583,6 +595,7 @@ def change_employee_pin(
     employee.pin_hash = hash_pin(payload.new_pin)
     employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
     employee.pin_last_changed = datetime.now(UTC).replace(tzinfo=None)
+    employee.pin_version += 1
 
     audit.record(
         db,
@@ -613,6 +626,7 @@ def reset_employee_pin(
     employee.pin_hash = DEFAULT_PIN_HASH
     employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
     employee.pin_last_changed = datetime.now(UTC).replace(tzinfo=None)
+    employee.pin_version += 1
 
     audit.record(
         db,

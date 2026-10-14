@@ -567,15 +567,34 @@ def test_employee_hidden_sidebar_tabs_accept_daily_report_tab(db_session, client
     assert resp.json()["hidden_sidebar_tabs"] == ["dailyReport"]
 
 
+def test_employee_hidden_sidebar_tabs_stocktake_round_trip(db_session, client):
+    """전수조사 표시 제한은 저장·조회되고 입출고 권한과 결합하지 않는다."""
+    response = client.post(
+        "/api/employees", headers=ADMIN_HEADERS,
+        json=_emp_payload(name="Stocktake hidden", hidden_sidebar_tabs=["stocktake"]),
+    )
+    assert response.status_code == 201, response.text
+    employee_id = response.json()["employee_id"]
+    assert response.json()["hidden_sidebar_tabs"] == ["stocktake"]
+    assert response.json()["io_enabled"] is True
+    rows = client.get("/api/employees").json()
+    assert next(row for row in rows if row["employee_id"] == employee_id)["hidden_sidebar_tabs"] == ["stocktake"]
+    update = client.put(f"/api/employees/{employee_id}", headers=ADMIN_HEADERS, json={"hidden_sidebar_tabs": []})
+    assert update.status_code == 200, update.text
+    assert update.json()["hidden_sidebar_tabs"] == []
+
+
 def test_employee_hidden_sidebar_tabs_reject_hiding_every_tab(db_session, client):
     """At least one desktop sidebar tab must remain visible for each employee."""
     all_tabs = [
         "dashboard",
+        "stocktake",
         "warehouse",
         "shipping",
         "warehouseMap",
         "defect",
         "history",
+        "dailyReport",
         "weekly",
         "admin",
     ]

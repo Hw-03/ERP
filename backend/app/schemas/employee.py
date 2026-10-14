@@ -6,11 +6,13 @@ import uuid
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.common import UtcDatetime
+from app.schemas.operator_session import OperatorSessionIssued
 
 
 class PinVerifyRequest(BaseModel):
     # 작업자 식별용 PIN 검증 요청 — 실제 보안 인증이 아님
     pin: str = Field(..., min_length=1, max_length=20)
+    tab_id: Optional[str] = Field(None, min_length=1, max_length=100)
 
 
 class EmployeePinResetRequest(BaseModel):
@@ -90,6 +92,13 @@ class EmployeeResponse(BaseModel):
     # 직원별 좌측 사이드바/모바일 탭 숨김 목록.
     hidden_sidebar_tabs: List[str] = Field(default_factory=list)
     login_notification_popup_enabled: bool = True
+
+
+class EmployeePinSessionResponse(BaseModel):
+    """New tab-aware PIN response; legacy EmployeeResponse stays unchanged."""
+
+    employee: EmployeeResponse
+    operator_session: OperatorSessionIssued
 
 
 class EmployeeLoginNotificationPopupUpdate(BaseModel):
