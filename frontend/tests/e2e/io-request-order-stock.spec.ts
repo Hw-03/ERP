@@ -121,6 +121,9 @@ test.describe("입출고 내역 — 요청 순 재고", () => {
     await expect(requestRow).not.toContainText("94");
 
     await requestRow.click();
+    await page.getByRole("complementary", { name: "COCOON 요청", exact: true }).evaluate(async (panel) => {
+      await Promise.all(panel.parentElement!.getAnimations({ subtree: true }).map((animation) => animation.finished));
+    });
 
     const assemblyStock = table.getByLabel("재고 변동: 창고 0 +50→50");
     await expect(assemblyStock).toBeVisible();
