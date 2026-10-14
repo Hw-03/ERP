@@ -17,6 +17,14 @@ async function assertReasonLayout(line: Locator, mobile: boolean): Promise<void>
   const boxes = await Promise.all([quantity, category, memo, management, remove].map((control) => control.boundingBox()));
   expect(boxes.every(Boolean)).toBe(true);
   const [q, c, m, g, r] = boxes.map((box) => box!);
+  const stackedDesktop = !mobile && await category.evaluate((element) => {
+    for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+      const style = getComputedStyle(parent);
+      if (style.containerType === "inline-size") return Number.parseFloat(style.width) <= 380;
+    }
+    throw new Error("사유 입력 영역의 크기 컨테이너가 없습니다.");
+  });
+  if (!mobile && line.page().viewportSize()?.width === 1100) expect(stackedDesktop).toBe(true);
   const overlapsVertically = (first: typeof q, second: typeof q): boolean =>
     first.y < second.y + second.height && second.y < first.y + first.height;
   expect(q.height).toBe(44);
@@ -30,8 +38,13 @@ async function assertReasonLayout(line: Locator, mobile: boolean): Promise<void>
     expect(buttonBox.height).toBeGreaterThanOrEqual(44);
     if (!mobile) {
       expect(buttonBox.height).toBe(m.height);
-      expect(buttonBox.y).toBe(m.y);
+      expect(buttonBox.y).toBe(stackedDesktop ? g.y : m.y);
     }
+  }
+  const lineBox = (await line.boundingBox())!;
+  for (const box of [q, c, m, g, r]) {
+    expect(box.x).toBeGreaterThanOrEqual(lineBox.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(lineBox.x + lineBox.width + 1);
   }
   if (mobile) {
     expect(g.x + g.width).toBeLessThanOrEqual((await line.boundingBox())!.x + (await line.boundingBox())!.width + 1);
@@ -56,8 +69,13 @@ async function assertReasonLayout(line: Locator, mobile: boolean): Promise<void>
     expect(overlapsVertically(q, r)).toBe(true);
     expect(c.x + c.width).toBeLessThanOrEqual(r.x + 1);
     expect(m.y).toBeGreaterThanOrEqual(q.y + q.height);
-    expect(overlapsVertically(m, g)).toBe(true);
-    expect(m.x + m.width).toBeLessThanOrEqual(g.x + 1);
+    if (stackedDesktop) {
+      expect(g.y).toBeGreaterThanOrEqual(m.y + m.height);
+      expect(Math.abs(g.x - m.x)).toBeLessThanOrEqual(1);
+    } else {
+      expect(overlapsVertically(m, g)).toBe(true);
+      expect(m.x + m.width).toBeLessThanOrEqual(g.x + 1);
+    }
   }
 }
 
@@ -126,6 +144,7 @@ for (const scenario of [
   { name: "PC", width: 1914, height: 878, mobile: false },
   { name: "PC 목표 크기", width: 1915, height: 884, mobile: false },
   { name: "좁은 PC", width: 1280, height: 878, mobile: false },
+  { name: "최소 PC", width: 1100, height: 878, mobile: false },
   { name: "모바일", width: 393, height: 852, mobile: true },
   { name: "좁은 모바일", width: 320, height: 740, mobile: true },
 ]) {
