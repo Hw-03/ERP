@@ -80,4 +80,8 @@ def _sync_total(db: Session, inv: Inventory) -> None:
         .filter(InventoryLocation.item_id == inv.item_id)
         .scalar()
     ) or 0
-    inv.quantity = (inv.warehouse_qty or Decimal("0")) + Decimal(str(loc_sum))
+    total = (inv.warehouse_qty or Decimal("0")) + Decimal(str(loc_sum))
+    from app.services import defect_pool
+    if defect_pool.is_pool_mode(db):
+        defect_pool.integer_quantity(total)
+    inv.quantity = total

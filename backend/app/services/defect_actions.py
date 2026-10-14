@@ -26,6 +26,7 @@ from app.services import inv_effect
 from app.services import inventory as inventory_svc
 from app.services import defect_records as defect_records_svc
 from app.services import inventory_operations as operation_svc
+from app.services import defect_pool
 from app.services._tx import transactional
 from app.services.inv_transfer import department_for_item, lock_items_for_department_routing
 
@@ -41,10 +42,11 @@ def new_submission_id(client_request_id: Optional[str] = None) -> uuid.UUID:
 class BulkUnquarantineLine:
     """정상 복귀 다건 요청의 제출 시점 기록 스냅샷."""
 
-    record_id: uuid.UUID
+    record_id: Optional[uuid.UUID]
     item_id: uuid.UUID
     department: DepartmentEnum
     quantity: Decimal
+    pool_id: Optional[uuid.UUID] = None
 
 
 @dataclass(frozen=True)
@@ -198,6 +200,7 @@ def quarantine_inventory_bulk(
     inventories: list[Inventory] = []
     submission_id = uuid.uuid4()
     with transactional(db):
+        inventory_svc.ensure_and_lock_inventories(db, sorted({line.item_id for line in lines}))
         for line in sorted(lines, key=lambda current: str(current.item_id)):
             inventories.append(
                 quarantine_inventory(
@@ -223,6 +226,7 @@ def unquarantine_inventory(
     db: Session,
     *,
     record_id: Optional[uuid.UUID] = None,
+    pool_id: Optional[uuid.UUID] = None,
     item_id: uuid.UUID,
     qty: Decimal,
     dept: DepartmentEnum,
@@ -235,7 +239,15 @@ def unquarantine_inventory(
     """정상 복귀와 원장 기록을 하나의 업무 트랜잭션으로 확정한다."""
     submission_id = submission_id or uuid.uuid4()
     with transactional(db):
-        record = defect_records_svc.get_record_for_action(
+        pool = None
+        if pool_id is not None and not defect_pool.is_pool_mode(db):
+            raise ValueError("공동재고 전환 전에는 pool_id를 사용할 수 없습니다.")
+        if defect_pool.is_pool_mode(db):
+            inventory_svc.ensure_and_lock_inventories(db, [item_id])
+            pool = defect_pool.resolve_source(db, pool_id=pool_id, record_id=record_id,
+                                               item_id=item_id, department=dept)
+            defect_pool.ensure_available(pool, qty)
+        record = None if pool is not None else defect_records_svc.get_record_for_action(
             db,
             record_id=record_id,
             item_id=item_id,
@@ -295,6 +307,8 @@ def unquarantine_inventory(
             InventoryOperationRoleEnum.PRIMARY,
         )
         db.add(log)
+        if pool is not None:
+            defect_pool.apply_delta(db, pool=pool, delta=-qty, operation=operation, reason="RESTORE")
         if record is not None:
             operation_svc.record_defect_movement(
                 db,
@@ -326,7 +340,28 @@ def unquarantine_inventory_bulk(
     if not lines:
         raise ValueError("정상 복귀할 격리 기록이 비어 있습니다.")
 
+    if defect_pool.is_pool_mode(db):
+        with transactional(db):
+            inventory_svc.ensure_and_lock_inventories(db, sorted({line.item_id for line in lines}))
+            sources = []
+            for line in lines:
+                pool = defect_pool.resolve_source(db, pool_id=line.pool_id, record_id=line.record_id,
+                    item_id=line.item_id, department=line.department, defect_only=False)
+                defect_pool.ensure_available(pool, line.quantity)
+                sources.append((line, pool))
+            if len({pool.pool_id for _, pool in sources}) != len(sources):
+                raise ValueError("동일 공동재고를 중복 선택할 수 없습니다.")
+            if len({(line.item_id, line.department) for line, _ in sources}) != 1:
+                raise ValueError("정상 복귀는 같은 품목·부서만 함께 처리할 수 있습니다.")
+            for line, pool in sources:
+                unquarantine_inventory(db, pool_id=pool.pool_id, item_id=line.item_id,
+                    qty=line.quantity, dept=line.department, actor=actor,
+                    reason_category=reason_category, reason_memo=reason_memo)
+        return
+
     record_ids = [line.record_id for line in lines]
+    if any(record_id is None for record_id in record_ids) or any(line.pool_id for line in lines):
+        raise ValueError("전환 전에는 격리 기록을 선택해야 합니다.")
     if len(record_ids) != len(set(record_ids)):
         raise ValueError("중복된 격리 기록은 함께 처리할 수 없습니다.")
     if len({line.item_id for line in lines}) != 1:

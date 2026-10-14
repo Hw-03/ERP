@@ -123,8 +123,13 @@ def repair_inventory_totals(db: Session, *, dry_run: bool = True) -> RepairRepor
 
     dry_run=True (기본) 이면 DB 에 쓰지 않고 리포트만.
     """
+    if dry_run:
+        inventories = db.query(Inventory).all()
+    else:
+        from app.services.inventory import ensure_and_lock_inventories
+        item_ids = [row[0] for row in db.query(Inventory.item_id).order_by(Inventory.item_id).all()]
+        inventories = list(ensure_and_lock_inventories(db, item_ids).values())
     loc_sums = _location_sum_map(db)
-    inventories = db.query(Inventory).all()
 
     mismatched = 0
     repaired = 0

@@ -163,6 +163,11 @@ def apply_effect_reverse(db: Session, item_id: uuid.UUID, effect: list[dict] | N
     창고는 Inventory.warehouse_qty, location 은 (dept,status) 행을 ORM 속성으로 갱신한다.
     호출 측에서 이후 _sync_total 로 Inventory.quantity 를 재동기화해야 한다.
     """
+    from app.services import stocktake_guard
+    stocktake_guard.prepare_items(db, [item_id])
+    for cell in effect or []:
+        department = "창고" if cell.get("scope") in {"warehouse", "warehouse_box"} else cell["department"]
+        stocktake_guard.record_change(db, item_id, department, kind="quantity", delta=-int(cell["delta"]))
     inventory_query = db.query(Inventory).filter(Inventory.item_id == item_id)
     if not _is_sqlite:
         inventory_query = inventory_query.with_for_update()

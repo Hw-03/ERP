@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
+import uuid
 from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
@@ -78,6 +80,23 @@ def _set_workflow_status(
     cancellation = db.get(InventoryOperation, effect.operation_id)
     if cancellation is None:
         raise InventoryIntegrityRepairError("취소 작업을 찾을 수 없어 복구할 수 없습니다.")
+    from app.services.business_correction_lineage import is_correction
+    if is_correction(cancellation):
+        # Restore only correction-owned fields from its immutable typed effect.
+        for name in ("prepared_at", "picked_up_at", "prepared_by_employee_id", "prepared_by_name",
+                     "cancelled_at", "cancelled_by_employee_id", "cancelled_by_name", "completed_at"):
+            if name not in effect.after_state or not hasattr(subject, name):
+                continue
+            value = effect.after_state[name]
+            if value is not None and name.endswith("_at"):
+                value = datetime.fromisoformat(value)
+            elif value is not None and name.endswith("_employee_id"):
+                value = uuid.UUID(value)
+            setattr(subject, name, value)
+        if isinstance(subject, StockRequest):
+            for line in subject.lines:
+                line.status = StockRequestStatusEnum(expected)
+        return
     if hasattr(subject, "cancelled_at"):
         subject.cancelled_at = cancellation.effective_at
     if hasattr(subject, "cancelled_by_employee_id"):
@@ -93,10 +112,15 @@ def _set_allocation_status(
     allocation = db.get(ShippingAllocation, effect.subject_id)
     if allocation is None:
         raise InventoryIntegrityRepairError("출하 배정을 찾을 수 없어 복구할 수 없습니다.")
+    from app.services import stocktake_guard
+    stocktake_guard.prepare_items(db, [allocation.item_id])
+    db.refresh(allocation, with_for_update=db.get_bind().dialect.name != "sqlite")
     expected = str((effect.after_state or {}).get("status") or "")
     cancellation = db.get(InventoryOperation, effect.operation_id)
     if cancellation is None:
         raise InventoryIntegrityRepairError("취소 작업을 찾을 수 없어 복구할 수 없습니다.")
+    reservation_delta = int(allocation.quantity) * (int(expected == "RESERVED") - int(allocation.status == "RESERVED"))
+    stocktake_guard.record_change(db, allocation.item_id, allocation.department or "창고", kind="reservation", delta=reservation_delta)
     allocation.status = expected
     allocation.released_at = cancellation.effective_at
     allocation.released_reason = f"정합성 복구: {cancellation.reason or '취소 작업 효과 반영'}"
@@ -138,6 +162,20 @@ def repair_inventory_integrity_issue(
     effect = db.get(InventoryOperationEffect, issue.cause_ids[1])
     if effect is None:
         raise InventoryIntegrityRepairError("복구 근거 효과를 찾을 수 없습니다.")
+
+    from app.services.business_correction_scope import lock_roots
+    identities = set()
+    if effect.subject_type == "ShippingAllocation":
+        allocation = db.get(ShippingAllocation, effect.subject_id)
+        if allocation is not None:
+            identities.add(("ShippingRequest", allocation.request_id))
+    else:
+        identities.add((effect.subject_type, uuid.UUID(effect.subject_id)))
+    lock_roots(db, identities)
+    # A concurrent approval/new workflow may supersede the diagnostic while waiting.
+    current = next((row for row in diagnose_inventory_integrity(db).issues if row.problem_id == problem_id), None)
+    if current is None or not current.repairable:
+        raise InventoryIntegrityRepairError("잠금 대기 중 업무 상태가 변경되었습니다. 진단을 다시 확인해 주세요.")
 
     if issue.category == "WORKFLOW_STATE_RESIDUE":
         _set_workflow_status(db, effect)

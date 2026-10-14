@@ -148,6 +148,11 @@ def ensure_available(
     require_exact: bool = False,
 ) -> None:
     """남은 수량에서 다른 승인 대기 수량을 뺀 처리 가능 수량을 검증한다."""
+    from app.services import defect_pool
+
+    if defect_pool.is_pool_mode(db):
+        defect_pool.ensure_available(defect_pool.pool_for_record(db, record), quantity)
+        return
     quantity = Decimal(str(quantity))
     pending = pending_quantity(
         db,
@@ -192,4 +197,7 @@ def decrement_record(
         quantity,
         exclude_line_id=exclude_line_id,
     )
-    record.remaining_quantity = Decimal(str(record.remaining_quantity)) - quantity
+    from app.services import defect_pool
+
+    if not defect_pool.is_pool_mode(db):
+        record.remaining_quantity = Decimal(str(record.remaining_quantity)) - quantity

@@ -86,6 +86,7 @@ from app.services.inv_defective import (  # noqa: F401
     return_to_supplier_from_normal,
 )
 from app.services import stock_availability
+from app.services import stocktake_guard
 
 
 def ensure_and_lock_inventories(
@@ -148,6 +149,7 @@ def reserve(
         raise ValueError("예약 수량은 0보다 커야 합니다.")
 
     _lock_inventory(db, item_id)
+    stocktake_guard.record_change(db, item_id, "창고", kind="reservation", delta=qty)
     db.flush()
     figure = stock_availability.figure_for_cell(
         db,
@@ -203,6 +205,7 @@ def release(db: Session, item_id: uuid.UUID, qty: Decimal) -> Inventory:
     current = inv.pending_quantity or Decimal("0")
     if current < qty:
         raise ValueError(f"예약된 수량이 부족합니다 (Pending {current}, 요청 {qty}).")
+    stocktake_guard.record_change(db, item_id, "창고", kind="reservation", delta=-qty)
     inv.pending_quantity = current - qty
     db.flush()
     return inv
@@ -222,6 +225,7 @@ def reserve_location(
         raise ValueError("예약 수량은 0보다 커야 합니다.")
 
     _lock_inventory(db, item_id)
+    stocktake_guard.record_change(db, item_id, department, kind="reservation", delta=qty)
     _lock_location(db, item_id, department, status)
     figure = stock_availability.figure_for_cell(
         db,
@@ -290,6 +294,7 @@ def release_location(
         raise ValueError("해제 수량은 0보다 커야 합니다.")
 
     _lock_inventory(db, item_id)
+    stocktake_guard.record_change(db, item_id, department, kind="reservation", delta=-qty)
     result = db.execute(
         sa_update(InventoryLocation)
         .where(
@@ -336,6 +341,8 @@ def consume_pending(db: Session, item_id: uuid.UUID, qty: Decimal) -> Inventory:
         raise ValueError("차감 수량은 0보다 커야 합니다.")
 
     inv = _lock_inventory(db, item_id)
+    stocktake_guard.record_change(db, item_id, "창고", kind="quantity", delta=-qty)
+    stocktake_guard.record_change(db, item_id, "창고", kind="reservation", delta=-qty)
     pending = inv.pending_quantity or Decimal("0")
     wh = inv.warehouse_qty or Decimal("0")
     if pending < qty:
@@ -388,6 +395,7 @@ def adjust_warehouse(
     qty_before = inv.quantity or Decimal("0")
     wh_before = inv.warehouse_qty or Decimal("0")
     delta = new_warehouse_qty - wh_before
+    stocktake_guard.record_change(db, item_id, "창고", kind="quantity", delta=delta)
     if delta < 0:
         figure = stock_availability.figure_for_cell(
             db,

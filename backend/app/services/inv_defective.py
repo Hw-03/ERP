@@ -29,6 +29,7 @@ from app.services.inv_base import (
 from app.services.inv_calc import _sync_total
 from app.repositories import inventory_repository
 from app.services.inv_transfer import consume_warehouse, _require_location_available
+from app.services import stocktake_guard
 
 
 # ---------------------------------------------------------------------------
@@ -95,6 +96,10 @@ def mark_defective(
         raise ValueError("source=production일 때 source_dept는 필수입니다.")
     if kind not in ("warehouse", "production"):
         raise ValueError(f"알 수 없는 source: {kind} (warehouse 또는 production)")
+
+    stocktake_guard.prepare_items(db, [item_id])
+    stocktake_guard.record_change(db, item_id, "창고" if kind == "warehouse" else source_dept, kind="quantity", delta=-qty)
+    stocktake_guard.record_change(db, item_id, target_dept, kind="quantity", delta=qty)
 
     get_or_create_inventory(db, item_id)
     locations = [(target_dept, LocationStatusEnum.DEFECTIVE)]
@@ -165,6 +170,8 @@ def return_to_supplier(
     validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("반품 수량은 0보다 커야 합니다.")
+    stocktake_guard.prepare_items(db, [item_id])
+    stocktake_guard.record_change(db, item_id, from_dept, kind="quantity", delta=-qty)
     get_or_create_inventory(db, item_id)
     _lock_location(db, item_id, from_dept, LocationStatusEnum.DEFECTIVE)
     db.flush()
@@ -212,6 +219,9 @@ def unmark_defective(
     validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("복귀 수량은 0보다 커야 합니다.")
+
+    stocktake_guard.prepare_items(db, [item_id])
+    stocktake_guard.record_change(db, item_id, dept, kind="category", delta=qty)
 
     get_or_create_inventory(db, item_id)
     defective_loc = _lock_location(db, item_id, dept, LocationStatusEnum.DEFECTIVE)
@@ -263,6 +273,9 @@ def scrap_defective(
     if qty <= 0:
         raise ValueError("폐기 수량은 0보다 커야 합니다.")
 
+    stocktake_guard.prepare_items(db, [item_id])
+    stocktake_guard.record_change(db, item_id, dept, kind="quantity", delta=-qty)
+
     get_or_create_inventory(db, item_id)
     defective_loc = _lock_location(db, item_id, dept, LocationStatusEnum.DEFECTIVE)
     db.flush()
@@ -310,6 +323,9 @@ def receive_defective(
     if qty <= 0:
         raise ValueError("격리 수량은 0보다 커야 합니다.")
 
+    stocktake_guard.prepare_items(db, [item_id])
+    stocktake_guard.record_change(db, item_id, dept, kind="quantity", delta=qty)
+
     get_or_create_inventory(db, item_id)
     _lock_location(db, item_id, dept, LocationStatusEnum.DEFECTIVE)
     db.flush()
@@ -345,6 +361,8 @@ def _consume_normal_source(
     source="production" → 해당 부서 PRODUCTION 차감 (부족 시 ValueError).
     scrap_normal / return_to_supplier_from_normal 공통 본문.
     """
+    stocktake_guard.prepare_items(db, [item_id])
+    stocktake_guard.record_change(db, item_id, "창고" if source == "warehouse" else dept_or_warehouse, kind="quantity", delta=-qty)
     if source == "warehouse":
         consume_warehouse(db, item_id, qty)
     else:

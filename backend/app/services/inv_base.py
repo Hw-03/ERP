@@ -69,6 +69,8 @@ def get_or_create_inventory(db: Session, item_id: uuid.UUID) -> Inventory:
 
 def _lock_inventory(db: Session, item_id: uuid.UUID) -> Inventory:
     """쓰기 경로용 — PostgreSQL: FOR UPDATE 행 잠금. SQLite: 일반 SELECT."""
+    from app.services.stocktake_guard import prepare_items
+    prepare_items(db, [item_id])
     q = db.query(Inventory).filter(Inventory.item_id == item_id)
     if not _is_sqlite:
         q = q.with_for_update()
@@ -149,6 +151,8 @@ def lock_inventories(db: Session, item_ids: list[uuid.UUID]) -> dict[uuid.UUID, 
     """
     if not item_ids:
         return {}
+    from app.services.stocktake_guard import prepare_items
+    prepare_items(db, item_ids)
     q = db.query(Inventory).filter(Inventory.item_id.in_(item_ids))
     if not _is_sqlite:
         q = q.with_for_update()

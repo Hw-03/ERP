@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     DefectInventoryMovement,
+    DefectPoolCutover,
+    DefectStockMovement,
     DefectQuarantineRecord,
     HandoverDoc,
     Inventory,
@@ -44,6 +46,7 @@ from app.schemas.inventory_integrity import (
     InventoryIntegrityIssue,
     InventoryIntegrityResponse,
 )
+from app.services.business_correction_lineage import effect_was_corrected, is_correction
 from app.services.inventory_integrity_engine import (
     IntegrityFinding,
     InventoryIntegritySnapshot,
@@ -119,6 +122,9 @@ def _issue(
 
 
 def _defect_stock_issues(db: Session) -> list[InventoryIntegrityIssue]:
+    from app.services import defect_pool, pool_integrity
+    if defect_pool.is_pool_mode(db):
+        return pool_integrity.stock_issues(db)
     physical = {
         (str(item_id), str(department)): Decimal(str(quantity or 0))
         for item_id, department, quantity in (
@@ -284,6 +290,16 @@ def _partial_cancellation_issues(db: Session) -> list[InventoryIntegrityIssue]:
             if (match := reversal_movement_by_source.get(str(row.movement_id))) is None
             or not _reversal_movement_is_valid(row, match)
         ]
+        from app.services import defect_pool, pool_cancellation
+        from app.services.inventory_conflicts import InventoryConflict
+        if defect_pool.is_pool_mode(db) and cancellation.effective_at >= defect_pool.current_cutover(db).performed_at:
+            try:
+                expected_pool = pool_cancellation.reversal_deltas(db, original, original_logs)
+                actual_pool = {key: -delta for key, delta in pool_cancellation.reversal_deltas(
+                    db, cancellation, reversal_logs).items()}
+                bad_movement_ids = [] if expected_pool == actual_pool and not reversal_movements else ["POOL_EFFECT_MISMATCH"]
+            except (InventoryConflict, ValueError):
+                bad_movement_ids = ["POOL_EFFECT_UNPROVEN"]
         bad_effect_ids = [
             str(row.effect_id)
             for row in original_effects
@@ -457,7 +473,10 @@ def _shipping_workflow_issues(db: Session) -> list[InventoryIntegrityIssue]:
 
     issues = []
     for subject_id, history in histories.items():
-        if not any(op.kind == InventoryOperationKindEnum.CANCELLATION for _, op in history):
+        if not any(op.kind == InventoryOperationKindEnum.CANCELLATION or is_correction(op) for _, op in history):
+            continue
+        history = [(effect, op) for effect, op in history if not effect_was_corrected(db, effect.effect_id)]
+        if not history:
             continue
         latest_time = max(op.created_at for _, op in history)
         candidates = [(effect, op) for effect, op in history if op.created_at == latest_time]
@@ -487,7 +506,7 @@ def _shipping_workflow_issues(db: Session) -> list[InventoryIntegrityIssue]:
             expected_value=f"최신 상태 {expected or '확정 불가'}",
             repairable=(
                 not ambiguous
-                and operation.kind == InventoryOperationKindEnum.CANCELLATION
+                and (operation.kind == InventoryOperationKindEnum.CANCELLATION or is_correction(operation))
                 and current != "CANCELLED"
             ),
         ))
@@ -519,7 +538,10 @@ def _non_shipping_workflow_issues(db: Session) -> list[InventoryIntegrityIssue]:
 
     issues = []
     for (subject_type, subject_id), history in histories.items():
-        if not any(op.kind == InventoryOperationKindEnum.CANCELLATION for _, op in history):
+        if not any(op.kind == InventoryOperationKindEnum.CANCELLATION or is_correction(op) for _, op in history):
+            continue
+        history = [(effect, op) for effect, op in history if not effect_was_corrected(db, effect.effect_id)]
+        if not history:
             continue
         latest_time = max(op.created_at for _, op in history)
         candidates = [(effect, op) for effect, op in history if op.created_at == latest_time]
@@ -562,7 +584,7 @@ def _non_shipping_workflow_issues(db: Session) -> list[InventoryIntegrityIssue]:
                 expected_value=f"최종 상태 {expected or '확정 불가'}",
                 repairable=(
                     not ambiguous
-                    and operation.kind == InventoryOperationKindEnum.CANCELLATION
+                    and (operation.kind == InventoryOperationKindEnum.CANCELLATION or is_correction(operation))
                 ),
             )
         )
@@ -588,7 +610,10 @@ def _workflow_and_allocation_issues(db: Session) -> list[InventoryIntegrityIssue
         histories[effect.subject_id].append((effect, operation))
 
     for subject_id, history in histories.items():
-        if not any(op.kind == InventoryOperationKindEnum.CANCELLATION for _, op in history):
+        if not any(op.kind == InventoryOperationKindEnum.CANCELLATION or is_correction(op) for _, op in history):
+            continue
+        history = [(effect, op) for effect, op in history if not effect_was_corrected(db, effect.effect_id)]
+        if not history:
             continue
         latest_time = max(op.created_at for _, op in history)
         candidates = [(effect, op) for effect, op in history if op.created_at == latest_time]
@@ -621,7 +646,7 @@ def _workflow_and_allocation_issues(db: Session) -> list[InventoryIntegrityIssue
                 cause_ids=(effect.operation_id, effect.effect_id, subject_id),
                 current_value=f"현재 배정 상태 {current or '대상 없음'}",
                 expected_value=f"배정 상태 {expected or '확정 불가'}",
-                repairable=not ambiguous and operation.kind == InventoryOperationKindEnum.CANCELLATION,
+                repairable=not ambiguous and (operation.kind == InventoryOperationKindEnum.CANCELLATION or is_correction(operation)),
             )
         )
     return issues
@@ -748,6 +773,11 @@ def _collect_integrity_snapshot(db: Session) -> InventoryIntegritySnapshot:
     transactions = db.query(TransactionLog).all()
     operation_effects = db.query(InventoryOperationEffect).all()
     defect_movements = db.query(DefectInventoryMovement).all()
+    from app.services import defect_pool
+    pooled_movements = db.query(DefectStockMovement).all() if defect_pool.is_pool_mode(db) else []
+    pool_cutovers = db.query(DefectPoolCutover).all() if defect_pool.is_pool_mode(db) else []
+    from app.services.stocktake_evidence import application_evidence
+    observations = application_evidence(db) if defect_pool.is_pool_mode(db) else []
 
     placements = [
         *(
@@ -775,6 +805,7 @@ def _collect_integrity_snapshot(db: Session) -> InventoryIntegritySnapshot:
         ),
     ]
     evidence = [
+        *observations,
         *(
             OperationEvidenceState(
                 evidence_id=str(row.effect_id),
@@ -800,6 +831,18 @@ def _collect_integrity_snapshot(db: Session) -> InventoryIntegritySnapshot:
                 valid=Decimal(str(row.quantity_delta or 0)) != 0,
             )
             for row in defect_movements
+        ),
+        *(
+            OperationEvidenceState(evidence_id=str(row.movement_id), operation_id=str(row.operation_id),
+                kind="pool_movement", valid=(int(row.delta) != 0 and int(row.before_quantity) >= 0
+                    and int(row.after_quantity) >= 0 and int(row.before_quantity) + int(row.delta) == int(row.after_quantity)))
+            for row in pooled_movements
+        ),
+        *(
+            OperationEvidenceState(evidence_id=str(row.cutover_id), operation_id=str(row.operation_id),
+                kind="pool_cutover", valid=(row.cutover_version == 1 and len(row.source_fingerprint) == 64
+                    and row.actor_employee_id is not None))
+            for row in pool_cutovers
         ),
     ]
     item_ids = frozenset(str(item_id) for item_id, _deleted_at in items)

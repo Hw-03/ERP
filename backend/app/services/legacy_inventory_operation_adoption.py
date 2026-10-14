@@ -645,6 +645,8 @@ def adopt_and_cancel(
 ) -> LegacyCancellationAdoption:
     """검증·편입·공통 역전을 호출자의 한 트랜잭션 안에서 수행한다."""
     selected, logs, scope, batch, shipping_request = _scope_logs(db, selected_log_id)
+    from app.services.business_correction_lineage import assert_not_corrected
+    assert_not_corrected(db, logs)
     if any(
         not cancellation_svc.is_same_kst_week(source_log.created_at, now)
         for source_log in logs
@@ -673,7 +675,11 @@ def adopt_and_cancel(
     )
     for source_log in logs:
         operation_svc.attach_transaction(source_log, operation, _role_for(source_log))
-        for movement in defect_movements[source_log.log_id]:
+        from app.services import defect_pool
+
+        # Historical effects already exist in the cutover balance. Adoption only
+        # links evidence; the cancellation applies the opposite effect once.
+        for movement in (() if defect_pool.is_pool_mode(db) else defect_movements[source_log.log_id]):
             operation_svc.record_defect_movement(
                 db,
                 operation=operation,
@@ -703,6 +709,10 @@ def adopt_and_cancel(
         now=now,
     )
     if not preview.can_cancel:
+        if preview.blocker_code:
+            from app.services.inventory_conflicts import InventoryConflict
+            raise InventoryConflict(preview.blocker_code, preview.blockers[0],
+                                    status_code=409 if preview.blocker_code in {"STOCKTAKE_OBSERVED_EFFECT", "BUSINESS_CORRECTED"} else 422)
         raise cancellation_svc.CancellationNotAllowed(preview.blockers[0])
     cancellation = cancellation_svc.cancel_operation(
         db,

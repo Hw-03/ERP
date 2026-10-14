@@ -28,6 +28,7 @@ from app.services.inv_base import (
 )
 from app.services.inv_calc import _sync_total
 from app.services import stock_availability
+from app.services import stocktake_guard
 from app.repositories import inventory_repository
 
 
@@ -58,6 +59,8 @@ def receive_confirmed(
     validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("입고 수량은 0보다 커야 합니다.")
+    stocktake_guard.prepare_items(db, [item_id])
+    stocktake_guard.record_change(db, item_id, dept if bucket == "production" and dept else "창고", kind="quantity", delta=qty)
     inv = _lock_inventory(db, item_id)
 
     if bucket == "production" and dept is not None:
@@ -80,6 +83,9 @@ def transfer_to_production(
     validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("이동 수량은 0보다 커야 합니다.")
+    stocktake_guard.prepare_items(db, [item_id])
+    stocktake_guard.record_change(db, item_id, "창고", kind="quantity", delta=-qty)
+    stocktake_guard.record_change(db, item_id, dept, kind="quantity", delta=qty)
     get_or_create_inventory(db, item_id)
     _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
     db.flush()
@@ -129,6 +135,9 @@ def transfer_to_warehouse(
     validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("이동 수량은 0보다 커야 합니다.")
+    stocktake_guard.prepare_items(db, [item_id])
+    stocktake_guard.record_change(db, item_id, dept, kind="quantity", delta=-qty)
+    stocktake_guard.record_change(db, item_id, "창고", kind="quantity", delta=qty)
     get_or_create_inventory(db, item_id)
     _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
     db.flush()
@@ -184,6 +193,9 @@ def transfer_between_departments(
         raise ValueError("이동 수량은 0보다 커야 합니다.")
     if from_dept == to_dept:
         raise ValueError("출발/도착 부서가 동일합니다.")
+    stocktake_guard.prepare_items(db, [item_id])
+    stocktake_guard.record_change(db, item_id, from_dept, kind="quantity", delta=-qty)
+    stocktake_guard.record_change(db, item_id, to_dept, kind="quantity", delta=qty)
     get_or_create_inventory(db, item_id)
     for d in sorted([from_dept, to_dept], key=lambda x: x.value if hasattr(x, "value") else str(x)):
         _lock_location(db, item_id, d, LocationStatusEnum.PRODUCTION)
@@ -252,6 +264,7 @@ def lock_items_for_department_routing(
     ordered_item_ids = sorted(set(item_ids))
     if not ordered_item_ids:
         return {}
+    stocktake_guard.prepare_items(db, ordered_item_ids)
     items = (
         db.query(Item)
         .filter(Item.item_id.in_(ordered_item_ids))
@@ -330,6 +343,8 @@ def consume_warehouse(
     validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("차감 수량은 0보다 커야 합니다.")
+    stocktake_guard.prepare_items(db, [item_id])
+    stocktake_guard.record_change(db, item_id, "창고", kind="quantity", delta=-qty)
 
     _lock_inventory(db, item_id)
     db.flush()
@@ -377,6 +392,8 @@ def consume_from_department(
     validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("차감 수량은 0보다 커야 합니다.")
+    stocktake_guard.prepare_items(db, [item_id])
+    stocktake_guard.record_change(db, item_id, dept, kind="quantity", delta=-qty)
     _require_location_available(
         db,
         item_id,

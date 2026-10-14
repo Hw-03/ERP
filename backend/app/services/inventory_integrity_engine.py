@@ -134,7 +134,7 @@ class TransactionEffectState:
 class OperationEvidenceState:
     evidence_id: str
     operation_id: str
-    kind: Literal["operation_effect", "defect_movement"]
+    kind: Literal["operation_effect", "defect_movement", "pool_movement", "pool_cutover"]
     valid: bool
 
 

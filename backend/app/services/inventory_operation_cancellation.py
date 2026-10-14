@@ -43,6 +43,8 @@ from app.services import inventory as inventory_svc
 from app.services import stock_availability
 from app.services import inventory_operations as operation_svc
 from app.services import defect_records as defect_records_svc
+from app.services import defect_pool, pool_cancellation
+from app.services.inventory_conflicts import InventoryConflict
 from app.services import shipping_workflow_operations as workflow_ops
 from app.services._tx import transactional
 from app.services.inv_calc import _sync_total
@@ -127,6 +129,8 @@ class CancellationPlan:
     cells: tuple[CancellationCell, ...]
     defect_records: tuple[CancellationDefectRecord, ...]
     effects: tuple[CancellationEffectSubject, ...]
+    pool_effects: tuple[pool_cancellation.PoolCancellationEffect, ...] = ()
+    blocker_code: str | None = None
 
 
 def _as_kst(value: datetime) -> datetime:
@@ -472,6 +476,10 @@ def preview_cancellation(
         raise CancellationOperationNotFound("취소할 작업을 찾을 수 없습니다.")
 
     blockers: list[str] = []
+    if operation.domain == "pool" and operation.action == "cutover":
+        blockers.append("공동재고 전환은 업무 취소 대상이 아닙니다. 검증된 전체 복사본 복구 절차를 사용해 주세요.")
+    if operation.domain == "stocktake":
+        blockers.append("전수조사 반영은 단순 취소할 수 없습니다. 새 재조사로 현재 실재고를 확인해 주세요.")
     if operation.kind != InventoryOperationKindEnum.BUSINESS:
         blockers.append("취소 작업은 다시 취소할 수 없습니다.")
     existing_reversal = (
@@ -557,8 +565,24 @@ def preview_cancellation(
             )
         )
 
+    pool_mode = defect_pool.is_pool_mode(db)
+    if pool_mode:
+        item_changes: dict[str, int] = {}
+        for cell in cell_plans:
+            if cell.quantity_after > defect_pool.MAX_QUANTITY:
+                blockers.append("취소 후 물리 위치 수량이 허용 범위를 벗어납니다.")
+            if cell.scope in {"warehouse", "location"}:
+                item_changes[cell.item_id] = item_changes.get(cell.item_id, 0) + cell.quantity_change
+        for item_id, delta in item_changes.items():
+            inventory = db.query(Inventory).filter_by(item_id=item_id).one_or_none()
+            current_total = int(inventory.warehouse_qty) if inventory else 0
+            current_total += sum(int(row[0]) for row in db.query(InventoryLocation.quantity).filter_by(item_id=item_id).all())
+            if not 0 <= current_total + delta <= defect_pool.MAX_QUANTITY:
+                blockers.append("취소 후 품목 전체 수량이 허용 범위를 벗어납니다.")
+    pool_effects = ()
+    blocker_code = None
     movement_changes: dict[str, int] = {}
-    for movement in movements:
+    for movement in (() if pool_mode else movements):
         record_key = str(movement.record_id)
         movement_changes[record_key] = (
             movement_changes.get(record_key, 0) - int(movement.quantity_delta or 0)
@@ -625,6 +649,28 @@ def preview_cancellation(
             blockers.append("연결 업무 상태가 변경되어 이 작업만 취소할 수 없습니다.")
         effect_plans.append(effect_plan)
 
+    from app.services.business_correction_lineage import assert_not_corrected, is_correction
+    try:
+        assert_not_corrected(db, logs, operation.operation_id)
+        if is_correction(operation):
+            raise InventoryConflict("BUSINESS_CORRECTED", "업무 정정 자체는 수량 취소할 수 없습니다.")
+    except InventoryConflict as exc:
+        blockers.insert(0, str(exc))
+        blocker_code = exc.code
+
+    # Preserve workflow, week and reservation blockers before reporting missing provenance.
+    if pool_mode and not blockers:
+        try:
+            pool_effects = pool_cancellation.plan_reversal(db, operation, logs)
+            from app.models import DefectStockMovement
+            from app.services.stocktake_observation import assert_unobserved
+            assert_unobserved(db, logs, db.query(DefectStockMovement).filter_by(operation_id=operation.operation_id).all())
+        except InventoryConflict as exc:
+            blockers.append(str(exc))
+            blocker_code = exc.code
+        except ValueError as exc:
+            blockers.append(str(exc))
+
     unique_blockers = tuple(dict.fromkeys(blockers))
     cells = tuple(cell_plans)
     defect_records = tuple(defect_plans)
@@ -639,6 +685,9 @@ def preview_cancellation(
     )
     if reservation_snapshot:
         payload["shipping_reservations"] = reservation_snapshot
+    if pool_mode:
+        payload["pool_effects"] = [asdict(effect) for effect in pool_effects]
+        payload["blocker_code"] = blocker_code
     plan_hash = hashlib.sha256(
         json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
             "utf-8"
@@ -652,6 +701,8 @@ def preview_cancellation(
         cells=cells,
         defect_records=defect_records,
         effects=effects,
+        pool_effects=pool_effects,
+        blocker_code=blocker_code,
     )
 
 
@@ -840,7 +891,11 @@ def _reverse_operation_effect(
         if allocation is None:
             raise CancellationNotAllowed("연결된 출하 배정을 찾을 수 없습니다.")
         before = {"status": allocation.status}
-        allocation.status = _effect_subject_plan(db, original).target_state["status"]
+        target_status = _effect_subject_plan(db, original).target_state["status"]
+        from app.services import stocktake_guard
+        reservation_delta = int(allocation.quantity) * (int(target_status == "RESERVED") - int(allocation.status == "RESERVED"))
+        stocktake_guard.record_change(db, allocation.item_id, allocation.department, kind="reservation", delta=reservation_delta)
+        allocation.status = target_status
         if allocation.status == "RESERVED":
             allocation.consumed_at = None
             allocation.released_at = None
@@ -875,6 +930,18 @@ def _assert_plan_applied(
 ) -> None:
     """역전 직후 원장·물리 상태가 미리보기의 최종값과 같은지 검산한다."""
     db.flush()
+    if defect_pool.is_pool_mode(db):
+        from app.models import DefectStockMovement, DefectStockPool
+        actual = db.query(DefectStockMovement).filter_by(operation_id=cancellation.operation_id).all()
+        expected = {(effect.item_id, effect.scope_key, effect.category): effect.quantity_change for effect in plan.pool_effects}
+        observed = {}
+        for movement in actual:
+            pool = db.get(DefectStockPool, movement.pool_id)
+            key = (str(pool.item_id), pool.scope_key, pool.category)
+            observed[key] = observed.get(key, 0) + int(movement.delta)
+        if expected != observed or len(actual) != len(expected):
+            raise CancellationNotAllowed("취소 적용 후 공동재고 역전 원장 검산에 실패했습니다.")
+        pool_cancellation.assert_physical_projection(db, {(effect.item_id, effect.department) for effect in plan.pool_effects})
     original_effects = (
         db.query(InventoryOperationEffect)
         .filter(InventoryOperationEffect.operation_id == original.operation_id)
@@ -964,7 +1031,7 @@ def _assert_plan_applied(
     ).count()
     if (
         reversed_logs != original_logs
-        or reversed_movements != original_movements
+        or (not defect_pool.is_pool_mode(db) and reversed_movements != original_movements)
         or reversed_effects != original_effects
     ):
         raise CancellationNotAllowed("취소 적용 후 역전 원장 검산에 실패했습니다.")
@@ -989,13 +1056,14 @@ def cancel_operation(
 ) -> InventoryOperation:
     """잠금 후 계획을 재검산하고 전체 역전 작업을 한 트랜잭션으로 확정한다."""
     with transactional(db):
-        # 단계 명령과 같은 순서: 요청 → 원 작업 → 품목 재고.
+        # 정정·단계 명령과 같은 순서: 모든 업무 부모 → 원 작업 → 품목 재고.
+        from app.services.business_correction_scope import ROOTS, lock_roots
         request_effects = db.query(InventoryOperationEffect).filter(
             InventoryOperationEffect.operation_id == operation_id,
-            InventoryOperationEffect.subject_type == "ShippingRequest",
+            InventoryOperationEffect.subject_type.in_(ROOTS),
+            InventoryOperationEffect.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW,
         ).all()
-        for request_id in sorted({uuid.UUID(effect.subject_id) for effect in request_effects}):
-            workflow_ops.lock_request(db, request_id)
+        lock_roots(db, {(effect.subject_type, uuid.UUID(effect.subject_id)) for effect in request_effects})
         original = _lock_original_operation(db, operation_id)
         logs = (
             db.query(TransactionLog)
@@ -1026,7 +1094,11 @@ def cancel_operation(
         allocation_items = {row.item_id for row in db.query(ShippingAllocation).filter(
             ShippingAllocation.allocation_id.in_(allocation_ids),
         ).all()} if allocation_ids else set()
-        affected_item_ids = sorted({log.item_id for log in logs} | allocation_items)
+        from app.models import DefectStockMovement, DefectStockPool
+        pool_items = {row[0] for row in db.query(DefectStockPool.item_id).join(
+            DefectStockMovement, DefectStockMovement.pool_id == DefectStockPool.pool_id,
+        ).filter(DefectStockMovement.operation_id == original.operation_id).all()} if defect_pool.is_pool_mode(db) else set()
+        affected_item_ids = sorted({log.item_id for log in logs} | allocation_items | pool_items)
         inventory_svc.lock_inventories(db, affected_item_ids)
         if affected_item_ids:
             location_query = (
@@ -1057,6 +1129,9 @@ def cancel_operation(
                 "취소 미리보기 이후 재고 또는 예약 상태가 변경되었습니다. 다시 확인해 주세요."
             )
         if not current_plan.can_cancel:
+            if current_plan.blocker_code:
+                raise InventoryConflict(current_plan.blocker_code, current_plan.blockers[0],
+                                        status_code=409 if current_plan.blocker_code in {"STOCKTAKE_OBSERVED_EFFECT", "BUSINESS_CORRECTED"} else 422)
             raise CancellationNotAllowed(current_plan.blockers[0])
 
         cancellation = operation_svc.create_cancellation_operation(
@@ -1075,7 +1150,10 @@ def cancel_operation(
                 canceller=canceller,
                 reason=reason,
             )
-        for movement in movements:
+        pool_mode = defect_pool.is_pool_mode(db)
+        if pool_mode:
+            pool_cancellation.apply_reversal(db, current_plan.pool_effects, cancellation)
+        for movement in (() if pool_mode else movements):
             _reverse_defect_movement(
                 db,
                 original=movement,
