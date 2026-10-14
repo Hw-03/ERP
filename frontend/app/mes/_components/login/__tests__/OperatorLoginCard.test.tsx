@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Employee } from "@/lib/api";
 import { ApiError } from "@/lib/api-core";
+import { authenticateEmployee } from "@/lib/auth/operator-session";
 
 const state = vi.hoisted(() => ({
   employees: [] as Employee[],
@@ -18,6 +19,9 @@ vi.mock("@/lib/api", () => ({
     verifyEmployeePin: state.verifyEmployeePin,
     getAppSession: state.getAppSession,
   },
+}));
+vi.mock("@/lib/auth/operator-session", () => ({
+  authenticateEmployee: vi.fn(async (...args: unknown[]) => ({ employee: await state.verifyEmployeePin(...args) })),
 }));
 
 vi.mock("../useLoginEmployees", () => ({
@@ -99,10 +103,19 @@ describe("OperatorLoginCard", () => {
     state.employeesState = "ready";
     state.retryEmployees.mockReset();
     state.verifyEmployeePin.mockReset();
+    vi.mocked(authenticateEmployee).mockClear();
     state.getAppSession.mockReset();
     state.markLoginNotificationPopupPending.mockReset();
     state.setCurrentOperator.mockReset();
     state.getAppSession.mockResolvedValue({ boot_id: "boot-1", started_at: "2026-07-02T00:00:00Z" });
+  });
+
+  it("uses one authoritative PIN login that issues the tab's operator session", async () => {
+    state.verifyEmployeePin.mockResolvedValue(makeEmployee());
+    render(<OperatorLoginCard onLogin={() => {}} />);
+    await submitLogin();
+    await waitFor(() => expect(state.setCurrentOperator).toHaveBeenCalled());
+    expect(authenticateEmployee).toHaveBeenCalledWith("emp-1", "1234");
   });
 
   it("does not show the PIN reset request helper on the login screen", () => {

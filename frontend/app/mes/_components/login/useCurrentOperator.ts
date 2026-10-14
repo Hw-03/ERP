@@ -12,6 +12,7 @@ import { clearAuditSession, startAuditSession } from "@/lib/activity-audit-conte
 import { getClientEventSource } from "@/lib/operator-log-context";
 import { normalizeSidebarMode, type SidebarMode } from "@/lib/sidebar-mode";
 import { OPERATOR_ACTIVITY_KEY, writeOperatorActivity } from "./operatorActivity";
+import { revokeOperatorSession } from "@/lib/auth/operator-session";
 
 export interface Operator {
   employee_id: string;
@@ -133,8 +134,15 @@ export function updateCurrentOperatorPreferences(patch: {
   window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));
 }
 
-export function clearCurrentOperator(): void {
-  if (typeof window === "undefined") return;
+/** Clear local identity immediately; reload callers await the server revocation result. */
+export function clearCurrentOperator(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  // Preserve uncertainty until the server acknowledges revocation, including network failures.
+  window.sessionStorage.setItem("dexcowin_mes_logout_warning", "이전 서버 세션의 해제를 아직 확인하지 못했습니다. 이 탭의 로그인 정보는 지웠습니다.");
+  const revocation = revokeOperatorSession().then((result) => {
+    if (result.status === "revoked") window.sessionStorage.removeItem("dexcowin_mes_logout_warning");
+    else window.sessionStorage.setItem("dexcowin_mes_logout_warning", result.message || "이전 서버 세션의 해제를 확인하지 못했습니다.");
+  }).catch(() => {});
   sendClientEvent({ event: "ui_logout", source: getClientEventSource() });
   clearAuditSession();
   window.sessionStorage.removeItem(OPERATOR_KEY);
@@ -143,6 +151,7 @@ export function clearCurrentOperator(): void {
   window.sessionStorage.removeItem(OPERATOR_ACTIVITY_KEY);
   clearLegacyPersistentOperator();
   window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));
+  return revocation;
 }
 
 export function markLoginNotificationPopupPending(employeeId: string): void {

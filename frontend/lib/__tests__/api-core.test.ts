@@ -155,6 +155,47 @@ describe("fetcher / write helpers", () => {
     await expect(fetcher("/api/x")).rejects.toThrow("권한 없음");
   });
 
+  it.each([
+    ["fetcher", () => fetcher("/api/inventory")],
+    ["fetchBlob", () => fetchBlob("/api/inventory/export")],
+    ["postJson", () => postJson("/api/inventory", {})],
+  ])("%s preserves a locked inventory cell conflict", async (_name, request) => {
+    const extra = { item_id: "item-1", scope_key: "WAREHOUSE", fence: 4 };
+    globalThis.fetch = vi.fn(() => Promise.resolve(makeResponse({
+      ok: false,
+      status: 423,
+      body: { detail: { code: "STOCKTAKE_CELL_LOCKED", message: "조사 중입니다.", extra } },
+    }))) as unknown as typeof fetch;
+
+    const failure = await request().catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(ApiError);
+    expect(failure).toMatchObject({
+      message: "조사 중입니다.",
+      status: 423,
+      code: "STOCKTAKE_CELL_LOCKED",
+      extra,
+    });
+  });
+
+  it("preserves a plan-change conflict with its status and empty extra", async () => {
+    globalThis.fetch = vi.fn(() => Promise.resolve(makeResponse({
+      ok: false,
+      status: 409,
+      body: { detail: { code: "INVENTORY_PLAN_CHANGED", message: "계획이 변경되었습니다.", extra: {} } },
+    }))) as unknown as typeof fetch;
+
+    const failure = await putJson("/api/inventory", {}).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(ApiError);
+    expect(failure).toMatchObject({
+      message: "계획이 변경되었습니다.",
+      status: 409,
+      code: "INVENTORY_PLAN_CHANGED",
+      extra: {},
+    });
+  });
+
   it("fetcher rethrows AbortError directly", async () => {
     const abort = new Error("AbortError");
     abort.name = "AbortError";

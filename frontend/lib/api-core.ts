@@ -47,6 +47,8 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
+    public readonly code?: string,
+    public readonly extra?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "ApiError";
@@ -93,18 +95,42 @@ export function extractErrorMessage(detail: unknown, fallback = "처리 실패")
   return fallback;
 }
 
+async function readError(res: Response): Promise<{
+  message: string;
+  code?: string;
+  extra?: Record<string, unknown>;
+}> {
+  const text = await res.text();
+  try {
+    const json = JSON.parse(text);
+    const detail = json?.detail;
+    const fields = detail && typeof detail === "object" && !Array.isArray(detail)
+      ? detail as Record<string, unknown>
+      : null;
+    const extra = fields?.extra;
+    return {
+      message: extractErrorMessage(detail, text || res.statusText),
+      code: typeof fields?.code === "string" ? fields.code : undefined,
+      extra: extra && typeof extra === "object" && !Array.isArray(extra)
+        ? extra as Record<string, unknown>
+        : undefined,
+    };
+  } catch {
+    return { message: text || res.statusText };
+  }
+}
+
 /**
  * Response 가 실패 상태일 때 detail 을 추출해 사용자 표시용 메시지로 변환.
  * 외부에서 직접 fetch 를 사용하는 도메인 코드가 동일 메시지 포맷을 쓰도록 export.
  */
 export async function parseError(res: Response): Promise<string> {
-  const text = await res.text();
-  try {
-    const json = JSON.parse(text);
-    return extractErrorMessage(json?.detail, text || res.statusText);
-  } catch {
-    return text || res.statusText;
-  }
+  return (await readError(res)).message;
+}
+
+async function parseApiError(res: Response): Promise<ApiError> {
+  const { message, code, extra } = await readError(res);
+  return new ApiError(message, res.status, code, extra);
 }
 
 /**
@@ -188,7 +214,7 @@ export async function fetcher<T>(url: string, signal?: AbortSignal): Promise<T> 
     rethrowGetRequestError(error, url);
   }
   if (!res.ok) {
-    throw new ApiError(await parseError(res), res.status);
+    throw await parseApiError(res);
   }
   return res.json();
 }
@@ -205,7 +231,7 @@ export async function fetchBlob(url: string, signal?: AbortSignal): Promise<Blob
     rethrowGetRequestError(error, url);
   }
   if (!res.ok) {
-    throw new ApiError(await parseError(res), res.status);
+    throw await parseApiError(res);
   }
   return res.blob();
 }
@@ -238,7 +264,7 @@ async function writeJson<T>(
   const res = await Promise.race([fetch(url, init), timeout]).catch(() => {
     throw new ApiConnectionError();
   });
-  if (!res.ok) throw new ApiError(await parseError(res), res.status);
+  if (!res.ok) throw await parseApiError(res);
   if (res.status === 204) return undefined as T;
   const text = await res.text();
   if (!text) return undefined as T;

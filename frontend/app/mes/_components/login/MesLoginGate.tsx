@@ -13,6 +13,7 @@ import { clearCurrentOperator, getStoredBootId, readCurrentOperator } from "./us
 import { runLoginReadWithRetry, validateActiveEmployees, validateAppSession } from "./loginReadRetry";
 import { useIdleOperatorConfirmation } from "./useIdleOperatorConfirmation";
 import { OperatorConfirmationDialog } from "./OperatorConfirmationDialog";
+import { OPERATOR_LOGIN_REQUIRED } from "@/lib/auth/login-recovery";
 
 type GatePhase = "loading" | "intro" | "form" | "recovery" | "authed";
 type LogoState = "center" | "above-card";
@@ -54,6 +55,18 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
   const [recoveryAttempt, setRecoveryAttempt] = useState(0);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const idleConfirmation = useIdleOperatorConfirmation(phase === "authed");
+  const [workspaceOwner, setWorkspaceOwner] = useState<string | null>(null);
+  const recoveringLogin = useRef(false);
+
+  useEffect(() => {
+    const recover = () => {
+      recoveringLogin.current = true;
+      setLogoState("above-card");
+      setPhase("form");
+    };
+    window.addEventListener(OPERATOR_LOGIN_REQUIRED, recover);
+    return () => window.removeEventListener(OPERATOR_LOGIN_REQUIRED, recover);
+  }, []);
 
   const clearTimers = () => {
     timersRef.current.forEach(clearTimeout);
@@ -128,6 +141,7 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
         if (cancelled) return;
         const stillActive = list.some((e) => e.employee_id === stored.employee_id);
         if (stillActive) {
+          setWorkspaceOwner(stored.employee_id);
           setPhase("authed");
         } else {
           clearCurrentOperator();
@@ -155,6 +169,12 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
   }, [phase]);
 
   const handleLogin = () => {
+    setWorkspaceOwner(readCurrentOperator()?.employee_id ?? null);
+    if (recoveringLogin.current) {
+      recoveringLogin.current = false;
+      setPhase("authed");
+      return;
+    }
     // 작업자 로그인 시 직전 메뉴와 무관하게 항상 대시보드로 진입.
     if (typeof window !== "undefined") {
       const currentTab = new URLSearchParams(window.location.search).get("tab");
@@ -175,21 +195,21 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
   if (phase === "loading") return null;
 
   // 로그인 완료 → 메인 화면
-  if (phase === "authed") return <>
-    {children}
+  return <>
+    {workspaceOwner && <div key={workspaceOwner} style={{ display: phase === "authed" ? "contents" : "none" }} inert={phase !== "authed"}>
+      {children}
+    </div>}
     {idleConfirmation.operator && <OperatorConfirmationDialog
       operator={idleConfirmation.operator}
       dialogRef={idleConfirmation.dialogRef}
       mascotSrc="/images/login/dexray-operator-confirm.webp"
       onContinue={idleConfirmation.continueAsOperator}
-      onSwitchAccount={() => {
-        clearCurrentOperator();
+      onSwitchAccount={async () => {
+        await clearCurrentOperator();
         window.location.reload();
       }}
     />}
-  </>;
-
-  return (
+    {phase !== "authed" && (
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center ${mobileStyles.gate}`}
       style={{ background: "var(--c-bg)" }}
@@ -299,5 +319,6 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
         </div>
       )}
     </div>
-  );
+    )}
+  </>;
 }

@@ -4,7 +4,7 @@
  * 작업자 식별용 PIN 로그인 카드 — 단일 카드 구조.
  *
  * 로그인된 작업자 정보는 입출고/수정 작업의 produced_by 기본값으로 사용된다.
- * 실제 보안 인증이 아닌 식별용.
+ * PIN 검증은 작업자 프로필과 이 탭의 전수조사용 서버 세션을 함께 발급한다.
  */
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
@@ -12,6 +12,7 @@ import { ArrowRight, Loader2, Lock } from "lucide-react";
 import { api, type Employee } from "@/lib/api";
 import { ApiError } from "@/lib/api-core";
 import { PIN_LENGTH } from "@/lib/auth/constants";
+import { authenticateEmployee } from "@/lib/auth/operator-session";
 import { normalizeSidebarMode } from "@/lib/sidebar-mode";
 import { markLoginNotificationPopupPending, setCurrentOperator, type Operator } from "./useCurrentOperator";
 import { useLoginEmployees } from "./useLoginEmployees";
@@ -30,12 +31,14 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [pendingOperator, setPendingOperator] = useState<Operator | null>(null);
+  const [logoutWarning, setLogoutWarning] = useState("");
   const pinInputRef = useRef<HTMLInputElement>(null);
   const requestControllerRef = useRef<AbortController | null>(null);
 
   const canSubmit = !!selected && pin.length === PIN_LENGTH && !loading && employeeList.status === "ready";
 
   useEffect(() => () => requestControllerRef.current?.abort(), []);
+  useEffect(() => { setLogoutWarning(window.sessionStorage.getItem("dexcowin_mes_logout_warning") ?? ""); }, []);
 
   const handlePinChange = (raw: string) => {
     const digits = raw.replace(/\D/g, "").slice(0, PIN_LENGTH);
@@ -92,7 +95,7 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
       return;
     }
     try {
-      const emp = await api.verifyEmployeePin(selected.employee_id, pin);
+      const { employee: emp } = await authenticateEmployee(selected.employee_id, pin);
       const op: Operator = {
         employee_id: emp.employee_id,
         name: emp.name,
@@ -131,6 +134,7 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
 
   return (
     <div className="mx-auto w-full" style={{ maxWidth: 440, padding: "0 16px" }}>
+      {logoutWarning && <p role="alert" className="mb-3 rounded-xl bg-[var(--c-warning-bg)] p-3 text-sm text-[var(--c-text)]">{logoutWarning}</p>}
       <div
         className={`relative flex w-full flex-col rounded-[24px] border ${mobileStyles.card}`}
         style={{

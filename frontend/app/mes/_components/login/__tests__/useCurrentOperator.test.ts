@@ -10,6 +10,8 @@ import {
   type Operator,
 } from "../useCurrentOperator";
 import { sendClientEvent } from "@/lib/client-events";
+import { revokeOperatorSession } from "@/lib/auth/operator-session";
+vi.mock("@/lib/auth/operator-session", () => ({ revokeOperatorSession: vi.fn(async () => ({ status: "revoked" })) }));
 
 vi.mock("@/lib/client-events", () => ({
   sendClientEvent: vi.fn(),
@@ -36,6 +38,38 @@ describe("useCurrentOperator storage", () => {
     window.localStorage.clear();
     window.sessionStorage.clear();
     vi.mocked(sendClientEvent).mockClear();
+    vi.mocked(revokeOperatorSession).mockClear();
+  });
+
+  it("revokes the current tab's server credential when logging out", () => {
+    setCurrentOperator(baseOperator, "boot-1");
+    clearCurrentOperator();
+    expect(revokeOperatorSession).toHaveBeenCalledTimes(1);
+    expect(readCurrentOperator()).toBeNull();
+  });
+
+  it("clears locally immediately and waits for slow successful revocation before clearing the warning", async () => {
+    let finish!: (result: { status: "revoked" }) => void;
+    vi.mocked(revokeOperatorSession).mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+    setCurrentOperator(baseOperator, "boot-1");
+    const completion = clearCurrentOperator();
+    expect(completion).toBeInstanceOf(Promise);
+    expect(readCurrentOperator()).toBeNull();
+    expect(getStoredBootId()).toBeNull();
+    expect(window.sessionStorage.getItem("dexcowin_mes_logout_warning")).not.toBeNull();
+    finish({ status: "revoked" });
+    await completion;
+    expect(window.sessionStorage.getItem("dexcowin_mes_logout_warning")).toBeNull();
+  });
+
+  it("finishes local logout but retains an acknowledged uncertain revocation warning", async () => {
+    vi.mocked(revokeOperatorSession).mockResolvedValueOnce({ status: "uncertain", message: "서버 폐기 확인 실패" });
+    setCurrentOperator(baseOperator, "boot-1");
+    const completion = clearCurrentOperator();
+    expect(completion).toBeInstanceOf(Promise);
+    expect(readCurrentOperator()).toBeNull();
+    await completion;
+    expect(window.sessionStorage.getItem("dexcowin_mes_logout_warning")).toBe("서버 폐기 확인 실패");
   });
 
   it("stores the operator and boot ID in tab session storage", () => {
