@@ -107,8 +107,32 @@ from app.models.defect import (
     DefectQuarantineReconstruction,
     DefectQuarantineReconstructionAllocation,
 )
+from app.models.stocktake_foundation import (
+    DefectPoolBridge,
+    DefectPoolCutover,
+    DefectStockMovement,
+    DefectStockPool,
+    InventoryScope,
+    OperatorSession,
+    StocktakeControl,
+    StocktakeGate,
+    StocktakeProgress,
+)
+
+from app.models.stocktake import (
+    StocktakeRound, StocktakePreview, StocktakeTargetSet, StocktakeTarget,
+    StocktakeCount, StocktakeEvent, StocktakeReceipt, StocktakePendingTarget,
+    StocktakeApplication, StocktakeApplicationLine, StocktakeEffectEpoch,
+)
+
+from .business_correction import BusinessCorrection, BusinessCorrectionEvent, BusinessCorrectionSource, BusinessCorrectionEffectLink, StocktakeReservationEpoch
+from .stocktake_close import StocktakeCloseManifest, StocktakeCloseChunk, StocktakeCloseSeal, StocktakeCloseCommit
 
 __all__ = [
+    "BusinessCorrection", "BusinessCorrectionEvent", "BusinessCorrectionSource", "BusinessCorrectionEffectLink",
+    "StocktakeRound", "StocktakePreview", "StocktakeTargetSet", "StocktakeTarget",
+    "StocktakeCount", "StocktakeEvent", "StocktakeReceipt", "StocktakePendingTarget",
+    "StocktakeApplication", "StocktakeApplicationLine", "StocktakeEffectEpoch",
     # Base / 공통
     "Base",
     "BoolAsString",
@@ -199,4 +223,13 @@ __all__ = [
     "DefectQuarantineManagementCategoryRevision",
     "DefectQuarantineReconstruction",
     "DefectQuarantineReconstructionAllocation",
+    "InventoryScope",
+    "StocktakeControl",
+    "StocktakeGate",
+    "StocktakeProgress",
+    "OperatorSession",
+    "DefectPoolCutover",
+    "DefectStockPool",
+    "DefectStockMovement",
+    "DefectPoolBridge",
 ]

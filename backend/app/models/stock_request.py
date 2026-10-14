@@ -222,6 +222,10 @@ class StockRequestLine(Base):
         nullable=True,
         index=True,
     )
+    pool_id = Column(
+        UUIDString, ForeignKey("defect_stock_pools.pool_id", ondelete="RESTRICT"),
+        nullable=True, index=True,
+    )
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
 
     request = relationship("StockRequest", back_populates="lines")

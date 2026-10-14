@@ -21,7 +21,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
 PREVIOUS_REVISION = "20260910_0033"
 MIGRATION_REVISION = "20260915_0034"
-HEAD_REVISION = "20261008_0041"
+HEAD_REVISION = "20261014_0045"
 
 
 def _config(path: Path) -> Config:
@@ -109,8 +109,11 @@ def test_migration_adds_fields_backfills_employee_codes_and_preserves_history(
             "VALUES (?, ?, 'approval_approved', '기존 알림', ?)",
             (notification_id, employee_ids["E04"], request_id),
         )
+        line_projection = ", ".join(
+            f'"{row[1]}"' for row in db.execute("PRAGMA table_info(stock_request_lines)")
+        )
         line_before = db.execute(
-            "SELECT * FROM stock_request_lines WHERE line_id = ?",
+            f"SELECT {line_projection} FROM stock_request_lines WHERE line_id = ?",
             (line_id,),
         ).fetchone()
 
@@ -146,7 +149,7 @@ def test_migration_adds_fields_backfills_employee_codes_and_preserves_history(
             (partial_batch_id,),
         ).fetchone()
         line_after = db.execute(
-            "SELECT * FROM stock_request_lines WHERE line_id = ?",
+            f"SELECT {line_projection} FROM stock_request_lines WHERE line_id = ?",
             (line_id,),
         ).fetchone()
         batch_request_id = db.execute(
