@@ -70,7 +70,7 @@ describe("employee appearance synchronization", () => {
     vi.mocked(employeesApi.getEmployeeAppearance).mockReturnValueOnce(old.promise);
     const { result } = renderHook(useAppearancePreferences, { wrapper });
     await waitFor(() => expect(employeesApi.getEmployeeAppearance).toHaveBeenCalled());
-    act(() => clearCurrentOperator());
+    await act(async () => { await clearCurrentOperator(); });
     await act(async () => old.resolve(pair()));
     expect(readCurrentOperator()).toBeNull();
     expect(result.current.preferences).toEqual({ theme: "light", sidebarMode: "hover" });
