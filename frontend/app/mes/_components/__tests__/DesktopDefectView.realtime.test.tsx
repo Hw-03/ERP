@@ -328,7 +328,7 @@ describe("DesktopDefectView realtime refresh", () => {
     expect(screen.getByText("1년 이상 ⚠").parentElement).toHaveTextContent("1건");
 
     const departmentFilters = screen.getByRole("group", { name: "부서 구분" });
-    fireEvent.click(within(departmentFilters).getByRole("button", { name: "내 부서" }));
+    fireEvent.click(within(departmentFilters).getByRole("button", { name: operator.department }));
 
     expect(screen.getByRole("button", { name: "Process MINE-ASSEMBLY" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Process MINE-VACUUM" })).not.toBeInTheDocument();
@@ -378,7 +378,8 @@ describe("DesktopDefectView realtime refresh", () => {
 
     expect(await screen.findByRole("checkbox", { name: "필터 고정" })).toBeChecked();
     expect(screen.getByRole("combobox")).toHaveValue("oldest");
-    expect(screen.getByRole("button", { name: "내 부서" })).toHaveAttribute("aria-pressed", "true");
+    const departmentFilters = screen.getByRole("group", { name: "부서 구분" });
+    expect(await within(departmentFilters).findByRole("button", { name: operator.department })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "내가 격리" })).toHaveAttribute("aria-pressed", "true");
     await waitFor(() => expect(screen.getByText("격리 중").parentElement).toHaveTextContent("2건"));
 
