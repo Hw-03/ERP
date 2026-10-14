@@ -40,6 +40,7 @@ export type RequestBucket = "warehouse" | "production" | "defective" | "none";
 
 export interface StockRequestLine {
   record_id?: string | null;
+  pool_id?: string | null;
   line_id: string;
   request_id: string;
   item_id: string;
@@ -111,6 +112,7 @@ export interface StockRequestCreatePayload {
   supplier_id?: string | null;
   lines: Array<{
     record_id?: string | null;
+    pool_id?: string | null;
     item_id: string;
     quantity: number;
     from_bucket: RequestBucket;
