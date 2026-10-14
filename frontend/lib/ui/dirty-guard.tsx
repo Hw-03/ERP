@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -36,6 +37,7 @@ type DirtyEntry = {
 type ProviderContextValue = {
   openModal: (save: () => Promise<void> | void, proceed: () => void, confirmOnly?: boolean, cancel?: () => void) => void;
   registryRef: React.MutableRefObject<Map<string, DirtyEntry>>;
+  commitSavedState: () => Promise<void>;
 };
 
 const DirtyGuardContext = createContext<ProviderContextValue | null>(null);
@@ -196,6 +198,17 @@ function DirtyModal({
 }
 export function DirtyGuardProvider({ children }: { children: ReactNode }) {
   const registryRef = useRef<Map<string, DirtyEntry>>(new Map());
+  const commitWaiters = useRef<Array<() => void>>([]);
+  const [saveCommit, setSaveCommit] = useState(0);
+  const commitSavedState = useCallback(() => new Promise<void>((resolve) => {
+    commitWaiters.current.push(resolve);
+    setSaveCommit((version) => version + 1);
+  }), []);
+  useEffect(() => {
+    // Child registration effects commit first, so unload/viewport callers see saved state.
+    const waiters = commitWaiters.current.splice(0);
+    waiters.forEach((resolve) => resolve());
+  }, [saveCommit]);
   const afterSaveRef = useRef<(() => void) | null>(null);
   const [modal, setModal] = useState<ModalState>({
     open: false,
@@ -220,7 +233,7 @@ export function DirtyGuardProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("beforeunload", handler);
   }, []);
 
-  const ctx: ProviderContextValue = { openModal, registryRef };
+  const ctx: ProviderContextValue = { openModal, registryRef, commitSavedState };
 
   useEffect(() => {
     if (modal.open || !afterSaveRef.current) return;
@@ -285,14 +298,15 @@ export function useRegisterDirty(
   const ctx = useContext(DirtyGuardContext);
   const saveRef = useRef(save);
   const discardRef = useRef(discard);
-  useEffect(() => {
+  useLayoutEffect(() => {
     saveRef.current = save;
   }, [save]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     discardRef.current = discard;
   }, [discard]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    // Register before the rendered controls can accept navigation/logout input.
     if (!ctx) return;
     ctx.registryRef.current.set(key, {
       dirty,
@@ -310,6 +324,7 @@ export function useRegisterDirty(
 
 export function useConfirmNavigation(): (proceed: () => void, cancel?: () => void) => void {
   const ctx = useContext(DirtyGuardContext);
+  const flush = useFlushDirtyEntries();
   if (!ctx) {
     throw new Error("useConfirmNavigation must be used inside <DirtyGuardProvider>");
   }
@@ -327,12 +342,12 @@ export function useConfirmNavigation(): (proceed: () => void, cancel?: () => voi
         }
       };
       if (dirtyEntries.every((entry) => entry.autoSave)) {
-        void aggregateSave().then(proceed).catch(() => {});
+        void flush().then(proceed).catch(() => {});
         return;
       }
       ctx.openModal(aggregateSave, proceed, dirtyEntries.some((entry) => entry.confirmOnly), cancel);
     },
-    [ctx],
+    [ctx, flush],
   );
 }
 
@@ -343,13 +358,18 @@ export function useFlushDirtyEntries(): () => Promise<void> {
   }
 
   return useCallback(async () => {
-    const dirtyEntries = Array.from(ctx.registryRef.current.values()).filter((entry) => entry.dirty);
-    if (dirtyEntries.some((entry) => entry.confirmOnly)) {
-      throw new Error("현재 작업은 자동 저장할 수 없습니다.");
-    }
-
-    for (const entry of dirtyEntries) {
-      await Promise.resolve(entry.save());
+    const savedKeys = new Set<string>();
+    let dirtyEntries = Array.from(ctx.registryRef.current.entries()).filter(([, entry]) => entry.dirty);
+    while (dirtyEntries.length) {
+      if (dirtyEntries.some(([, entry]) => entry.confirmOnly)) throw new Error("현재 작업은 자동 저장할 수 없습니다.");
+      for (const [key, entry] of dirtyEntries) {
+        // A completed save may register a receipt guard; revisit new guards, never discard new edits.
+        if (savedKeys.has(key)) throw new Error("저장되지 않은 변경이 남아 있습니다.");
+        savedKeys.add(key);
+        await Promise.resolve(entry.save());
+      }
+      await ctx.commitSavedState();
+      dirtyEntries = Array.from(ctx.registryRef.current.entries()).filter(([, entry]) => entry.dirty);
     }
   }, [ctx]);
 }

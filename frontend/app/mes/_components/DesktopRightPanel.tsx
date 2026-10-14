@@ -58,6 +58,7 @@ export function DesktopRightPanel({
   onClose,
   fillAvailableWidth = false,
   tone = "default",
+  surfaceColor,
   bodyScrollbarOutset = false,
   children,
 }: {
@@ -73,6 +74,8 @@ export function DesktopRightPanel({
   /** SlidePanel 내부의 사용 가능한 전체 폭을 사용할지 여부. */
   fillAvailableWidth?: boolean;
   tone?: "default" | "danger";
+  /** Match a caller's status surface while preserving the default panel appearance. */
+  surfaceColor?: string;
   bodyScrollbarOutset?: boolean;
   children: React.ReactNode;
 }) {
@@ -86,7 +89,7 @@ export function DesktopRightPanel({
           data-testid="desktop-right-panel"
           className={`flex h-full min-h-0 ${fillAvailableWidth ? "w-full" : "w-[420px]"} shrink-0 flex-col overflow-hidden rounded-[32px] border px-5 py-5`}
           style={{
-            background: LEGACY_COLORS.s1,
+            background: surfaceColor ?? LEGACY_COLORS.s1,
             borderColor: tone === "danger"
               ? `color-mix(in srgb, ${LEGACY_COLORS.red} 32%, ${LEGACY_COLORS.border})`
               : LEGACY_COLORS.border,

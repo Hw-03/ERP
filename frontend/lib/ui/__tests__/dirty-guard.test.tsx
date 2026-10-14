@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import {
   DirtyGuardProvider,
   useConfirmNavigation,
@@ -59,7 +60,8 @@ function AutoSaveRegisteredSection({
   save: () => Promise<void> | void;
   onProceed: () => void;
 }) {
-  useRegisterDirty("autosave", true, save, undefined, { mode: "auto-save", warnOnUnload: false });
+  const [dirty, setDirty] = useState(true);
+  useRegisterDirty("autosave", dirty, async () => { await save(); setDirty(false); }, undefined, { mode: "auto-save", warnOnUnload: false });
   return <NavButton onProceed={onProceed} />;
 }
 

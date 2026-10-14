@@ -37,6 +37,7 @@ export function DesktopTopbar({
   statusNonce,
   titleAddon,
   onNavigate,
+  onBeforeLogout,
 }: {
   title: string;
   icon?: ElementType;
@@ -47,11 +48,14 @@ export function DesktopTopbar({
   statusNonce?: number;
   titleAddon?: ReactNode;
   onNavigate?: (target: NotificationNavigationTarget) => void;
+  onBeforeLogout?: () => Promise<void>;
 }) {
   const operator = useCurrentOperator();
   const roleLabel = operator ? WAREHOUSE_ROLE_LABEL[operator.warehouse_role] ?? null : null;
   const deptRoleLabel = operator ? DEPARTMENT_ROLE_LABEL[operator.department_role] ?? null : null;
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [showPinModal, setShowPinModal] = useState(false);
@@ -240,13 +244,21 @@ export function DesktopTopbar({
         title="로그아웃"
         tone="danger"
         confirmLabel="로그아웃"
+        busy={logoutBusy}
         onClose={() => setShowLogoutModal(false)}
-        onConfirm={() => {
-          clearCurrentOperator();
-          window.location.reload();
+        onConfirm={async () => {
+          if (logoutBusy) return;
+          setLogoutBusy(true); setLogoutError("");
+          try {
+            await onBeforeLogout?.();
+            await clearCurrentOperator();
+            window.location.reload();
+          } catch { setLogoutError("저장 결과를 확인하지 못해 로그아웃하지 않았습니다."); }
+          finally { setLogoutBusy(false); }
         }}
       >
         로그아웃하시겠습니까?
+        {logoutError && <p role="alert" className="mt-3 text-sm text-[var(--c-red)]">{logoutError}</p>}
       </ConfirmModal>
 
       <ConfirmModal

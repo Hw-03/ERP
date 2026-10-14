@@ -1,9 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { DailyWorkDatePicker } from "../_daily_report/DailyWorkDatePicker";
 import { DesktopTopbar } from "../DesktopTopbar";
+import { clearCurrentOperator } from "../login/useCurrentOperator";
 
 const notificationBellState = vi.hoisted(() => ({
   loginDialogEnabled: undefined as boolean | undefined,
@@ -23,6 +24,23 @@ vi.mock("../notifications/NotificationBell", () => ({
 }));
 
 describe("DesktopTopbar", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("waits for server revocation before reloading after logout", async () => {
+    const reload = vi.fn();
+    vi.stubGlobal("window", new Proxy(window, { get: (target, key) => key === "location" ? { reload } : Reflect.get(target, key) }));
+    let finish!: () => void;
+    vi.mocked(clearCurrentOperator).mockReturnValueOnce(new Promise<void>(resolve => { finish = resolve; }));
+    notificationBellState.operator = { employee_id: "emp-1", name: "김현우", department: "조립", warehouse_role: "none", department_role: "none" };
+    render(<DesktopTopbar title="전수조사" onRefresh={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: /김현우/ }));
+    fireEvent.click(screen.getByRole("button", { name: "로그아웃", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "로그아웃", exact: true }));
+    await waitFor(() => expect(clearCurrentOperator).toHaveBeenCalled());
+    expect(reload).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /로그아웃|처리 중/ })).toBeDisabled();
+    await act(async () => { finish(); });
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
   it("uses the active tab color for the leading icon", () => {
     const { container } = render(
       <DesktopTopbar
@@ -126,5 +144,15 @@ describe("DesktopTopbar", () => {
       background: "var(--c-popup-bg)",
       boxShadow: "var(--c-popup-shadow)",
     });
+  });
+  it("keeps the operator when a pending stocktake blocks logout", async () => {
+    vi.mocked(clearCurrentOperator).mockClear();
+    notificationBellState.operator = { employee_id: "emp-1", name: "김현우", department: "조립", warehouse_role: "none", department_role: "none" };
+    render(<DesktopTopbar title="전수조사" onRefresh={vi.fn()} onBeforeLogout={async () => { throw new Error("pending"); }} />);
+    fireEvent.click(screen.getByRole("button", { name: /김현우/ }));
+    fireEvent.click(screen.getByRole("button", { name: "로그아웃", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "로그아웃", exact: true }));
+    await screen.findByText("저장 결과를 확인하지 못해 로그아웃하지 않았습니다.");
+    expect(clearCurrentOperator).not.toHaveBeenCalled();
   });
 });

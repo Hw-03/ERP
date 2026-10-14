@@ -27,6 +27,9 @@ import { DesktopHistoryView } from "./DesktopHistoryView";
 import { DesktopWeeklyReportView } from "./DesktopWeeklyReportView";
 import { DesktopDailyWorkReportView } from "./DesktopDailyWorkReportView";
 import { DesktopSettingsView } from "./AppearanceSettingsModal";
+import { StocktakeView } from "./stocktake/StocktakeView";
+import { useStocktakeMenuVisibility } from "./stocktake/useStocktakeMenuVisibility";
+import { StocktakeLoadingSkeleton } from "./stocktake/StocktakeLoadingSkeleton";
 import { useAppearancePreferences } from "./useAppearancePreferences";
 import { useCurrentOperator } from "./login/useCurrentOperator";
 import {
@@ -45,7 +48,7 @@ import { useProductionCapacityQuery } from "@/lib/queries/useProductionQuery";
 import { sendClientEvent } from "@/lib/client-events";
 import { setAuditScreen } from "@/lib/activity-audit-context";
 import { CapacityDetailModal } from "./CapacityDetailModal";
-import { DirtyGuardProvider, useConfirmNavigation, useBeforeViewportSwitch } from "@/lib/ui/dirty-guard";
+import { DirtyGuardProvider, useConfirmNavigation, useBeforeViewportSwitch, useFlushDirtyEntries } from "@/lib/ui/dirty-guard";
 import { canSeeWorkType } from "./_warehouse_v2/ioWorkType";
 import type { IoEntryIntent } from "./_warehouse_v2/types";
 import { HISTORY_PAGE_SIZE } from "./_history_sections/historyConstants";
@@ -72,6 +75,7 @@ const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
   weekly: { title: "주간보고", icon: BarChart2 },
   admin: { title: "관리자", icon: Settings2 },
   settings: { title: "설정", icon: Settings },
+  stocktake: { title: "재고 전수조사", icon: ClipboardList },
 };
 
 export function DesktopMesShell({
@@ -108,12 +112,15 @@ function DesktopMesShellInner({
     );
     return () => animation?.cancel();
   }, [returnSequence]);
-  const flushDirtyEntries = useBeforeViewportSwitch();
+  const beforeViewportSwitch = useBeforeViewportSwitch();
+  const flushDirtyEntries = useFlushDirtyEntries();
   const operator = useCurrentOperator();
+  const stocktakeMenuQuery = useStocktakeMenuVisibility(operator);
+  const stocktakeMenu = stocktakeMenuQuery.data;
   const { preferences, savePreferences } = useAppearancePreferences();
-  const visibleTabs = useMemo(
-    () => filterVisibleSidebarTabs(SIDEBAR_TAB_IDS, operator),
-    [operator],
+  const visibleTabs = useMemo<DesktopTabId[]>(
+    () => filterVisibleSidebarTabs(SIDEBAR_TAB_IDS, operator, stocktakeMenu),
+    [operator, stocktakeMenu],
   );
   const fallbackTab = visibleTabs[0] ?? "dashboard";
   const canOpenTab = useCallback(
@@ -132,6 +139,15 @@ function DesktopMesShellInner({
   const [activeTab, setActiveTab] = useState<DesktopTabId>(initialTab);
   const deferredTab = useDeferredValue(activeTab);
   const contentTab = activeTab === "dashboard" || activeTab === "history" ? deferredTab : activeTab;
+  const admittedStocktakeEmployee = useRef<string | null>(null);
+  const canOpenStocktake = canOpenTab("stocktake");
+  // The operator hook restores after mount, including a mobile-to-desktop switch.
+  const stocktakeAccessPending = !operator || (stocktakeMenuQuery.isLoading && !canOpenStocktake);
+  const retainStocktake = contentTab === "stocktake" && !!operator && admittedStocktakeEmployee.current === operator.employee_id;
+  useLayoutEffect(() => {
+    if (contentTab !== "stocktake") admittedStocktakeEmployee.current = null;
+    else if (canOpenStocktake && operator) admittedStocktakeEmployee.current = operator.employee_id;
+  }, [contentTab, canOpenStocktake, operator]);
   const [status, setStatus] = useState(DEFAULT_STATUS);
   const [statusNonce, setStatusNonce] = useState(0);
   const [refreshNonce, setRefreshNonce] = useState(0);
@@ -148,9 +164,9 @@ function DesktopMesShellInner({
   }, [activeTab]);
 
   useEffect(() => {
-    onBeforeViewportSwitchChange?.(flushDirtyEntries);
+    onBeforeViewportSwitchChange?.(beforeViewportSwitch);
     return () => onBeforeViewportSwitchChange?.(null);
-  }, [flushDirtyEntries, onBeforeViewportSwitchChange]);
+  }, [beforeViewportSwitch, onBeforeViewportSwitchChange]);
 
   const handleStatusChange = useCallback((msg: string) => {
     if (autoRevertTimerRef.current) clearTimeout(autoRevertTimerRef.current);
@@ -203,7 +219,7 @@ function DesktopMesShellInner({
   function handleTabChange(tab: DesktopTabId) {
     if (!canOpenTab(tab)) {
       if (fallbackTab !== activeTab) {
-        commitDesktopTab(fallbackTab);
+        confirmAdminNavigation(() => commitDesktopTab(fallbackTab));
       }
       return;
     }
@@ -268,6 +284,9 @@ function DesktopMesShellInner({
   // defect_dept 쿼리도 함께 읽어 불량 탭 진입 시 부서 필터로 전달.
   // ?defect_dept= 만 있고 ?tab= 이 없으면(레거시 링크 호환) 불량 탭으로 재라우팅.
   useEffect(() => {
+    // A menu change must not unmount an admitted draft before its save/receipt guard completes.
+    if (activeTab === "stocktake" && stocktakeAccessPending) return;
+    if (activeTab === "stocktake" && retainStocktake && !canOpenStocktake) return;
     // A responsive remount can briefly see the previous shell's App Router snapshot.
     // The address-bar URL is authoritative for restoring the active desktop tab.
     const currentParams = new URLSearchParams(window.location.search);
@@ -296,7 +315,16 @@ function DesktopMesShellInner({
     }
 
     setDefectDeptFilter(canOpenTab("defect") ? dept : null);
-  }, [searchParams, activeTab, canOpenTab, fallbackTab, router, commitDesktopTab]);
+  }, [searchParams, activeTab, canOpenTab, fallbackTab, router, commitDesktopTab, retainStocktake, canOpenStocktake, stocktakeAccessPending]);
+
+  useEffect(() => {
+    if (activeTab !== "stocktake" || !retainStocktake || canOpenStocktake || stocktakeAccessPending) return;
+    let live = true;
+    void flushDirtyEntries().then(() => {
+      if (live) commitDesktopTab(fallbackTab, { navigation: "replace" });
+    }).catch(() => {});
+    return () => { live = false; };
+  }, [activeTab, retainStocktake, canOpenStocktake, flushDirtyEntries, commitDesktopTab, fallbackTab, stocktakeAccessPending]);
 
   useEffect(() => {
     if (activeTab !== "warehouseMap" && warehouseMapFullscreen) {
@@ -403,6 +431,8 @@ function DesktopMesShellInner({
 
   const content = useMemo(() => {
     const key = contentTab === "admin" ? `admin-${adminPinEntryNonce}` : `${contentTab}-${refreshNonce}`;
+    if (contentTab === "stocktake" && stocktakeAccessPending && !retainStocktake) return <StocktakeLoadingSkeleton variant="desktop" />;
+    if (contentTab === "stocktake") return canOpenTab("stocktake") || retainStocktake ? <StocktakeView key={key} operator={operator} variant="desktop" /> : null;
     if (contentTab === "dashboard") {
       return (
         <DesktopInventoryView
@@ -491,7 +521,7 @@ function DesktopMesShellInner({
     // setStockWarnings/setCapacityModal(setter), handleTabChange 는 안정적이거나 결과에
     // 영향이 없어 의도적으로 제외 — 누락이 아니라 최소 deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, capacityLoading, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen, isItemPickerFullscreen, preferences, savePreferences, canOpenTab, handleOpenAdminPinEntry, handleDailyReportTopbarControlsChange]);
+  }, [contentTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, capacityLoading, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen, isItemPickerFullscreen, preferences, savePreferences, canOpenTab, handleOpenAdminPinEntry, handleDailyReportTopbarControlsChange, retainStocktake, stocktakeAccessPending]);
 
   return (
     <>
@@ -525,9 +555,11 @@ function DesktopMesShellInner({
               icon={activeMeta.icon}
               iconColor={DESKTOP_TAB_ICON_COLORS[activeTab]}
               onRefresh={() => {
-                setRefreshNonce((current) => current + 1);
-                void refetchCapacity();
+                const refresh = () => { setRefreshNonce((current) => current + 1); void refetchCapacity(); };
+                if (activeTab === "stocktake") confirmAdminNavigation(refresh);
+                else refresh();
               }}
+              onBeforeLogout={activeTab === "stocktake" ? flushDirtyEntries : undefined}
               status={status}
               statusNonce={statusNonce}
               titleAddon={

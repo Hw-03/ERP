@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DesktopMesShell } from "../DesktopMesShell";
 import { AppearancePreferencesProvider } from "../useAppearancePreferences";
 import { SIDEBAR_TAB_IDS } from "../tabAccess";
+vi.mock("../stocktake/useStocktakeMenuVisibility", () => ({ useStocktakeMenuVisibility: () => ({ data: undefined }) }));
 
 function render(ui: ReactNode) {
   return renderBase(<AppearancePreferencesProvider>{ui}</AppearancePreferencesProvider>);
@@ -12,6 +13,7 @@ function render(ui: ReactNode) {
 
 const desktopTabIconColors = vi.hoisted(() => ({
   dashboard: "#fff",
+  stocktake: "#fff",
   warehouse: "#fff",
   shipping: "#fff",
   warehouseMap: "#fff",
@@ -40,6 +42,7 @@ vi.mock("@/lib/ui/dirty-guard", () => ({
   DirtyGuardProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   useConfirmNavigation: () => (next: () => void) => next(),
   useBeforeViewportSwitch: () => async () => {},
+  useFlushDirtyEntries: () => async () => {},
 }));
 
 vi.mock("@/lib/queries/useProductionQuery", () => ({

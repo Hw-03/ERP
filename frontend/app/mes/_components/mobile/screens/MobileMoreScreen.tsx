@@ -8,7 +8,7 @@ import { NotificationBellButton } from "../../notifications/NotificationBell";
 import presentation from "../mobilePresentation.module.css";
 import { MobilePageHeader } from "../primitives/MobilePageHeader";
 
-export type MobileMoreEntryId = "assemblyChecklist" | "dailyReport" | "weekly" | "shipping" | "warehouseMap";
+export type MobileMoreEntryId = "assemblyChecklist" | "dailyReport" | "weekly" | "shipping" | "warehouseMap" | "stocktake";
 
 const MORE_ENTRIES: Record<
   MobileMoreEntryId,
@@ -18,6 +18,7 @@ const MORE_ENTRIES: Record<
     accent: string;
   }
 > = {
+  stocktake: { icon: ClipboardList, label: "재고 전수조사", accent: DESKTOP_TAB_ICON_COLORS.stocktake },
   assemblyChecklist: {
     icon: ClipboardCheck,
     label: "체크리스트",
@@ -55,6 +56,7 @@ export function MobileMoreScreen({
   onWeekly,
   onShipping,
   onWarehouseMap,
+  onStocktake,
   visibleEntries = ["assemblyChecklist", "dailyReport", "shipping", "weekly", "warehouseMap"],
 }: {
   operator: Operator | null;
@@ -66,6 +68,7 @@ export function MobileMoreScreen({
   onWeekly: () => void;
   onShipping: () => void;
   onWarehouseMap: () => void;
+  onStocktake?: () => void;
   visibleEntries?: MobileMoreEntryId[];
 }) {
   const handlers: Record<MobileMoreEntryId, () => void> = {
@@ -74,6 +77,7 @@ export function MobileMoreScreen({
     weekly: onWeekly,
     shipping: onShipping,
     warehouseMap: onWarehouseMap,
+    stocktake: () => onStocktake?.(),
   };
   const entries = visibleEntries.map((id) => ({ id, ...MORE_ENTRIES[id], onClick: handlers[id] }));
 

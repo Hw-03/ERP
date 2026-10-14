@@ -46,9 +46,12 @@ import presentation from "./mobilePresentation.module.css";
 import { DESKTOP_TAB_ICON_COLORS } from "../DesktopSidebar";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import type { NotificationNavigationTarget } from "../notifications/NotificationBell";
-import { DirtyGuardProvider, useBeforeViewportSwitch, useConfirmNavigation } from "@/lib/ui/dirty-guard";
+import { DirtyGuardProvider, useBeforeViewportSwitch, useFlushDirtyEntries, useConfirmNavigation } from "@/lib/ui/dirty-guard";
 import { mobileHistoryState } from "./historyState";
 import { mobileTabLocation } from "./mobileNavigation";
+import { StocktakeView } from "../stocktake/StocktakeView";
+import { useStocktakeMenuVisibility } from "../stocktake/useStocktakeMenuVisibility";
+import { StocktakeLoadingSkeleton } from "../stocktake/StocktakeLoadingSkeleton";
 
 // 관리(admin)는 모바일에서 제외 — 관리 작업은 데스크톱(PC)에서 한다.
 export type MobileTabId =
@@ -61,7 +64,8 @@ export type MobileTabId =
   | "warehouseMap"
   | "shipping"
   | "assemblyChecklist"
-  | "dailyReport";
+  | "dailyReport"
+  | "stocktake";
 
 type MobileTargetEntry = { item?: Item; intent?: IoEntryIntent; notification?: NotificationNavigationTarget };
 
@@ -76,11 +80,12 @@ const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon; color: st
   shipping: { label: "출하", icon: PackageCheck, color: DESKTOP_TAB_ICON_COLORS.shipping },
   weekly: { label: "주간보고", icon: BarChart2, color: DESKTOP_TAB_ICON_COLORS.weekly },
   warehouseMap: { label: "창고지도", icon: MapPinned, color: DESKTOP_TAB_ICON_COLORS.warehouseMap },
+  stocktake: { label: "재고 전수조사", icon: ClipboardCheck, color: DESKTOP_TAB_ICON_COLORS.stocktake },
 };
 
 // 하단 탭바에 노출되는 5탭. 더보기는 전폭 화면(출하·주간보고·창고지도)으로 진입한다.
 const TAB_BAR_IDS: MobileTabId[] = ["dashboard", "warehouse", "defect", "history", "more"];
-const MORE_ENTRY_ORDER: MobileMoreEntryId[] = ["assemblyChecklist", "dailyReport", "shipping", "weekly", "warehouseMap"];
+const MORE_ENTRY_ORDER: MobileMoreEntryId[] = ["stocktake", "assemblyChecklist", "dailyReport", "shipping", "weekly", "warehouseMap"];
 
 // 마운트 딥링크(?tab=)·알림 네비가 받아들이는 유효 탭 집합. 알 수 없는 값(예: admin)이
 // 들어오면 무시되어 기본 dashboard 가 유지된다.
@@ -95,6 +100,7 @@ const VALID_TAB_IDS: MobileTabId[] = [
   "shipping",
   "assemblyChecklist",
   "dailyReport",
+  "stocktake",
 ];
 
 // 항목 3-1 — 데스크톱 상단바와 동일한 기본 브랜드 상태 텍스트.
@@ -155,12 +161,8 @@ function NavButton({
   );
 }
 
-export function MobileShell({
-  onBeforeViewportSwitchChange,
-}: {
-  onBeforeViewportSwitchChange?: (handler: (() => Promise<void | boolean>) | null) => void;
-}) {
-  return <DirtyGuardProvider><MobileShellInner onBeforeViewportSwitchChange={onBeforeViewportSwitchChange} /></DirtyGuardProvider>;
+export function MobileShell(props: { onBeforeViewportSwitchChange?: (handler: (() => Promise<void | boolean>) | null) => void }) {
+  return <DirtyGuardProvider><MobileShellInner {...props} /></DirtyGuardProvider>;
 }
 
 function MobileShellInner({ onBeforeViewportSwitchChange }: {
@@ -170,6 +172,10 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
   const beforeShippingViewportSwitch = useBeforeViewportSwitch();
   const revision = useRealtimeRevision();
   const operator = useCurrentOperator();
+  const confirmStocktakeNavigation = confirmNavigation;
+  const flushStocktake = useFlushDirtyEntries();
+  const stocktakeMenuQuery = useStocktakeMenuVisibility(operator);
+  const stocktakeMenu = stocktakeMenuQuery.data;
   const [activeTab, setActiveTab] = useState<MobileTabId>("dashboard");
   const activeTabRef = useRef(activeTab);
   activeTabRef.current = activeTab;
@@ -221,6 +227,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
   const [pendingWarehouseNotificationTarget, setPendingWarehouseNotificationTarget] = useState<NotificationNavigationTarget | null>(null);
 
   const flushBeforeViewportSwitch = useCallback(async () => {
+    if (activeTab === "stocktake") await flushStocktake();
     if (activeTab === "dailyReport") {
       await dailyReportFlushRef.current?.();
     } else if (activeTab === "warehouse") {
@@ -229,7 +236,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
       if (shippingBusyRef.current) return false;
       return beforeShippingViewportSwitch();
     }
-  }, [activeTab, beforeShippingViewportSwitch]);
+  }, [activeTab, beforeShippingViewportSwitch, flushStocktake]);
 
   useEffect(() => {
     onBeforeViewportSwitchChange?.(flushBeforeViewportSwitch);
@@ -289,28 +296,42 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
   const canOpenMobileTab = useCallback((tab: MobileTabId) => {
     if (!operator) return true;
     if (tab === "more" || tab === "assemblyChecklist") return true;
-    return isSidebarTabVisible(tab, operator);
-  }, [operator]);
+    return isSidebarTabVisible(tab, operator, stocktakeMenu);
+  }, [operator, stocktakeMenu]);
 
   const visibleTabs = useMemo(
     () => TAB_BAR_IDS.filter((tab) => canOpenMobileTab(tab)),
     [canOpenMobileTab],
   );
   const fallbackTab = visibleTabs[0] ?? "dashboard";
+  const admittedStocktakeEmployee = useRef<string | null>(null);
+  const canOpenStocktake = canOpenMobileTab("stocktake");
+  const stocktakeAccessPending = stocktakeMenuQuery.isLoading && !!operator && !canOpenStocktake;
+  const retainStocktake = activeTab === "stocktake" && !!operator && admittedStocktakeEmployee.current === operator.employee_id;
+  useLayoutEffect(() => {
+    if (activeTab !== "stocktake") admittedStocktakeEmployee.current = null;
+    else if (canOpenStocktake && operator) admittedStocktakeEmployee.current = operator.employee_id;
+  }, [activeTab, canOpenStocktake, operator]);
   const visibleMoreEntries = useMemo<MobileMoreEntryId[]>(
     () => [
-      ...MORE_ENTRY_ORDER.filter((tab) => tab === "assemblyChecklist" || isSidebarTabVisible(tab, operator)),
+      ...MORE_ENTRY_ORDER.filter((tab) => tab === "assemblyChecklist" || isSidebarTabVisible(tab, operator, stocktakeMenu)),
     ],
-    [operator],
+    [operator, stocktakeMenu],
   );
 
   useEffect(() => {
     if (!operator) return;
+    if (activeTab === "stocktake" && stocktakeAccessPending) return;
     if (!canOpenMobileTab(activeTab)) {
+      if (activeTab === "stocktake" && retainStocktake) {
+        let live = true;
+        void flushStocktake().then(() => { if (live) commitMobileTab(fallbackTab); }).catch(() => {});
+        return () => { live = false; };
+      }
       commitMobileTab(fallbackTab);
       if (activeTab === "defect") setDefectDeptFilter(null);
     }
-  }, [activeTab, canOpenMobileTab, commitMobileTab, fallbackTab, operator]);
+  }, [activeTab, canOpenMobileTab, commitMobileTab, fallbackTab, operator, retainStocktake, flushStocktake, stocktakeAccessPending]);
 
   const handleTabChange = useCallback((tab: MobileTabId, notification?: NotificationNavigationTarget) => {
     if (activeTab === "shipping" && shippingBusyRef.current) return;
@@ -334,6 +355,10 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
       }
       commitMobileTab(target, notification ? "target" : "general", false, notification ? { notification } : undefined);
     };
+    if (activeTab === "stocktake") {
+      confirmStocktakeNavigation(navigate);
+      return;
+    }
     if (activeTab === "dailyReport") {
       void (dailyReportFlushRef.current?.() ?? Promise.resolve()).then(navigate).catch(() => {});
       return;
@@ -346,7 +371,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
     }
     if (activeTab === "shipping") confirmNavigation(navigate);
     else navigate();
-  }, [activeTab, canOpenMobileTab, commitMobileTab, confirmNavigation, dailyReportFlushRef, fallbackTab, resetActiveMobileTab, warehouseDirty]);
+  }, [activeTab, canOpenMobileTab, commitMobileTab, confirmNavigation, dailyReportFlushRef, fallbackTab, resetActiveMobileTab, warehouseDirty, confirmStocktakeNavigation]);
 
   useEffect(() => {
     activeLocationRef.current = window.location.href;
@@ -376,9 +401,11 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
         acceptHistoryTab(next);
       };
       if (allowPopRef.current) { allowPopRef.current = false; proceed(); return; }
-      if (activeTabRef.current === "dailyReport" || (activeTabRef.current === "warehouse" && warehouseDirtyRef.current)) {
+      if (activeTabRef.current === "stocktake" || activeTabRef.current === "dailyReport" || (activeTabRef.current === "warehouse" && warehouseDirtyRef.current)) {
         const decide = (navigate: () => void) => {
-          if (activeTabRef.current === "dailyReport") {
+          if (activeTabRef.current === "stocktake") {
+            void flushStocktake().then(navigate).catch(() => {});
+          } else if (activeTabRef.current === "dailyReport") {
             void (dailyReportFlushRef.current?.() ?? Promise.resolve()).then(navigate).catch(() => {});
           } else {
             pendingPopNavigationRef.current = navigate;
@@ -401,7 +428,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [acceptHistoryTab, canOpenMobileTab]);
+  }, [acceptHistoryTab, canOpenMobileTab, flushStocktake]);
 
   const handleNotificationNavigate = useCallback((targetInfo: NotificationNavigationTarget) => {
     const { tab } = targetInfo;
@@ -477,7 +504,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
   // 항목 2-9 — weekly/warehouseMap 은 '더보기' 탭으로 진입한 하위 화면이라 TAB_BAR_IDS 에 없다.
   // 하단 네비에선 '더보기' 슬롯을 활성으로 매핑해 pill·강조가 더보기에 붙도록 한다.
   const isMoreSubScreen =
-    activeTab === "weekly" || activeTab === "warehouseMap" || activeTab === "shipping" || activeTab === "assemblyChecklist" || activeTab === "dailyReport";
+    activeTab === "weekly" || activeTab === "warehouseMap" || activeTab === "shipping" || activeTab === "assemblyChecklist" || activeTab === "dailyReport" || activeTab === "stocktake";
   const effectiveNavTab: MobileTabId = isMoreSubScreen ? "more" : activeTab;
   const activeIndex = visibleTabs.indexOf(effectiveNavTab);
 
@@ -496,7 +523,8 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
 
   const content = useMemo(() => {
     const key = `${activeTab}-${refreshNonce}`;
-    if (!canOpenMobileTab(activeTab)) return null;
+    if (activeTab === "stocktake" && stocktakeAccessPending && !retainStocktake) return <StocktakeLoadingSkeleton variant="mobile" />;
+    if (!canOpenMobileTab(activeTab) && !retainStocktake) return null;
     if (activeTab === "dashboard") {
       return (
         <MobileDashboardScreen
@@ -551,6 +579,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
           onWeekly={() => handleTabChange("weekly")}
           onShipping={() => handleTabChange("shipping")}
           onWarehouseMap={() => handleTabChange("warehouseMap")}
+          onStocktake={() => handleTabChange("stocktake")}
           visibleEntries={visibleMoreEntries}
         />
       );
@@ -558,6 +587,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
     if (activeTab === "shipping") {
       return <MobileShippingScreen key={key} operator={operator} onExit={() => handleTabChange("more")} onBusyChange={(busy) => { shippingBusyRef.current = busy; }} onGoToWarehouse={handleGoToWarehouse} onNavigateAway={(tab) => acceptHistoryTab(VALID_TAB_IDS.includes(tab as MobileTabId) ? tab as MobileTabId : "dashboard")} />;
     }
+    if (activeTab === "stocktake") return canOpenMobileTab("stocktake") || retainStocktake ? <StocktakeView key={key} operator={operator} variant="mobile" /> : null;
     if (activeTab === "assemblyChecklist") {
       return <MobileAssemblyChecklistScreen key={key} onExit={() => handleTabChange("more")} />;
     }
@@ -600,6 +630,8 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
     operator,
     unreadNotifications,
     notificationController.openDialog,
+    retainStocktake,
+    stocktakeAccessPending,
   ]);
 
   return (
@@ -663,7 +695,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
                   key={tab}
                   icon={meta.icon}
                   iconColor={meta.color}
-                  label={tab === "more" && activeTab === "dailyReport" ? "작업 일보" : meta.label}
+                  label={tab === "more" && activeTab === "dailyReport" ? "작업 일보" : tab === "more" && activeTab === "stocktake" ? "전수조사" : meta.label}
                   active={tab === effectiveNavTab}
                   badgeCount={tab === "more" ? unreadNotifications : undefined}
                   onClick={() => handleTabChange(tab)}
@@ -771,6 +803,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
       <MobileUserMenuSheet
         open={userMenuOpen}
         onClose={() => setUserMenuOpen(false)}
+        onBeforeLogout={activeTab === "stocktake" ? flushStocktake : undefined}
       />
       </div>
     </MobileViewportFrame>

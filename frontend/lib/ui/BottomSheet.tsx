@@ -23,6 +23,8 @@ export function BottomSheet({
   dismissThresholdPx = 96,
   dismissVelocity = 0.5,
   ariaLabel,
+  keepMounted = false,
+  surfaceColor,
 }: {
   open: boolean;
   onClose: () => void;
@@ -35,6 +37,10 @@ export function BottomSheet({
   dismissVelocity?: number;
   /** title 이 없을 때 dialog 접근명 (기본 "선택 시트") */
   ariaLabel?: string;
+  /** Preserve editors and their pending drafts while the sheet is hidden. */
+  keepMounted?: boolean;
+  /** Tint the surface layer while preserving the opaque background underneath. */
+  surfaceColor?: string;
 }) {
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -151,14 +157,16 @@ export function BottomSheet({
     [onClose],
   );
 
-  if (!open) return null;
+  if (!open && !keepMounted) return null;
 
   const sheetH = sheetRef.current?.offsetHeight ?? 1;
   const dimFactor = Math.max(0, Math.min(1, 1 - dragY / sheetH));
+  const surface = surfaceColor ?? LEGACY_COLORS.s1;
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-end justify-center"
+      hidden={!open}
+      className={`fixed inset-0 z-[200] ${open ? "flex" : "hidden"} items-end justify-center`}
       // zIndex 인라인 — 모달 스택은 Tailwind 스캔 여부와 무관히 항상 최상위.
       style={{ zIndex: 200, background: `rgba(0,0,0,${(0.6 * dimFactor).toFixed(3)})` }}
       onClick={onClose}
@@ -174,7 +182,7 @@ export function BottomSheet({
           // 모달 시트는 불투명해야 함 — --c-s1 은 반투명이라 뒤 화면이 비친다.
           // 불투명 --c-bg 위에 s1 표면 틴트를 합성해 불투명 + 표면감 유지.
           backgroundColor: LEGACY_COLORS.bg,
-          backgroundImage: `linear-gradient(${LEGACY_COLORS.s1}, ${LEGACY_COLORS.s1})`,
+          backgroundImage: `linear-gradient(${surface}, ${surface})`,
           borderColor: LEGACY_COLORS.border,
           maxHeight: "92vh",
           paddingBottom: "calc(env(safe-area-inset-bottom, 16px) + 20px)",

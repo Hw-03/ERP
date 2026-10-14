@@ -10,9 +10,14 @@ import type { DesktopTabId } from "../tabAccess";
 import { sendClientEvent } from "@/lib/client-events";
 
 const setAuditScreen = vi.hoisted(() => vi.fn());
+const operatorState = vi.hoisted(() => ({ current: null as { employee_id: string; name: string; department: string; hidden_sidebar_tabs: string[]; level?: string; department_role?: string } | null }));
+const stocktakeMenuState = vi.hoisted(() => ({ data: { enabled: true, employee_visible: true, participant_departments: ["조립"], participant_count: 1 } as { enabled: boolean; employee_visible: boolean; participant_departments: string[]; participant_count: number } | undefined, isLoading: false }));
+const stocktakeFlush = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock("../stocktake/useStocktakeMenuVisibility", () => ({ useStocktakeMenuVisibility: () => stocktakeMenuState }));
 
 function render(ui: ReactNode) {
-  return renderBase(<AppearancePreferencesProvider>{ui}</AppearancePreferencesProvider>);
+  const view = renderBase(<AppearancePreferencesProvider>{ui}</AppearancePreferencesProvider>);
+  return { ...view, rerender: (next: ReactNode) => view.rerender(<AppearancePreferencesProvider>{next}</AppearancePreferencesProvider>) };
 }
 
 const routerPush = vi.hoisted(() => vi.fn());
@@ -49,12 +54,17 @@ vi.mock("@/lib/queries/useProductionQuery", () => ({
 }));
 
 vi.mock("../login/useCurrentOperator", () => ({
-  useCurrentOperator: () => null,
-  readCurrentOperator: () => null,
+  useCurrentOperator: () => operatorState.current,
+  readCurrentOperator: () => operatorState.current,
   setCurrentOperator: vi.fn(),
 }));
 
-const sidebarTabs: DesktopTabId[] = ["dashboard", "warehouse", "shipping", "defect", "history", "dailyReport", "weekly", "warehouseMap", "settings"];
+const sidebarTabs: DesktopTabId[] = ["dashboard", "warehouse", "shipping", "defect", "history", "dailyReport", "weekly", "warehouseMap", "settings", "stocktake"];
+vi.mock("../stocktake/StocktakeView", () => ({ StocktakeView: () => {
+  const [dirty, setDirty] = useState(true);
+  useRegisterDirty("stocktake-test", dirty, async () => { await stocktakeFlush(); setDirty(false); }, undefined, { mode: "auto-save" });
+  return <main>stocktake content</main>;
+} }));
 
 vi.mock("../DesktopSidebar", () => ({
   DESKTOP_TAB_ICON_COLORS: {
@@ -73,12 +83,14 @@ vi.mock("../DesktopSidebar", () => ({
     activeTab,
     onTabChange,
     onOpenAdminPinEntry,
+    visibleTabs,
   }: {
     activeTab: DesktopTabId;
     onTabChange: (tab: DesktopTabId) => void;
     onOpenAdminPinEntry: () => void;
+    visibleTabs: DesktopTabId[];
   }) => (
-    <nav>
+    <nav data-testid="sidebar-visible-tabs" data-visible-tabs={visibleTabs.join(",")}>
       <button type="button" onClick={onOpenAdminPinEntry}>admin pin entry</button>
       {sidebarTabs.map((tab) => (
         <button
@@ -209,7 +221,7 @@ it("keeps summary card details while the history screen is preparing", () => {
     expect(screen.getByRole("status", { name: "입출고 내역 화면을 불러오는 중입니다" })).toBeInTheDocument();
     expect(screen.getByText("창고 재고가 움직인 작업")).toBeInTheDocument();
     expect(screen.getByText("부서 재고가 움직인 작업")).toBeInTheDocument();
-    expect(screen.getByText("재고 수량을 직접 조정한 거래")).toBeInTheDocument();
+    expect(screen.getByText("실수량 확인과 재고 조정 작업")).toBeInTheDocument();
     expect(screen.getAllByLabelText("집계 중")).toHaveLength(4);
     expect(screen.getByPlaceholderText("작업 · 품명 · 코드 · 담당자 · 메모")).toBeDisabled();
     expect(screen.getByRole("button", { name: "전체", exact: true })).toBeDisabled();
@@ -256,8 +268,129 @@ vi.mock("../_weekly_sections/WeeklyWeekPicker", () => ({
 
 describe("DesktopMesShell tab transition", () => {
   const originalStartViewTransition = document.startViewTransition;
+  it.each(["manager", "visible-worker", "hidden-worker"])("preserves the stocktake URL while the operator restores on desktop remount: %s", outcome => {
+    operatorState.current = null;
+    stocktakeMenuState.data = undefined;
+    stocktakeMenuState.isLoading = false;
+    window.history.replaceState({}, "", "/mes?tab=stocktake");
+    const { rerender } = render(<DesktopMesShell />);
+    expect(routerReplace).not.toHaveBeenCalled();
+    expect(window.location.search).toBe("?tab=stocktake");
+    expect(screen.getByRole("status", { name: "재고 전수조사 준비 중" })).toBeInTheDocument();
+    expect(screen.queryByText("stocktake content")).not.toBeInTheDocument();
+
+    operatorState.current = { employee_id: "restored-worker", name: "작업자", department: "조립", department_role: outcome === "manager" ? "primary" : "none", hidden_sidebar_tabs: [] };
+    stocktakeMenuState.data = { enabled: false, employee_visible: outcome !== "hidden-worker", participant_departments: ["조립"], participant_count: 1 };
+    rerender(<DesktopMesShell />);
+    if (outcome === "hidden-worker") {
+      expect(screen.queryByText("stocktake content")).not.toBeInTheDocument();
+      expect(screen.getByText("dashboard content")).toBeInTheDocument();
+      expect(routerReplace).toHaveBeenCalledWith("?tab=dashboard", { scroll: false });
+    } else {
+      expect(routerReplace).not.toHaveBeenCalled();
+      expect(screen.getByText("stocktake content")).toBeInTheDocument();
+    }
+  });
+  it.each(["ON", "OFF", "error"])("초기 전수조사 URL은 표시 조회 대기 후 %s 결과에 따라 진입한다", outcome => {
+    operatorState.current = { employee_id: "worker-a", name: "작업자", department: "조립", hidden_sidebar_tabs: ["stocktake"] };
+    stocktakeMenuState.data = undefined;
+    stocktakeMenuState.isLoading = true;
+    window.history.replaceState({}, "", "/mes?tab=stocktake");
+    const { rerender } = render(<DesktopMesShell />);
+    expect(window.location.search).toBe("?tab=stocktake");
+    expect(screen.getByRole("status", { name: "재고 전수조사 준비 중" })).toBeInTheDocument();
+    expect(screen.queryByText("stocktake content")).not.toBeInTheDocument();
+    expect(stocktakeFlush).not.toHaveBeenCalled();
+    stocktakeMenuState.isLoading = false;
+    stocktakeMenuState.data = outcome === "error" ? undefined : { enabled: outcome === "ON", employee_visible: outcome === "ON", participant_departments: ["조립"], participant_count: 1 };
+    rerender(<DesktopMesShell />);
+    if (outcome === "ON") expect(screen.getByText("stocktake content")).toBeInTheDocument();
+    else {
+      expect(screen.queryByText("stocktake content")).not.toBeInTheDocument();
+      expect(screen.getByText("dashboard content")).toBeInTheDocument();
+    }
+  });
+
+  it("opens the stocktake screen through the real desktop render branch", () => {
+    operatorState.current = { employee_id: "employee-a", name: "작업자", department: "조립", hidden_sidebar_tabs: [] };
+    render(<DesktopMesShell />);
+    fireEvent.click(screen.getByRole("button", { name: "stocktake", exact: true }));
+    expect(screen.getByText("stocktake content")).toBeInTheDocument();
+  });
+
+  it("일괄 OFF에서 직접 진입을 막고 로그인 중 ON 변경을 사이드바에 반영한다", () => {
+    operatorState.current = { employee_id: "employee-a", name: "작업자", department: "조립", hidden_sidebar_tabs: [] };
+    stocktakeMenuState.data = { enabled: false, employee_visible: false, participant_departments: ["조립"], participant_count: 1 };
+    window.history.replaceState({}, "", "/mes?tab=stocktake");
+    const { rerender } = render(<DesktopMesShell />);
+    expect(screen.queryByText("stocktake content")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sidebar-visible-tabs").getAttribute("data-visible-tabs")?.split(",")).not.toContain("stocktake");
+    stocktakeMenuState.data = { enabled: true, employee_visible: true, participant_departments: ["조립"], participant_count: 1 };
+    rerender(<DesktopMesShell />);
+    expect(screen.getByTestId("sidebar-visible-tabs").getAttribute("data-visible-tabs")?.split(",")).toContain("stocktake");
+    fireEvent.click(screen.getByRole("button", { name: "stocktake", exact: true }));
+    expect(screen.getByText("stocktake content")).toBeInTheDocument();
+  });
+  it.each([{ department_role: "primary" }, { department_role: "deputy" }, { level: "admin", department_role: "none" }])("관리자 전수조사 진입은 일괄 OFF에도 유지한다: %j", manager => {
+    operatorState.current = { employee_id: "manager-a", name: "관리자", department: "연구", hidden_sidebar_tabs: [], ...manager };
+    stocktakeMenuState.data = { enabled: false, employee_visible: true, participant_departments: ["조립"], participant_count: 1 };
+    render(<DesktopMesShell />);
+    expect(screen.getByTestId("sidebar-visible-tabs").getAttribute("data-visible-tabs")?.split(",")).toContain("stocktake");
+    fireEvent.click(screen.getByRole("button", { name: "stocktake", exact: true }));
+    expect(screen.getByText("stocktake content")).toBeInTheDocument();
+  });
+  it("일괄 OFF를 받아도 전수조사 초안 저장이 끝나기 전에는 본문을 보존한다", async () => {
+    let finish!: () => void;
+    stocktakeFlush.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+    operatorState.current = { employee_id: "worker-a", name: "작업자", department: "조립", hidden_sidebar_tabs: [] };
+    const { rerender } = render(<DesktopMesShell />);
+    fireEvent.click(screen.getByRole("button", { name: "stocktake", exact: true }));
+    stocktakeMenuState.data = { enabled: false, employee_visible: false, participant_departments: ["조립"], participant_count: 1 };
+    rerender(<DesktopMesShell />);
+    expect(screen.getByText("stocktake content")).toBeInTheDocument();
+    expect(stocktakeFlush).toHaveBeenCalledOnce();
+    expect(screen.getByTestId("sidebar-visible-tabs").getAttribute("data-visible-tabs")?.split(",")).not.toContain("stocktake");
+    await act(async () => { finish(); });
+    await waitFor(() => expect(screen.queryByText("stocktake content")).not.toBeInTheDocument());
+    expect(screen.getByText("dashboard content")).toBeInTheDocument();
+  });
+  it("일괄 OFF 후 저장 실패나 미확정 명령이면 전수조사 본문을 유지한다", async () => {
+    stocktakeFlush.mockRejectedValueOnce(new Error("unresolved command"));
+    operatorState.current = { employee_id: "worker-a", name: "작업자", department: "조립", hidden_sidebar_tabs: [] };
+    const { rerender } = render(<DesktopMesShell />);
+    fireEvent.click(screen.getByRole("button", { name: "stocktake", exact: true }));
+    stocktakeMenuState.data = { enabled: false, employee_visible: false, participant_departments: ["조립"], participant_count: 1 };
+    rerender(<DesktopMesShell />);
+    await act(async () => {});
+    expect(stocktakeFlush).toHaveBeenCalledOnce();
+    expect(screen.getByText("stocktake content")).toBeInTheDocument();
+  });
+
+  it("숨긴 전수조사는 사이드바에서 제외하고 직접 URL 및 콜백 진입도 제한한다", () => {
+    operatorState.current = { employee_id: "employee-hidden", name: "작업자", department: "조립", hidden_sidebar_tabs: ["stocktake"] };
+    stocktakeMenuState.data = { enabled: true, employee_visible: false, participant_departments: ["조립"], participant_count: 1 };
+    window.history.replaceState({}, "", "/mes?tab=stocktake");
+    render(<DesktopMesShell />);
+    expect(screen.getByTestId("sidebar-visible-tabs").getAttribute("data-visible-tabs")?.split(",")).not.toContain("stocktake");
+    expect(screen.queryByText("stocktake content")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "stocktake", exact: true }));
+    expect(screen.queryByText("stocktake content")).not.toBeInTheDocument();
+    expect(screen.getByText("dashboard content")).toBeInTheDocument();
+  });
+
+  it("일괄 OFF 후 개인 켜기를 서버에서 받으면 이전 로그인 숨김과 무관하게 표시한다", () => {
+    operatorState.current = { employee_id: "worker-a", name: "작업자", department: "조립", hidden_sidebar_tabs: ["stocktake"] };
+    stocktakeMenuState.data = { enabled: false, employee_visible: true, participant_departments: ["조립"], participant_count: 1 };
+    render(<DesktopMesShell />);
+    fireEvent.click(screen.getByRole("button", { name: "stocktake", exact: true }));
+    expect(screen.getByText("stocktake content")).toBeInTheDocument();
+  });
 
   beforeEach(() => {
+    stocktakeMenuState.isLoading = false;
+    stocktakeFlush.mockReset().mockResolvedValue(undefined);
+    stocktakeMenuState.data = { enabled: true, employee_visible: true, participant_departments: ["조립"], participant_count: 1 };
+    operatorState.current = null;
     vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
     window.history.replaceState({}, "", "/mes?tab=history");
     routerPush.mockClear();
@@ -469,6 +602,7 @@ describe("DesktopMesShell tab transition", () => {
   });
 
   it.each(sidebarTabs)("applies the shared content transition when navigating to %s", (tab) => {
+    if (tab === "stocktake") operatorState.current = { employee_id: "employee-a", name: "작업자", department: "조립", hidden_sidebar_tabs: [] };
     render(<DesktopMesShell />);
 
     fireEvent.click(screen.getByRole("button", { name: tab }));

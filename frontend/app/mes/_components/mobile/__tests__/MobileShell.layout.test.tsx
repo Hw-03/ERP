@@ -1,11 +1,22 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useEffect, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import type { AppNotification } from "@/lib/api/types";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { useShippingNavigation } from "../shipping/useShippingNavigation";
 
 const setAuditScreen = vi.hoisted(() => vi.fn());
+const stocktakeFlush = vi.hoisted(() => vi.fn(async () => {}));
+const stocktakeRender = vi.hoisted(() => vi.fn());
+const stocktakeMenuState = vi.hoisted(() => ({ data: { enabled: true, employee_visible: true, participant_departments: ["Assembly"], participant_count: 1 } as { enabled: boolean; employee_visible: boolean; participant_departments: string[]; participant_count: number } | undefined, isLoading: false }));
+vi.mock("../../stocktake/useStocktakeMenuVisibility", () => ({ useStocktakeMenuVisibility: () => stocktakeMenuState }));
+vi.mock("../../stocktake/StocktakeView", () => ({ StocktakeView: () => {
+  stocktakeRender();
+  const [dirty, setDirty] = useState(true);
+  useRegisterDirty("stocktake-test", dirty, async () => { await stocktakeFlush(); setDirty(false); }, undefined, { mode: "auto-save" });
+  return <div>stocktake content</div>;
+} }));
 const flushWarehouseDraft = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const flushDailyReport = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const warehouseMounts = vi.hoisted(() => ({ count: 0 }));
@@ -168,11 +179,13 @@ vi.mock("../screens", () => ({
     </>
   ),
   MobileMoreScreen: ({
+    onStocktake,
     onChecklist,
     onShipping,
     onWeekly,
     visibleEntries,
   }: {
+    onStocktake?: () => void;
     onChecklist?: () => void;
     onShipping?: () => void;
     onWeekly?: () => void;
@@ -182,6 +195,7 @@ vi.mock("../screens", () => ({
       <div data-testid="more-entry-order">{visibleEntries?.join(",")}</div>
       <button type="button" onClick={onChecklist}>open checklist</button>
       <button type="button" onClick={onShipping}>open shipping</button>
+      <button type="button" onClick={onStocktake}>open stocktake</button>
       <button type="button" onClick={onWeekly}>open weekly</button>
       <button type="button" onClick={() => notificationNavigation.current?.({ tab: "warehouse", section: "as-research-queue", relatedRequestId: "as-request-1" })}>open AS notification</button>
     </>;
@@ -392,7 +406,110 @@ describe("MobileShell layout", () => {
     });
     expect(screen.getByText("shipping screen")).toBeInTheDocument();
   });
+  it.each(["ON", "OFF", "error"])("초기 전수조사 URL은 표시 조회 대기 후 %s 결과에 따라 진입한다", outcome => {
+    state.operator.hidden_sidebar_tabs = ["stocktake"];
+    stocktakeMenuState.data = undefined;
+    stocktakeMenuState.isLoading = true;
+    window.history.pushState({}, "", "/mes?tab=stocktake");
+    const { rerender } = render(<MobileShell />);
+    expect(window.location.search).toBe("?tab=stocktake");
+    expect(screen.getByRole("status", { name: "재고 전수조사 준비 중" })).toBeInTheDocument();
+    expect(screen.queryByText("stocktake content")).not.toBeInTheDocument();
+    expect(stocktakeRender).not.toHaveBeenCalled();
+    stocktakeMenuState.isLoading = false;
+    stocktakeMenuState.data = outcome === "error" ? undefined : { enabled: outcome === "ON", employee_visible: outcome === "ON", participant_departments: ["Assembly"], participant_count: 1 };
+    rerender(<MobileShell />);
+    if (outcome === "ON") expect(screen.getByText("stocktake content")).toBeInTheDocument();
+    else {
+      expect(screen.queryByText("stocktake content")).not.toBeInTheDocument();
+      expect(screen.getByText("dashboard screen")).toBeInTheDocument();
+    }
+  });
+  it("일괄 OFF에도 전수조사 초안 저장을 기다린 뒤 이동한다", async () => {
+    const pending = deferred<void>();
+    stocktakeFlush.mockImplementationOnce(() => pending.promise);
+    const { rerender } = render(<MobileShell />);
+    fireEvent.click(screen.getByRole("button", { name: "더보기", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "open stocktake" }));
+    stocktakeMenuState.data = { enabled: false, employee_visible: false, participant_departments: ["Assembly"], participant_count: 1 };
+    rerender(<MobileShell />);
+    expect(screen.getByText("stocktake content")).toBeInTheDocument();
+    expect(stocktakeFlush).toHaveBeenCalledOnce();
+    await act(async () => { pending.resolve(); });
+    await waitFor(() => expect(screen.queryByText("stocktake content")).not.toBeInTheDocument());
+    expect(screen.getByText("dashboard screen")).toBeInTheDocument();
+  });
+  it("일괄 OFF 후 저장 실패나 미확정 명령이면 모바일 본문을 유지한다", async () => {
+    stocktakeFlush.mockRejectedValueOnce(new Error("unresolved command"));
+    const { rerender } = render(<MobileShell />);
+    fireEvent.click(screen.getByRole("button", { name: "더보기", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "open stocktake" }));
+    stocktakeMenuState.data = { enabled: false, employee_visible: false, participant_departments: ["Assembly"], participant_count: 1 };
+    rerender(<MobileShell />);
+    await act(async () => {});
+    expect(stocktakeFlush).toHaveBeenCalledOnce();
+    expect(screen.getByText("stocktake content")).toBeInTheDocument();
+  });
+  it("일괄 OFF는 직접 URL을 막고 로그인 중 ON 변경을 More 메뉴에 반영한다", () => {
+    stocktakeMenuState.data = { enabled: false, employee_visible: false, participant_departments: ["Assembly"], participant_count: 1 };
+    window.history.pushState({}, "", "/mes?tab=stocktake");
+    const { rerender } = render(<MobileShell />);
+    expect(screen.queryByText("stocktake content")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "더보기", exact: true }));
+    expect(screen.getByTestId("more-entry-order").textContent?.split(",")).not.toContain("stocktake");
+    stocktakeMenuState.data = { enabled: true, employee_visible: true, participant_departments: ["Assembly"], participant_count: 1 };
+    rerender(<MobileShell />);
+    expect(screen.getByTestId("more-entry-order").textContent?.split(",")).toContain("stocktake");
+    fireEvent.click(screen.getByRole("button", { name: "open stocktake" }));
+    expect(screen.getByText("stocktake content")).toBeInTheDocument();
+  });
+  it("숨긴 전수조사는 More 목록과 직접 콜백 진입에서 제외한다", () => {
+    state.operator.hidden_sidebar_tabs = ["stocktake"];
+    stocktakeMenuState.data = { enabled: true, employee_visible: false, participant_departments: ["Assembly"], participant_count: 1 };
+    render(<MobileShell />);
+    fireEvent.click(screen.getByRole("button", { name: "더보기", exact: true }));
+    expect(screen.getByTestId("more-entry-order").textContent?.split(",")).not.toContain("stocktake");
+    fireEvent.click(screen.getByRole("button", { name: "open stocktake" }));
+    expect(screen.queryByText("stocktake content")).not.toBeInTheDocument();
+    expect(screen.getByText("dashboard screen")).toBeInTheDocument();
+    expect(stocktakeRender).not.toHaveBeenCalled();
+  });
+
+  it("숨긴 전수조사의 모바일 직접 URL을 허용하지 않는다", () => {
+    state.operator.hidden_sidebar_tabs = ["stocktake"];
+    stocktakeMenuState.data = { enabled: true, employee_visible: false, participant_departments: ["Assembly"], participant_count: 1 };
+    window.history.pushState({}, "", "/mes?tab=stocktake");
+    render(<MobileShell />);
+    expect(screen.queryByText("stocktake content")).not.toBeInTheDocument();
+    expect(screen.getByText("dashboard screen")).toBeInTheDocument();
+    expect(stocktakeRender).not.toHaveBeenCalled();
+  });
+  it("opens stocktake from More and keeps the screen when its save fails", async () => {
+    stocktakeFlush.mockRejectedValueOnce(new Error("save failed"));
+    render(<MobileShell />);
+    fireEvent.click(screen.getByRole("button", { name: "더보기", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "open stocktake" }));
+    expect(screen.getByText("stocktake content")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "대시보드", exact: true }));
+    await act(async () => {});
+    expect(stocktakeFlush).toHaveBeenCalled();
+    expect(screen.getByText("stocktake content")).toBeInTheDocument();
+  });
+  it("일괄 OFF 후 개인 켜기를 받으면 이전 로그인 숨김과 무관하게 More에서 표시한다", () => {
+    state.operator.hidden_sidebar_tabs = ["stocktake"];
+    stocktakeMenuState.data = { enabled: false, employee_visible: true, participant_departments: ["Assembly"], participant_count: 1 };
+    render(<MobileShell />);
+    fireEvent.click(screen.getByRole("button", { name: "더보기", exact: true }));
+    expect(screen.getByTestId("more-entry-order").textContent?.split(",")).toContain("stocktake");
+    fireEvent.click(screen.getByRole("button", { name: "open stocktake" }));
+    expect(screen.getByText("stocktake content")).toBeInTheDocument();
+  });
+
   beforeEach(() => {
+    stocktakeMenuState.isLoading = false;
+    stocktakeFlush.mockReset().mockResolvedValue(undefined);
+    stocktakeMenuState.data = { enabled: true, employee_visible: true, participant_departments: ["Assembly"], participant_count: 1 };
+    stocktakeRender.mockClear();
     window.history.pushState({}, "", "/mes");
     state.notifications = { items: [], unread_count: 0 };
     state.operator.hidden_sidebar_tabs = [];

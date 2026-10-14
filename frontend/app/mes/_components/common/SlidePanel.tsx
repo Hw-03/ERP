@@ -7,7 +7,7 @@ import { useFocusTrap } from "@/lib/mes/useFocusTrap";
 
 interface Props {
   open: boolean;
-  width?: number;
+  width?: number | string;
   onClose?: () => void;
   /** true 면 X 버튼을 렌더하지 않음 (카드 내부에서 직접 닫기 버튼을 제공할 때). ESC 처리는 유지. */
   hideCloseButton?: boolean;
