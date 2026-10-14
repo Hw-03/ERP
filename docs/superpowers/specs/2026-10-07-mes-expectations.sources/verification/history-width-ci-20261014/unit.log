@@ -1,0 +1,11 @@
+Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+ ✓ app/mes/_components/_history_sections/__tests__/historyTableHelpers.test.tsx (82 tests) 1491ms
+
+ Test Files  1 passed (1)
+      Tests  82 passed (82)
+   Start at  15:26:48
+   Duration  13.50s (transform 1.51s, setup 1.78s, collect 3.32s, tests 1.49s, environment 3.27s, prepare 576ms)
+
+

@@ -801,7 +801,7 @@ describe("history table helper rendering policies", () => {
     const table = tableScroller?.querySelector("table");
 
     expect(tableCard).not.toBeInTheDocument();
-    expect(tableScroller).toHaveClass("min-w-0");
+    expect(tableScroller).toHaveClass("min-w-[1000px]");
     expect(tableScroller).toHaveClass("overflow-clip");
     expect(tableScroller).not.toHaveClass("overflow-x-hidden");
     expect(tableScroller).not.toHaveClass("-mr-5");

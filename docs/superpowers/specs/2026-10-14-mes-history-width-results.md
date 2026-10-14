@@ -38,4 +38,6 @@
 
 ## 적용 범위
 
+2026-10-14 후속 CI에서 별도 `historyTableHelpers.test.tsx`에 남은 `min-w-0` 단언 1건이 실패했다. 이를 기존 승인된 1000px 계약으로 갱신한 뒤 해당 파일 82건과 ESLint를 통과했다. 제품 코드·E2E·공유 설정·설치 의존성은 그대로이며 위 화면·도구 결과를 재사용한다. [후속 검토 기록](2026-10-07-mes-expectations.sources/verification/history-width-ci-20261014/review.json)과 [영수증](2026-10-07-mes-expectations.sources/verification/history-width-ci-20261014/completion.json)에 새 테스트 입력·기존 근거 보존 대조를 연결했다. 이전 근거 파일은 수정하지 않고 원장 이력을 추가했다. 현재 전체 PASS 또는 이번 빌드 통과를 주장하지 않는다.
+
 정리 기록, 화면 수정, 기준 완료 연결을 작업 브랜치에 나누어 저장한다. main 반영과 직원 배포는 하지 않는다. 새 HEAD의 CI는 시작 상태만 확인하며 전체 종료는 기다리지 않는다. 합의된 제외 기능과 기존 성능 기준 미충족 기록은 이번 화면 수정으로 바뀌지 않는다.
