@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { requiredInputs, verifyExecution } from "./mes-expectation-evidence.mjs";
+import { resolveReviewedReuse } from "./mes-expectation-reviewed-reuse.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const BASE = "docs/superpowers/specs/2026-10-07-mes-expectations";
@@ -82,7 +83,7 @@ export function normalizeExpectations({ audit, feedback, policy, registry, prove
   });
   return {
     schemaVersion: policy.schemaVersion ?? 1, policyDate: "2026-10-07", provenance: clone(provenance), originalRun: clone(audit.run),
-    semantics: { linkage: "selector + actual assertion fragment + source SHA256", currentPass: "all individual conditions require fresh execution evidence; original observations remain historical", denominator: "active original ledger cases grouped by source; excluded cases are separate" },
+    semantics: { linkage: "selector + actual assertion fragment + source SHA256", currentPass: "all individual conditions require validated native execution evidence or explicit reviewed-reuse evidence; original execution dates and observations remain historical", denominator: "active original ledger cases grouped by source; excluded cases are separate" },
     cases, excludedCases: (audit.excludedCases ?? []).map((c) => ({ ...clone(c), status: "deferred" })), metrics: summarize(cases),
   };
 }
@@ -202,7 +203,7 @@ export function validateExpectations(model, readSource, { requireComplete = fals
   const errors = [];
   // Every binding in this validation sees one immutable source snapshot. Cache
   // parsing per declaration because many independent conditions share a test.
-  const sources = new Map(), declarations = new Map();
+  const sources = new Map(), declarations = new Map(), reviewedReports = new Map();
   if (requireComplete && model.schemaVersion !== 2) errors.push("complete verification requires schema 2");
   try { unique(model.cases, (c) => c.id, "model"); } catch (error) { errors.push(error.message); }
   for (const row of model.cases) {
@@ -253,13 +254,20 @@ export function validateExpectations(model, readSource, { requireComplete = fals
             if (!supportedPath || evidencePath.split("/").includes("..")) throw new Error("invalid execution evidence path");
             const bytes = readSource(evidence.evidenceFile);
             if (sha256(bytes) !== evidence.evidenceHash) throw new Error("stale evidence hash");
-            const report = JSON.parse(bytes.toString());
+            const stored = JSON.parse(bytes.toString());
+            let report = stored, executionRead = readSource, executionPaths = paths;
+            if (stored.kind === "reviewed-reuse") {
+              if (assertion.execution.basis !== "reviewed-reuse") throw new Error("reviewed execution basis missing");
+              if (!reviewedReports.has(evidence.evidenceHash)) reviewedReports.set(evidence.evidenceHash, resolveReviewedReuse(stored, { read: readSource, paths }));
+              const resolved = reviewedReports.get(evidence.evidenceHash);
+              report = resolved.report; executionRead = resolved.read; executionPaths = resolved.paths;
+            }
             if (model.schemaVersion === 2) {
               if (report.schemaVersion !== 2) throw new Error("schema 2 raw execution required");
               const targets = report.conditions?.find((entry) => entry.caseId === row.id && entry.conditionId === assertion.id)?.targets ?? [];
               const bindings = assertion.bindings.filter((binding) => targets.some((target) => target.file === binding.file && target.selector === binding.selector));
               const kind = report.runner === "playwright" ? "browser" : "test";
-              const problems = verifyExecution(report, row, assertion, { read: readSource, paths, requiredInputs: requiredInputs(bindings, paths), evidenceKind: kind, bindings });
+              const problems = verifyExecution(report, row, assertion, { read: executionRead, paths: executionPaths, requiredInputs: requiredInputs(bindings, paths), evidenceKind: kind, bindings });
               if (problems.length) throw new Error(problems.join("; "));
               for (const binding of bindings) proven.add(`${binding.file}::${binding.selector}`);
               evidenceKinds.add("test");

@@ -29,7 +29,7 @@ jobs:
         run: python -m pip install "pytest>=8.0"
 
       - name: Verify evidence tooling
-        run: node --test scripts/dev/normalize-mes-expectations.test.mjs scripts/dev/mes-expectation-evidence.test.mjs scripts/dev/run-mes-expectations.test.mjs
+        run: node --test scripts/dev/normalize-mes-expectations.test.mjs scripts/dev/mes-expectation-evidence.test.mjs scripts/dev/run-mes-expectations.test.mjs scripts/dev/mes-expectation-reviewed-reuse.test.mjs
 
       - name: Verify current ledger structure and selectors
         run: node scripts/dev/normalize-mes-expectations.mjs --check
