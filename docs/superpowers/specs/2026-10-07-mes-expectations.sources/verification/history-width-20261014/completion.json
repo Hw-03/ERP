@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "kind": "mes-baseline-verification-completion",
+  "completedAt": "2026-10-14T14:15:26.812878+09:00",
+  "status": "BASELINE_PRESERVED_WITH_LOCAL_PASS",
+  "baselineHead": "9bf71b9b4a0ecb64e747f91284d4431571b77fee",
+  "baselineConditions": 1058,
+  "currentFullPass": false,
+  "localLayoutTests": 3,
+  "toolTests": 74,
+  "fullBusinessReruns": 0,
+  "ledgerCheck": {
+    "argv": [
+      "node",
+      "scripts/dev/normalize-mes-expectations.mjs",
+      "--check"
+    ],
+    "exitCode": 0,
+    "result": {
+      "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/history-width-20261014/ledger-check.log",
+      "sha256": "9d9d61a83fa3f98babd882a12c7f3b44a9d07011db4eea892c74c3cdaec69160"
+    }
+  },
+  "review": {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/history-width-20261014/review.json",
+    "sha256": "f216fc081188005b611766eff00c80aa7f15558d7a421c447d5009096c07bd0b"
+  },
+  "preservation": {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/history-width-20261014/preservation.json",
+    "sha256": "9da627b871d00602b4187a45c7525d53d961b0af910602efe5a64a49000acbc4"
+  },
+  "screen": {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/history-width-20261014/layout-1440.png",
+    "sha256": "d9d4bb92ecb363fbda277cbaac2bdd6736c726570d935a6753c3891251c7db97"
+  }
+}

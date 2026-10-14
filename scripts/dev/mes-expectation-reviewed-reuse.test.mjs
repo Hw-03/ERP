@@ -14,6 +14,60 @@ async function load() {
 const item = (name, status = "passed") => ({ fullName: `suite ${name}`, title: name, status, location: { line: 10, column: 3 }, failureMessages: [] });
 const vitest = (rows) => JSON.stringify({ success: true, numTotalTests: rows.length, testResults: [{ name: "/repo/frontend/item.test.ts", status: "passed", assertionResults: rows }] });
 
+async function baselineFixture() {
+  const f = await reviewedFixture(); f.save();
+  const { captureSnapshot } = await load();
+  f.files["baseline-record.json"] = JSON.stringify(f.record);
+  f.files["product-before.txt"] = f.files["frontend/app/item.ts"];
+  f.files["frontend/app/item.ts"] = "layout width changed";
+  const review = {
+    schemaVersion: 1, kind: "mes-baseline-verification", head: "b".repeat(40), reviewedAt: "2026-10-14T14:00:00+09:00",
+    baseline: f.review.current, current: captureSnapshot(f.inputs, Object.keys(f.files), f.read),
+    changes: [{ path: "frontend/app/item.ts", before: f.ref("product-before.txt"), reason: "layout only; historical completion is not a current full pass" }],
+    localVerification: { ...f.review.localVerification, inputs: captureSnapshot(["frontend/"], Object.keys(f.files), f.read) },
+  };
+  const record = { schemaVersion: 4, kind: "baseline-verification", original: f.ref("baseline-record.json"), review: null };
+  const save = () => { f.files["baseline-review.json"] = JSON.stringify(review); record.review = f.ref("baseline-review.json"); };
+  save();
+  return { ...f, baselineReview: review, baselineRecord: record, saveBaseline: save };
+}
+
+test("기준 완료 연결은 제품 변경 뒤에도 과거 원문을 검증하고 현재 전체 PASS를 만들지 않는다", async () => {
+  const module = await import("./mes-expectation-reviewed-reuse.mjs");
+  assert.equal(typeof module.resolveBaselineVerification, "function");
+  const f = await baselineFixture();
+  const resolved = module.resolveBaselineVerification(f.baselineRecord, { read: f.read, paths: Object.keys(f.files) });
+  assert.deepEqual(resolved.report, f.report);
+  assert.equal(resolved.read("frontend/app/item.ts").toString(), "ok");
+  assert.equal(f.read("frontend/app/item.ts").toString(), "layout width changed");
+});
+
+test("기준 완료 연결도 변경 누락·현재 입력·원문·국소 결과 변조를 거부한다", async () => {
+  const { resolveBaselineVerification } = await import("./mes-expectation-reviewed-reuse.mjs");
+  for (const mutate of [
+    f => { f.baselineReview.changes = []; f.saveBaseline(); },
+    f => { f.files["frontend/app/item.ts"] += "unexpected edit"; },
+    f => { f.files["product-before.txt"] += "tamper"; },
+    f => { f.files["baseline-record.json"] += "tamper"; },
+    f => { f.files["local.log"] += "  1 failed\n"; },
+    f => { f.baselineReview.localVerification.inputs = f.baselineReview.baseline; f.saveBaseline(); },
+    f => { f.baselineReview.localVerification.exitCode = 1; f.saveBaseline(); },
+  ]) {
+    const f = await baselineFixture(); mutate(f);
+    assert.throws(() => resolveBaselineVerification(f.baselineRecord, { read: f.read, paths: Object.keys(f.files) }));
+  }
+});
+
+test("원장은 기준 완료와 현재 PASS를 분리하고 엄격 완료로 승격하지 않는다", async () => {
+  const { normalizeExpectations, validateExpectations } = await import("./normalize-mes-expectations.mjs");
+  const model = normalizeExpectations({ audit: { run: {}, cases: [{ id: "A", source: "CONTRACT", expected: "works" }] }, feedback: { reviews: {} }, policy: { schemaVersion: 2, cases: [{ id: "A", conditions: [{ id: "a", expected: "works", requiredEvidence: ["test"] }] }] }, registry: { assertions: [{ caseId: "A", conditionId: "a", execution: { status: "BASELINE_PASS", basis: "baseline-verification", evidence: [] } }] } });
+  assert.equal(model.cases[0].currentVerification, "BASELINE_PASS");
+  assert.equal(model.metrics.CONTRACT.executedCases, 0);
+  assert.equal(model.metrics.CONTRACT.baselineCases, 1);
+  assert.ok(validateExpectations(model, () => "", { requireComplete: true }).some(e => e.includes("not complete")));
+  assert.ok(validateExpectations(model, () => "").some(e => e.includes("evidence")));
+});
+
 function evidenceFixture(captureSnapshot, conditionFingerprint) {
   const row = { id: "ID", decisionIds: ["G01"] };
   const binding = { file: "frontend/item.test.ts", selector: "case A", line: 10, sourceHash: "test-hash", assertion: "expect(ok).toBe(true)" };
@@ -140,6 +194,27 @@ test("원장 검사는 재사용 구분·리뷰 해시·현재 바인딩을 모�
   f.files[wrapper] = JSON.stringify(f.record); assertion.execution.evidence[0].evidenceHash = hash(f.files[wrapper]);
   const validate = () => validateExpectations(model, f.read, { requireComplete: true, paths: Object.keys(f.files) });
   assert.deepEqual(validate(), []);
+  // A product edit preserves the proven baseline, but cannot pass strict current completion.
+  f.files["baseline-record.json"] = f.files[wrapper];
+  f.files["baseline-product.txt"] = f.files["frontend/app/item.ts"];
+  f.files["frontend/app/item.ts"] = "new layout";
+  const baselineReview = {
+    schemaVersion: 1, kind: "mes-baseline-verification", head: "b".repeat(40), reviewedAt: "2026-10-14T14:00:00+09:00",
+    baseline: f.review.current, current: captureSnapshot(f.inputs, Object.keys(f.files), f.read),
+    changes: [{ path: "frontend/app/item.ts", before: f.ref("baseline-product.txt"), reason: "local layout verification only" }],
+    localVerification: { ...f.review.localVerification, inputs: captureSnapshot(["frontend/"], Object.keys(f.files), f.read) },
+  };
+  f.files["baseline-review.json"] = JSON.stringify(baselineReview);
+  f.files[wrapper] = JSON.stringify({ schemaVersion: 4, kind: "baseline-verification", original: f.ref("baseline-record.json"), review: f.ref("baseline-review.json") });
+  assertion.execution = { status: "BASELINE_PASS", basis: "baseline-verification", evidence: [{ evidenceFile: wrapper, evidenceHash: hash(f.files[wrapper]) }] };
+  cases[0].currentVerification = "BASELINE_PASS"; model.metrics = summarize(cases);
+  assert.deepEqual(validateExpectations(model, f.read, { paths: Object.keys(f.files) }), []);
+  assert.ok(validate().some(e => e.includes("not complete")));
+  assertion.execution.status = "PASS"; cases[0].currentVerification = "PASS"; model.metrics = summarize(cases);
+  assert.ok(validate().some(e => e.includes("cannot claim current PASS")));
+  f.files["frontend/app/item.ts"] = f.files["baseline-product.txt"];
+  f.files[wrapper] = f.files["baseline-record.json"];
+  assertion.execution = { status: "PASS", basis: "reviewed-reuse", evidence: [{ evidenceFile: wrapper, evidenceHash: hash(f.files[wrapper]) }] };
   delete assertion.execution.basis; assert.ok(validate().some(e => e.includes("basis")));
   assertion.execution.basis = "reviewed-reuse";
   f.files["review.json"] += " "; assert.ok(validate().some(e => e.includes("hash"))); f.save();

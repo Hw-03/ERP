@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { requiredInputs, verifyExecution } from "./mes-expectation-evidence.mjs";
-import { resolveReviewedReuse } from "./mes-expectation-reviewed-reuse.mjs";
+import { resolveBaselineVerification, resolveReviewedReuse } from "./mes-expectation-reviewed-reuse.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const BASE = "docs/superpowers/specs/2026-10-07-mes-expectations";
@@ -26,8 +26,9 @@ function unique(rows, key, label) {
 
 function verification(assertions) {
   const passed = assertions.filter((a) => a.execution.status === "PASS").length;
+  const baseline = assertions.filter((a) => a.execution.status === "BASELINE_PASS").length;
   if (assertions.some((a) => a.execution.status === "FAIL")) return "FAIL";
-  return passed === assertions.length ? "PASS" : passed ? "PARTIAL" : "NOT_RUN";
+  return passed === assertions.length ? "PASS" : passed + baseline === assertions.length ? "BASELINE_PASS" : passed || baseline ? "PARTIAL" : "NOT_RUN";
 }
 
 /** Sentence boundaries are available; conjunctions still require human atomic review. */
@@ -84,6 +85,7 @@ export function normalizeExpectations({ audit, feedback, policy, registry, prove
   return {
     schemaVersion: policy.schemaVersion ?? 1, policyDate: "2026-10-07", provenance: clone(provenance), originalRun: clone(audit.run),
     semantics: { linkage: "selector + actual assertion fragment + source SHA256", currentPass: "all individual conditions require validated native execution evidence or explicit reviewed-reuse evidence; original execution dates and observations remain historical", denominator: "active original ledger cases grouped by source; excluded cases are separate" },
+    ...(cases.some(c => c.currentVerification === "BASELINE_PASS") ? { baselineVerification: "BASELINE_PASS preserves validated completion at the recorded baseline. Separate current local checks do not certify every condition at the current source." } : {}),
     cases, excludedCases: (audit.excludedCases ?? []).map((c) => ({ ...clone(c), status: "deferred" })), metrics: summarize(cases),
   };
 }
@@ -93,7 +95,8 @@ export function summarize(cases) {
   return Object.fromEntries(["CONTRACT", "DELTA"].map((source) => {
     const rows = cases.filter((c) => c.source === source);
     const eligible = rows.filter((row) => row.scope !== "deferred");
-    return [source, { total: rows.length, eligibleCases: eligible.length, deferredCases: rows.length - eligible.length, reviewedCases: eligible.filter((row) => row.atomicReview === "reviewed").length, eligibleConditions: eligible.flatMap((row) => row.assertions).length, linkedCases: eligible.filter((c) => c.assertions.every((a) => a.coverage === "linked")).length, linkedConditions: eligible.flatMap((c) => c.assertions).filter((a) => a.coverage === "linked").length, totalConditions: rows.flatMap((c) => c.assertions).length, executedCases: eligible.filter((c) => c.currentVerification === "PASS").length }];
+    const baselineCases = eligible.filter(row => row.currentVerification === "BASELINE_PASS").length;
+    return [source, { total: rows.length, eligibleCases: eligible.length, deferredCases: rows.length - eligible.length, reviewedCases: eligible.filter((row) => row.atomicReview === "reviewed").length, eligibleConditions: eligible.flatMap((row) => row.assertions).length, linkedCases: eligible.filter((c) => c.assertions.every((a) => a.coverage === "linked")).length, linkedConditions: eligible.flatMap((c) => c.assertions).filter((a) => a.coverage === "linked").length, totalConditions: rows.flatMap((c) => c.assertions).length, executedCases: eligible.filter((c) => c.currentVerification === "PASS").length, ...(baselineCases ? { baselineCases } : {}) }];
   }));
 }
 
@@ -243,8 +246,8 @@ export function validateExpectations(model, readSource, { requireComplete = fals
           if (!body || offset < 0 || !(python ? /^\s*(?:assert\s|with pytest\.raises\()/m.test(executableFragment) : /(?:\bexpect(?:\.[\w]+)?\s*\(|\bassert\.[\w]+\s*\()/m.test(executableFragment))) errors.push(`${label}: selector/assertion not found in actual test body`);
         } catch (error) { errors.push(`${label}: source unavailable ${error.message}`); }
       }
-      if (!["NOT_RUN", "PASS", "FAIL"].includes(assertion.execution.status)) errors.push(`${label}: invalid execution status`);
-      if (assertion.execution.status === "PASS") {
+      if (!["NOT_RUN", "PASS", "FAIL", "BASELINE_PASS"].includes(assertion.execution.status)) errors.push(`${label}: invalid execution status`);
+      if (["PASS", "BASELINE_PASS"].includes(assertion.execution.status)) {
         const results = [];
         const proven = new Set(), evidenceKinds = new Set();
         for (const evidence of assertion.execution.evidence ?? []) {
@@ -256,7 +259,12 @@ export function validateExpectations(model, readSource, { requireComplete = fals
             if (sha256(bytes) !== evidence.evidenceHash) throw new Error("stale evidence hash");
             const stored = JSON.parse(bytes.toString());
             let report = stored, executionRead = readSource, executionPaths = paths;
-            if (stored.kind === "reviewed-reuse") {
+            if (assertion.execution.status === "BASELINE_PASS" || stored.kind === "baseline-verification") {
+              if (assertion.execution.status !== "BASELINE_PASS" || assertion.execution.basis !== "baseline-verification" || stored.kind !== "baseline-verification") throw new Error("baseline evidence cannot claim current PASS");
+              if (!reviewedReports.has(evidence.evidenceHash)) reviewedReports.set(evidence.evidenceHash, resolveBaselineVerification(stored, { read: readSource, paths }));
+              const resolved = reviewedReports.get(evidence.evidenceHash);
+              report = resolved.report; executionRead = resolved.read; executionPaths = resolved.paths;
+            } else if (stored.kind === "reviewed-reuse") {
               if (assertion.execution.basis !== "reviewed-reuse") throw new Error("reviewed execution basis missing");
               if (!reviewedReports.has(evidence.evidenceHash)) reviewedReports.set(evidence.evidenceHash, resolveReviewedReuse(stored, { read: readSource, paths }));
               const resolved = reviewedReports.get(evidence.evidenceHash);

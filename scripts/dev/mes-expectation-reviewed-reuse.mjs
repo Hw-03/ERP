@@ -97,3 +97,38 @@ export function resolveReviewedReuse(record, { read, paths }) {
   if (changed.some((p) => changes.get(p).reason === "verifier-compatibility")) verifyCompatibility(review.compatibility, read);
   return { report, read: historicalRead, paths: historicalPaths, review };
 }
+
+/** Preserve a proven baseline, with separate local evidence; never certify the current full suite. */
+export function resolveBaselineVerification(record, { read, paths }) {
+  if (record.schemaVersion !== 4 || record.kind !== "baseline-verification") throw new Error("unsupported baseline verification");
+  const original = JSON.parse(artifact(record.original, read).toString("utf8"));
+  if (original.kind !== "reviewed-reuse") throw new Error("baseline must reference a reviewed completion, not another baseline");
+  const review = JSON.parse(artifact(record.review, read).toString("utf8"));
+  if (review.schemaVersion !== 1 || review.kind !== "mes-baseline-verification" || !/^[a-f0-9]{40}$/.test(review.head) || !Number.isFinite(Date.parse(review.reviewedAt))) throw new Error("baseline identity missing");
+  if (!same(review.baseline?.selectors, review.current?.selectors)) throw new Error("baseline scope changed");
+  const current = captureSnapshot(review.current.selectors, paths, read);
+  if (!same(current, review.current)) throw new Error("baseline current snapshot changed");
+  const before = new Map(review.baseline.files.map(f => [f.path, f.sha256]));
+  const after = new Map(current.files.map(f => [f.path, f.sha256]));
+  const changed = [...new Set([...before.keys(), ...after.keys()])].filter(p => before.get(p) !== after.get(p)).sort();
+  if (!changed.length || !same(review.changes?.map(c => c.path).sort(), changed)) throw new Error("baseline changes missing/duplicate");
+  const oldBytes = new Map();
+  for (const change of review.changes) {
+    if (!change.reason?.trim() || !before.has(change.path) || !after.has(change.path)) throw new Error("baseline only supports reviewed edits to existing inputs");
+    const bytes = artifact(change.before, read);
+    if (sourceHash(bytes) !== before.get(change.path)) throw new Error("baseline original source mismatch");
+    oldBytes.set(change.path, bytes);
+  }
+  const historicalRead = file => oldBytes.has(file) ? oldBytes.get(file) : read(file);
+  if (!same(captureSnapshot(review.baseline.selectors, paths, historicalRead), review.baseline)) throw new Error("baseline snapshot invalid");
+  const priorReview = JSON.parse(artifact(original.review, historicalRead).toString("utf8"));
+  if (!same(priorReview.current, review.baseline)) throw new Error("baseline does not match prior completion");
+  const local = review.localVerification;
+  if (!same(local?.inputs?.selectors, ["frontend/"]) || !same(captureSnapshot(local.inputs.selectors, paths, read), local.inputs)) throw new Error("baseline local inputs changed");
+  const localFiles = (local.files ?? []).map(f => f.path);
+  if (!localFiles.length) throw new Error("baseline local evidence missing");
+  verifyLocal(local, localFiles, read);
+  if (changed.some(p => COMPATIBILITY_FILES.includes(p))) verifyCompatibility(review.compatibility, read);
+  const resolved = resolveReviewedReuse(original, { read: historicalRead, paths });
+  return { ...resolved, baselineReview: review };
+}
