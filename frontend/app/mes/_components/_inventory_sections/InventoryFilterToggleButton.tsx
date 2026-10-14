@@ -10,13 +10,17 @@ type Props = {
   onLogicChange: (logic: InventoryFilterLogic) => void;
   onToggle: () => void;
   disabled?: boolean;
+  showLogic?: boolean;
+  controlsId?: string;
+  ariaLabel?: string;
 };
 
 export function InventoryFilterLogicToggle({
   open,
   logic,
   onLogicChange,
-}: Pick<Props, "logic" | "onLogicChange"> & { open: boolean }) {
+  disabled = false,
+}: Pick<Props, "logic" | "onLogicChange" | "disabled"> & { open: boolean }) {
   return (
     <div
       aria-hidden={!open}
@@ -35,7 +39,7 @@ export function InventoryFilterLogicToggle({
                 type="button"
                 aria-label={value}
                 aria-pressed={active}
-                disabled={!open}
+                disabled={!open || disabled}
                 onClick={() => onLogicChange(value)}
                 className="h-full rounded-[10px] px-2.5 py-1.5 text-xs font-bold transition-colors"
                 style={{
@@ -59,6 +63,9 @@ export function InventoryFilterToggleButton({
   onLogicChange,
   onToggle,
   disabled = false,
+  showLogic = true,
+  controlsId = "inventory-filter-panel",
+  ariaLabel,
 }: Props) {
   return (
     <div className="flex shrink-0 self-stretch items-stretch gap-1.5">
@@ -74,7 +81,8 @@ export function InventoryFilterToggleButton({
           color: filtersOpen ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
         }}
         aria-expanded={filtersOpen}
-        aria-controls="inventory-filter-panel"
+        aria-controls={controlsId}
+        aria-label={ariaLabel}
       >
         <Filter className="h-3.5 w-3.5" />
         필터
@@ -83,7 +91,7 @@ export function InventoryFilterToggleButton({
           style={{ transform: filtersOpen ? "rotate(180deg)" : undefined }}
         />
       </button>
-      <InventoryFilterLogicToggle open={filtersOpen} logic={logic} onLogicChange={onLogicChange} />
+      {showLogic && <InventoryFilterLogicToggle open={filtersOpen} logic={logic} onLogicChange={onLogicChange} />}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Item } from "@/lib/api";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 const push = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
@@ -26,7 +27,7 @@ describe("InventoryDetailLocations", () => {
     const defect = screen.getByRole("button", { name: "조립 불량 2 — 불량 탭으로 이동" });
     const bGrade = screen.getByRole("button", { name: "조립 B급 10 — 불량 탭으로 이동" });
     const obsolete = screen.getByRole("button", { name: "조립 구형 30 — 불량 탭으로 이동" });
-    expect(within(defect).getByText("조립 [불량]")).toHaveStyle({ color: "#ef4444" });
+    expect(within(defect).getByText("조립 [불량]")).toHaveStyle({ color: LEGACY_COLORS.red });
     expect(within(bGrade).getByText("조립 [B급]")).toHaveStyle({ color: "var(--c-stock-b-grade)" });
     expect(within(obsolete).getByText("조립 [구형]")).toHaveStyle({ color: "var(--c-stock-obsolete)" });
     expect(screen.getByRole("button", { name: "AS B급 4 — 불량 탭으로 이동" })).toBeInTheDocument();

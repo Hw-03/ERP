@@ -1,17 +1,15 @@
 "use client";
 
-import { memo, useState, type KeyboardEvent } from "react";
+import { memo, useState } from "react";
 import Image from "next/image";
 import { AlertTriangle, Archive, CheckCircle2, XCircle } from "lucide-react";
 import type { Item } from "@/lib/api";
-import type { DefectManagementCategory } from "@/lib/api/types/defects";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { tint } from "@/lib/mes/colorUtils";
-import { getStockState, totalApprovalPending } from "@/lib/mes/inventory";
+import { getStockState } from "@/lib/mes/inventory";
 import { formatQty } from "@/lib/mes/format";
 import { ImageLightbox } from "@/lib/ui/ImageLightbox";
-import { useDeptColorLookup } from "../DepartmentsContext";
-import { getManagedStockBreakdown, STOCK_CATEGORY_ORDER, STOCK_CATEGORY_STYLES } from "./inventoryManagedStock";
+import { InventoryTableRow } from "./InventoryTable";
+import { InventoryStockSummary } from "./InventoryStockSummary";
 import { isDisusedInventoryItem } from "./inventoryFilter";
 
 function safeAvailableQty(item: Item) {
@@ -33,137 +31,21 @@ type Props = {
 };
 
 function InventoryItemRowImpl({ item, selected, detailOpen = true, onSelect, imageFilename, compact }: Props) {
-  const getDeptColor = useDeptColorLookup();
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [hovered, setHovered] = useState(false);
   const minStock = getMinStock(item);
   const qty = safeAvailableQty(item);
   const stock = getStockState(qty, minStock === 0 ? null : minStock);
   const statusBadge = isDisusedInventoryItem(item)
     ? { label: "불용", color: LEGACY_COLORS.muted2 }
     : stock;
-  const pendingQty = totalApprovalPending(item);
   const isCritical = qty <= 0 || (minStock > 0 && qty < minStock);
 
-  const DEFECT_RED = compact ? LEGACY_COLORS.red : STOCK_CATEGORY_STYLES.DEFECT.color;
-  const total = Math.max(Number(item.quantity), 1);
-  const wh = Number(item.warehouse_qty);
-  const allLocs = (item.locations ?? []).filter((l) => Number(l.quantity) > 0);
-  const prodLocs = allLocs.filter((l) => l.status !== "DEFECTIVE");
-  const managedStock = getManagedStockBreakdown(item);
-  const segments: { pct: number; color: string; label: string; category?: DefectManagementCategory }[] = [];
-  let used = 0;
-  if (wh > 0) {
-    const pct = Math.min(100, (wh / total) * 100);
-    segments.push({ pct, color: compact ? LEGACY_COLORS.cyan : "#3ac4b0", label: `창고 ${formatQty(wh)}` });
-    used += pct;
-  }
-  for (const loc of prodLocs) {
-    const pct = Math.min(100 - used, (Number(loc.quantity) / total) * 100);
-    if (pct <= 0) break;
-    segments.push({
-      pct,
-      color: getDeptColor(loc.department),
-      label: `${loc.department} ${formatQty(loc.quantity)}`,
-    });
-    used += pct;
-  }
-  for (const category of STOCK_CATEGORY_ORDER) {
-    for (const entry of managedStock.filter((row) => row.management_category === category)) {
-      const pct = Math.min(100 - used, (Number(entry.quantity) / total) * 100);
-      if (pct <= 0) break;
-      const { label, color } = STOCK_CATEGORY_STYLES[category];
-      segments.push({
-        pct,
-        color: category === "DEFECT" ? DEFECT_RED : color,
-        label: `${entry.department} [${label}] ${formatQty(entry.quantity)}`,
-        category,
-      });
-      used += pct;
-    }
-  }
-
-  const prodQtyByDept = new Map<string, number>();
-  for (const loc of prodLocs) {
-    prodQtyByDept.set(loc.department, (prodQtyByDept.get(loc.department) ?? 0) + Number(loc.quantity));
-  }
-  const stockChips: { key: string; label: string; quantity: number; color: string }[] = [];
-  if (wh > 0) {
-    stockChips.push({ key: "warehouse", label: "창고", quantity: wh, color: "#3dd4a0" });
-  }
-  if (pendingQty > 0) {
-    stockChips.push({ key: "pending", label: "예약", quantity: pendingQty, color: LEGACY_COLORS.yellow });
-  }
-  for (const [dept, quantity] of Array.from(prodQtyByDept)) {
-    stockChips.push({ key: `dept-${dept}`, label: dept, quantity, color: getDeptColor(dept) });
-  }
-  for (const category of STOCK_CATEGORY_ORDER) {
-    const quantity = managedStock.filter((entry) => entry.management_category === category)
-      .reduce((sum, entry) => sum + Number(entry.quantity), 0);
-    if (quantity > 0) {
-      const { label, color } = STOCK_CATEGORY_STYLES[category];
-      stockChips.push({ key: category, label, quantity, color: category === "DEFECT" ? DEFECT_RED : color });
-    }
-  }
 
   const StockIcon = statusBadge.label === "불용" ? Archive : stock.label === "품절" ? XCircle : stock.label === "부족" ? AlertTriangle : CheckCircle2;
   const handleSelect = () => onSelect(selected && detailOpen ? null : item);
-  const stockBar = Number(item.quantity) === 0 ? (
-    <div className={compact ? "mt-2 h-1 overflow-hidden rounded-full" : "mt-[20px] h-[6px] overflow-hidden rounded-full"} style={{ background: DEFECT_RED }} title="품절" />
-  ) : (
-    <div
-      className={compact ? "mt-2 flex h-1 overflow-hidden rounded-full" : "mt-[20px] flex h-[6px] overflow-hidden rounded-full"}
-      style={{ background: LEGACY_COLORS.s3 }}
-      title={segments.map((s) => s.label).join(" / ")}
-      role="img"
-      aria-label={`재고 분포: ${segments.map((s) => `${s.label} ${s.pct.toFixed(0)}%`).join(", ")}`}
-    >
-      {segments.map((s, i) => (
-        <div key={i} data-stock-category={s.category} className="relative h-full shrink-0" style={{
-          width: `${s.pct}%`,
-          backgroundColor: s.color,
-          ...(s.category ? { color: s.color, ...STOCK_CATEGORY_STYLES[s.category].pattern } : {}),
-        }}>
-          {segments[i + 1] && segments[i + 1].color !== s.color && (
-            <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0"
-              style={{ width: "min(24px, 50%)", background: `linear-gradient(to right, transparent, ${segments[i + 1].color})` }} />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-  const rowProps = {
-    onClick: handleSelect,
-    onKeyDown: (e: KeyboardEvent<HTMLTableRowElement>) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        handleSelect();
-      }
-    },
-    tabIndex: 0,
-    role: "button",
-    "aria-pressed": selected,
-    onMouseEnter: () => setHovered(true),
-    onMouseLeave: () => setHovered(false),
-    className: `group cursor-pointer transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]${compact ? " h-[98px]" : ""}`,
-    style: {
-      background: selected
-        ? compact
-          ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 9%, ${LEGACY_COLORS.s1})`
-          : tint(LEGACY_COLORS.blue, hovered ? 18 : 10)
-        : hovered
-          ? compact ? LEGACY_COLORS.s2 : LEGACY_COLORS.s4
-          : undefined,
-      boxShadow: selected
-        ? `inset 3px 0 0 ${LEGACY_COLORS.blue}`
-        : hovered
-          ? `inset 3px 0 0 ${tint(LEGACY_COLORS.blue, 45)}`
-          : undefined,
-    },
-  };
 
   return (
-    <tr {...rowProps}>
+    <InventoryTableRow selected={selected} onSelect={handleSelect} compact={compact}>
       <td className={compact ? "border-b px-2 py-3 text-center align-middle whitespace-nowrap" : "border-b px-4 py-5 text-center align-middle whitespace-nowrap"} style={{ borderColor: LEGACY_COLORS.border }}>
         <span
           className={compact ? "inline-flex w-fit items-center gap-1 rounded-full px-2 py-1 text-xs font-medium" : "inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-sm font-bold"}
@@ -200,7 +82,7 @@ function InventoryItemRowImpl({ item, selected, detailOpen = true, onSelect, ima
           ) : (
             <div className="font-semibold">{item.item_name}</div>
           )}
-          {stockBar}
+          <InventoryStockSummary item={item} compact={compact} mode="bar" />
         </td>
       {!compact && (
         <>
@@ -208,23 +90,7 @@ function InventoryItemRowImpl({ item, selected, detailOpen = true, onSelect, ima
         {item.mes_code ?? "-"}
       </td>
       <td className="hidden sm:table-cell border-b px-4 py-5 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
-        <div data-testid="inventory-dept-stock-summary" className="flex min-w-[190px] flex-wrap items-center justify-center gap-1.5">
-          {stockChips.length === 0
-            ? "-"
-            : stockChips.map((chip) => (
-              <span
-                key={chip.key}
-                className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-bold"
-                style={{
-                  color: chip.color,
-                  background: `color-mix(in srgb, ${chip.color} 14%, transparent)`,
-                  borderColor: `color-mix(in srgb, ${chip.color} 35%, transparent)`,
-                }}
-              >
-                {chip.label} {formatQty(chip.quantity)}
-              </span>
-            ))}
-        </div>
+        <InventoryStockSummary item={item} />
       </td>
         </>
       )}
@@ -240,7 +106,7 @@ function InventoryItemRowImpl({ item, selected, detailOpen = true, onSelect, ima
         {item.min_stock == null ? "-" : formatQty(item.min_stock)}
       </td>
       )}
-    </tr>
+    </InventoryTableRow>
   );
 }
 

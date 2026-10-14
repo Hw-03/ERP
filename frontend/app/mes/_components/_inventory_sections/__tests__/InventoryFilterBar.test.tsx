@@ -29,6 +29,19 @@ describe("InventoryFilters", () => {
     rerender(<InventoryFilters {...baseProps} showResetAll={false} />);
     expect(screen.queryByRole("button", { name: "전체 초기화" })).not.toBeInTheDocument();
   });
+
+  it("전수조사 부서 목록은 창고와 기준 전환 없이 복수 선택한다", () => {
+    const toggleDept = vi.fn();
+    render(<InventoryFilters {...baseProps} departmentOptions={["튜브", "고압", "진공", "튜닝", "조립", "출하"]}
+      showDepartmentFilterBasis={false} selectedDepts={["튜브", "고압"]} toggleDept={toggleDept} />);
+    expect(screen.queryByRole("button", { name: "창고" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "품목 코드 기준" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "재고 위치 기준" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "튜브" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "고압" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "진공" }));
+    expect(toggleDept).toHaveBeenCalledWith("진공");
+  });
   it("omits the unclassified model filter", () => {
     render(<InventoryFilters {...baseProps} />);
     expect(screen.queryByRole("button", { name: "미분류" })).not.toBeInTheDocument();

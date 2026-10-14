@@ -21,6 +21,7 @@ export function InlineSearch({
   inputRef,
   ariaLabel,
   maxLength,
+  disabled = false,
 }: {
   value: string;
   onChange: (next: string) => void;
@@ -30,6 +31,7 @@ export function InlineSearch({
   inputRef?: Ref<HTMLInputElement>;
   ariaLabel?: string;
   maxLength?: number;
+  disabled?: boolean;
 }) {
   const composingRef = useRef(false);
   const [draft, setDraft] = useState(value);
@@ -57,6 +59,7 @@ export function InlineSearch({
       <input
         aria-label={ariaLabel}
         maxLength={maxLength}
+        disabled={disabled}
         autoFocus={autoFocus}
         ref={inputRef}
         value={draft}
@@ -79,6 +82,7 @@ export function InlineSearch({
       {draft ? (
         <button
           type="button"
+          disabled={disabled}
           onClick={() => {
             composingRef.current = false;
             setDraft("");

@@ -1,9 +1,10 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MobileDashboardScreen } from "../MobileDashboardScreen";
 
 const inventoryState = vi.hoisted(() => ({ loading: false, items: [{ item_id: "item-1", item_name: "테스트 품목", quantity: 10, warehouse_qty: 10, locations: [], model_slots: [] }] }));
 const kpiProps = vi.hoisted(() => vi.fn());
+const filterState = vi.hoisted(() => ({ activeFilterCount: 0 }));
 
 vi.mock("@/lib/queries/useItemsQuery", () => ({
   useItemQuery: () => ({ data: undefined, error: null, isFetching: false, refetch: vi.fn() }),
@@ -29,7 +30,7 @@ vi.mock("@/lib/queries/useModelsQuery", () => ({
 vi.mock("../../../_hooks/useDesktopInventoryDerivations", () => ({
   useDesktopInventoryDerivations: () => ({
     isFiltered: false,
-    activeFilterCount: 0,
+    activeFilterCount: filterState.activeFilterCount,
     kpiCards: [],
     headerBadge: null,
   }),
@@ -80,6 +81,26 @@ vi.mock("../../../_inventory_sections/InventoryDetailPanel", () => ({
 }));
 
 describe("MobileDashboardScreen", () => {
+  it("필터 버튼은 현재 활성 필터 개수를 표시하고 0이면 배지를 숨긴다", () => {
+    filterState.activeFilterCount = 3;
+    const view = render(<MobileDashboardScreen globalSearch="" onStatusChange={() => {}} onGoToWarehouse={() => {}} />);
+    expect(within(screen.getByRole("button", { name: "필터 열기" })).getByText("3")).toBeVisible();
+    filterState.activeFilterCount = 0;
+    view.rerender(<MobileDashboardScreen globalSearch="" onStatusChange={() => {}} onGoToWarehouse={() => {}} />);
+    expect(within(screen.getByRole("button", { name: "필터 열기" })).queryByText("3")).toBeNull();
+  });
+
+  it("검색과 필터 도구줄은 함께 식별되고 초기화 버튼은 필요할 때 표시한다", () => {
+    render(<MobileDashboardScreen globalSearch="" onStatusChange={() => {}} onGoToWarehouse={() => {}} />);
+    const toolbar = screen.getByRole("search", { name: "재고 검색 및 필터" });
+    expect(toolbar).toContainElement(screen.getByRole("button", { name: "필터 열기" }));
+    expect(screen.queryByRole("button", { name: "전체 초기화" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "필터 열기" }));
+    expect(screen.getByRole("button", { name: "전체 초기화" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "필터 닫기" }));
+    expect(screen.queryByRole("button", { name: "전체 초기화" })).toBeNull();
+  });
+
   it("별도 상세 버튼 없이 생산 요약 표를 눌러 상세를 연다", () => {
     const onCapacityClick = vi.fn();
     render(<MobileDashboardScreen globalSearch="" onStatusChange={() => {}} onGoToWarehouse={() => {}}
@@ -93,6 +114,7 @@ describe("MobileDashboardScreen", () => {
     expect(screen.queryByRole("button", { name: "생산 요약 표" })).not.toBeInTheDocument();
   });
   beforeEach(() => {
+    filterState.activeFilterCount = 0;
     inventoryState.loading = false;
     inventoryState.items = [{ item_id: "item-1", item_name: "테스트 품목", quantity: 10, warehouse_qty: 10, locations: [], model_slots: [] }];
   });

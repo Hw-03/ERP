@@ -3,14 +3,13 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Item, type ProductModel, type ProductionCapacity } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { ChevronDown, RotateCcw, SlidersHorizontal, Zap } from "lucide-react";
+import { ChevronDown, RotateCcw, Zap } from "lucide-react";
 import { BottomSheet } from "@/lib/ui/BottomSheet";
-import { InlineSearch } from "../primitives";
 import { MobileScrollFrame } from "../primitives/MobileScrollFrame";
 import { InventoryKpiPanel, type KpiFilter } from "../../_inventory_sections/InventoryKpiPanel";
 import { InventoryCapacityPanel, capacityStatusBadge } from "../../_inventory_sections/InventoryCapacityPanel";
 import { InventoryFilters } from "../../_inventory_sections/InventoryFilterBar";
-import { InventoryFilterLogicToggle } from "../../_inventory_sections/InventoryFilterToggleButton";
+import { InventorySearchToolbar } from "../../_inventory_sections/InventorySearchToolbar";
 import { InventoryItemsTable } from "../../_inventory_sections/InventoryItemsTable";
 import { MobileInventoryDetailContent } from "./MobileInventoryDetailContent";
 import { useInventoryData } from "../../_hooks/useInventoryData";
@@ -246,31 +245,18 @@ export function MobileDashboardScreen({
             className="sticky top-0 z-20 flex flex-col gap-2"
             style={{ background: LEGACY_COLORS.bg }}
           >
-            <div className="flex items-center gap-2">
-              <InlineSearch
-                value={localSearch}
-                onChange={setLocalSearch}
-                placeholder="품명 · 코드 · 위치 · 공급처"
-                className="min-w-0 flex-1"
-              />
-              <div className={`flex shrink-0 self-stretch items-center${filtersOpen ? " gap-2" : ""}`}>
-                <InventoryFilterLogicToggle open={filtersOpen} logic={filterLogic} onLogicChange={setFilterLogic} />
-                <button
-                  type="button"
-                  onClick={() => setFiltersOpen((prev) => !prev)}
-                  aria-label={filtersOpen ? "필터 닫기" : "필터 열기"}
-                  aria-expanded={filtersOpen}
-                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] border transition-[transform] active:scale-95"
-                  style={{
-                    background: filtersOpen || isFiltered ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
-                    borderColor: LEGACY_COLORS.border,
-                    color: filtersOpen || isFiltered ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
-                  }}
-                >
-                  <SlidersHorizontal size={18} strokeWidth={2} className="shrink-0" />
-                </button>
-              </div>
-            </div>
+            <InventorySearchToolbar
+              value={localSearch}
+              onChange={setLocalSearch}
+              placeholder="품명 · 코드 · 위치 · 공급처"
+              filtersOpen={filtersOpen}
+              filterLogic={filterLogic}
+              onFilterLogicChange={setFilterLogic}
+              onToggleFilters={() => setFiltersOpen((prev) => !prev)}
+              isFiltered={isFiltered}
+              activeFilterCount={activeFilterCount}
+              controlsId="mobile-inventory-filter-panel"
+            />
             {(filtersOpen || canResetAll) && (
               <div
                 className="flex items-center"
@@ -296,7 +282,7 @@ export function MobileDashboardScreen({
           {/* 항목 2 — 필터 칩은 sticky 밖(일반 흐름)에 둬서 열려도 목록을 가리지 않고 아래로 밀어낸다.
               4-2 — 검색바와 함께 card 밖, 화면 배경 위에 배치. */}
           {filtersOpen && (
-            <div className="[&>div]:mt-0">
+            <div id="mobile-inventory-filter-panel" className="[&>div]:mt-0">
               <InventoryFilters
                 open={filtersOpen}
                 selectedDepts={selectedDepts}

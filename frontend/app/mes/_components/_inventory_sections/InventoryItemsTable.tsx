@@ -8,6 +8,7 @@ import { formatQty } from "@/lib/mes/format";
 import { ReadEmpty, ReadFailure } from "../common/ReadState";
 import { SkeletonBlock } from "../common/LoadingSkeleton";
 import { InventoryItemRow } from "./InventoryItemRow";
+import { InventoryTable, type InventoryTableColumn } from "./InventoryTable";
 import { useChunkedRender } from "../_hooks/useChunkedRender";
 
 const PAGE_SIZE = 100;
@@ -60,7 +61,7 @@ export function InventoryItemsTable({
     observer.observe(element);
     return () => observer.disconnect();
   }, [loading, filteredItems.length, compact, error]);
-  const headerColumns = compact
+  const headerColumns: InventoryTableColumn[] = compact
     ? [
         { label: "상태", nowrap: true, width: "72px", center: true },
         { label: "품목명", nowrap: false, minWidth: "100px" },
@@ -72,6 +73,8 @@ export function InventoryItemsTable({
         { label: "품목 코드", nowrap: true, width: "160px", center: true, hidden: true },
         { label: "부서별 재고", nowrap: true, width: "220px", center: true, hidden: true },
       ];
+  headerColumns.push({ label: "사용 가능 재고", nowrap: true, center: true, width: compact ? "104px" : "160px", className: compact ? undefined : "text-right sm:text-center" });
+  if (!compact) headerColumns.push({ label: "안전재고", nowrap: true, center: true, width: "160px", hidden: true });
   // 좌측 사이드바 탭 전환 시 실제 렌더 비용(Long Task) 완화: displayLimit(최대
   // 100개) 전부를 한 번에 마운트하지 않고 chunk(20개) 단위로 나눠 그린다.
   // 스크롤이 sentinel 근처에 오면 다음 chunk를 이어 붙인다. 행 하나당 이미지 +
@@ -119,73 +122,8 @@ export function InventoryItemsTable({
           />
         </div>
       )}
-      {compact && (
-        // Cover the outer border too; an inset mask leaves vertical seams beside the sticky corners.
-        <div aria-hidden="true" data-testid="inventory-mobile-header-corners" className="pointer-events-none sticky top-[var(--mobile-inventory-header-top,54px)] z-20 -mb-5 flex h-5 justify-between">
-          <span className="absolute inset-x-5 top-0 h-px" style={{ background: LEGACY_COLORS.border }} />
-          <span className="h-5 w-5" style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 19px, var(--c-border) 19px 20px, var(--c-bg) 20px)" }} />
-          <span className="h-5 w-5" style={{ background: "radial-gradient(circle at 0 100%, transparent 0 19px, var(--c-border) 19px 20px, var(--c-bg) 20px)" }} />
-        </div>
-      )}
-      <div
-        className={compact ? "overflow-clip rounded-[20px] border" : "overflow-clip rounded-[24px]"}
-        style={compact ? { borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 } : undefined}
-      >
-        {!compact && (
-          <div
-            aria-hidden
-            data-testid="inventory-table-corner-mask"
-            className="pointer-events-none sticky top-[71px] z-20 -mb-6 flex h-6 justify-between"
-          >
-            <span
-              className="h-6 w-6"
-              style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 23px, color-mix(in srgb, var(--c-border) 50%, transparent) 23px 24px, var(--c-inventory-table-corner-backdrop) 24px)" }}
-            />
-            <span
-              className="h-6 w-6"
-              style={{ background: "radial-gradient(circle at 0 100%, transparent 0 23px, color-mix(in srgb, var(--c-border) 50%, transparent) 23px 24px, var(--c-inventory-table-corner-backdrop) 24px)" }}
-            />
-          </div>
-        )}
-        {loading && <span role="status" aria-busy="true" className="sr-only">재고 데이터를 불러오는 중입니다...</span>}
-        <table aria-busy={loading || undefined} className={`${compact ? "w-full table-fixed" : "min-w-full"} border-separate border-spacing-0 text-sm`}>
-          <thead className={`sticky ${compact ? "top-[var(--mobile-inventory-header-top,54px)]" : "top-[71px]"} z-10`}>
-            <tr>
-              {headerColumns.map(({ label, nowrap, width, minWidth, center, hidden }, columnIndex) => (
-                <th
-                  key={label}
-                  scope="col"
-                  className={`${compact ? "border-b px-2 py-2.5 text-xs font-medium" : "border-y px-4 py-2.5 text-sm font-bold"}${columnIndex === 0 && !compact ? " rounded-tl-[24px] border-l" : ""}${nowrap ? " whitespace-nowrap" : ""}${center ? " text-center" : " text-left"}${hidden ? " hidden sm:table-cell" : ""}`}
-                  style={{
-                    background: "var(--c-inventory-table-header)",
-                    borderColor: LEGACY_COLORS.border,
-                    color: LEGACY_COLORS.muted2,
-                    width,
-                    minWidth,
-                  }}
-                >
-                  {label}
-                </th>
-              ))}
-              <th
-                scope="col"
-                className={compact ? "border-b px-2 py-2.5 text-center text-xs font-medium whitespace-nowrap" : "border-y px-4 py-2.5 text-sm font-bold whitespace-nowrap text-right sm:text-center"}
-                style={{ background: "var(--c-inventory-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: compact ? "104px" : "160px" }}
-              >
-                사용 가능 재고
-              </th>
-              {!compact && (
-                <th
-                  scope="col"
-                  className="hidden rounded-tr-[24px] border-y border-r px-4 py-2.5 text-sm font-bold whitespace-nowrap text-center sm:table-cell"
-                  style={{ background: "var(--c-inventory-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: "160px" }}
-                >
-                  안전재고
-                </th>
-              )}
-            </tr>
-          </thead>
-          <tbody className={!loading && !compact ? "mes-data-reveal" : undefined}>
+      {loading && <span role="status" aria-busy="true" className="sr-only">재고 데이터를 불러오는 중입니다...</span>}
+      <InventoryTable columns={headerColumns} compact={compact} loading={loading}>
             {loading ? Array.from({ length: skeletonRowCount }, (_, index) => (
               <tr key={index} data-testid="inventory-skeleton-row" aria-hidden="true" className={compact ? "h-[98px]" : undefined}>
                 {compact ? <>
@@ -217,10 +155,8 @@ export function InventoryItemsTable({
                 compact={compact}
               />
             ))}
-          </tbody>
-        </table>
-        {hasMoreChunk && <div ref={sentinelRef as React.RefObject<HTMLDivElement>} aria-hidden className="h-px" />}
-      </div>
+      </InventoryTable>
+      {hasMoreChunk && <div ref={sentinelRef as React.RefObject<HTMLDivElement>} aria-hidden className="h-px" />}
 
       {filteredItems.length > displayLimit && (
         <button

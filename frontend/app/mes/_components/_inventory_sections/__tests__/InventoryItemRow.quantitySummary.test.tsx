@@ -39,10 +39,36 @@ function makeItem(overrides: Partial<Item> = {}): Item {
 }
 
 describe("InventoryItemRow quantity summary", () => {
+  it("행 내부 컨트롤에서 전파된 키 입력은 품목 선택을 바꾸지 않는다", () => {
+    const onSelect = vi.fn();
+    render(<table><tbody><InventoryItemRow item={makeItem()} selected={false} onSelect={onSelect} /></tbody></table>);
+    fireEvent.keyDown(screen.getByTestId("inventory-total-stock"), { key: "Enter" });
+    expect(onSelect).not.toHaveBeenCalled();
+    fireEvent.keyDown(screen.getByRole("button", { name: /테스트 품목/ }), { key: " " });
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ item_id: "item-1" }));
+  });
+
+  it.each([false, true])("상세 열림 상태를 생략한 선택 행은 다시 누르면 닫힌다 (compact=%s)", (compact) => {
+    const onSelect = vi.fn();
+    render(<table><tbody><InventoryItemRow item={makeItem()} selected compact={compact} onSelect={onSelect} /></tbody></table>);
+    fireEvent.click(screen.getByRole("button", { name: /테스트 품목/ }));
+    expect(onSelect).toHaveBeenCalledWith(null);
+  });
+
   it.each([false, true])("상세가 닫힌 선택 행을 다시 누르면 해당 품목을 연다 (compact=%s)", (compact) => {
     const item = makeItem();
     const onSelect = vi.fn();
     render(<table><tbody><InventoryItemRow item={item} selected detailOpen={false} compact={compact} onSelect={onSelect} /></tbody></table>);
+    fireEvent.click(screen.getByRole("button", { name: /테스트 품목/ }));
+    expect(onSelect).toHaveBeenCalledWith(item);
+  });
+
+  it("표에서도 닫힌 상세 상태를 선택 행에 전달한다", () => {
+    const item = makeItem();
+    const onSelect = vi.fn();
+    render(<InventoryItemsTable compact error={null} loading={false} filteredItems={[item]}
+      displayLimit={100} setDisplayLimit={() => {}} selectedItem={item} detailOpen={false} onSelectItem={onSelect}
+      activeFilterCount={0} hasKpiFilter={false} onRetry={() => {}} onResetAllFilters={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: /테스트 품목/ }));
     expect(onSelect).toHaveBeenCalledWith(item);
   });

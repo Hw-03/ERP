@@ -2,6 +2,7 @@
 
 import { Layers, RotateCcw, Search, Sparkles, TrendingUp } from "lucide-react";
 import type { ProductModel } from "@/lib/api";
+import type { ReactNode, Ref } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { FilterChip } from "../common";
 import type { DepartmentFilterBasis } from "./inventoryFilter";
@@ -34,6 +35,12 @@ type FiltersProps = {
   onResetAll: () => void;
   isAnyFilterActive: boolean;
   showResetAll?: boolean;
+  locationFilter?: ReactNode;
+  departmentOptions?: readonly string[];
+  showDepartmentFilterBasis?: boolean;
+  panelId?: string;
+  chipClassName?: string;
+  className?: string;
 };
 
 export function InventoryFilters({
@@ -55,17 +62,24 @@ export function InventoryFilters({
   onResetAll,
   isAnyFilterActive,
   showResetAll = true,
+  locationFilter,
+  departmentOptions = ["창고", ...DEPT_CHIPS],
+  showDepartmentFilterBasis = true,
+  panelId = "inventory-filter-panel",
+  chipClassName = "w-full",
+  className = "",
 }: FiltersProps) {
   if (!open) return null;
   return (
-    <div id="inventory-filter-panel" className="mt-3 grid gap-3 xl:grid-cols-3">
+    <div id={panelId} className={`mt-3 grid gap-3 xl:grid-cols-3 ${className}`}>
       <div className="rounded-[16px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        {locationFilter ?? <>
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-sm font-bold">
             <Sparkles className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />
             부서 구분
           </div>
-          <div className="inline-flex shrink-0 items-stretch rounded-[12px] border p-1" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+          {showDepartmentFilterBasis && <div className="inline-flex shrink-0 items-stretch rounded-[12px] border p-1" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
             {([
               ["code", "품목 코드 기준"],
               ["location", "재고 위치 기준"],
@@ -87,28 +101,22 @@ export function InventoryFilters({
                 </button>
               );
             })}
-          </div>
+          </div>}
         </div>
         <div className="grid grid-cols-3 gap-2">
-          <FilterChip active={selectedDepts.length === 0} label="전체" onClick={onClearDepts} tone={LEGACY_COLORS.green} className="w-full" />
-          <FilterChip
-            active={selectedDepts.includes("창고")}
-            label="창고"
-            onClick={() => toggleDept("창고")}
-            tone={LEGACY_COLORS.green}
-            className="w-full"
-          />
-          {DEPT_CHIPS.map((name) => (
+          <FilterChip active={selectedDepts.length === 0} label="전체" onClick={onClearDepts} tone={LEGACY_COLORS.green} className={chipClassName} />
+          {departmentOptions.map((name) => (
             <FilterChip
               key={name}
               active={selectedDepts.includes(name)}
               label={name}
               onClick={() => toggleDept(name)}
               tone={LEGACY_COLORS.green}
-              className="w-full"
+              className={chipClassName}
             />
           ))}
         </div>
+        </>}
       </div>
       <div className="rounded-[16px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
         <div className="mb-2 flex items-center gap-2 text-sm font-bold">
@@ -116,7 +124,7 @@ export function InventoryFilters({
           모델 구분
         </div>
         <div className="grid grid-cols-3 gap-2 overflow-x-auto">
-          <FilterChip active={selectedModels.length === 0} label="전체" onClick={onClearModels} tone={LEGACY_COLORS.cyan} className="w-full" />
+          <FilterChip active={selectedModels.length === 0} label="전체" onClick={onClearModels} tone={LEGACY_COLORS.cyan} className={chipClassName} />
           {productModels.map((m) => (
             <FilterChip
               key={m.model_name}
@@ -124,7 +132,7 @@ export function InventoryFilters({
               label={m.model_name ?? ""}
               onClick={() => toggleModel(m.model_name ?? "")}
               tone={LEGACY_COLORS.cyan}
-              className="w-full"
+              className={chipClassName}
             />
           ))}
         </div>
@@ -140,7 +148,7 @@ export function InventoryFilters({
             label="전체"
             onClick={onClearProcessSteps}
             tone={LEGACY_COLORS.yellow}
-            className="w-full"
+            className={chipClassName}
           />
           {PROCESS_STEP_CHIPS.map((step) => (
             <FilterChip
@@ -149,7 +157,7 @@ export function InventoryFilters({
               label={step.label}
               onClick={() => toggleProcessStep(step.value)}
               tone={LEGACY_COLORS.yellow}
-              className="w-full"
+              className={chipClassName}
             />
           ))}
           <FilterChip
@@ -157,7 +165,7 @@ export function InventoryFilters({
             label="불용"
             onClick={toggleDisused}
             tone={LEGACY_COLORS.red}
-            className="w-full"
+            className={chipClassName}
           />
         </div>
       </div>
@@ -186,6 +194,10 @@ type StickyHeaderProps = {
   isFiltered: boolean;
   onResetAllFilters?: () => void;
   disabled?: boolean;
+  compact?: boolean;
+  searchLabel?: string;
+  searchPlaceholder?: string;
+  headerRef?: Ref<HTMLDivElement>;
 };
 
 export function InventoryTableStickyHeader({
@@ -194,28 +206,34 @@ export function InventoryTableStickyHeader({
   isFiltered,
   onResetAllFilters,
   disabled = false,
+  compact = false,
+  searchLabel = "자재 검색",
+  searchPlaceholder = "품명 · 품목 코드 · 위치 · 공급처 검색",
+  headerRef,
 }: StickyHeaderProps) {
   return (
     <div
-      className="sticky top-0 z-20 -mx-5 -mt-5 mb-0 rounded-t-[24px]"
+      ref={headerRef}
+      className={compact ? "sticky top-0 z-20 mb-0 rounded-t-[20px]" : "sticky top-0 z-20 -mx-5 -mt-5 mb-0 rounded-t-[24px]"}
       style={{
         background: "var(--c-popup-bg)",
       }}
     >
-      <div className="flex flex-wrap items-center gap-2.5 px-5 pb-[15px] pt-[14px]">
+      <div className={compact ? "flex items-center px-3 pb-3 pt-3" : "flex flex-wrap items-center gap-2.5 px-5 pb-[15px] pt-[14px]"}>
         <div
-          className="flex w-full min-w-[240px] items-center gap-2 rounded-[14px] border px-3 py-2"
+          className={`flex w-full min-w-0 items-center gap-2 rounded-[14px] border px-3 py-2 ${compact ? "min-h-11" : ""}`}
           style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
         >
           <Search className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
           <input
             value={searchValue}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="품명 · 품목 코드 · 위치 · 공급처 검색"
+            placeholder={searchPlaceholder}
             disabled={disabled}
-            className="flex-1 bg-transparent text-base outline-none"
+            className="min-w-0 flex-1 bg-transparent text-base outline-none"
+            inputMode="search"
             style={{ color: LEGACY_COLORS.text }}
-            aria-label="자재 검색"
+            aria-label={searchLabel}
           />
         </div>
       </div>
