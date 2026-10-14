@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import csv
+import json
 import uuid
 from dataclasses import asdict
+from datetime import date
+from io import StringIO
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -14,26 +18,28 @@ from sqlalchemy.orm import Session
 from app._actor import set_actor
 from app.database import get_db
 from app.models import (
-    DefectInventoryMovement,
+    BusinessCorrection,
+    DefectStockMovement,
+    DefectStockPool,
     Employee,
     InventoryOperation,
-    InventoryOperationEffect,
     InventoryOperationKindEnum,
     Item,
+    StocktakeApplication,
+    StocktakeApplicationLine,
     TransactionLog,
 )
 from app.routers._errors import ErrorCode, http_error
-from app.routers.inventory._tx_filters import (
-    _batch_name_map,
-    _history_batch_response,
-    _history_request_date_expr,
-    _stock_request_info_map,
-    _to_log_response,
-)
-from app.schemas import RequestOrderStockResponse, TransactionLogResponse
+from app.routers.inventory._tx_filters import _history_request_date_expr
+from app.routers.inventory.transactions import _enforce_export_limit, _require_export_range
 from app.services import inventory_operation_cancellation as cancellation_svc
 from app.services.pin_auth import verify_pin
+from app.services.export_helpers import csv_streaming_response
 from app.services.request_order_stock import load_request_order_stock
+from app.services.inventory_operation_history import (
+    item_operation_ids, operation_payload as _operation_payload,
+    _correction_operation_ids,
+)
 
 
 router = APIRouter()
@@ -44,214 +50,6 @@ class OperationCancelRequest(BaseModel):
     employee_code: str = Field(..., min_length=1, max_length=30)
     pin: str = Field(..., min_length=1, max_length=20)
     plan_hash: str = Field(..., min_length=64, max_length=64)
-
-
-def _line_payload(
-    log: TransactionLog,
-    item: Item | None,
-    *,
-    movement_quantity: object | None = None,
-    history_log: TransactionLogResponse | None = None,
-) -> dict:
-    transfer_qty = log.transfer_qty if log.transfer_qty is not None else movement_quantity
-    return {
-        "log_id": str(log.log_id),
-        "item_id": str(log.item_id),
-        "item_name": item.item_name if item else None,
-        "mes_code": item.mes_code if item else None,
-        "transaction_type": log.transaction_type.value,
-        "quantity_change": str(log.quantity_change),
-        "quantity_before": (
-            str(log.quantity_before) if log.quantity_before is not None else None
-        ),
-        "quantity_after": (
-            str(log.quantity_after) if log.quantity_after is not None else None
-        ),
-        "transfer_qty": str(transfer_qty) if transfer_qty is not None else None,
-        "department": log.department,
-        "operation_role": log.operation_role.value if log.operation_role else None,
-        "reverses_log_id": str(log.reverses_log_id) if log.reverses_log_id else None,
-        "reference_no": log.reference_no,
-        "notes": log.notes,
-        "created_at": log.created_at,
-        "history_log": history_log,
-    }
-
-
-def _history_log_map(
-    db: Session,
-    logs: list[TransactionLog],
-    items: dict[uuid.UUID, Item],
-    operation: InventoryOperation,
-    reversal: InventoryOperation | None,
-    request_order_stock: dict[uuid.UUID, RequestOrderStockResponse],
-) -> dict[uuid.UUID, TransactionLogResponse]:
-    """작업 행을 기존 거래 이력과 동일한 감사 응답으로 보강한다."""
-    batch_map = _batch_name_map(
-        db, {log.operation_batch_id for log in logs if log.operation_batch_id}
-    )
-    stock_request_map = _stock_request_info_map(
-        db, {log.reference_no for log in logs if log.reference_no}
-    )
-    response_by_log_id: dict[uuid.UUID, TransactionLogResponse] = {}
-    for log in logs:
-        item = items.get(log.item_id)
-        if item is None:
-            continue
-        info = stock_request_map.get(log.reference_no) if log.reference_no else None
-        if info is None:
-            info = batch_map.get(log.operation_batch_id)
-        response = _to_log_response(
-            log,
-            item,
-            requester_name=info.requester_name if info else None,
-            approver_name=info.approver_name if info else None,
-            requested_at=info.requested_at if info else None,
-            approved_at=info.approved_at if info else None,
-            operation=operation,
-            reversal=reversal,
-            history_batch=_history_batch_response(batch_map.get(log.operation_batch_id)),
-        )
-        response.request_order_stock = request_order_stock.get(log.log_id)
-        response_by_log_id[log.log_id] = response
-    return response_by_log_id
-
-
-def _operation_payload(
-    db: Session,
-    operation: InventoryOperation,
-    *,
-    selected_item_id: uuid.UUID | None = None,
-    request_order_stock: dict[uuid.UUID, RequestOrderStockResponse] | None = None,
-) -> dict:
-    logs = (
-        db.query(TransactionLog)
-        .filter(TransactionLog.operation_id == operation.operation_id)
-        .order_by(TransactionLog.created_at.asc(), TransactionLog.log_id.asc())
-        .all()
-    )
-    item_ids = {log.item_id for log in logs}
-    items = {
-        item.item_id: item
-        for item in db.query(Item).filter(Item.item_id.in_(item_ids)).all()
-    } if item_ids else {}
-    reversal = (
-        db.query(InventoryOperation)
-        .filter(InventoryOperation.reverses_operation_id == operation.operation_id)
-        .one_or_none()
-    )
-    effects = (
-        db.query(InventoryOperationEffect)
-        .filter(InventoryOperationEffect.operation_id == operation.operation_id)
-        .order_by(
-            InventoryOperationEffect.created_at.asc(),
-            InventoryOperationEffect.effect_id.asc(),
-        )
-        .all()
-    )
-    movement_quantities = {
-        item_id: abs(quantity)
-        for item_id, quantity in (
-            db.query(
-                DefectInventoryMovement.item_id,
-                func.sum(DefectInventoryMovement.quantity_delta),
-            )
-            .filter(DefectInventoryMovement.operation_id == operation.operation_id)
-            .group_by(DefectInventoryMovement.item_id)
-            .all()
-        )
-        if quantity is not None and quantity != 0
-    }
-    if operation.kind == InventoryOperationKindEnum.CANCELLATION:
-        effective_status = "cancellation"
-    elif reversal is not None:
-        effective_status = "cancelled"
-    else:
-        effective_status = "active"
-    if request_order_stock is None:
-        request_order_stock = load_request_order_stock(
-            db,
-            item_ids,
-            request_date_expr=_history_request_date_expr(),
-        )
-    history_logs = _history_log_map(
-        db,
-        logs,
-        items,
-        operation,
-        reversal,
-        request_order_stock,
-    )
-    matching_lines = [
-        _line_payload(
-            log,
-            items.get(log.item_id),
-            movement_quantity=movement_quantities.get(log.item_id),
-            history_log=history_logs.get(log.log_id),
-        )
-        for log in logs
-        if selected_item_id is None or log.item_id == selected_item_id
-    ]
-    try:
-        cancel_plan = cancellation_svc.preview_cancellation(
-            db,
-            operation.operation_id,
-        )
-        can_cancel = cancel_plan.can_cancel
-        cancel_blockers = list(cancel_plan.blockers)
-    except cancellation_svc.CancellationError as exc:
-        can_cancel = False
-        cancel_blockers = [str(exc)]
-    return {
-        "operation_id": str(operation.operation_id),
-        "kind": operation.kind.value,
-        "domain": operation.domain,
-        "action": operation.action,
-        "display_label": operation.display_label,
-        "effective_status": effective_status,
-        "actor_employee_id": (
-            str(operation.actor_employee_id) if operation.actor_employee_id else None
-        ),
-        "actor_name": operation.actor_name,
-        "department": operation.department,
-        "reason": operation.reason,
-        "effective_at": operation.effective_at,
-        "reverses_operation_id": (
-            str(operation.reverses_operation_id)
-            if operation.reverses_operation_id
-            else None
-        ),
-        "reversal_operation_id": str(reversal.operation_id) if reversal else None,
-        "can_cancel": can_cancel,
-        "cancel_blockers": cancel_blockers,
-        "lines": [
-            _line_payload(
-                log,
-                items.get(log.item_id),
-                movement_quantity=movement_quantities.get(log.item_id),
-                history_log=history_logs.get(log.log_id),
-            )
-            for log in logs
-        ],
-        "matching_lines": matching_lines,
-        "effects": [
-            {
-                "effect_id": str(effect.effect_id),
-                "effect_kind": effect.effect_kind.value,
-                "subject_type": effect.subject_type,
-                "subject_id": effect.subject_id,
-                "role": effect.role,
-                "before_state": effect.before_state,
-                "after_state": effect.after_state,
-                "reverses_effect_id": (
-                    str(effect.reverses_effect_id)
-                    if effect.reverses_effect_id
-                    else None
-                ),
-            }
-            for effect in effects
-        ],
-    }
 
 
 @router.get("/operations/summary")
@@ -282,10 +80,8 @@ def list_operations(
 ) -> dict:
     query = db.query(InventoryOperation)
     if item_id is not None:
-        query = query.join(
-            TransactionLog,
-            TransactionLog.operation_id == InventoryOperation.operation_id,
-        ).filter(TransactionLog.item_id == item_id)
+        matching_ids = item_operation_ids(db, item_id)
+        query = query.filter(InventoryOperation.operation_id.in_(matching_ids))
     if kind is not None:
         query = query.filter(InventoryOperation.kind == kind)
     if domain:
@@ -347,6 +143,100 @@ def list_operations(
         ],
         "next_cursor": next_cursor,
     }
+
+
+OPERATION_EXPORT_COLUMNS = [
+    "row_type", "effective_at", "operation_id", "domain", "action", "display_label",
+    "actor_name", "item_id", "item_name", "mes_code", "scope_key", "source_id",
+    "source_operation_id", "source_operation_ids", "transaction_log_id", "count_id", "confirmation_revision_id",
+    "quantity_change", "before_quantities",
+    "after_quantities", "observation_epoch_before", "observation_epoch_after", "reason",
+]
+
+
+def _operation_export_rows(db: Session, start_date: date | None, end_date: date | None) -> list[dict]:
+    """Export typed evidence without inventing a transaction for a zero delta."""
+    start_dt, end_dt = _require_export_range(start_date, end_date)
+    operations = db.query(InventoryOperation).filter(
+        InventoryOperation.effective_at >= start_dt,
+        InventoryOperation.effective_at < end_dt,
+    ).order_by(InventoryOperation.effective_at.desc(), InventoryOperation.operation_id.desc()).all()
+    rows = []
+    for operation in operations:
+        base = {
+            "effective_at": operation.effective_at.isoformat(),
+            "operation_id": str(operation.operation_id),
+            "domain": operation.domain,
+            "action": operation.action,
+            "display_label": operation.display_label,
+            "actor_name": operation.actor_name,
+            "reason": operation.reason or "",
+        }
+        logs = db.query(TransactionLog, Item).join(Item, Item.item_id == TransactionLog.item_id).filter(
+            TransactionLog.operation_id == operation.operation_id
+        ).order_by(TransactionLog.created_at, TransactionLog.log_id).all()
+        for log, item in logs:
+            rows.append({**base, "row_type": "TRANSACTION", "item_id": str(item.item_id),
+                "item_name": item.item_name, "mes_code": item.mes_code or "",
+                "source_id": str(log.log_id), "transaction_log_id": str(log.log_id),
+                "quantity_change": str(log.quantity_change)})
+        observations = db.query(StocktakeApplicationLine, StocktakeApplication, Item).join(
+            StocktakeApplication, StocktakeApplication.application_id == StocktakeApplicationLine.application_id
+        ).join(Item, Item.item_id == StocktakeApplicationLine.item_id).filter(
+            StocktakeApplication.operation_id == operation.operation_id
+        ).order_by(StocktakeApplicationLine.scope_key, StocktakeApplicationLine.item_id).all()
+        for line, application, item in observations:
+            rows.append({**base, "row_type": "STOCKTAKE_OBSERVATION", "item_id": str(item.item_id),
+                "item_name": item.item_name, "mes_code": item.mes_code or "",
+                "scope_key": line.scope_key, "source_id": str(application.application_id),
+                "count_id": str(line.count_id),
+                "confirmation_revision_id": str(line.confirmation_revision_id),
+                "before_quantities": json.dumps(line.before_quantities, ensure_ascii=False, sort_keys=True),
+                "after_quantities": json.dumps(line.after_quantities, ensure_ascii=False, sort_keys=True),
+                "observation_epoch_before": line.observation_epoch_before,
+                "observation_epoch_after": line.observation_epoch_after})
+        correction = db.query(BusinessCorrection).filter_by(application_operation_id=operation.operation_id).one_or_none()
+        if correction is not None:
+            source_operation_ids = _correction_operation_ids(db, correction)
+            rows.append({**base, "row_type": "BUSINESS_CORRECTION", "source_id": str(correction.correction_id),
+                "source_operation_id": source_operation_ids[0] if len(source_operation_ids) == 1 else "",
+                "source_operation_ids": json.dumps(source_operation_ids)})
+        if not logs and not observations and correction is None:
+            rows.append({**base, "row_type": "OPERATION"})
+        _enforce_export_limit(len(rows))
+    return rows
+
+
+@router.get("/operations/export.csv")
+def export_operations_csv(
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    buffer = StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=OPERATION_EXPORT_COLUMNS, extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(_operation_export_rows(db, start_date, end_date))
+    return csv_streaming_response(buffer, "operations-export.csv")
+
+
+@router.get("/operations/export.xlsx")
+def export_operations_xlsx(
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    from openpyxl import Workbook
+    from app.utils.excel import apply_header, auto_width, make_xlsx_response
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "작업 이력"
+    apply_header(sheet, OPERATION_EXPORT_COLUMNS)
+    for row in _operation_export_rows(db, start_date, end_date):
+        sheet.append([row.get(column, "") for column in OPERATION_EXPORT_COLUMNS])
+    auto_width(sheet)
+    return make_xlsx_response(workbook, "operations-export.xlsx")
 
 
 @router.get("/operations/{operation_id}")

@@ -162,6 +162,7 @@ def create_stock_request(payload: StockRequestCreate, db: Session = Depends(get_
     lines_input = [
         svc.LineInput(
             record_id=li.record_id,
+            pool_id=li.pool_id,
             item_id=li.item_id,
             quantity=li.quantity,
             from_bucket=li.from_bucket,
@@ -494,6 +495,7 @@ def upsert_stock_request_draft(
     lines_input = [
         svc.LineInput(
             record_id=li.record_id,
+            pool_id=li.pool_id,
             item_id=li.item_id,
             quantity=li.quantity,
             from_bucket=li.from_bucket,

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.routers._errors import ErrorCode, http_error
 from app.dependencies.admin import require_admin_pin
-from app.models import Department
+from app.models import Department, InventoryScope
 from app.services.reorder import reorder_by_display_order
 from app.schemas import (
     DepartmentCreate,
@@ -78,6 +78,10 @@ def update_department(
     if not dept:
         raise http_error(404, ErrorCode.NOT_FOUND, "부서를 찾을 수 없습니다.")
     if payload.name is not None:
+        if payload.name != dept.name and db.query(InventoryScope.scope_key).filter(
+            InventoryScope.department_id == dept_id
+        ).first():
+            raise http_error(409, ErrorCode.CONFLICT, "재고 위치에 연결된 부서명은 변경할 수 없습니다.")
         if db.query(Department).filter(Department.name == payload.name, Department.id != dept_id).first():
             raise http_error(409, ErrorCode.CONFLICT, "이미 존재하는 부서명입니다.")
         dept.name = payload.name
@@ -114,5 +118,7 @@ def delete_department(
     dept = db.query(Department).filter(Department.id == dept_id).first()
     if not dept:
         raise http_error(404, ErrorCode.NOT_FOUND, "부서를 찾을 수 없습니다.")
+    if db.query(InventoryScope.scope_key).filter(InventoryScope.department_id == dept_id).first():
+        raise http_error(409, ErrorCode.CONFLICT, "재고 위치에 연결된 부서는 삭제할 수 없습니다.")
     db.delete(dept)
     db.commit()

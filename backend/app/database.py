@@ -44,6 +44,7 @@ def _create_database_engine(
     database_url: str,
     *,
     sqlite_read_only: bool = False,
+    stocktake_close: bool = False,
 ) -> Engine:
     """요청 역할에 맞는 engine을 만들고 SQLite 트랜잭션 경계를 고정한다."""
 
@@ -52,13 +53,18 @@ def _create_database_engine(
         raise ValueError("sqlite_read_only requires a SQLite database URL")
     created_engine = create_engine(
         database_url,
-        connect_args={"check_same_thread": False} if is_sqlite else {},
+        connect_args=({"check_same_thread": False, "timeout": 0.75 if stocktake_close else 10}
+                      if is_sqlite else {"connect_timeout": 2} if stocktake_close else {}),
         **(
             {"poolclass": NullPool}
             if is_sqlite
-            else {"pool_pre_ping": True, "pool_size": 10, "max_overflow": 20}
+            else {"pool_pre_ping": True, "pool_size": 10, "max_overflow": 20,
+                  **({"pool_timeout": 0.75} if stocktake_close else {})}
         ),
     )
+    if stocktake_close:
+        from app.services.stocktake_deadline import install
+        install(created_engine)
     if not is_sqlite:
         return created_engine
 
@@ -67,7 +73,7 @@ def _create_database_engine(
         cursor = dbapi_conn.cursor()
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.execute("PRAGMA busy_timeout=10000")
+        cursor.execute("PRAGMA busy_timeout=750" if stocktake_close else "PRAGMA busy_timeout=10000")
         cursor.execute("PRAGMA synchronous=NORMAL")
         if sqlite_read_only:
             cursor.execute("PRAGMA query_only=ON")
@@ -99,6 +105,10 @@ if read_engine is not engine:
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 ReadSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=read_engine)
+close_engine = _create_database_engine(DATABASE_URL, stocktake_close=True)
+CloseSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=close_engine)
+snapshot_engine = read_engine if _is_sqlite else engine.execution_options(isolation_level="REPEATABLE READ")
+ClosePreviewSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=snapshot_engine)
 
 Base = declarative_base()
 
@@ -113,6 +123,7 @@ _WEEKLY_SNAPSHOT_GUARD_PREFIXES = (
     "/api/handovers",
     "/api/dept-adjustment",
     "/api/defects",
+    "/api/stocktakes",
 )
 
 
@@ -129,14 +140,25 @@ def _requires_weekly_snapshot_guard(request: Request) -> bool:
 
 
 def get_db(request: Request):
+    close_preview = request.method == "POST" and request.url.path.startswith("/api/stocktakes/rounds/") and request.url.path.endswith("/close-previews")
+    closing = request.method == "POST" and request.url.path.startswith("/api/stocktakes/rounds/") and request.url.path.endswith("/close")
+    resolving = request.method == "POST" and request.url.path.startswith("/api/stocktakes/commands/") and request.url.path.endswith("/resolve")
+    bounded = closing or resolving
     session_factory = (
+        ClosePreviewSessionLocal if close_preview else CloseSessionLocal if bounded else
         ReadSessionLocal
         if _is_file_sqlite and request.method in {"GET", "HEAD"}
         else SessionLocal
     )
     db = session_factory()
     try:
-        if _requires_weekly_snapshot_guard(request):
+        if close_preview:
+            db.info["stocktake_preview_writer"] = engine
+            if not _is_sqlite:
+                db.connection().exec_driver_sql("SET TRANSACTION READ ONLY")
+        if bounded:
+            db.info["stocktake_close_request"] = True
+        if not close_preview and not resolving and _requires_weekly_snapshot_guard(request):
             from app.services.weekly_inventory_snapshot import (
                 WeeklyInventorySnapshotGapError,
                 ensure_due_snapshot_committed,
@@ -152,13 +174,24 @@ def get_db(request: Request):
                         "message": str(exc),
                     },
                 ) from exc
+        if request.method not in {"GET", "HEAD", "OPTIONS"} and (
+            _requires_weekly_snapshot_guard(request)
+            or request.url.path.startswith(("/api/warehouse-map/", "/api/settings/"))
+            or request.url.path == "/api/departments" or request.url.path.startswith("/api/departments/")
+        ) and not request.url.path.startswith("/api/stocktakes/"):
+            from app.services.stocktake_guard import lock_control
+            lock_control(db, exclusive=request.url.path == "/api/warehouse-map/box-tracking")
         yield db
-    except Exception:
+    except Exception as exc:
         # WS4: 핸들러 중간 예외 시 세션을 명시적으로 롤백한 뒤 반환.
         # 미롤백 시 풀드 PostgreSQL(pool_size=10) 경로에서 aborted-transaction
         # 상태의 커넥션이 풀로 반환돼 다음 요청을 오염시킨다(SQLite/NullPool 은
         # 커넥션 폐기로 가려졌을 뿐). 재던지기로 기존 예외 핸들러 체인은 유지.
         db.rollback()
+        if bounded:
+            from app.services.stocktake_deadline import busy, is_timeout
+            if is_timeout(exc):
+                raise busy() from exc
         raise
     finally:
         db.close()

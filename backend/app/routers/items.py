@@ -45,6 +45,7 @@ from app.services import audit
 from app.services import inventory as inventory_svc
 from app.services import stock_availability, stock_math
 from app.services.audit_actor_session import get_verified_audit_actor_code
+from app.services.inventory_read import bulk_defective_breakdown as _bulk_defective_breakdown
 from app.services.item_display_order import insert_item_at_process_end
 from app.services._tx import commit_and_refresh
 from app._evt import emit as _evt_emit
@@ -88,45 +89,6 @@ def _build_item_query(db: Session) -> SAQuery:
     return db.query(Item, Inventory).outerjoin(Inventory, Item.item_id == Inventory.item_id)
 
 
-def _bulk_defective_breakdown(
-    db: Session,
-    item_ids: list[uuid.UUID],
-    locations_by_item: dict[uuid.UUID, list[InventoryLocationResponse]],
-) -> dict[uuid.UUID, list[DefectiveStockBreakdown]]:
-    """남은 원장을 일괄 집계하고, 원장 없는 기존 위치만 불량으로 보완한다."""
-    if not item_ids:
-        return {}
-    record = DefectQuarantineRecord
-    category = func.coalesce(record.management_category, "DEFECT")
-    rows = (
-        db.query(record.item_id, record.department, category, func.sum(record.remaining_quantity))
-        .filter(record.item_id.in_(item_ids), record.remaining_quantity > 0)
-        .group_by(record.item_id, record.department, category)
-        .order_by(record.item_id, record.department, category)
-        .all()
-    )
-    result: dict[uuid.UUID, list[DefectiveStockBreakdown]] = {}
-    covered_cells: set[tuple[uuid.UUID, str]] = set()
-    for item_id, department, management_category, quantity in rows:
-        result.setdefault(item_id, []).append(DefectiveStockBreakdown(
-            department=department,
-            management_category=management_category,
-            quantity=quantity,
-        ))
-        covered_cells.add((item_id, department))
-    for item_id in item_ids:
-        for location in locations_by_item.get(item_id, []):
-            if (
-                location.status == LocationStatusEnum.DEFECTIVE
-                and location.quantity > 0
-                and (item_id, location.department) not in covered_cells
-            ):
-                result.setdefault(item_id, []).append(DefectiveStockBreakdown(
-                    department=location.department,
-                    management_category="DEFECT",
-                    quantity=location.quantity,
-                ))
-    return result
 
 
 def _to_item_with_inventory(

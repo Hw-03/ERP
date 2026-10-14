@@ -18,6 +18,7 @@ from app.schemas import (
 )
 from app.services import production_receipt as production_receipt_svc
 from app.services import inventory as inventory_svc
+from app.services.inventory_conflicts import InventoryConflict
 from app.services.production_receipt import (
     ProductionBadRequest,
     ProductionItemNotFound,
@@ -80,6 +81,8 @@ def production_receipt(
             message="재고 부족으로 생산 입고를 진행할 수 없습니다.",
             shortages=[str(exc)],
         )
+    except InventoryConflict:
+        raise
     except Exception as exc:
         # WS8: 재던지기 전 풀스택 보존(기존엔 str(exc) 만 남고 트레이스 소실).
         logger.exception("생산 처리 중 예기치 못한 오류")

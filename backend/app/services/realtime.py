@@ -56,6 +56,8 @@ def _advance_revision_before_commit(session: Session) -> None:
         return
     if session.in_nested_transaction():
         return
+    from app.services.stocktake_guard import flush_progress
+    flush_progress(session)
     session.flush()
     result = session.execute(
         update(DataRevision)

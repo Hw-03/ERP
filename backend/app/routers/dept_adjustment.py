@@ -21,6 +21,7 @@ from app.database import get_db
 from app.models import DepartmentEnum, DeptAdjSubTypeEnum, Item
 from app.routers._errors import ErrorCode, http_error
 from app.services import dept_adjustment as svc
+from app.services.inventory_conflicts import InventoryConflict
 from app._evt import emit as _evt_emit
 from app.repositories import item_repository
 from app.routers.inventory._tx_helper import resolve_producer
@@ -210,6 +211,8 @@ def submit_adjustment(
         )
     except ValueError as exc:
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
+    except InventoryConflict:
+        raise
     except Exception as exc:
         # WS8: 재던지기 전 풀스택 보존(기존엔 str(exc) 만 남고 트레이스 소실).
         logger.exception("부서 조정 처리 중 예기치 못한 오류")

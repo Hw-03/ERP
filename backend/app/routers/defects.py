@@ -43,6 +43,7 @@ from app.models import (
 from app.routers._errors import ErrorCode, http_error
 from app.services import rate_limit
 from app.services import defect_actions as defect_actions_svc
+from app.services import defect_pool
 from app.services.pin_auth import validate_pin, verify_pin
 from app._evt import emit as _evt_emit
 from app._actor import set_actor
@@ -66,7 +67,10 @@ router = APIRouter()
 
 
 class DefectLocationItem(BaseModel):
-    record_id: uuid.UUID
+    record_id: Optional[uuid.UUID] = None
+    pool_id: Optional[uuid.UUID] = None
+    source_kind: Literal["RECORD", "POOL"] = "RECORD"
+    version: Optional[int] = None
     item_id: uuid.UUID
     item_name: str
     mes_code: Optional[str]
@@ -74,7 +78,7 @@ class DefectLocationItem(BaseModel):
     return_supplier_scope: Literal["warehouse", "tube"] = "warehouse"
     department: str
     quantity: Decimal
-    original_quantity: Decimal
+    original_quantity: Optional[Decimal]
     pending_quantity: Decimal = Decimal("0")
     available_quantity: Decimal
     defective_at: Optional[datetime]
@@ -92,7 +96,8 @@ class DefectLocationItem(BaseModel):
 
 class DefectKpi(BaseModel):
     quarantined: int
-    over_one_year: int
+    over_one_year: Optional[int]
+    basis: Literal["RECORD", "POOL"] = "RECORD"
 
 
 class QuarantineRequest(BaseModel):
@@ -138,6 +143,7 @@ class BulkQuarantineResult(BaseModel):
 class UnquarantineRequest(BaseModel):
     submission_id: Optional[uuid.UUID] = None
     record_id: Optional[uuid.UUID] = None
+    pool_id: Optional[uuid.UUID] = None
     item_id: uuid.UUID
     qty: Decimal
     dept: str
@@ -154,7 +160,8 @@ class DefectActionResult(BaseModel):
 
 
 class BulkUnquarantineLine(BaseModel):
-    record_id: uuid.UUID
+    record_id: Optional[uuid.UUID] = None
+    pool_id: Optional[uuid.UUID] = None
     item_id: uuid.UUID
     department: str
     quantity: Decimal
@@ -206,6 +213,44 @@ class DefectManagementCategoryUpdateRequest(BaseModel):
 
 class DefectManagementCategoryUpdateResult(BaseModel):
     management_category: str
+
+
+class PoolManagementCategoryUpdateRequest(BaseModel):
+    management_category: Literal["DEFECT", "B_GRADE", "OBSOLETE"]
+    quantity: int = Field(gt=0, le=2147483647, strict=True)
+    expected_version: int = Field(ge=0, strict=True)
+    memo: Optional[str] = None
+    actor_employee_id: uuid.UUID
+    pin: str
+
+
+@router.put("/pools/{pool_id}/management-category")
+def update_pool_management_category(
+    pool_id: uuid.UUID, payload: PoolManagementCategoryUpdateRequest,
+    http_request: Request, db: Session = Depends(get_db),
+) -> dict:
+    """Move an explicit quantity after the existing active-worker PIN check."""
+    actor = db.get(Employee, payload.actor_employee_id)
+    if actor is None or not actor.is_active:
+        raise http_error(403, ErrorCode.FORBIDDEN, "활성 직원을 선택해 주세요.")
+    validate_pin(payload.pin)
+    client_ip = getattr(getattr(http_request, "client", None), "host", None) or "unknown"
+    key = f"verify_pin:{actor.employee_id}:{client_ip}"
+    if rate_limit.is_blocked(key):
+        raise http_error(429, ErrorCode.TOO_MANY_REQUESTS, "PIN 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.")
+    if not verify_pin(actor.pin_hash, payload.pin):
+        rate_limit.record_failure(key)
+        raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
+    rate_limit.record_success(key)
+    set_actor(http_request, actor)
+    try:
+        target = defect_pool.move_category(db, pool_id=pool_id, quantity=payload.quantity,
+            category=payload.management_category, expected_version=payload.expected_version,
+            actor=actor, reason=payload.memo or "격리 재고 분류 이동")
+    except ValueError as exc:
+        raise http_error(422, ErrorCode.VALIDATION_ERROR, str(exc)) from exc
+    _evt_emit("defect_pool_category_change", request=http_request, pool_id=str(pool_id))
+    return {"management_category": target.category, "target_pool_id": str(target.pool_id)}
 
 
 class DefectManagementCategoryRevisionItem(BaseModel):
@@ -372,6 +417,29 @@ def list_defect_locations(
     db: Session = Depends(get_db),
 ):
     """남은 수량이 있는 격리 기록을 격리 건 단위로 반환한다."""
+    if defect_pool.is_pool_mode(db):
+        from app.models import DefectStockPool, InventoryScope
+        query = db.query(DefectStockPool, InventoryScope, Item).join(
+            InventoryScope, InventoryScope.scope_key == DefectStockPool.scope_key,
+        ).join(Item, Item.item_id == DefectStockPool.item_id).filter(DefectStockPool.quantity > 0)
+        if department:
+            query = query.filter(InventoryScope.physical_department == department)
+        if management_category:
+            query = query.filter(DefectStockPool.category == management_category)
+        rows = query.order_by(DefectStockPool.item_id, DefectStockPool.scope_key, DefectStockPool.category).all()
+        bom_items = {row[0] for row in db.query(BOM.parent_item_id).filter(
+            BOM.parent_item_id.in_([pool.item_id for pool, _scope, _item in rows]),
+        ).distinct().all()} if rows else set()
+        return [DefectLocationItem(
+            pool_id=pool.pool_id, source_kind="POOL", version=pool.version,
+            item_id=item.item_id, item_name=item.item_name, mes_code=item.mes_code,
+            process_type_code=item.process_type_code,
+            return_supplier_scope="tube" if scope.physical_department == "튜브" and item.process_type_code == "TR" else "warehouse",
+            department=scope.physical_department, quantity=pool.quantity, original_quantity=None,
+            pending_quantity=pool.pending_quantity, available_quantity=pool.quantity - pool.pending_quantity,
+            defective_at=None, reason_category=None, reason_memo=None, quarantined_by=None,
+            quarantined_by_employee_id=None, has_bom=item.item_id in bom_items, management_category=pool.category,
+        ) for pool, scope, item in rows]
     q = (
         db.query(DefectQuarantineRecord, Item)
         .join(Item, Item.item_id == DefectQuarantineRecord.item_id)
@@ -540,7 +608,7 @@ def list_defect_locations(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/kpi", response_model=DefectKpi)
+@router.get("/kpi", response_model=DefectKpi, response_model_exclude_unset=True)
 def get_defect_kpi(
     management_category: Optional[Literal["DEFECT", "B_GRADE", "OBSOLETE"]] = Query(None),
     db: Session = Depends(get_db),
@@ -550,6 +618,12 @@ def get_defect_kpi(
     - over_one_year: 격리 시각이 365일을 넘긴 활성 기록 수
     """
     now = datetime.utcnow()
+    if defect_pool.is_pool_mode(db):
+        from app.models import DefectStockPool
+        query = db.query(DefectStockPool).filter(DefectStockPool.quantity > 0)
+        if management_category:
+            query = query.filter(DefectStockPool.category == management_category)
+        return DefectKpi(quarantined=query.count(), over_one_year=None, basis="POOL")
     one_year_ago = now - timedelta(days=365)
 
     filters = [DefectQuarantineRecord.remaining_quantity > 0]
@@ -748,6 +822,8 @@ def update_management_category(
     db: Session = Depends(get_db),
 ):
     """PIN 확인 뒤, 처리 대기 없는 활성 격리 원장의 관리 분류만 변경한다."""
+    if defect_pool.is_pool_mode(db):
+        raise http_error(409, "POOL_SOURCE_REQUIRED", "공동재고 분류 이동을 사용해 주세요. 과거 발생 분류는 보존됩니다.")
     record = db.get(DefectQuarantineRecord, record_id)
     if record is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "격리 기록을 찾을 수 없습니다.")
@@ -982,6 +1058,7 @@ def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Sessio
         defect_actions_svc.unquarantine_inventory(
             db,
             record_id=payload.record_id,
+            pool_id=payload.pool_id,
             item_id=payload.item_id,
             qty=payload.qty,
             dept=dept,
@@ -1028,6 +1105,7 @@ def unquarantine_bulk(
         lines = [
             defect_actions_svc.BulkUnquarantineLine(
                 record_id=line.record_id,
+                pool_id=line.pool_id,
                 item_id=line.item_id,
                 department=_dept_enum(line.department),
                 quantity=line.quantity,

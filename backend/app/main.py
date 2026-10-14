@@ -56,6 +56,9 @@ from app.routers import (
     items,
     models as models_router,
     notifications,
+    operator_sessions,
+    stocktakes,
+    business_corrections,
     production,
     realtime,
     settings,
@@ -69,6 +72,9 @@ from app.services import realtime as realtime_svc
 
 audit_csv_svc.register_session_listeners()
 realtime_svc.register_session_listeners()
+from app.database import CloseSessionLocal, ClosePreviewSessionLocal
+realtime_svc.register_session_listeners(CloseSessionLocal)
+realtime_svc.register_session_listeners(ClosePreviewSessionLocal)
 
 
 _BOOT_ID: str = uuid.uuid4().hex
@@ -116,6 +122,7 @@ app = FastAPI(
         {"name": "Suppliers", "description": "원자재 입출고 공급업체 마스터."},
         {"name": "Shipping", "description": "출하 요청과 준비·완료 처리."},
         {"name": "Stock Requests", "description": "재고 요청과 결재 처리."},
+        {"name": "Stocktakes", "description": "재고 전수조사 회차·계수·확인·반영과 종료 증빙."},
         {"name": "Warehouse Map", "description": "창고 배치도 관리."},
         {"name": "Notifications", "description": "결재 알림 — 요청 도착/승인/반려."},
         {"name": "Handover", "description": "튜브→고압/진공 인수인계서."},
@@ -215,6 +222,16 @@ def _rid(request: Request) -> str:
     )
 
 
+from app.services.inventory_conflicts import InventoryConflict
+
+
+@app.exception_handler(InventoryConflict)
+def _inventory_conflict_handler(request: Request, exc: InventoryConflict) -> JSONResponse:
+    """Preserve retryable stock conflicts without turning approvals into failures."""
+    return JSONResponse(status_code=exc.status_code,
+                        content={"detail": {"code": exc.code, "message": str(exc), "extra": exc.extra}})
+
+
 @app.exception_handler(ValueError)
 def _value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
     # Pydantic ValidationError 도 ValueError 하위 — 응답 모델 검증 실패는 서버 결함이므로
@@ -298,6 +315,9 @@ def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONRespon
 app.include_router(employee_item_order.router, prefix="/api/items", tags=["Items"])
 app.include_router(items.router, prefix="/api/items", tags=["Items"])
 app.include_router(employees.router, prefix="/api/employees", tags=["Employees"])
+app.include_router(operator_sessions.router, prefix="/api/operator-sessions", tags=["Employees"])
+app.include_router(stocktakes.router, prefix="/api/stocktakes", tags=["Stocktakes"])
+app.include_router(business_corrections.router, prefix="/api/inventory/business-corrections", tags=["Inventory"])
 app.include_router(daily_work_reports.router, prefix="/api/daily-work-reports", tags=["Daily Work Reports"])
 app.include_router(departments.router, prefix="/api/departments", tags=["Departments"])
 app.include_router(client_events.router, prefix="/api", tags=["Client Events"])
