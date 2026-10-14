@@ -8,7 +8,7 @@ import { OPERATION_OPTIONS } from "./historyQuery";
 
 // 3차: 유일 필터 패널. 3카드 모두 다중 선택.
 // 부서 = 서버 departmentCounts 기반 동적("창고" 포함, 미상은 진짜 unknown만).
-// 작업 종류 = 부모 작업 5종 고정. KPI 박스는 표시 전용이라 동기 없음.
+// 작업 종류 = 부모 작업 기준. KPI 박스는 표시 전용이라 동기 없음.
 type Props = {
   open: boolean;
   /** baseline summary 의 부서별 카운트 — 부서 칩 소스(동적). */
@@ -89,7 +89,7 @@ export function HistoryFilterPanel({
             active={selectedOps.includes(opt.value)}
             label={opt.label}
             onClick={() => toggleOp(opt.value)}
-            tone={LEGACY_COLORS.yellow}
+            tone={opt.value === "stocktake" ? LEGACY_COLORS.green : LEGACY_COLORS.yellow}
             className="w-full"
           />
         ))}

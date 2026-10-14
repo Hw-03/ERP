@@ -29,7 +29,7 @@ const NUM = (loading: boolean, n: number | null | undefined) =>
 /**
  * 입출고 내역 상단 요약 — 3차: **표시 전용**(클릭 필터 폐기, 필터는 "필터" 패널 단일).
  * 카운트는 "{기간} X건 / 전체 Y건" 정직 표기 — X=현재 필터, Y=기간 전체.
- * 3박스(창고/부서/수량조정)는 건수만 보여주는 표시판.
+ * 3박스(창고/부서/재고 확인·조정)는 건수만 보여주는 표시판.
  */
 export function HistoryStatsBar({
   baseline,
@@ -98,11 +98,11 @@ export function HistoryStatsBar({
         <StatBox
           mobile={mobile}
           icon={<Sliders className="h-3.5 w-3.5" />}
-          label="수량조정"
+          label="재고 확인·조정"
           value={filtered?.adjustCount}
           loading={loading}
           loadingDisplay={countDisplay}
-          sub="재고 수량을 직접 조정한 거래"
+          sub="실수량 확인과 재고 조정 작업"
           color={LEGACY_COLORS.yellow}
         />
       </div>
@@ -166,11 +166,11 @@ function StatBox({
       style={{ background: "transparent", borderColor: mobile ? LEGACY_COLORS.border : tint(color, 22) }}
     >
       <div
-        className="flex items-center gap-1.5 whitespace-nowrap text-xs font-bold"
+        className="flex min-h-8 items-center gap-1.5 text-xs font-bold"
         style={{ color: `color-mix(in srgb, ${color} 45%, ${LEGACY_COLORS.text})` }}
       >
-        {icon}
-        {label}
+        <span className="shrink-0">{icon}</span>
+        <span className="min-w-0 break-words">{label}</span>
       </div>
       <div
         className={mobile ? "text-base font-semibold tabular-nums" : "text-2xl font-black tabular-nums"}

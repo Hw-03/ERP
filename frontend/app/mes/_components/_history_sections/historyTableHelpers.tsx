@@ -3,11 +3,12 @@
 import { Fragment, useState, type ReactNode } from "react";
 import {
   Activity, AlertCircle, ArrowDownToLine, ArrowRightLeft, ArrowUpFromLine,
-  BookmarkMinus, BookmarkPlus, ChevronDown, ChevronRight, Hammer, Layers,
+  BookmarkMinus, BookmarkPlus, ChevronDown, ChevronRight, ClipboardCheck, Hammer, Layers,
   Package, PackageX, Recycle, ShieldAlert, Sliders, Trash2, Undo2, Wrench,
 } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import type { TransactionDisplayGroup, TransactionReferenceSummary } from "@/lib/api/production";
+import { OBSERVATION_LABELS, observationChanges, stocktakeHistoryRows } from "./stocktakeHistory";
 import type { RequestOrderStockUnavailableReason } from "@/lib/api/types/production";
 import type { IoBatch } from "@/lib/api/types/io";
 import { TruncatedText } from "@/lib/ui/TruncatedText";
@@ -29,6 +30,7 @@ import {
   type MovementTone,
 } from "./historyBatchInterpreter";
 import { isReworkOperation } from "./transactionTaxonomy";
+import { historyOperationColor, isStocktakeOperation } from "./historyOperationSource";
 import { getHistoryListOperationLabel, getHistoryRowPresentation, getReferenceBatchLinePresentation, getReferenceBatchPresentation, getShippingPhaseFlowLabel, isDepartmentCorrectionLog } from "./historyPresentation";
 import { formatHistoryDate } from "./historyFormat";
 import type { HistorySelection } from "./historyConstants";
@@ -118,6 +120,7 @@ export function resolveStockSnapshot(log: TransactionLog): ResolvedStockSnapshot
 
 export function FlowBadge({
   type,
+  operation,
   label,
   color,
   compact = false,
@@ -125,13 +128,14 @@ export function FlowBadge({
   variant = "table",
 }: {
   type: TransactionLog["transaction_type"] | null;
+  operation?: Pick<TransactionLog, "operation_domain" | "operation_action">;
   label: string;
   color: string;
   compact?: boolean;
   accessibleLabel?: string;
   variant?: "table" | "panel";
 }): ReactNode {
-  const Icon = type ? TX_ICON[transactionIconName(type)] : null;
+  const Icon = operation && isStocktakeOperation(operation) ? ClipboardCheck : type ? TX_ICON[transactionIconName(type)] : null;
   const fullLabel = accessibleLabel ?? label;
   return (
     <span
@@ -474,6 +478,18 @@ export function StockSnapshotContent({
   }
 
   const departmentCorrectionFlow = getDepartmentCorrectionStockFlow(log);
+  if (log.stocktake_history) {
+    const { work, line, selection } = log.stocktake_history;
+    if (selection === "work" && work.itemCount > 1) return <span className="block whitespace-normal text-xs leading-5" style={{ color: LEGACY_COLORS.text }}>변경 {work.changedItemCount}품목 · 변동 없음 {work.unchangedItemCount}품목</span>;
+    const changes = observationChanges(line);
+    if (!changes?.length) return <span className={variant === "panel" ? "text-sm font-medium" : "text-xs font-semibold"} style={{ color: LEGACY_COLORS.muted2 }}>{changes ? "변동 없음" : "당시 수량 기록 없음"}</span>;
+    const beforeWidth = Math.max(quantityWidth ?? STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH_PX, ...changes.map(change => formatQty(change.before, { maximumFractionDigits: 3 }).length * STOCK_SNAPSHOT_DIGIT_WIDTH_PX));
+    const deltaWidth = Math.max(STOCK_SNAPSHOT_DELTA_WIDTH_PX, ...changes.map(change => formatStockDelta(change.delta, true).length * STOCK_SNAPSHOT_DIGIT_WIDTH_PX));
+    return <div className={`flex w-fit min-w-0 max-w-full flex-col items-start ${variant === "table" ? "mx-auto" : ""} ${dense ? "gap-0" : "gap-0.5"}`}>
+      {changes.map(change => <StockSnapshotLine key={change.category} label={OBSERVATION_LABELS[change.category]} beforeText={formatQty(change.before, { maximumFractionDigits: 3 })} afterText={formatQty(change.after, { maximumFractionDigits: 3 })} delta={change.delta}
+        hideDelta={false} beforeQuantityWidthPx={beforeWidth} afterQuantityWidthPx={Math.max(STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX, formatQty(change.after, { maximumFractionDigits: 3 }).length * STOCK_SNAPSHOT_DIGIT_WIDTH_PX)} deltaWidthPx={deltaWidth} increased={change.delta > 0} decreased={change.delta < 0} cancelled={false} variant={variant} allowWrap unit={showUnit ? log.item_unit ?? undefined : undefined} />)}
+    </div>;
+  }
   if (departmentCorrectionFlow) {
     return (
       <DepartmentCorrectionStockFlow flow={departmentCorrectionFlow} variant={variant} />
@@ -551,9 +567,10 @@ export function StockSnapshotContent({
     quantityWidth ?? Math.max(...changedSnapshots.flatMap((snapshot) => [snapshot.beforeText.length, snapshot.afterText.length])) * STOCK_SNAPSHOT_DIGIT_WIDTH_PX,
   );
   const beforeQuantityWidthPx = chipQuantityWidthPx;
+  const hideDelta = isStocktakeOperation(log);
   const snapshotLabel = changedSnapshots.length === 0
     ? "재고 변동 없음"
-    : `재고 변동: ${changedSnapshots.map((snapshot) => `${snapshot.label} ${snapshot.beforeText} ${formatStockDelta(snapshot.after - snapshot.before)}→${snapshot.afterText}`).join(", ")}`;
+    : `재고 변동: ${changedSnapshots.map((snapshot) => `${snapshot.label} ${snapshot.beforeText} ${hideDelta ? "" : formatStockDelta(snapshot.after - snapshot.before)}→${snapshot.afterText}`).join(", ")}`;
 
   return (
     <div
@@ -563,7 +580,7 @@ export function StockSnapshotContent({
       {changedSnapshots.length === 0 ? (
         <span aria-hidden="true" className={variant === "panel" ? "text-sm font-medium" : "text-xs font-semibold"} style={{ color: LEGACY_COLORS.muted2 }}>변동 없음</span>
       ) : changedSnapshots.map((snapshot) => (
-        <StockSnapshotLine key={snapshot.label} label={snapshot.label} beforeText={snapshot.beforeText} afterText={snapshot.afterText} delta={snapshot.after - snapshot.before} beforeQuantityWidthPx={beforeQuantityWidthPx} afterQuantityWidthPx={STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX} increased={snapshot.after > snapshot.before} decreased={snapshot.after < snapshot.before} cancelled={log.cancelled} variant={variant} unit={showUnit ? log.item_unit : undefined} />
+        <StockSnapshotLine key={snapshot.label} label={snapshot.label} beforeText={snapshot.beforeText} afterText={snapshot.afterText} delta={snapshot.after - snapshot.before} hideDelta={hideDelta} beforeQuantityWidthPx={beforeQuantityWidthPx} afterQuantityWidthPx={STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX} increased={snapshot.after > snapshot.before} decreased={snapshot.after < snapshot.before} cancelled={log.cancelled} variant={variant} unit={showUnit ? log.item_unit : undefined} />
       ))}
     </div>
   );
@@ -652,6 +669,7 @@ function DepartmentCorrectionStockFlow({ flow, variant }: { flow: DepartmentCorr
 /** 묶음 안의 전·후 창고/부서 수량 중 가장 긴 화면 표기 폭을 구한다. */
 export function getStockSnapshotQuantityWidth(logs: TransactionLog[]): number | undefined {
   const quantities = logs.flatMap((log) => {
+    if (log.stocktake_history) return observationChanges(log.stocktake_history.line)?.flatMap(change => [change.before, change.after].map(value => formatQty(value, { maximumFractionDigits: 3 }))) ?? [];
     const snapshot = resolveStockSnapshot(log);
     if (snapshot.status !== "available") return [];
     const warehouseChanged = snapshot.warehouseBefore !== snapshot.warehouseAfter;
@@ -659,10 +677,10 @@ export function getStockSnapshotQuantityWidth(logs: TransactionLog[]): number | 
     return [
       ...(warehouseChanged ? [snapshot.warehouseBefore, snapshot.warehouseAfter] : []),
       ...(departmentChanged ? [snapshot.departmentBefore, snapshot.departmentAfter] : []),
-    ];
+    ].map(value => formatQty(value));
   });
   return quantities.length > 0
-    ? Math.max(STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH_PX, ...quantities.map((quantity) => formatQty(quantity).length * STOCK_SNAPSHOT_DIGIT_WIDTH_PX))
+    ? Math.max(STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH_PX, ...quantities.map((quantity) => quantity.length * STOCK_SNAPSHOT_DIGIT_WIDTH_PX))
     : undefined;
 }
 
@@ -671,52 +689,62 @@ function StockSnapshotLine({
   beforeText,
   afterText,
   delta,
+  hideDelta,
   beforeQuantityWidthPx,
   afterQuantityWidthPx,
   increased,
   decreased,
   cancelled,
   variant,
+  allowWrap = false,
   unit,
+  deltaWidthPx = STOCK_SNAPSHOT_DELTA_WIDTH_PX,
 }: {
   label: string;
   beforeText: string;
   afterText: string;
   delta: number;
+  hideDelta: boolean;
   beforeQuantityWidthPx: number;
   afterQuantityWidthPx: number;
   increased: boolean;
   decreased: boolean;
   cancelled: boolean;
   variant: "table" | "panel";
+  allowWrap?: boolean;
   unit?: string;
+  deltaWidthPx?: number;
 }): ReactNode {
   const afterColor = increased ? LEGACY_COLORS.blue : decreased ? LEGACY_COLORS.red : LEGACY_COLORS.muted2;
-  const deltaText = formatStockDelta(delta);
-  if (variant === "panel") {
+  const deltaText = hideDelta ? "" : formatStockDelta(delta, allowWrap);
+  if (variant === "panel" && !allowWrap) {
     return (
-      <span aria-label={`${label} ${beforeText} ${deltaText}→${afterText}`} aria-description={unit ? `단위 ${unit}` : undefined} className="history-stock-panel-line">
+      <span aria-label={`${label} ${beforeText} ${deltaText}→${afterText}`} aria-description={unit ? `단위 ${unit}` : undefined} className="history-stock-panel-line" style={hideDelta ? { gridTemplateColumns: "minmax(0,1fr) auto 16px auto" } : undefined}>
         <span className="history-stock-panel-location">{label}</span>
         <span>{beforeText}</span>
-        <strong style={{ color: afterColor }}>{deltaText}</strong>
+        {!hideDelta && <strong style={{ color: afterColor }}>{deltaText}</strong>}
         <span aria-hidden="true" className="text-center">→</span>
         <strong style={{ color: afterColor }}>{afterText}{unit && <span className="ml-1 text-xs font-medium" style={{color:LEGACY_COLORS.muted2}}>{unit}</span>}</strong>
       </span>
     );
   }
-  return (
-    <span aria-label={`${label} ${beforeText} ${deltaText}→${afterText}`} className="inline-flex items-center whitespace-nowrap text-xs font-semibold leading-4">
-      <span className="w-7 text-left" style={{ color: LEGACY_COLORS.muted }}>{label}</span>
-      <span className="text-right tabular-nums" style={{ color: LEGACY_COLORS.muted2, width: `${beforeQuantityWidthPx}px` }}>{beforeText}</span>
-      <span data-history-after-stock={cancelled || undefined} className="shrink-0 text-left font-bold tabular-nums" style={{ color: afterColor, width: `${STOCK_SNAPSHOT_DELTA_WIDTH_PX}px` }}>{deltaText}</span>
+  const result = <>
+      {!hideDelta && <span data-history-after-stock={cancelled || undefined} className="shrink-0 text-left font-bold tabular-nums" style={{ color: afterColor, width: `${deltaWidthPx}px` }}>{deltaText}</span>}
       <span aria-hidden="true" data-history-after-stock={cancelled || undefined} className="shrink-0 text-center font-bold" style={{ color: afterColor, width: `${STOCK_SNAPSHOT_ARROW_WIDTH_PX}px` }}>→</span>
       <span data-history-after-stock={cancelled || undefined} className="min-w-0 shrink-0 text-left font-bold tabular-nums" style={{ color: afterColor, width: `${afterQuantityWidthPx}px` }}>{afterText}</span>
+      {unit && <span className="ml-1 shrink-0 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{unit}</span>}
+    </>;
+  return (
+    <span aria-label={`${label} ${beforeText} ${deltaText}→${afterText}${unit ? ` ${unit}` : ""}`} className={`inline-flex items-center whitespace-nowrap ${allowWrap ? "max-w-full flex-wrap gap-y-1" : ""} ${variant === "panel" ? "text-sm font-medium leading-5" : "text-xs font-semibold leading-4"}`}>
+      <span className={`w-7 text-left ${allowWrap ? "shrink-0" : ""}`} style={{ color: LEGACY_COLORS.muted }}>{label}</span>
+      <span className={`text-right tabular-nums ${allowWrap ? "shrink-0" : ""}`} style={{ color: LEGACY_COLORS.muted2, width: `${beforeQuantityWidthPx}px` }}>{beforeText}</span>
+      {allowWrap ? <span className="inline-flex max-w-full flex-wrap items-center gap-y-1">{result}</span> : result}
     </span>
   );
 }
 
-function formatStockDelta(delta: number): string {
-  const absolute = formatQty(Math.abs(delta));
+function formatStockDelta(delta: number, precise = false): string {
+  const absolute = formatQty(Math.abs(delta), precise ? { maximumFractionDigits: 3 } : undefined);
   return delta > 0 ? `+${absolute}` : `−${absolute}`;
 }
 
@@ -815,7 +843,7 @@ export function getHistoryGroupSummary(group: LogGroup, batch?: IoBatch | null, 
   let title = first.item_name;
   let displayType: TransactionLog["transaction_type"] | null = first.transaction_type;
   let label = getHistoryListOperationLabel(first);
-  let color = isReworkOperation(first) ? LEGACY_COLORS.red : transactionColor(displayType);
+  let color = isReworkOperation(first) ? LEGACY_COLORS.red : historyOperationColor(first, displayType);
   if (group.type === "operation") {
     const operationLabel = logs.find((log) => log.operation_display_label)?.operation_display_label ?? "";
     const hasProduce = logs.some((log) => log.transaction_type === "PRODUCE");
@@ -827,7 +855,7 @@ export function getHistoryGroupSummary(group: LogGroup, batch?: IoBatch | null, 
       displayType = "ADJUST";
       label = "부서 입출고";
     }
-    color = isReworkOperation(first) ? LEGACY_COLORS.red : transactionColor(displayType);
+    color = isReworkOperation(first) ? LEGACY_COLORS.red : historyOperationColor(first, displayType);
   } else if (group.type === "op_batch") {
     const rawType = (logs.find((log) => log.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
     displayType = batch ? getHistoryDisplayTransactionType({ transaction_type: rawType }, batch) : null;
@@ -867,6 +895,12 @@ export function getHistoryGroupSummary(group: LogGroup, batch?: IoBatch | null, 
 /** 서버가 확정한 대표 묶음을 표 렌더링 모델로만 변환한다. 새 묶음을 만들거나 합치지 않는다. */
 export function toHistoryLogGroups(groups: TransactionDisplayGroup[]): LogGroup[] {
   return groups.reduce<LogGroup[]>((result, group) => {
+    if (group.stocktake) {
+      const logs = stocktakeHistoryRows(group.stocktake);
+      result.push({ type: "operation", operationId: group.key, logs,
+        matchedLogIds: group.stocktake.filteredMembers ? logs.filter(log => group.stocktake!.matchedItemIds.includes(log.item_id)).map(log => log.log_id) : null });
+      return result;
+    }
     const first = group.logs[0];
     if (!first) return result;
     if (group.type === "submission") {
@@ -1234,7 +1268,7 @@ export function BatchHeader({
   const representativeLog = groupSummary.primaryLog;
   const additionalItemCount = groupSummary.additionalItemCount;
   const primaryType = groupSummary.displayType;
-  const flowColor = groupSummary.color;
+  const flowColor = isStocktakeOperation(first) ? historyOperationColor(first) : groupSummary.color;
   const summary = referenceSummary === null
     ? { parts: [{ label: referenceSummaryLoading ? "세부 확인 중" : "세부 —", tone: "muted" as const }] }
     : referencePresentation.movement;
@@ -1298,7 +1332,7 @@ export function BatchHeader({
         </div>
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
-        <FlowBadge type={primaryType} label={groupSummary.label} color={flowColor} />
+        <FlowBadge type={primaryType} operation={first} label={groupSummary.label} color={flowColor} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex min-w-0 items-center gap-1.5">
@@ -1652,6 +1686,7 @@ function ReferenceBatchLineRow({
           type={sectionLabel ? "ADJUST" : log.transaction_type}
           label={sectionLabel ?? lineLabel}
           color={lineColor}
+          operation={log}
           compact={compact}
           accessibleLabel={sectionLabel ? undefined : fullLineLabel !== lineLabel ? fullLineLabel : undefined}
         />
@@ -1806,7 +1841,7 @@ export function OpBatchHeader({
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
         {batch ? (
-          <FlowBadge type={primaryType} label={groupSummary.label} color={flowColor} compact={compact} />
+          <FlowBadge type={primaryType} operation={first} label={groupSummary.label} color={flowColor} compact={compact} />
         ) : (
           <HistoryBatchMetadataPlaceholder widthClass={compact ? "w-20" : "w-32"} />
         )}

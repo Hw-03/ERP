@@ -190,7 +190,9 @@ export function reconcileHistorySelection(
   }
   if (selection.kind === "log") {
     const fresh = logs.find((log) => log.log_id === selection.log.log_id);
-    return fresh ? { ...selection, log: fresh } : null;
+    return fresh ? { ...selection, log: selection.log.stocktake_history?.selection === "work" && fresh.stocktake_history
+      ? { ...fresh, item_name: `${fresh.item_name}${fresh.stocktake_history.work.itemCount > 1 ? ` 외 ${fresh.stocktake_history.work.itemCount - 1}품목` : ""}`,
+          stocktake_history: { ...fresh.stocktake_history, selection: "work" } } : fresh } : null;
   }
 
   const lifecycleIds = selection.groupType === "defect_lifecycle" ? new Set(selection.logs.map((log) => log.log_id)) : null;

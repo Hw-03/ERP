@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { TransactionLog } from "@/lib/api/types/production";
 import type { IoBatch, IoBundle, IoLine } from "@/lib/api/types/io";
+import { getHistoryDisplayLabel } from "../historyBatchInterpreter";
 import {
   formatDefectReason,
   getBatchLineStats,
@@ -66,6 +67,32 @@ describe("튜브 입고 처리 후 기준 재고", () => {
     const row = getHistoryRowPresentation(makeLog({ quantity_after: 12, inventory_effect: [{ scope: "warehouse", delta: 10, quantity_before: 2, quantity_after: 12 }] }), makeBatch({ work_type: "receive", sub_type: "receive_supplier" }));
     expect(row.stock).toMatchObject({ label: "창고 12 EA", scopeLabel: "창고", after: 12 });
   });
+  });
+
+it("전수조사 출처로 목록과 상세 작업명을 구분하고 메모만 같은 조정은 유지한다", () => {
+  const log = makeLog({ transaction_type: "ADJUST", operation_domain: "stocktake", operation_action: "apply", notes: null });
+  for (const department of ["튜브", "창고"]) {
+    const scoped = { ...log, department };
+    expect(getHistoryListOperationLabel(scoped)).toBe("재고 전수조사");
+    expect(getHistoryDisplayLabel(scoped)).toBe("재고 전수조사");
+    expect(getHistoryRowPresentation(scoped).operation.label).toBe("재고 전수조사");
+  }
+  expect(getHistoryListOperationLabel({ ...log, operation_kind: "CANCELLATION" })).toBe("재고 전수조사 취소");
+  expect(getHistoryListOperationLabel(makeLog({ transaction_type: "ADJUST", notes: "부서 전수조사" }))).toBe("부서 입출고");
+});
+
+it.each([-5, 5])("전수조사 하위 행은 수량 변화 %i에도 조사 작업으로 표시한다", (quantity_change) => {
+  const log = makeLog({ transaction_type: "ADJUST", operation_role: "CORRECTION", quantity_change });
+  expect(getReferenceBatchLinePresentation({ ...log, operation_domain: "stocktake", operation_action: "apply" }, "batch"))
+    .toEqual({ label: "재고 전수조사", tone: "success" });
+  expect(getReferenceBatchLinePresentation({ ...log, notes: "부서 전수조사" }, "batch"))
+    .toEqual({ label: quantity_change < 0 ? "단품 출고" : "단품 입고", tone: "muted" });
+});
+
+it("전수조사 자동 작업명은 메모 배지에서 생략하고 실제 메모는 유지한다", () => {
+  const log = makeLog({ transaction_type: "ADJUST", operation_domain: "stocktake", operation_action: "apply", operation_display_label: "부서 전수조사", notes: "부서 전수조사" });
+  expect(getHistoryRowPresentation(log).statusChips.some((chip) => chip.label === "메모")).toBe(false);
+  expect(getHistoryRowPresentation({ ...log, notes: "재확인 완료" }).statusChips).toContainEqual({ label: "메모", tone: "primary", title: "재확인 완료" });
 });
 
 function makeLine(overrides: Partial<IoLine> = {}): IoLine {

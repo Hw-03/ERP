@@ -1,13 +1,19 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render as renderView, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
+import type { InventoryOperation } from "@/lib/api/types/production";
 import { ioApi } from "@/lib/api/io";
 import { productionApi } from "@/lib/api/production";
 import type { IoBatch } from "@/lib/api/types/io";
 import { HistoryDetailMemo, HistoryDetailPanel } from "../HistoryDetailPanel";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { MobileHistoryList } from "../../mobile/history/MobileHistoryList";
 import { HistoryBatchDetailPanel } from "../HistoryBatchDetailPanel";
 import { HistoryCancelAction } from "../HistoryCancelAction";
+import { stocktakeHistoryRows, stocktakeWorkSelection } from "../stocktakeHistory";
+import type { StocktakeHistoryWork } from "@/lib/api/production";
 
 const realtimeState = vi.hoisted(() => ({
   revision: 1 as number | null,
@@ -41,6 +47,7 @@ vi.mock("@/lib/api/io", () => ({
 vi.mock("@/lib/api/production", () => ({
   productionApi: {
     getTransactions: vi.fn(),
+    getInventoryOperation: vi.fn(),
     previewInventoryOperationCancellation: vi.fn(),
     cancelInventoryOperation: vi.fn(),
   },
@@ -93,6 +100,154 @@ function makeLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
     ...overrides,
   };
 }
+
+function render(view: React.ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return renderView(view, { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+}
+
+it.each(["default", "desktop"] as const)("%s observation work never requests cancellation scope", async (variant) => {
+  vi.mocked(productionApi.getTransactions).mockClear();
+  vi.mocked(productionApi.previewInventoryOperationCancellation).mockClear();
+  const work = { operationId: "zero-operation", actorName: "김도영", department: "튜브", createdAt: "2026-10-12T05:15:09Z",
+    itemCount: 1, observations: [{ countId: "count", itemId: "item", itemName: "애노드", unit: "EA", mesCode: "9-TR-0011",
+      beforeQuantities: { normal: 591, defect: 0, b_grade: 0, obsolete: 0 }, afterQuantities: { normal: 591, defect: 0, b_grade: 0, obsolete: 0 } }] } as StocktakeHistoryWork;
+  await act(async () => { render(<HistoryDetailPanel panelOpen selected={stocktakeWorkSelection(stocktakeHistoryRows(work)[0])}
+    onSelectLog={() => {}} onLogUpdated={() => {}} variant={variant} />); });
+  expect(productionApi.getTransactions).not.toHaveBeenCalled();
+  expect(productionApi.previewInventoryOperationCancellation).not.toHaveBeenCalled();
+  expect(screen.queryByText(/취소 범위/)).not.toBeInTheDocument();
+});
+
+it.each(["default", "desktop"] as const)("%s 상세에서도 조사 작업명과 초록 배지를 표시한다", (variant) => {
+  const selected = makeLog({ transaction_type: "ADJUST", operation_domain: "stocktake", operation_action: "apply", notes: null });
+  render(<HistoryDetailPanel panelOpen selected={selected} onSelectLog={() => {}} onLogUpdated={() => {}} variant={variant} />);
+  const badge = screen.getByText("재고 전수조사").closest("span.inline-flex")!;
+  expect(badge).toHaveStyle({ color: LEGACY_COLORS.green });
+  expect(badge.querySelector(".lucide-clipboard-check")).toBeInTheDocument();
+});
+
+it("모바일 목록도 메모 없이 조사 작업명과 초록 배지를 표시한다", () => {
+  const log = makeLog({ transaction_type: "ADJUST", operation_domain: "stocktake", operation_action: "apply", notes: null, operation_batch_id: null });
+  render(<MobileHistoryList loading={false} error={null} displayGroups={[{ type: "solo", log }]} batchCache={new Map()} setBatchCache={() => {}} selectedKey={null} onSelectLog={() => {}} onSelectBatch={() => {}} onRetry={() => {}} canLoadMore={false} loadingMore={false} onLoadMore={() => {}} />);
+  const badge = screen.getByText("재고 전수조사").closest("span.inline-flex")!;
+  expect(badge).toHaveStyle({ color: LEGACY_COLORS.green });
+  expect(badge.querySelector(".lucide-clipboard-check")).toBeInTheDocument();
+});
+
+it.each(["default", "desktop"] as const)("%s 원장 묶음 상세도 조사 색상을 쓰고 자동 메모는 생략한다", async (variant) => {
+  const log = makeLog({ transaction_type: "ADJUST", operation_domain: "stocktake", operation_action: "apply", operation_id: "stocktake-1", operation_batch_id: null, operation_display_label: "부서 전수조사", notes: "부서 전수조사" });
+  await act(async () => { render(<HistoryBatchDetailPanel panelOpen mobilePresentation variant={variant} batchId="stocktake-1" logs={[log]} batchCache={new Map()} setBatchCache={() => {}} onBatchCancelled={() => {}} />); });
+  const badge = screen.getByText("재고 전수조사").closest("span.inline-flex")!;
+  expect(badge).toHaveStyle({ color: LEGACY_COLORS.green });
+  expect(badge.querySelector(".lucide-clipboard-check")).toBeInTheDocument();
+  expect(screen.queryByText("메모")).not.toBeInTheDocument();
+});
+
+it.each(["single", "batch"] as const)("PC 전수조사 %s 상세는 증감 없이 전후 수량을 표시한다", async kind => {
+  const log = makeLog({ operation_domain: "stocktake", operation_action: "apply", transaction_type: "ADJUST", operation_batch_id: null, inventory_effect: [
+    { scope: "warehouse", status: "AVAILABLE", delta: -41, quantity_before: 41, quantity_after: 0 },
+  ] });
+  await act(async () => { render(kind === "single"
+    ? <HistoryDetailPanel panelOpen selected={log} onSelectLog={() => {}} onLogUpdated={() => {}} variant="desktop" />
+    : <HistoryBatchDetailPanel panelOpen variant="desktop" batchId="stocktake-pc" logs={[log]} batchCache={new Map()} setBatchCache={() => {}} onBatchCancelled={() => {}} />); });
+  const summary = screen.getByTestId("history-key-point-summary");
+  expect(within(summary).queryByText("-41 EA")).not.toBeInTheDocument();
+  expect(within(summary).getByText("41 → 0 EA")).toBeInTheDocument();
+});
+
+it.each(["single", "batch"] as const)("PC 전수조사 %s 상세는 순증감 기록 대신 원래 관측 증빙을 사용한다", async kind => {
+  const log = makeLog({ operation_domain: "stocktake", operation_action: "apply", transaction_type: "ADJUST", operation_id: "pc-observation", operation_batch_id: null, inventory_effect: [{ scope: "location", department: "튜브", delta: -41 }] });
+  vi.mocked(productionApi.getTransactions).mockResolvedValue([log]);
+  vi.mocked(productionApi.getInventoryOperation).mockResolvedValue({ operationId: "pc-observation", department: "튜브", observationLines: [{
+    applicationId: "application-pc", countId: "count-pc", itemId: log.item_id, itemName: "긴 이름의 전수조사 품목", mesCode: "8-TR-0008", scopeKey: "department:5",
+    beforeQuantities: { normal: 41, defect: 0, b_grade: 0, obsolete: 268 }, afterQuantities: { normal: 0, defect: 0, b_grade: 10, obsolete: 0 },
+  }] } as InventoryOperation);
+  render(kind === "single"
+    ? <HistoryDetailPanel panelOpen selected={log} onSelectLog={() => {}} onLogUpdated={() => {}} variant="desktop" />
+    : <HistoryBatchDetailPanel panelOpen variant="desktop" batchId="pc-observation" logs={[log]} batchCache={new Map()} setBatchCache={() => {}} onBatchCancelled={() => {}} />);
+  const card = await screen.findByRole("region", { name: "긴 이름의 전수조사 품목 · 튜브" });
+  for (const label of ["정상: 41 → 0", "B급: 0 → 10", "구형: 268 → 0"]) expect(within(card).getByLabelText(label)).toBeInTheDocument();
+  for (const delta of ["-41", "-268", "+10"]) expect(within(card).queryByText(delta)).not.toBeInTheDocument();
+});
+
+it("모바일 전수조사는 구성 묶음 없이도 전체 품목과 정상·불량 재고의 전후 수량을 표시한다", async () => {
+  const first = makeLog({ item_name: "게터", transaction_type: "ADJUST", operation_domain: "stocktake", operation_action: "apply", operation_id: "stocktake-1", operation_role: "CORRECTION", department: "튜브", inventory_effect: [
+    { scope: "location", department: "튜브", status: "PRODUCTION", delta: -566, quantity_before: 566, quantity_after: 0 },
+  ] });
+  const child = makeLog({ ...first, log_id: "child", item_id: "child-item", item_name: "텅스텐 필라멘트", inventory_effect: [
+    { scope: "location", department: "튜브", status: "PRODUCTION", delta: -57, quantity_before: 180, quantity_after: 123 },
+    { scope: "location", department: "튜브", status: "DEFECTIVE", delta: -13, quantity_before: 26, quantity_after: 13 },
+  ] });
+  const pending = deferred<TransactionLog[]>();
+  vi.mocked(productionApi.getTransactions).mockReturnValue(pending.promise);
+  render(<HistoryBatchDetailPanel panelOpen mobilePresentation batchId="stocktake-1" logs={[first]} batchCache={new Map()} setBatchCache={() => {}} onBatchCancelled={() => {}} />);
+  expect(screen.getByLabelText("게터 · 튜브 재고: 566 → 0 EA")).toBeInTheDocument();
+  expect(screen.getByText("재고 변화 불러오는 중")).toBeInTheDocument();
+  await act(async () => { pending.resolve([first, child]); });
+  expect(screen.getByLabelText("텅스텐 필라멘트 · 튜브 재고: 180 → 123 EA")).toBeInTheDocument();
+  expect(screen.getByLabelText("텅스텐 필라멘트 · 불량 재고: 26 → 13 EA")).toBeInTheDocument();
+  expect(screen.getAllByLabelText("게터 · 튜브 재고: 566 → 0 EA")).toHaveLength(1);
+  expect(screen.queryByText("-566 EA")).not.toBeInTheDocument();
+  expect(ioApi.getBatch).not.toHaveBeenCalled();
+});
+
+it("모바일 전수조사는 현재 재고나 거래 순증감 대신 당시 네 상태의 관측 증빙을 표시한다", async () => {
+  const log = makeLog({ item_name: "게터", transaction_type: "ADJUST", operation_domain: "stocktake", operation_action: "apply", operation_id: "stocktake-1", inventory_effect: [{ scope: "location", department: "튜브", delta: -566 }] });
+  vi.mocked(productionApi.getInventoryOperation).mockResolvedValue({
+    operationId: "stocktake-1", department: "튜브", observationLines: [{
+      rowType: "STOCKTAKE_OBSERVATION", applicationId: "apply-1", countId: "count-1", confirmationRevisionId: "revision-1", itemId: "filament", itemName: "텅스텐 필라멘트", mesCode: "8-TR-0002", scopeKey: "department:5",
+      beforeQuantities: { normal: 180, defect: 26, b_grade: 0, obsolete: 0 },
+      afterQuantities: { normal: 123, defect: 2, b_grade: 5, obsolete: 6 },
+      reservations: { normal: 0, defect: 0, b_grade: 0, obsolete: 0 }, observationEpochBefore: 0, observationEpochAfter: 1,
+    }],
+  } as InventoryOperation);
+  render(<HistoryBatchDetailPanel panelOpen mobilePresentation batchId="stocktake-1" logs={[log]} batchCache={new Map()} setBatchCache={() => {}} onBatchCancelled={() => {}} />);
+  const card = await screen.findByRole("region", { name: "텅스텐 필라멘트 · 튜브" });
+  expect(within(card).getByLabelText("정상: 180 → 123")).toBeInTheDocument();
+  expect(within(card).getByLabelText("불량: 26 → 2")).toBeInTheDocument();
+  expect(within(card).getByLabelText("B급: 0 → 5")).toBeInTheDocument();
+  expect(within(card).getByLabelText("구형: 0 → 6")).toBeInTheDocument();
+  for (const delta of ["-57", "-24", "+5", "+6"]) expect(within(card).queryByText(delta)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("게터 · 튜브 재고: 변화 -566 EA")).not.toBeInTheDocument();
+  expect(productionApi.getInventoryOperation).toHaveBeenCalledWith("stocktake-1", expect.objectContaining({ signal: expect.any(AbortSignal) }));
+});
+
+it("모바일 전수조사 조회 실패는 알려진 변화를 유지하고 재시도로 전체 변화를 표시한다", async () => {
+  const log = makeLog({ transaction_type: "ADJUST", operation_domain: "stocktake", operation_action: "apply", operation_id: "stocktake-1", inventory_effect: [{ scope: "warehouse", delta: 5, quantity_before: 0, quantity_after: 5 }] });
+  vi.mocked(productionApi.getTransactions).mockRejectedValueOnce(new Error("조회 실패")).mockResolvedValueOnce([log]);
+  render(<HistoryBatchDetailPanel panelOpen mobilePresentation batchId="stocktake-1" logs={[log]} batchCache={new Map()} setBatchCache={() => {}} onBatchCancelled={() => {}} />);
+  await screen.findByText("전체 재고 변화를 불러오지 못했습니다.");
+  expect(screen.getByLabelText("완제품 A · 창고 재고: 0 → 5 EA")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "재고 변화 다시 불러오기" }));
+  await waitFor(() => { expect(screen.queryByText("전체 재고 변화를 불러오지 못했습니다.")).not.toBeInTheDocument(); });
+  expect(screen.getByLabelText("완제품 A · 창고 재고: 0 → 5 EA")).toBeInTheDocument();
+  expect(productionApi.getTransactions).toHaveBeenCalledTimes(2);
+});
+
+it("모바일 관측 증빙 조회 실패도 재시도 후 반영 당시 창고 수량으로 복구한다", async () => {
+  const log = makeLog({ transaction_type: "ADJUST", operation_domain: "stocktake", operation_action: "apply", operation_id: "stocktake-1", inventory_effect: [{ scope: "warehouse", delta: 5 }] });
+  vi.mocked(productionApi.getTransactions).mockResolvedValue([log]);
+  vi.mocked(productionApi.getInventoryOperation).mockRejectedValueOnce(new Error("증빙 조회 실패")).mockResolvedValueOnce({
+    operationId: "stocktake-1", department: null, observationLines: [{
+      applicationId: "apply-1", countId: "count-1", itemId: log.item_id, itemName: log.item_name, mesCode: log.mes_code, scopeKey: "warehouse",
+      beforeQuantities: { normal: 0, defect: 0, b_grade: 0, obsolete: 0 }, afterQuantities: { normal: 5, defect: 0, b_grade: 0, obsolete: 0 },
+    }],
+  } as InventoryOperation);
+  render(<HistoryBatchDetailPanel panelOpen mobilePresentation batchId="stocktake-1" logs={[log]} batchCache={new Map()} setBatchCache={() => {}} onBatchCancelled={() => {}} />);
+  fireEvent.click(await screen.findByRole("button", { name: "재고 변화 다시 불러오기" }));
+  const card = await screen.findByRole("region", { name: "완제품 A · 창고" });
+  expect(within(card).getByLabelText("정상: 0 → 5")).toBeInTheDocument();
+  expect(productionApi.getInventoryOperation).toHaveBeenCalledTimes(2);
+});
+
+it("모바일 전수조사 이력에 전후 기록이 없으면 수량을 추측하지 않고 기록 없음으로 표시한다", () => {
+  const log = makeLog({ transaction_type: "ADJUST", operation_domain: "stocktake", operation_action: "apply", inventory_effect: [{ scope: "warehouse", delta: 5 }] });
+  render(<HistoryBatchDetailPanel panelOpen mobilePresentation batchId="legacy-stocktake" logs={[log]} batchCache={new Map()} setBatchCache={() => {}} onBatchCancelled={() => {}} />);
+  expect(screen.getByLabelText("완제품 A · 창고 재고: 전후 수량 기록 없음")).toBeInTheDocument();
+  expect(screen.queryByText("+5 EA")).not.toBeInTheDocument();
+  expect(screen.queryByText("309 → 401")).not.toBeInTheDocument();
+});
 
 function makeBatch(overrides: Partial<IoBatch> = {}): IoBatch {
   return {
@@ -174,6 +329,7 @@ function makeBatch(overrides: Partial<IoBatch> = {}): IoBatch {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(productionApi.getInventoryOperation).mockImplementation(() => new Promise(() => {}));
   realtimeState.revision = 1;
   vi.mocked(productionApi.getTransactions).mockResolvedValue([]);
   vi.mocked((productionApi as any).previewInventoryOperationCancellation).mockResolvedValue({

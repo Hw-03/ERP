@@ -157,6 +157,13 @@ describe("getStockSnapshotQuantityWidth", () => {
 });
 
 describe("StockSnapshotContent panel", () => {
+  it.each(["table", "panel"] as const)("전수조사 %s 수량은 증감 없이 전후 값만 표시한다", variant => {
+    const log = makeLog({ operation_domain: "stocktake", operation_action: "apply", warehouse_qty_before: 41, warehouse_qty_after: 0, department_qty_before: 0, department_qty_after: 0 });
+    render(<StockSnapshotContent log={log} variant={variant} />);
+    expect(screen.getByLabelText("창고 41 →0").textContent).toBe("창고41→0");
+    expect(screen.queryByText("−41")).not.toBeInTheDocument();
+  });
+
   it("패널과 표 모두 변경 전 수량·증감·화살표·변경 후 수량 순서를 유지한다", () => {
     const log = makeLog({ warehouse_qty_before: 1_234_567, warehouse_qty_after: 1_234_559, department_qty_before: 0, department_qty_after: 0 });
     const { rerender } = render(<StockSnapshotContent log={log} variant="panel" />);

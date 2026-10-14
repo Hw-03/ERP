@@ -1504,11 +1504,12 @@ describe("internal use history", () => {
 });
 
 describe("OPERATION_OPTIONS", () => {
-  it("uses the five parent work-type API keys", () => {
+  it("uses the parent work-type API keys including stocktake", () => {
     expect(OPERATION_OPTIONS).toEqual([
       { value: "warehouse", label: "창고 입출고" },
       { value: "tube_material", label: "튜브 원자재 입출고" },
       { value: "process", label: "부서 입출고" },
+      { value: "stocktake", label: "재고 전수조사" },
       { value: "defect", label: "불량" },
       { value: "item_conversion", label: "품목 전환" },
       { value: "shipping", label: "출하" },

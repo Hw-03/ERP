@@ -33,6 +33,7 @@ import {
 import { BomBatchDetail } from "./BomBatchDetail";
 import { ReworkBatchHeader } from "./ReworkBatchHeader";
 import { ReworkBatchDetail } from "./ReworkBatchDetail";
+import { stocktakeWorkSelection } from "./stocktakeHistory";
 
 export type HistoryTableFocusTarget = {
   groupKey: string;
@@ -554,19 +555,19 @@ export function HistoryTable({
       const hasBackflush = group.logs.some((log) => log.transaction_type === "BACKFLUSH");
       const isCustomBomSingleAdjustment = (operationLabel.startsWith("produce") || operationLabel.startsWith("disassemble"))
         && hasProduce !== hasBackflush;
-      const childLogs = group.logs.filter((log) => log.log_id !== primaryLog.log_id);
+      const childLogs = primaryLog.stocktake_history ? group.logs : group.logs.filter((log) => log.log_id !== primaryLog.log_id);
       const expanded = isGroupExpanded(group.operationId, group.matchedLogIds);
       const controlsId = historyGroupPanelId(group.operationId);
-      const primarySelected = selectedLogId === primaryLog.log_id;
+      const primarySelected = selectedLogId === primaryLog.log_id && (!primaryLog.stocktake_history || (selection?.kind === "log" && selection.log.stocktake_history?.selection === "work"));
       const selected = selectedLogId === primaryLog.log_id
         || childLogs.some((log) => log.log_id === selectedLogId);
       return (
         <Fragment key={`operation-${group.operationId}`}>
           <HistoryLogRow
-            log={primaryLog}
+            log={primaryLog.stocktake_history ? { ...stocktakeWorkSelection(primaryLog), item_name: primaryLog.item_name } : primaryLog}
             selected={selected}
             onSelect={() => {
-              onSelectLog(primaryLog);
+              onSelectLog(primaryLog.stocktake_history ? stocktakeWorkSelection(primaryLog) : primaryLog);
               if (primarySelected) collapseGroup(group.operationId, group.matchedLogIds);
               else expandGroup(group.operationId, group.matchedLogIds);
             }}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useLayoutEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { GitBranch, Package, XCircle } from "lucide-react";
 import { api, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
@@ -9,7 +10,7 @@ import type { IoBatch, IoBundle, IoLine } from "@/lib/api/types/io";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { transactionColor } from "@/lib/mes-status";
+import { historyOperationColor, historyUserNotes, isStocktakeOperation } from "./historyOperationSource";
 import { formatQty } from "@/lib/mes/format";
 import { TruncatedText } from "@/lib/ui/TruncatedText";
 import {
@@ -58,6 +59,8 @@ const SIGN_TONE_HEX: Record<LineSignTone, string> = {
   move: LEGACY_COLORS.cyan,
   muted: LEGACY_COLORS.muted2,
 };
+
+const STOCKTAKE_CATEGORY_LABELS = { normal: "정상", defect: "불량", b_grade: "B급", obsolete: "구형" } as const;
 
 type Props = {
   panelOpen: boolean;
@@ -157,6 +160,11 @@ export function HistoryBatchDetailPanel({
   }, [operationBatchId, realtimeRevision, retryEpoch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const first = logs[0];
+  const stocktakeOperationQuery = useQuery({
+    queryKey: ["transactions", "operations", "detail", first.operation_id],
+    queryFn: ({ signal }) => productionApi.getInventoryOperation(first.operation_id!, { signal }),
+    enabled: panelOpen && (mobilePresentation || variant === "desktop") && isStocktakeOperation(first) && Boolean(first.operation_id),
+  });
   const cancelScope = getHistoryCancelScope(first);
   const canCancelAsBatch = cancelScope === "batch";
   const cancellationScope = useHistoryCancellationScopeLogs({
@@ -223,6 +231,8 @@ export function HistoryBatchDetailPanel({
   const summary = cancellationScope.status === "ready"
     ? { ...buildHistoryDetailSummary(cancellationScope.logs, batch), actualStock: visibleSummary.actualStock }
     : { ...visibleSummary, impactGroups: [] };
+  const stocktakeImpactGroups = cancellationScope.status === "ready" ? summary.impactGroups : visibleSummary.impactGroups;
+  const stocktakeObservations = stocktakeOperationQuery.data?.observationLines ?? [];
   const excludedLineCount = batch && batch.sub_type !== "internal_use_out"
     ? batch.bundles.reduce((count, bundle) => {
       const parent = getHistoryBomParentLine(bundle);
@@ -269,8 +279,10 @@ export function HistoryBatchDetailPanel({
           <>
             <HistoryKeyPointSummary
               summary={summary}
-              impactStatus={cancellationScope.status}
-              onRetryImpact={cancellationScope.retry}
+              operation={first}
+              stocktakeOperation={stocktakeOperationQuery.data}
+              impactStatus={stocktakeOperationQuery.isError ? "error" : cancellationScope.status}
+              onRetryImpact={() => { cancellationScope.retry(); if (isStocktakeOperation(first) && first.operation_id) void stocktakeOperationQuery.refetch(); }}
               fillHeight
             />
             {excludedLineCount > 0 && (
@@ -279,7 +291,7 @@ export function HistoryBatchDetailPanel({
               </div>
             )}
             <HistoryDetailMemo
-              notes={first.notes}
+              notes={historyUserNotes(first)}
               reasonMemo={first.reason_memo}
               transactionType={first.transaction_type}
             />
@@ -338,6 +350,65 @@ export function HistoryBatchDetailPanel({
           />
           {mobilePresentation && <HistoryMobileContext summary={visibleSummary} omitCancelledStatus
             omitParticipantNames={[batch?.requester_name ?? getHistoryActor(first), batch?.approver_name ?? first.approver_name ?? ""]} />}
+          {mobilePresentation && isStocktakeOperation(first) && !operationBatchId && (
+            <section aria-label="재고 변화" className="space-y-2">
+              <h3 className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>재고 변화</h3>
+              {stocktakeObservations.map((line) => {
+                const location = line.scopeKey === "warehouse" ? "창고" : stocktakeOperationQuery.data?.department ?? first.department ?? "부서";
+                const changedCategories = (Object.keys(STOCKTAKE_CATEGORY_LABELS) as Array<keyof typeof STOCKTAKE_CATEGORY_LABELS>).filter((category) => line.beforeQuantities[category] !== line.afterQuantities[category]);
+                return (
+                  <section key={`${line.applicationId}:${line.countId}`} aria-label={`${line.itemName ?? "품목"} · ${location}`} className="rounded-[16px] border px-3 py-2.5" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                    <h4 className="break-words text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>{line.itemName ?? line.mesCode ?? "품목"}</h4>
+                    <p className="mb-1 mt-0.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{line.mesCode} · {location}</p>
+                    {changedCategories.length === 0 && <p className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>수량 변동 없음</p>}
+                    <div className={`${mobileStyles.observationValues} grid grid-cols-2 gap-x-6 gap-y-1`}>{changedCategories.map((category) => {
+                      const before = line.beforeQuantities[category];
+                      const after = line.afterQuantities[category];
+                      const delta = after - before;
+                      const label = STOCKTAKE_CATEGORY_LABELS[category];
+                      return (
+                        <div key={category} aria-label={`${label}: ${formatQty(before)} → ${formatQty(after)}`} className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 py-1 text-sm tabular-nums">
+                          <span style={{ color: LEGACY_COLORS.muted2 }}>{label}</span>
+                          <span className="ml-auto inline-grid grid-cols-[auto_auto_auto] items-center gap-2 whitespace-nowrap font-bold">
+                            <span style={{ color: LEGACY_COLORS.muted2 }}>{formatQty(before)}</span>
+                            <span aria-hidden="true" style={{ color: LEGACY_COLORS.muted2 }}>→</span>
+                            <span style={{ color: delta > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.red }}>{formatQty(after)}</span>
+                          </span>
+                        </div>
+                      );
+                    })}</div>
+                  </section>
+                );
+              })}
+              {stocktakeObservations.length === 0 && stocktakeImpactGroups.map((group) => (
+                <div key={group.key} className="overflow-hidden rounded-[20px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                  <h4 className="px-3 pt-3 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{group.label}</h4>
+                  {group.effects.map((effect) => {
+                    const unit = effect.unit ? ` ${effect.unit}` : "";
+                    const snapshot = effect.quantityBefore != null && effect.quantityAfter != null
+                      ? `${formatQty(effect.quantityBefore)} → ${formatQty(effect.quantityAfter)}`
+                      : null;
+                    return (
+                      <div key={effect.key} aria-label={`${effect.itemName} · ${effect.label}: ${snapshot ? `${snapshot}${unit}` : "전후 수량 기록 없음"}`} className="space-y-1 px-3 py-3 text-sm">
+                        <div className="break-words font-bold" style={{ color: LEGACY_COLORS.text }}>{effect.itemName}</div>
+                        <div className="flex flex-wrap items-center justify-between gap-2 tabular-nums">
+                          {snapshot ? <span style={{ color: LEGACY_COLORS.text }}>{snapshot}{unit}</span>
+                            : <span style={{ color: LEGACY_COLORS.muted2 }}>전후 수량 기록 없음</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+              {stocktakeObservations.length === 0 && (cancellationScope.status === "loading" || Boolean(first.operation_id) && stocktakeOperationQuery.isLoading) && <p role="status" className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>재고 변화 불러오는 중</p>}
+              {stocktakeObservations.length === 0 && (cancellationScope.status === "error" || stocktakeOperationQuery.isError) && (
+                <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+                  <p>전체 재고 변화를 불러오지 못했습니다.</p>
+                  <button type="button" onClick={() => { cancellationScope.retry(); if (first.operation_id) void stocktakeOperationQuery.refetch(); }} className="min-h-11 text-sm font-bold" style={{ color: LEGACY_COLORS.blue }}>재고 변화 다시 불러오기</button>
+                </div>
+              )}
+            </section>
+          )}
           {isBatchCancelled && (
             <div
               className="rounded-[16px] border px-4 py-3 text-sm font-bold"
@@ -354,7 +425,7 @@ export function HistoryBatchDetailPanel({
 
           {mobilePresentation && <HistoryDetailReason log={first} />}
           <HistoryDetailMemo
-            notes={first.notes}
+            notes={historyUserNotes(first)}
             reasonMemo={first.reason_memo}
             transactionType={first.transaction_type}
           />
@@ -372,7 +443,7 @@ export function HistoryBatchDetailPanel({
             작업 구성을 불러오지 못했습니다.
             <button type="button" className="ml-2 rounded-[12px] border px-3" style={{borderColor:LEGACY_COLORS.border,color:LEGACY_COLORS.blue}} onClick={() => setRetryEpoch((value) => value + 1)}>다시 시도</button>
           </div>}
-          {mobilePresentation && (!batch || batch.bundles.length === 0) && <HistoryMobileStockDetails logs={logs} onSelectLog={(log) => onSelectLog?.(log)} />}
+          {mobilePresentation && !isStocktakeOperation(first) && (!batch || batch.bundles.length === 0) && <HistoryMobileStockDetails logs={logs} onSelectLog={(log) => onSelectLog?.(log)} />}
           {batch && batch.bundles.length > 0 && (
             <div
               className={mobilePresentation ? "space-y-3" : "rounded-[20px] border p-4"}
@@ -433,7 +504,7 @@ function HistoryBatchHero({
 }) {
   const blockerId = useId();
   const displayType = getHistoryDisplayTransactionType(first, batch);
-  const tcolor = transactionColor(displayType);
+  const tcolor = historyOperationColor(first, displayType);
   const heroStyle = {
     background: `color-mix(in srgb, ${tcolor} 5%, ${LEGACY_COLORS.s2})`,
     borderColor: `color-mix(in srgb, ${tcolor} 22%, ${LEGACY_COLORS.border})`,
@@ -475,6 +546,7 @@ function HistoryBatchHero({
         <div className={mobilePresentation ? "flex min-w-0 flex-wrap items-center gap-2" : "contents"}>
           <FlowBadge
             type={displayType}
+            operation={first}
             label={getHistoryDisplayLabel(first, batch ?? undefined)}
             color={tcolor}
             variant="panel"

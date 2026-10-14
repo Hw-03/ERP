@@ -5,7 +5,7 @@ import { DesktopHistoryView } from "../DesktopHistoryView";
 
 vi.mock("@/lib/queries/useModelsQuery", () => ({ useModelsQuery: () => ({ data: [] }) }));
 vi.mock("@/lib/api/production", () => ({
-  productionApi: { getTransactionsSummary: () => new Promise(() => {}) },
+  productionApi: { getTransactionsSummary: () => new Promise(() => {}), getInventoryOperations: async () => ({ items: [], nextCursor: null }) },
 }));
 vi.mock("@/lib/queries/useTransactionsQuery", () => ({
   useTransactionDisplayCalendarQuery: () => ({ data: {} }),
@@ -33,6 +33,12 @@ vi.mock("../_history_sections/HistoryTable", () => ({ HistoryTable: () => <div d
 vi.mock("../_history_sections/DesktopHistoryRightPanel", () => ({ DesktopHistoryRightPanel: () => <div /> }));
 
 describe("DesktopHistoryView scrollbar", () => {
+  it("보기 전환 없이 기존 수량 이력을 바로 표시한다", () => {
+    render(<QueryClientProvider client={new QueryClient()}><DesktopHistoryView /></QueryClientProvider>);
+    expect(screen.getByTestId("history-table")).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "이력 보기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "통합 작업" })).not.toBeInTheDocument();
+  });
   it("keeps the full transaction workspace inside a rounded surface beside the outer scrollbar", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(

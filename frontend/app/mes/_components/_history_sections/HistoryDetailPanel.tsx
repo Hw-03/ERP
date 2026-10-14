@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useLayoutEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Activity, ArrowRight, ChevronDown, History, StickyNote, XCircle } from "lucide-react";
 import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
@@ -9,7 +10,7 @@ import type { IoBatch } from "@/lib/api/types/io";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { transactionColor } from "@/lib/mes-status";
+import { historyOperationColor, historyUserNotes, isStocktakeOperation } from "./historyOperationSource";
 import { formatQty } from "@/lib/mes/format";
 import { PROCESS_TYPE_META } from "./historyTheme";
 import { formatHistoryDateTimeLong } from "./historyFormat";
@@ -29,6 +30,7 @@ import { getHistoryRowPresentation } from "./historyPresentation";
 import { buildHistoryDetailSummary } from "./historyDetailSummary";
 import { HistoryKeyPointSummary } from "./HistoryKeyPointSummary";
 import { HistoryMobileContext, HistoryMobileStockDetails } from "./HistoryMobileInformation";
+import { StocktakeHistoryDetail } from "./StocktakeHistoryDetail";
 import {
   HistoryCancelAction,
   HistoryMobileCancelConfirmation,
@@ -70,15 +72,21 @@ export function HistoryDetailPanel({
 }: Props) {
   const operator = useCurrentOperator();
   const realtimeRevision = useRealtimeRevision();
+  const stocktakeOperationQuery = useQuery({
+    queryKey: ["transactions", "operations", "detail", selected?.operation_id],
+    queryFn: ({ signal }) => productionApi.getInventoryOperation(selected!.operation_id!, { signal }),
+    enabled: panelOpen && variant === "desktop" && !!selected && !selected.stocktake_history && isStocktakeOperation(selected) && Boolean(selected.operation_id),
+  });
   const [edits, setEdits] = useState<TransactionEditLog[]>([]);
   const [editsLoaded, setEditsLoaded] = useState(false);
   const [flow, setFlow] = useState<FlowState>({ status: "idle" });
   const editsLoadedLogRef = useRef<string | null>(null);
   const flowLoadedBatchRef = useRef<string | null>(null);
   const cancelScope = selected ? getHistoryCancelScope(selected) : "single";
+  const cancellationAllowed = allowCancellation && !!selected && !isStocktakeOperation(selected);
   const canCancelAsBatch = cancelScope === "batch";
   const cancellationScope = useHistoryCancellationScopeLogs({
-    panelOpen: panelOpen && selected !== null,
+    panelOpen: panelOpen && selected !== null && !isStocktakeOperation(selected),
     identity: selected?.operation_id
       ? `operation:${selected.operation_id}`
       : selected
@@ -93,7 +101,7 @@ export function HistoryDetailPanel({
   });
 
   useLayoutEffect(() => {
-    if (!selected) {
+    if (!selected || selected.stocktake_history) {
       editsLoadedLogRef.current = null;
       setEdits([]);
       setEditsLoaded(false);
@@ -257,6 +265,9 @@ export function HistoryDetailPanel({
     onDesktopCancellationOpenChange,
   };
   const isDesktopCancellationOpen = variant === "desktop" && desktopCancellationOpen;
+  if (selected.stocktake_history) return <div className="space-y-4">
+    {!isDesktopCancellationOpen && <StocktakeHistoryDetail log={selected} />}
+  </div>;
 
   return (
     <div className={variant === "desktop"
@@ -269,8 +280,10 @@ export function HistoryDetailPanel({
         !isDesktopCancellationOpen && (
           <HistoryKeyPointSummary
             summary={summary}
-            impactStatus={cancellationScope.status}
-            onRetryImpact={cancellationScope.retry}
+            operation={selected}
+            stocktakeOperation={stocktakeOperationQuery.data}
+            impactStatus={stocktakeOperationQuery.isError ? "error" : cancellationScope.status}
+            onRetryImpact={() => { cancellationScope.retry(); if (isStocktakeOperation(selected) && selected.operation_id) void stocktakeOperationQuery.refetch(); }}
             fillHeight
           />
         )
@@ -301,7 +314,7 @@ export function HistoryDetailPanel({
         <>
           <HistoryDetailReason log={selected} />
           <HistoryDetailMemo
-            notes={selected.notes}
+            notes={historyUserNotes(selected)}
             reasonMemo={selected.reason_memo}
             transactionType={selected.transaction_type}
           />
@@ -326,14 +339,14 @@ export function HistoryDetailPanel({
               <HistoryDetailEditHistory edits={edits} />
             </Collapsible>
           )}
-          {allowCancellation && (
+          {cancellationAllowed && (
             <HistoryCancelAction
               {...cancelActionProps}
               pinToDesktopFooter={!isDesktopCancellationOpen}
             />
           )}
         </>
-      ) : allowCancellation ? (
+      ) : cancellationAllowed ? (
         <HistoryCancelAction
           {...cancelActionProps}
         >
@@ -383,7 +396,7 @@ function HistoryDetailHero({
   editCount: number;
   logs: TransactionLog[];
 }) {
-  const tcolor = transactionColor(log.transaction_type);
+  const tcolor = historyOperationColor(log);
   const batch = flow.status === "available" ? flow.batch : null;
   const presentation = getHistoryRowPresentation(log, batch ?? undefined);
   const movement = getHistoryMovementSummary(log, batch ?? undefined, logs.length, logs);
@@ -406,6 +419,7 @@ function HistoryDetailHero({
       <div className="flex flex-wrap items-center gap-2">
         <FlowBadge
           type={log.transaction_type}
+          operation={log}
           label={presentation.operation.label}
           color={tcolor}
           variant="panel"

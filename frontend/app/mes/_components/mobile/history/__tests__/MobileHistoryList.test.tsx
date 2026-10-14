@@ -8,6 +8,8 @@ import { MobileHistoryList as ActualMobileHistoryList } from "../MobileHistoryLi
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { buildGroups, type LogGroup } from "../../../_history_sections/historyTableHelpers";
 import { getSingleLogMovement } from "../../../_history_sections/historyBatchInterpreter";
+import { stocktakeHistoryRows } from "../../../_history_sections/stocktakeHistory";
+import type { StocktakeHistoryWork } from "@/lib/api/production";
 
 function MobileHistoryList({ filteredLogs, ...props }: Omit<Parameters<typeof ActualMobileHistoryList>[0], "displayGroups" | "batchCache" | "setBatchCache"> & { filteredLogs: TransactionLog[] }) {
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
@@ -148,6 +150,35 @@ describe("MobileHistoryList", () => {
     expect(screen.getByRole("button")).toHaveAttribute("data-history-cancellation", "true");
     expect(screen.getByText("원자재 입고 취소")).toBeInTheDocument();
     expect(screen.queryByText("취소됨")).not.toBeInTheDocument();
+  });
+
+  it("shows the only observation quantity without an extra disclosure", () => {
+    const work = { operationId: "single-work", actorName: "이지훈", department: "진공", createdAt: "2026-10-12T05:00:00Z",
+      itemCount: 1, changedItemCount: 1, unchangedItemCount: 0, observations: [{ countId: "count", itemId: "item", itemName: "발생부", unit: "EA", mesCode: "3-VA-0019",
+        beforeQuantities: { normal: 20, defect: 0, b_grade: 0, obsolete: 0 }, afterQuantities: { normal: 13, defect: 0, b_grade: 0, obsolete: 0 } }] } as StocktakeHistoryWork;
+    render(<MobileHistoryList loading={false} error={null} filteredLogs={stocktakeHistoryRows(work)} selectedKey={null}
+      onSelectLog={vi.fn()} onSelectBatch={vi.fn()} onRetry={vi.fn()} canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />);
+    expect(screen.getByLabelText("정상 20 −7→13 EA")).toBeInTheDocument();
+    expect(screen.getByText("EA")).toBeVisible();
+    expect(screen.queryByText("전체 1품목 보기")).not.toBeInTheDocument();
+  });
+  it("여러 품목을 펼쳐도 품목별 단위와 수량을 합치지 않고 선택 대상을 유지한다", () => {
+    const quantities = { normal: 0, defect: 0, b_grade: 0, obsolete: 0 };
+    const work = { operationId: "multi-work", actorName: "작업자", department: "창고", createdAt: "2026-10-12T05:00:00Z",
+      itemCount: 2, changedItemCount: 2, unchangedItemCount: 0, observations: [
+        { countId: "a", itemId: "a", itemName: "첫째 품목", unit: "EA", mesCode: "A", beforeQuantities: { ...quantities, normal: 1 }, afterQuantities: { ...quantities, normal: 2 } },
+        { countId: "b", itemId: "b", itemName: "둘째 품목", unit: "SET", mesCode: "B", beforeQuantities: { ...quantities, normal: 3 }, afterQuantities: { ...quantities, normal: 1 } },
+      ] } as StocktakeHistoryWork;
+    const rows = stocktakeHistoryRows(work);
+    const select = vi.fn();
+    render(<MobileHistoryList loading={false} error={null} filteredLogs={rows} selectedKey={null}
+      onSelectLog={select} onSelectBatch={vi.fn()} onRetry={vi.fn()} canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />);
+    expect(screen.getByText("변경 2품목 · 변동 없음 0품목")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("전체 2품목 보기"));
+    expect(screen.getByLabelText("정상 1 +1→2 EA")).toBeVisible();
+    expect(screen.getByLabelText("정상 3 −2→1 SET")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /둘째 품목/ }));
+    expect(select).toHaveBeenCalledWith(rows[1]);
   });
   it("캐시 재검증 실패는 기존 행을 유지하며 실패와 재시도를 표시한다", () => {
     const retry = vi.fn();

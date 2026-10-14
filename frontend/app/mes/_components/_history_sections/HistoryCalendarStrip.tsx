@@ -74,7 +74,7 @@ export function HistoryCalendarStrip({
     const counts: number[] = Array.from({ length: 12 }, (_, m) => monthlyCountMap?.get(m) ?? 0);
     const maxCount = counts.reduce((a, b) => (b > a ? b : a), 0);
     return (
-      <section className="card">
+      <section className="card max-lg:!p-0">
         {/* 연도 네비게이션 */}
         <div
           className="mb-4 flex items-center justify-between rounded-[20px] border px-5 py-3"
@@ -161,7 +161,7 @@ export function HistoryCalendarStrip({
     : calendarDays;
 
   return (
-    <section className="card">
+    <section className="card max-lg:!p-0">
       {/* 월 네비게이션 */}
       <div
         className="mb-4 flex items-center justify-between rounded-[20px] border px-5 py-3"
@@ -218,28 +218,29 @@ export function HistoryCalendarStrip({
               const mm = String(calendarMonth + 1).padStart(2, "0");
               const dd = String(day).padStart(2, "0");
               const key = `${calendarYear}-${mm}-${dd}`;
-              const dayLogs = calendarDayMap?.get(key) ?? [];
               const counts = calendarDayCounts?.[key];
-              const total = counts?.total ?? dayLogs.length;
+              let total = counts?.total ?? 0;
+              let warehouseCount = counts?.warehouseCount ?? 0;
+              let deptCount = counts?.deptCount ?? 0;
+              let adjustCount = counts?.adjustCount ?? 0;
+              let otherCount = counts?.otherCount ?? 0;
+              // 서버 집계가 없을 때만 기존 로그 기반 호출을 지원한다.
+              if (calendarDayCounts === undefined) {
+                const dayLogs = calendarDayMap?.get(key) ?? [];
+                total = dayLogs.length;
+                for (const log of dayLogs) {
+                  if (isAdjustmentLike(log)) {
+                    adjustCount++;
+                    continue;
+                  }
+                  const scope = classifyHistoryScope(log);
+                  if (scope === "warehouse_involved") warehouseCount++;
+                  if (scope === "department_internal") deptCount++;
+                }
+                otherCount = Math.max(total - warehouseCount - deptCount - adjustCount, 0);
+              }
               const isToday = key === todayKey;
               const isSelected = key === selectedDay;
-              // KPI 와 일치 — 작업 투영과 실제 재고 위치를 포함한 공통 분류를 사용한다.
-              let warehouseCount = 0;
-              let deptCount = 0;
-              let adjustCount = 0;
-              for (const l of dayLogs) {
-                if (isAdjustmentLike(l)) {
-                  adjustCount++;
-                  continue;
-                }
-                const scope = classifyHistoryScope(l);
-                if (scope === "warehouse_involved") warehouseCount++;
-                if (scope === "department_internal") deptCount++;
-              }
-              warehouseCount = counts?.warehouseCount ?? warehouseCount;
-              deptCount = counts?.deptCount ?? deptCount;
-              adjustCount = counts?.adjustCount ?? adjustCount;
-              const otherCount = counts?.otherCount ?? Math.max(total - warehouseCount - deptCount - adjustCount, 0);
               return (
                 <button
                   key={key}
@@ -264,7 +265,7 @@ export function HistoryCalendarStrip({
                       className="mt-1 rounded-full px-1.5 py-0.5 text-xs font-bold"
                       style={{ background: "color-mix(in srgb, var(--c-blue) 20%, transparent)", color: LEGACY_COLORS.blue }}
                     >
-                      총 {total}건
+                      총 <span className="whitespace-nowrap">{total}건</span>
                     </span>
                   )}
                   <div className="mt-1 flex w-full flex-col gap-0.5 px-1">
@@ -279,8 +280,8 @@ export function HistoryCalendarStrip({
                       </span>
                     )}
                     {adjustCount > 0 && (
-                      <span className="whitespace-nowrap text-[11px] font-bold leading-tight" style={{ color: LEGACY_COLORS.yellow }}>
-                        조정 {adjustCount}건
+                      <span className="break-words text-xs font-bold leading-tight" style={{ color: LEGACY_COLORS.yellow }}>
+                        확인·조정 <span className="whitespace-nowrap">{adjustCount}건</span>
                       </span>
                     )}
                     {otherCount > 0 && (

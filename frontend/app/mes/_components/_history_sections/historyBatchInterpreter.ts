@@ -8,6 +8,7 @@ import type { Department, TransactionType } from "@/lib/api/types/shared";
 import type { IoBatch, IoBundle, IoLine } from "@/lib/api/types/io";
 import type { TransactionLog } from "@/lib/api/types/production";
 import { formatQty } from "@/lib/mes/format";
+import { isStocktakeOperation } from "./historyOperationSource";
 import {
   SUB_TYPE_LABEL as _SUB_LABEL,
   TRANSACTION_TYPE_LABEL as _TX_LABEL,
@@ -510,11 +511,12 @@ const _DISPLAY_SUB_LABEL: Record<string, string> = {
 // 공개 함수 — 라벨/흐름/actor
 // ──────────────────────────────────────────────────────────────────
 
-/** 작업 의도 라벨. batch.sub_type 우선, 없으면 transaction_type 기반. */
+/** 전수조사 원장 출처를 우선하며 나머지는 batch.sub_type과 거래 유형으로 해석한다. */
 export function getHistoryOperationLabel(
-  log: { transaction_type: string; department?: string | null; item_id?: string | null },
+  log: { transaction_type: string; department?: string | null; item_id?: string | null; operation_domain?: string | null; operation_action?: string | null; operation_kind?: string | null },
   batch?: IoBatch | null,
 ): string {
+  if (isStocktakeOperation(log)) return log.operation_kind === "CANCELLATION" ? "재고 전수조사 취소" : "재고 전수조사";
   const batchContext = getHistoryChildResultBatchOperationLabel(log, batch);
   if (batchContext) return batchContext;
   if (log.transaction_type === "DEFECT_SCRAP") {
@@ -552,7 +554,7 @@ export function getHistoryWorkTypeLabel(workType: string): string {
 
 /** 화면 정본 메인 라벨. 의도 우선. 모든 row/패널이 같은 정책으로 보이도록. */
 export function getHistoryDisplayLabel(
-  log: { transaction_type: string; department?: string | null; item_id?: string | null },
+  log: { transaction_type: string; department?: string | null; item_id?: string | null; operation_domain?: string | null; operation_action?: string | null; operation_kind?: string | null },
   batch?: IoBatch | null,
 ): string {
   return getHistoryOperationLabel(log, batch);

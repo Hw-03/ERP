@@ -1,10 +1,10 @@
 "use client";
 
-import type { TransactionLog } from "@/lib/api";
 import type { TransactionDisplayCalendarDay } from "@/lib/api/production";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { HistoryCalendarStrip } from "./HistoryCalendarStrip";
 import type { SelectedHistoryMonth } from "./historyQuery";
+import { ReadFailure } from "../common/ReadState";
 
 /**
  * 입출고 내역 달력 본문 — 3차 C8: 자체 헤더/토글 제거.
@@ -23,8 +23,9 @@ export interface HistoryCalendarPanelProps {
   onSelectMonth: (month: SelectedHistoryMonth) => void;
   calendarLoading: boolean;
   calendarDays: (number | null)[];
-  calendarDayMap?: Map<string, TransactionLog[]>;
-  calendarDayCounts?: Record<string, TransactionDisplayCalendarDay>;
+  calendarDayCounts: Record<string, TransactionDisplayCalendarDay>;
+  calendarError?: string | null;
+  onRetryCalendar?: () => void;
   monthlyCountMap?: Map<number, number>;
   todayKey: string;
   selectedDay: string | null;
@@ -44,8 +45,9 @@ export function HistoryCalendarPanel({
   onSelectMonth,
   calendarLoading,
   calendarDays,
-  calendarDayMap,
   calendarDayCounts,
+  calendarError,
+  onRetryCalendar,
   monthlyCountMap,
   todayKey,
   selectedDay,
@@ -55,7 +57,7 @@ export function HistoryCalendarPanel({
   if (!open) return null;
   return (
     <section className="card" style={{ paddingTop: 14, paddingBottom: 14 }}>
-      <HistoryCalendarStrip
+      {calendarError ? <ReadFailure message={calendarError} onRetry={onRetryCalendar ?? (() => {})} /> : <HistoryCalendarStrip
         calendarYear={calendarYear}
         calendarMonth={calendarMonth}
         prevMonth={prevMonth}
@@ -65,21 +67,20 @@ export function HistoryCalendarPanel({
         onSelectMonth={onSelectMonth}
         calendarLoading={calendarLoading}
         calendarDays={calendarDays}
-        calendarDayMap={calendarDayMap}
         calendarDayCounts={calendarDayCounts}
         monthlyCountMap={monthlyCountMap}
         todayKey={todayKey}
         selectedDay={selectedDay}
         setSelectedDay={setSelectedDay}
         hideWeekends={hideWeekends}
-      />
+      />}
       <div
         className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[11px]"
         style={{ color: LEGACY_COLORS.muted2 }}
       >
         <span style={{ color: LEGACY_COLORS.green, fontWeight: 700 }}>창고</span> = 창고 거래
         <span style={{ color: LEGACY_COLORS.cyan, fontWeight: 700 }}>부서</span> = 부서 거래
-        <span style={{ color: LEGACY_COLORS.yellow, fontWeight: 700 }}>조정</span> = 수량 조정
+        <span style={{ color: LEGACY_COLORS.yellow, fontWeight: 700 }}>확인·조정</span> = 재고 확인·조정 작업
         <span style={{ color: LEGACY_COLORS.muted2, fontWeight: 700 }}>기타</span> = 위 분류 외 거래
       </div>
     </section>

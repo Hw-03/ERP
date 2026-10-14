@@ -15,6 +15,7 @@ import { HistoryDetailPanel } from "../../_history_sections/HistoryDetailPanel";
 import { HistoryBatchDetailPanel } from "../../_history_sections/HistoryBatchDetailPanel";
 import { useHistoryGroups } from "../../_hooks/useHistoryGroups";
 import { useCurrentOperator } from "../../login/useCurrentOperator";
+import { historyDisplayLogs } from "../../_history_sections/stocktakeHistory";
 import { useToggleSet } from "../../_hooks/useToggleSet";
 import { useTransactionDisplayCalendarQuery } from "@/lib/queries/useTransactionsQuery";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
@@ -172,7 +173,7 @@ function MobileHistoryContent({ employeeId }: { employeeId?: string }) {
     loadMore,
     refreshLoaded,
   } = historyData;
-  const logs = useMemo(() => serverGroups.flatMap((group) => group.logs), [serverGroups]);
+  const logs = useMemo(() => historyDisplayLogs(serverGroups), [serverGroups]);
   const displayGroups = useMemo(() => toHistoryLogGroups(serverGroups), [serverGroups]);
   const loadReconcileRef = useRef<HistoryLoadReconcileState>({
     wasLoading: loading,
@@ -367,7 +368,7 @@ function MobileHistoryContent({ employeeId }: { employeeId?: string }) {
   function handleSelectLog(log: TransactionLog) {
     setSelectionStack([]);
     setSelection((c) =>
-      c?.kind === "log" && c.log.log_id === log.log_id ? null : { kind: "log", log },
+      c?.kind === "log" && c.log.log_id === log.log_id && c.log.stocktake_history?.selection === log.stocktake_history?.selection ? null : { kind: "log", log },
     );
   }
 
@@ -584,6 +585,8 @@ function MobileHistoryContent({ employeeId }: { employeeId?: string }) {
             calendarLoading={calendarLoading}
             calendarDays={calendarDays}
             calendarDayCounts={calendarDayCounts}
+            calendarError={calendarQuery.isError ? "달력 작업 건수를 불러오지 못했습니다." : null}
+            onRetryCalendar={() => void calendarQuery.refetch()}
             monthlyCountMap={monthlyCountMap}
             todayKey={todayKey}
             selectedDay={selectedDay}

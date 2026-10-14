@@ -3,6 +3,7 @@ import type { TransactionReferenceSummary } from "@/lib/api/production";
 import type { IoBatch } from "@/lib/api/types/io";
 import { formatQty } from "@/lib/mes/format";
 import { toInventoryEffectRows } from "./historyInventoryEffect";
+import { historyUserNotes, isStocktakeOperation } from "./historyOperationSource";
 import {
   getBatchFlowEndpoints,
   getHistoryActor,
@@ -180,6 +181,7 @@ export function getReferenceBatchLinePresentation(
   log: TransactionLog,
   kind: ReferenceBatchKind,
 ): ReferenceBatchLinePresentation {
+  if (isStocktakeOperation(log)) return { label: getHistoryDisplayLabel(log), tone: "success" };
   if (isDepartmentCorrectionLog(log)) return { label: "이동", tone: "info" };
   if (kind === "shipment") {
     if (log.shipping_phase === "COMPONENT_CHANGE") {
@@ -628,7 +630,7 @@ function getStatusChips(
   const editCount = log.edit_count ?? 0;
   if (editCount > 0) chips.push({ label: `수정 ${editCount}`, tone: "warning" });
 
-  const memo = parseTransactionNotes(batch?.notes ?? log.notes, log.transaction_type).userMemo;
+  const memo = parseTransactionNotes(historyUserNotes(log, batch?.notes ?? log.notes), log.transaction_type).userMemo;
   if (memo) chips.push({ label: "메모", tone: "primary", title: memo });
   const defectReason = formatDefectReason(log);
   if (defectReason) chips.push({ label: "\uC0AC\uC720", tone: "warning", title: defectReason });
@@ -649,6 +651,7 @@ export function getHistoryListOperationLabel(
   log: TransactionLog,
   batch?: IoBatch | null,
 ): string {
+  if (isStocktakeOperation(log)) return getHistoryDisplayLabel(log, batch);
   if (isDepartmentCorrectionLog(log)) {
     return log.operation_kind === "CANCELLATION" ? "부서 위치 조정 취소" : "부서 위치 조정";
   }

@@ -21,6 +21,7 @@ const OPERATIONAL_QUERY_ROOTS = [
   queryKeys.warehouseMap.all,
   queryKeys.weekly.all,
   queryKeys.dailyWorkReports.all,
+  queryKeys.stocktake.all,
 ] as const;
 
 type RevisionSnapshot = {

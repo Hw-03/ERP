@@ -56,14 +56,31 @@ describe("HistoryCalendarStrip", () => {
     render(<HistoryCalendarStrip calendarYear={2026} calendarMonth={6} prevMonth={vi.fn()} nextMonth={vi.fn()} setCalendarYear={vi.fn()} setCalendarMonth={vi.fn()} onSelectMonth={vi.fn()} calendarLoading={false} calendarDays={[1]} calendarDayMap={new Map([["2026-07-01", dayLogs]])} todayKey="2026-07-09" selectedDay={null} setSelectedDay={vi.fn()} />);
     expect(screen.getByText("부서 1건")).toBeInTheDocument();
   });
-  it("labels total daily count and exposes uncategorized remainder as 기타", () => {
+  it("서버 집계가 없으면 기존 일별 로그로 총 건수와 기타를 분류한다", () => {
     const dayLogs = [
       makeLog({ log_id: "receive", transaction_type: "RECEIVE" }),
       makeLog({ log_id: "produce", transaction_type: "PRODUCE" }),
       makeLog({ log_id: "adjust", transaction_type: "ADJUST" }),
       makeLog({ log_id: "return", transaction_type: "SUPPLIER_RETURN" }),
     ];
-
+    render(<HistoryCalendarStrip calendarYear={2026} calendarMonth={6} prevMonth={vi.fn()} nextMonth={vi.fn()} setCalendarYear={vi.fn()} setCalendarMonth={vi.fn()} onSelectMonth={vi.fn()} calendarLoading={false} calendarDays={[1]} calendarDayMap={new Map([["2026-07-01", dayLogs]])} todayKey="2026-07-09" selectedDay={null} setSelectedDay={vi.fn()} />);
+    const day = screen.getByRole("button", { name: "2026년 7월 1일 · 총 4건" });
+    expect(day).toHaveTextContent("총 4건");
+    expect(day).toHaveTextContent("확인·조정 1건");
+    expect(screen.getByText("기타 1건")).toBeInTheDocument();
+  });
+  it.each([
+    { "2026-07-01": { total: 1, warehouseCount: 0, deptCount: 1, adjustCount: 0, otherCount: 0 } },
+    {},
+  ])("서버 집계가 있으면 현재 페이지 로그를 조회하거나 합산하지 않는다", (calendarDayCounts) => {
+    const calendarDayMap = new Map([["2026-07-01", [makeLog()]]]);
+    const readPage = vi.spyOn(calendarDayMap, "get");
+    render(<HistoryCalendarStrip calendarYear={2026} calendarMonth={6} prevMonth={vi.fn()} nextMonth={vi.fn()} setCalendarYear={vi.fn()} setCalendarMonth={vi.fn()} onSelectMonth={vi.fn()} calendarLoading={false} calendarDays={[1]} calendarDayMap={calendarDayMap} calendarDayCounts={calendarDayCounts} todayKey="2026-07-09" selectedDay={null} setSelectedDay={vi.fn()} />);
+    expect(readPage).not.toHaveBeenCalled();
+    expect(screen.queryByText("창고 1건")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: `2026년 7월 1일 · 총 ${calendarDayCounts["2026-07-01"]?.total ?? 0}건` })).toBeInTheDocument();
+  });
+  it("labels total daily count and exposes uncategorized remainder as 기타", () => {
     render(
       <HistoryCalendarStrip
         calendarYear={2026}
@@ -75,14 +92,14 @@ describe("HistoryCalendarStrip", () => {
         onSelectMonth={vi.fn()}
         calendarLoading={false}
         calendarDays={[1]}
-        calendarDayMap={new Map([["2026-07-01", dayLogs]])}
+        calendarDayCounts={{ "2026-07-01": { total: 4, warehouseCount: 1, deptCount: 1, adjustCount: 1, otherCount: 1 } }}
         todayKey="2026-07-09"
         selectedDay={null}
         setSelectedDay={vi.fn()}
       />,
     );
 
-    expect(screen.getByText("총 4건")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "2026년 7월 1일 · 총 4건" })).toHaveTextContent("총 4건");
     expect(screen.getByText("기타 1건")).toBeInTheDocument();
   });
 
@@ -99,7 +116,7 @@ describe("HistoryCalendarStrip", () => {
         onSelectMonth={onSelectMonth}
         calendarLoading={false}
         calendarDays={[1]}
-        calendarDayMap={new Map()}
+        calendarDayCounts={{}}
         todayKey="2026-07-09"
         selectedDay={null}
         setSelectedDay={vi.fn()}

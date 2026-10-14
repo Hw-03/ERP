@@ -96,7 +96,7 @@
 .heroHeader {
   display: flex;
   flex-wrap: wrap;
-  align-items: start;
+  align-items: center;
   gap: 8px;
 }
 
@@ -275,4 +275,18 @@
   .compositionRow {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.observationValues > :nth-child(even) {
+  position: relative;
+}
+
+.observationValues > :nth-child(even)::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: -12px;
+  width: 1px;
+  background: var(--c-border-strong);
 }

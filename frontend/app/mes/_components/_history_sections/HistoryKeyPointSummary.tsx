@@ -1,6 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Activity, ArrowRight, ChevronDown, Clock3, MapPin, UserRound } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import type { TransactionLog } from "@/lib/api/types/production";
+import type { InventoryOperation } from "@/lib/api/types/production";
+import { isStocktakeOperation } from "./historyOperationSource";
+import { FlowBadge } from "./historyTableHelpers";
 import { formatQty } from "@/lib/mes/format";
 import { Tooltip } from "@/lib/ui/Tooltip";
 import { useDesktopRightPanelBody } from "../DesktopRightPanel";
@@ -19,16 +23,22 @@ const STATUS_COLORS: Record<HistoryDetailSummaryTone, string> = {
 
 export function HistoryKeyPointSummary({
   summary,
+  operation,
   impactStatus = "ready",
   onRetryImpact,
   fillHeight = false,
+  stocktakeOperation,
 }: {
   summary: HistoryDetailSummary;
+  operation?: Pick<TransactionLog, "operation_domain" | "operation_action">;
   impactStatus?: "ready" | "loading" | "error";
   onRetryImpact?: () => void;
   fillHeight?: boolean;
+  stocktakeOperation?: InventoryOperation;
 }) {
   const statusColor = STATUS_COLORS[summary.status.tone];
+  const isStocktake = !!operation && isStocktakeOperation(operation);
+  const observations = isStocktake ? stocktakeOperation?.observationLines ?? [] : [];
   const [expandedImpactGroups, setExpandedImpactGroups] = useState<Set<string>>(new Set());
   const [autoCollapsedImpactIdentity, setAutoCollapsedImpactIdentity] = useState<string | null>(null);
   const panelBody = useDesktopRightPanelBody();
@@ -84,9 +94,13 @@ export function HistoryKeyPointSummary({
     >
       <div className="flex items-center justify-between gap-3 px-4 py-3.5">
         <div data-testid="history-operation-summary" className="flex min-w-0 items-center gap-2">
-          <div className="truncate text-base font-black" style={{ color: LEGACY_COLORS.text }}>
-            {summary.operationLabel}
-          </div>
+          {operation && isStocktakeOperation(operation) ? (
+            <FlowBadge type={null} operation={operation} label={summary.operationLabel} color={LEGACY_COLORS.green} variant="panel" />
+          ) : (
+            <div className="truncate text-base font-black" style={{ color: LEGACY_COLORS.text }}>
+              {summary.operationLabel}
+            </div>
+          )}
         </div>
         <span
           className="inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-bold"
@@ -175,7 +189,27 @@ export function HistoryKeyPointSummary({
         </div>
       )}
 
-      {(impactStatus !== "ready" || summary.impactGroups.length > 0) && (
+      {observations.length > 0 && <section aria-label="재고 변화" className="border-t px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+        <h3 className="mb-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>재고 변화</h3>
+        {observations.map(line => {
+          const location = line.scopeKey === "warehouse" ? "창고" : stocktakeOperation?.department ?? "부서";
+          const labels = { normal: "정상", defect: "불량", b_grade: "B급", obsolete: "구형" } as const;
+          const changed = (Object.keys(labels) as Array<keyof typeof labels>).filter(category => line.beforeQuantities[category] !== line.afterQuantities[category]);
+          return <section key={`${line.applicationId}:${line.countId}`} aria-label={`${line.itemName ?? "품목"} · ${location}`} className="border-t py-3 first:border-t-0" style={{ borderColor: LEGACY_COLORS.border }}>
+            <h4 className="break-words text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>{line.itemName ?? line.mesCode ?? "품목"}</h4>
+            <p className="mb-1 mt-0.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{line.mesCode} · {location}</p>
+            {changed.length === 0 && <p className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>수량 변동 없음</p>}
+            {changed.map(category => {
+              const before = line.beforeQuantities[category], after = line.afterQuantities[category];
+              return <div key={category} aria-label={`${labels[category]}: ${formatQty(before)} → ${formatQty(after)}`} className="flex items-center justify-between gap-3 py-1 text-sm tabular-nums">
+                <span style={{ color: LEGACY_COLORS.muted2 }}>{labels[category]}</span>
+                <span className="inline-flex items-center gap-2 font-bold"><span style={{ color: LEGACY_COLORS.muted2 }}>{formatQty(before)}</span><span aria-hidden="true" style={{ color: LEGACY_COLORS.muted2 }}>→</span><span style={{ color: after > before ? LEGACY_COLORS.blue : LEGACY_COLORS.red }}>{formatQty(after)}</span></span>
+              </div>;
+            })}
+          </section>;
+        })}
+      </section>}
+      {observations.length === 0 && (impactStatus !== "ready" || summary.impactGroups.length > 0) && (
         <div className="border-t" style={{ borderColor: LEGACY_COLORS.border }}>
           <div
             className="flex items-center gap-1.5 px-4 pb-1 pt-3 text-xs font-bold"
@@ -212,7 +246,7 @@ export function HistoryKeyPointSummary({
             const hasSingleUnit = Boolean(firstUnit)
               && group.effects.every((effect) => effect.unit === firstUnit);
             const totalDelta = group.effects.reduce((total, effect) => total + effect.delta, 0);
-            const totalDeltaLabel = hasSingleUnit && totalDelta !== 0
+            const totalDeltaLabel = !isStocktake && hasSingleUnit && totalDelta !== 0
               ? ` · ${totalDelta > 0 ? "+" : ""}${totalDelta}`
               : "";
 
@@ -269,7 +303,11 @@ export function HistoryKeyPointSummary({
                             )}
                           </div>
                           <div className="shrink-0 text-sm font-black" style={{ color }}>
-                            {effect.deltaLabel}{effect.unit ? ` ${effect.unit}` : ""}
+                            {isStocktake
+                              ? effect.quantityBefore != null && effect.quantityAfter != null
+                                ? `${formatQty(effect.quantityBefore)} → ${formatQty(effect.quantityAfter)}${effect.unit ? ` ${effect.unit}` : ""}`
+                                : "전후 수량 기록 없음"
+                              : `${effect.deltaLabel}${effect.unit ? ` ${effect.unit}` : ""}`}
                           </div>
                         </>;
                       return (

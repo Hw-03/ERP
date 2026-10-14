@@ -60,6 +60,10 @@ vi.mock("@/lib/queries/useModelsQuery", () => ({
   useModelsQuery: () => ({ data: [] }),
 }));
 
+vi.mock("@/lib/queries/useInventoryOperationsQuery", () => ({
+  useInventoryOperationsQuery: () => ({ data: { items: [], nextCursor: null }, isLoading: false, isError: false, isFetching: false, refetch: vi.fn() }),
+}));
+
 vi.mock("@/lib/queries/useTransactionsQuery", () => ({
   useTransactionDisplayCalendarQuery: (...args: any[]) => testState.monthlyQuery(...args),
 }));
@@ -335,6 +339,13 @@ describe("MobileHistoryScreen history state", () => {
     expect(screen.getByTestId("mobile-log-detail-state")).toHaveAttribute("data-name","후속 품목");
     fireEvent.click(screen.getByRole("button",{name:"← 뒤로"}));
     expect(screen.getByTestId("mobile-batch-detail-state")).toHaveAttribute("data-log-ids","log-1,child");
+  });
+
+  it("보기 전환 없이 기존 수량 이력을 바로 표시한다", () => {
+    render(<MobileHistoryScreen />);
+    expect(screen.getByTestId("mobile-history-list-state")).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "이력 보기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "통합 작업" })).not.toBeInTheDocument();
   });
   it("does not query annual counts while the calendar is closed", () => {
     render(<MobileHistoryScreen />);

@@ -66,6 +66,26 @@ function makeLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
   };
 }
 
+it("전수조사 작업 배지는 초록색과 조사 아이콘을 사용한다", () => {
+  const log = makeLog({ transaction_type: "ADJUST", operation_domain: "stocktake", operation_action: "apply", operation_id: "stocktake-1", reference_no: null });
+  renderTable([{ type: "operation", operationId: "stocktake-1", logs: [log] }]);
+  const badge = screen.getByText("재고 전수조사").closest("span.inline-flex")!;
+  expect(badge).toHaveStyle({ color: LEGACY_COLORS.green });
+  expect(badge.querySelector(".lucide-clipboard-check")).toBeInTheDocument();
+});
+
+it.each([-5, 5])("펼친 전수조사 하위 행은 수량 변화 %i에도 초록색 조사 배지를 사용한다", (quantity_change) => {
+  const primary = makeLog({ transaction_type: "ADJUST", operation_domain: "stocktake", operation_action: "apply", operation_id: "stocktake-1", reference_no: null, operation_role: "CORRECTION" });
+  const child = { ...primary, log_id: "stocktake-child", item_id: "CHILD-1", item_name: "조사 하위 품목", quantity_change };
+  renderTable([{ type: "operation", operationId: "stocktake-1", logs: [primary, child] }]);
+  fireEvent.click(screen.getByRole("button", { name: "작업 구성 펼치기" }));
+  const row = screen.getByText(child.item_name).closest("tr")!;
+  const badge = within(row).getByText("재고 전수조사").closest("span.inline-flex")!;
+  expect(badge).toHaveStyle({ color: LEGACY_COLORS.green });
+  expect(badge.querySelector(".lucide-clipboard-check")).toBeInTheDocument();
+  expect(within(row).queryByText(/단품 (입고|출고)/)).not.toBeInTheDocument();
+});
+
 function makeBatch(): IoBatch {
   return {
     batch_id: "batch-1", work_type: "process", sub_type: "produce", status: "completed", requester_employee_id: "E001", requester_name: "요청자",

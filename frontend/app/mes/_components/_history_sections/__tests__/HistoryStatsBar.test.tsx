@@ -36,15 +36,15 @@ describe("HistoryStatsBar", () => {
     expect(screen.getAllByLabelText("집계 중")).toHaveLength(5);
     expect(screen.getByText("창고")).toBeInTheDocument();
     expect(screen.getByText("부서")).toBeInTheDocument();
-    expect(screen.getByText("수량조정")).toBeInTheDocument();
-    for (const label of ["창고", "부서", "수량조정"]) {
-      const card = screen.getByText(label).parentElement!;
+    expect(screen.getByText("재고 확인·조정")).toBeInTheDocument();
+    for (const label of ["창고", "부서", "재고 확인·조정"]) {
+      const card = screen.getByText(label).parentElement!.parentElement!;
       expect(card.querySelector('[aria-label="집계 중"]')).toHaveClass("h-6", "motion-safe:animate-pulse");
       expect(card.querySelector("svg")).toBeInTheDocument();
     }
     expect(screen.getByText("창고 재고가 움직인 작업")).toBeInTheDocument();
     expect(screen.getByText("부서 재고가 움직인 작업")).toBeInTheDocument();
-    expect(screen.getByText("재고 수량을 직접 조정한 거래")).toBeInTheDocument();
+    expect(screen.getByText("실수량 확인과 재고 조정 작업")).toBeInTheDocument();
   });
 
   it("separates current list conditions from period summary counts", () => {

@@ -13,6 +13,7 @@ export type HistoryOperationKey =
   | "warehouse"
   | "tube_material"
   | "process"
+  | "stocktake"
   | "defect"
   | "item_conversion"
   | "shipping";
@@ -23,6 +24,7 @@ export const OPERATION_OPTIONS: OperationOption[] = [
   { value: "warehouse", label: "창고 입출고" },
   { value: "tube_material", label: "튜브 원자재 입출고" },
   { value: "process", label: "부서 입출고" },
+  { value: "stocktake", label: "재고 전수조사" },
   { value: "defect", label: "불량" },
   { value: "item_conversion", label: "품목 전환" },
   { value: "shipping", label: "출하" },

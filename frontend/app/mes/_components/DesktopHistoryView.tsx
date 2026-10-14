@@ -31,6 +31,7 @@ import {
   type HistoryLoadReconcileState,
 } from "./_history_sections/historyCancellation";
 import { getHistoryGroupSummary, getHistoryWorkSelection, toHistoryLogGroups, type LogGroup } from "./_history_sections/historyTableHelpers";
+import { historyDisplayLogs } from "./_history_sections/stocktakeHistory";
 
 const SEARCH_DEBOUNCE_MS = 350;
 
@@ -201,8 +202,13 @@ function DesktopHistoryContent({ employeeId }: { employeeId?: string }) {
     loadMore,
     refreshLoaded,
   } = historyData;
-  const logs = useMemo(() => serverGroups.flatMap((group) => group.logs), [serverGroups]);
+  const logs = useMemo(() => historyDisplayLogs(serverGroups), [serverGroups]);
   const displayGroups = useMemo(() => toHistoryLogGroups(serverGroups), [serverGroups]);
+  const navigatingHistoryRef = useRef(false);
+  useEffect(() => {
+    if (navigatingHistoryRef.current) { navigatingHistoryRef.current = false; return; }
+    setSelection(null); setSelectionStack([]); lastSelectionRef.current = null; setFocusTarget(null);
+  }, [search, deptParam, modelParam, opParam, dateFilter, selectedDay, selectedMonth, requesterEmployeeId]);
   const loadReconcileRef = useRef<HistoryLoadReconcileState>({
     wasLoading: loading,
     loadingLogs: loading ? logs : null,
@@ -336,11 +342,11 @@ function DesktopHistoryContent({ employeeId }: { employeeId?: string }) {
 
   // 표 행 클릭(top-level) — 드릴 스택 초기화.
   function handleSelectLog(log: TransactionLog) {
-    const opening = !(selection?.kind === "log" && selection.log.log_id === log.log_id);
+    const opening = !(selection?.kind === "log" && selection.log.log_id === log.log_id && selection.log.stocktake_history?.selection === log.stocktake_history?.selection);
     if (opening) pushHistoryStep();
     setSelectionStack([]);
     setSelection((c) =>
-      c?.kind === "log" && c.log.log_id === log.log_id ? null : { kind: "log", log },
+      c?.kind === "log" && c.log.log_id === log.log_id && c.log.stocktake_history?.selection === log.stocktake_history?.selection ? null : { kind: "log", log },
     );
   }
 
@@ -381,6 +387,7 @@ function DesktopHistoryContent({ employeeId }: { employeeId?: string }) {
   // 리스트가 해당 거래를 포함하게 한 뒤, 효과(useEffect 으로 logs 로드 완료 시점에)
   // 로 그 행으로 scrollIntoView.
   function navigateToLog(log: TransactionLog) {
+    if (toDateKey(log.created_at) !== selectedDay) navigatingHistoryRef.current = true;
     const logYmd = toDateKey(log.created_at);
     const logAlreadyInList = logs.some((entry) => entry.log_id === log.log_id);
     if (!logAlreadyInList && logYmd && logYmd !== selectedDay) {
@@ -496,6 +503,7 @@ function DesktopHistoryContent({ employeeId }: { employeeId?: string }) {
     lastSelectionRef.current = null;
     setFocusTarget(null);
     pendingScrollLogIdRef.current = null;
+    navigatingHistoryRef.current = false;
   }
 
   if (selection) lastSelectionRef.current = selection;
@@ -605,6 +613,8 @@ function DesktopHistoryContent({ employeeId }: { employeeId?: string }) {
             calendarLoading={calendarLoading}
             calendarDays={calendarDays}
             calendarDayCounts={calendarDayCounts}
+            calendarError={calendarQuery.isError ? "달력 작업 건수를 불러오지 못했습니다." : null}
+            onRetryCalendar={() => void calendarQuery.refetch()}
             monthlyCountMap={monthlyCountMap}
             todayKey={todayKey}
             selectedDay={selectedDay}

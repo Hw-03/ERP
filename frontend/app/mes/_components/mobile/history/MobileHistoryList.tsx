@@ -5,21 +5,23 @@ import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { IoBatch } from "@/lib/api/types/io";
 import { useHistoryBatchMetadata } from "../../_hooks/useHistoryBatchMetadata";
+import { historyOperationColor } from "../../_history_sections/historyOperationSource";
 import { ReadEmpty, ReadFailure } from "../../common/ReadState";
 import { dataRevealClassName } from "../../common/LoadingSkeleton";
 import { formatHistoryDate } from "../../_history_sections/historyFormat";
 import {
   getHistoryActor,
 } from "../../_history_sections/historyBatchInterpreter";
-import { FlowBadge, getHistoryGroupSummary, type LogGroup } from "../../_history_sections/historyTableHelpers";
+import { FlowBadge, StockSnapshotContent, getHistoryGroupSummary, type LogGroup } from "../../_history_sections/historyTableHelpers";
 import styles from "./MobileHistoryList.module.css";
+import { stocktakeWorkSelection } from "../../_history_sections/stocktakeHistory";
 
 function HistoryListHeader({ summary }: { summary: ReturnType<typeof getHistoryGroupSummary> }) {
   const log = summary.primaryLog;
   return (
     <div className="flex items-center justify-between gap-2">
       <span className={`shrink-0 ${styles.affected} ${styles.badge}`}>
-        <FlowBadge type={summary.displayType} label={summary.label} color={summary.color} />
+        <FlowBadge type={summary.displayType} operation={log} label={summary.label} color={summary.color} />
       </span>
       <div className="ml-auto flex min-w-0 items-center gap-2">
         <span className="min-w-0 truncate text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{getHistoryActor(log)}</span>
@@ -139,6 +141,25 @@ export function MobileHistoryList({
 
       {metadata.failed && <ReadFailure message="작업 정보를 불러오지 못했습니다." onRetry={metadata.retry} refresh />}
       <div className={dataRevealClassName}>{groups.map((g) => {
+        const observationLogs = g.type === "operation" ? g.logs : g.type === "solo" ? [g.log] : [];
+        const firstObservation = observationLogs[0];
+        if (firstObservation?.stocktake_history) {
+          const work = firstObservation.stocktake_history.work;
+          return <div key={work.operationId} className="border-b border-[var(--c-border)] p-4">
+            <button type="button" className="min-h-11 w-full text-left" onClick={() => onSelectLog(stocktakeWorkSelection(firstObservation))}>
+              <HistoryListHeader summary={getHistoryGroupSummary(g)} />
+              <p className="mt-2 text-sm font-bold">{stocktakeWorkSelection(firstObservation).item_name}</p>
+              <div className="mt-2 min-w-0 text-sm text-[var(--c-muted2)]">{work.itemCount === 1
+                ? <StockSnapshotContent log={firstObservation} variant="panel" showUnit />
+                : `변경 ${work.changedItemCount}품목 · 변동 없음 ${work.unchangedItemCount}품목`}</div>
+            </button>
+            {work.itemCount > 1 && <details><summary className="flex min-h-11 cursor-pointer items-center text-xs text-[var(--c-blue)]">전체 {work.itemCount}품목 보기</summary>
+              {observationLogs.map(log => <button key={log.log_id} type="button" className="block min-h-11 w-full border-t border-[var(--c-border)] py-3 text-left" onClick={() => onSelectLog(log)}>
+                <span className="text-sm font-bold">{log.item_name}</span><span className="mt-1 block text-xs text-[var(--c-muted2)]">{log.mes_code}</span><div className="mt-1 min-w-0"><StockSnapshotContent log={log} variant="panel" showUnit /></div>
+              </button>)}
+            </details>}
+          </div>;
+        }
         const summary = getHistoryGroupSummary(g, g.type === "op_batch" ? batchCache.get(g.batchId) : undefined, batchCache);
         const single = g.type === "solo";
         const logs = g.type === "solo" ? [g.log] : g.type === "defect_lifecycle" ? [g.parent, g.child] : g.logs;

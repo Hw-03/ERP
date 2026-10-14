@@ -5,7 +5,7 @@ import { Package } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
-import { transactionColor } from "@/lib/mes-status";
+import { historyOperationColor } from "./historyOperationSource";
 import { formatHistoryDate } from "./historyFormat";
 import { getHistoryRowPresentation } from "./historyPresentation";
 import {
@@ -50,7 +50,7 @@ function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, contro
     : basePresentation;
   const groupSummary = getHistoryGroupSummary({ type: "solo", log });
   const badgeType = displayType ?? groupSummary.displayType;
-  const tcolor = isReworkOperation(log) ? LEGACY_COLORS.red : transactionColor(badgeType ?? log.transaction_type);
+  const tcolor = isReworkOperation(log) ? LEGACY_COLORS.red : historyOperationColor(log, badgeType ?? log.transaction_type);
 
   const rowBackground = selected
     ? tint(tcolor, hovered ? 18 : 10)
@@ -99,7 +99,7 @@ function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, contro
         </div>
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
-        <FlowBadge type={badgeType} label={operationLabel ?? groupSummary.label} color={tcolor} />
+        <FlowBadge type={badgeType} operation={log} label={operationLabel ?? groupSummary.label} color={tcolor} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex min-w-0 items-center gap-3">
