@@ -18,12 +18,12 @@ import { useRealtimeRevision } from "@/lib/queries/realtime";
  * Round-8 (R8-1) 추출. DesktopAdminView 의 6 useState + 2 useEffect (exhaustive-deps
  * disable Cat-C 2건) 를 1 hook 으로 묶고 useCallback 으로 deps 정상화.
  *
- * fetch 타이밍 / API 호출 횟수 변화 0:
  *   - unlocked + globalSearch 변화 시 items/employees/departments fetch (Promise.all)
  *   - models 는 useModelsQuery(enabled: unlocked) 로 분리 — unlocked 게이트 동일,
  *     React Query 캐시를 로컬 productModels state 로 미러링해 기존 setProductModels
  *     낙관적 갱신 API 를 그대로 유지한다.
  *   - unlocked 변화 시 BOM 별도 fetch
+ *   - realtime revision 변화 시 items/employees/BOM 갱신
  */
 export interface UseAdminBootstrapOptions {
   unlocked: boolean;
@@ -53,13 +53,19 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
   const realtimeRevision = useRealtimeRevision();
 
   const [items, setItems] = useState<Item[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employees, setEmployeesState] = useState<Employee[]>([]);
   const [productModels, setProductModels] = useState<ProductModel[]>([]);
   const [allBomRows, setAllBomRows] = useState<BOMDetailEntry[]>([]);
   const [departments, setDepartments] = useState<DepartmentMaster[]>([]);
   const itemsRequestId = useRef(0);
   const employeesRequestId = useRef(0);
   const allBomRequestId = useRef(0);
+
+  // 개인 저장 결과보다 먼저 시작한 조회가 저장 상태를 되돌리지 않게 한다.
+  const setEmployees = useCallback((next: React.SetStateAction<Employee[]>): void => {
+    employeesRequestId.current += 1;
+    setEmployeesState(next);
+  }, []);
 
   // models 만 React Query 로 분리 — enabled(unlocked) 로 게이트 보존.
   const { data: modelsData } = useModelsQuery({ enabled: unlocked });
@@ -76,7 +82,7 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
       api.getDepartments(),
     ]);
     if (requestId === itemsRequestId.current) setItems(nextItems);
-    if (employeeRequestId === employeesRequestId.current) setEmployees(nextEmployees);
+    if (employeeRequestId === employeesRequestId.current) setEmployeesState(nextEmployees);
     setDepartments(nextDepts);
   }, [globalSearch]);
 
@@ -99,10 +105,10 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
     if (requestId === itemsRequestId.current) setItems(next);
   }, [globalSearch]);
 
-  const refreshEmployees = useCallback(async (): Promise<void> => {
+  const refreshEmployees = useCallback(async () => {
     const requestId = ++employeesRequestId.current;
     const next = await api.getEmployees({ activeOnly: false });
-    if (requestId === employeesRequestId.current) setEmployees(next);
+    if (requestId === employeesRequestId.current) setEmployeesState(next);
   }, []);
 
   // items/employees/departments 부트스트랩 — unlocked + globalSearch 변화 시
@@ -124,8 +130,11 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
     void refreshItems().catch((nextError) =>
       onError(nextError instanceof Error ? nextError.message : "품목 목록을 새로고침하지 못했습니다."),
     );
+    void refreshEmployees().catch((nextError) =>
+      onError(nextError instanceof Error ? nextError.message : "직원 목록을 새로고침하지 못했습니다."),
+    );
     refreshAllBom();
-  }, [unlocked, realtimeRevision, refreshItems, refreshAllBom, onError]);
+  }, [unlocked, realtimeRevision, refreshItems, refreshEmployees, refreshAllBom, onError]);
 
   return {
     items, setItems,

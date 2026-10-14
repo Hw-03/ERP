@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DepartmentRole, Employee, WarehouseRole } from "@/lib/api";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "../_admin_sections/adminShared";
 import { normalizeEmployeePosition } from "../_admin_sections/_employee_parts/employeeRoleLabels";
@@ -54,28 +54,42 @@ function toEditForm(emp: Employee): EmployeeEditForm {
 }
 
 export function useAdminEmployeesForm(employees: Employee[]) {
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [selectedEmployee, setSelection] = useState<Employee | null>(null);
   const [empAddMode, setEmpAddMode] = useState(false);
   const [empAddForm, setEmpAddForm] = useState<EmployeeAddForm>(EMPTY_EMPLOYEE_FORM);
   const [editForm, setEditForm] = useState<EmployeeEditForm>(EMPTY_EDIT_FORM);
+
+  // 명시적 선택과 저장 응답은 새 편집 기준으로 사용한다.
+  const setSelectedEmployee = useCallback((employee: Employee | null) => {
+    setSelection(employee);
+    setEditForm(employee ? toEditForm(employee) : EMPTY_EDIT_FORM);
+  }, []);
 
   // 외부 employees 변경 시 selectedEmployee 동기화
   useEffect(() => {
     if (!selectedEmployee) return;
     const synced = employees.find((e) => e.employee_id === selectedEmployee.employee_id);
     if (synced && synced !== selectedEmployee) {
-      setSelectedEmployee(synced);
+      setEditForm((current) => {
+        const previous = toEditForm(selectedEmployee);
+        const next = toEditForm(synced);
+        const localChanges = Object.fromEntries(Object.entries(current).filter(([key, value]) =>
+          key !== "hidden_sidebar_tabs"
+          && JSON.stringify(value) !== JSON.stringify(previous[key as keyof EmployeeEditForm]),
+        ));
+        // 숨김 목록은 탭별로 병합해 다른 탭의 미저장 체크를 유지한다.
+        const tabs = new Set([...next.hidden_sidebar_tabs, ...current.hidden_sidebar_tabs]);
+        const hidden_sidebar_tabs = [...tabs].filter((tab) => {
+          const localHidden = current.hidden_sidebar_tabs.includes(tab);
+          return localHidden !== previous.hidden_sidebar_tabs.includes(tab)
+            ? localHidden
+            : next.hidden_sidebar_tabs.includes(tab);
+        });
+        return { ...next, ...localChanges, hidden_sidebar_tabs };
+      });
+      setSelection(synced);
     }
   }, [employees, selectedEmployee]);
-
-  // 직원 선택 시 editForm 채우기
-  useEffect(() => {
-    if (selectedEmployee) {
-      setEditForm(toEditForm(selectedEmployee));
-    } else {
-      setEditForm(EMPTY_EDIT_FORM);
-    }
-  }, [selectedEmployee]);
 
   function resetAddForm() {
     setEmpAddForm(() => EMPTY_EMPLOYEE_FORM);

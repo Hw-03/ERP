@@ -8,6 +8,11 @@ vi.mock("next/image", () => ({
 }));
 
 describe("DesktopSidebar", () => {
+  it("전수조사를 대시보드 바로 아래와 입출고 위에 둔다", () => {
+    render(<DesktopSidebar activeTab="dashboard" onTabChange={vi.fn()} visibleTabs={["dashboard", "stocktake", "warehouse"]} />);
+    const labels = screen.getAllByRole("button").map((button) => button.textContent ?? "").filter((text) => ["대시보드", "전수조사", "입출고"].some((label) => text.includes(label)));
+    expect(labels).toEqual([expect.stringContaining("대시보드"), expect.stringContaining("재고 전수조사"), expect.stringContaining("입출고")]);
+  });
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();

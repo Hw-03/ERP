@@ -37,6 +37,86 @@ describe("useAdminEmployeesForm", () => {
 
     expect(result.current.selectedEmployee).toBe(refreshed);
     expect(result.current.editForm.assigned_model_slots).toEqual([3, 1]);
+  });
+
+  it("preserves unsaved fields and individual tab edits while receiving a remote stocktake change", async () => {
+    const original = employee({ hidden_sidebar_tabs: ["weekly"] });
+    const { result, rerender } = renderHook(({ employees }) => useAdminEmployeesForm(employees), {
+      initialProps: { employees: [original] },
+    });
+    await act(async () => { result.current.setSelectedEmployee(original); });
+    await act(async () => {
+      result.current.setEditForm((form) => ({ ...form, name: "미저장 이름", hidden_sidebar_tabs: [] }));
+    });
+
+    const remote = employee({ phone: "01012345678", hidden_sidebar_tabs: ["weekly", "stocktake"] });
+    rerender({ employees: [remote] });
+
+    expect(result.current.selectedEmployee).toBe(remote);
+    expect(result.current.editForm.name).toBe("미저장 이름");
+    expect(result.current.editForm.phone).toBe("01012345678");
+    expect(result.current.editForm.hidden_sidebar_tabs).toEqual(["stocktake"]);
+    expect(result.current.dirty).toBe(true);
+  });
+
+  it("preserves an unsaved stocktake checkbox when the same employee refreshes", async () => {
+    const original = employee({ hidden_sidebar_tabs: ["stocktake"] });
+    const { result, rerender } = renderHook(({ employees }) => useAdminEmployeesForm(employees), {
+      initialProps: { employees: [original] },
+    });
+    await act(async () => { result.current.setSelectedEmployee(original); });
+    await act(async () => {
+      result.current.setEditForm((form) => ({ ...form, hidden_sidebar_tabs: [] }));
+    });
+    rerender({ employees: [employee({ phone: "updated", hidden_sidebar_tabs: ["stocktake", "weekly"] })] });
+
+    expect(result.current.editForm.hidden_sidebar_tabs).toEqual(["weekly"]);
+    expect(result.current.editForm.phone).toBe("updated");
+    expect(result.current.dirty).toBe(true);
+  });
+
+  it("applies remote values without making a clean employee form dirty", async () => {
+    const original = employee();
+    const { result, rerender } = renderHook(({ employees }) => useAdminEmployeesForm(employees), {
+      initialProps: { employees: [original] },
+    });
+    await act(async () => { result.current.setSelectedEmployee(original); });
+    rerender({ employees: [employee({ name: "서버 이름", hidden_sidebar_tabs: ["stocktake"] })] });
+    expect(result.current.editForm.name).toBe("서버 이름");
+    expect(result.current.editForm.hidden_sidebar_tabs).toEqual(["stocktake"]);
+    expect(result.current.dirty).toBe(false);
+  });
+
+  it("clears dirty edits after applying a successful save response", async () => {
+    const original = employee();
+    const saved = employee({ name: "저장 이름", hidden_sidebar_tabs: ["stocktake"] });
+    const { result, rerender } = renderHook(({ employees }) => useAdminEmployeesForm(employees), {
+      initialProps: { employees: [original] },
+    });
+    await act(async () => { result.current.setSelectedEmployee(original); });
+    await act(async () => {
+      result.current.setEditForm((form) => ({ ...form, name: " 저장 이름 ", hidden_sidebar_tabs: ["stocktake"] }));
+    });
+    await act(async () => {
+      rerender({ employees: [saved] });
+      result.current.setSelectedEmployee(saved);
+    });
+    expect(result.current.editForm.name).toBe("저장 이름");
+    expect(result.current.dirty).toBe(false);
+    rerender({ employees: [employee({ name: "다음 이름", hidden_sidebar_tabs: [] })] });
+    expect(result.current.editForm.name).toBe("다음 이름");
+    expect(result.current.editForm.hidden_sidebar_tabs).toEqual([]);
+    expect(result.current.dirty).toBe(false);
+  });
+
+  it("resets unsaved edits when selecting a different employee", async () => {
+    const original = employee();
+    const next = employee({ employee_id: "emp-2", name: "다른 직원", hidden_sidebar_tabs: [] });
+    const { result } = renderHook(() => useAdminEmployeesForm([original, next]));
+    await act(async () => { result.current.setSelectedEmployee(original); });
+    await act(async () => { result.current.setEditForm((form) => ({ ...form, name: "미저장" })); });
+    await act(async () => { result.current.setSelectedEmployee(next); });
+    expect(result.current.editForm.name).toBe("다른 직원");
     expect(result.current.dirty).toBe(false);
   });
 

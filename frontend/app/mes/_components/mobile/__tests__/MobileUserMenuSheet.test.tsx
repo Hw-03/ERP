@@ -1,5 +1,6 @@
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { clearCurrentOperator } from "../../login/useCurrentOperator";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const DEFAULT_ROLE = "조립/사원";
 
@@ -34,6 +35,29 @@ vi.mock("@/lib/api", () => ({ api: { changeMyPin: vi.fn() } }));
 import { MobileUserMenuSheet } from "../MobileUserMenuSheet";
 
 describe("MobileUserMenuSheet", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("waits for server revocation before reloading after logout", async () => {
+    const reload = vi.fn();
+    vi.stubGlobal("window", new Proxy(window, { get: (target, key) => key === "location" ? { reload } : Reflect.get(target, key) }));
+    let finish!: () => void;
+    vi.mocked(clearCurrentOperator).mockReturnValueOnce(new Promise<void>(resolve => { finish = resolve; }));
+    render(<MobileUserMenuSheet open onClose={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "로그아웃", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "로그아웃", exact: true }));
+    await waitFor(() => expect(clearCurrentOperator).toHaveBeenCalled());
+    expect(reload).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "로그아웃", exact: true })).toBeDisabled();
+    await act(async () => { finish(); });
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+  it("preserves login when the active stocktake cannot be saved", async () => {
+    vi.mocked(clearCurrentOperator).mockClear();
+    render(<MobileUserMenuSheet open onClose={() => {}} onBeforeLogout={async () => { throw new Error("저장 실패"); }} />);
+    fireEvent.click(screen.getByRole("button", { name: "로그아웃", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "로그아웃", exact: true }));
+    await screen.findByText("저장 결과를 확인하지 못해 로그아웃하지 않았습니다.");
+    expect(clearCurrentOperator).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     state.operator.role = DEFAULT_ROLE;
   });

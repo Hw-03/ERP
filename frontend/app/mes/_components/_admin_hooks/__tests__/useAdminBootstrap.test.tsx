@@ -28,6 +28,8 @@ vi.mock("@/lib/queries/realtime", () => ({
 }));
 
 import { useAdminBootstrap } from "../useAdminBootstrap";
+import { useAdminEmployeesForm } from "../useAdminEmployeesForm";
+import type { Employee } from "@/lib/api";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -46,7 +48,7 @@ describe("useAdminBootstrap realtime refresh", () => {
     mocks.getAllBOM.mockReset().mockResolvedValue([]);
   });
 
-  it("refreshes only items and all BOM rows when the database revision changes", async () => {
+  it("refreshes items, employees and BOM rows without reloading departments on revision changes", async () => {
     const onError = vi.fn();
     const { rerender } = renderHook(
       () => useAdminBootstrap({ unlocked: true, globalSearch: "", onError }),
@@ -66,7 +68,7 @@ describe("useAdminBootstrap realtime refresh", () => {
       expect(mocks.getItems).toHaveBeenCalledTimes(2);
       expect(mocks.getAllBOM).toHaveBeenCalledTimes(2);
     });
-    expect(mocks.getEmployees).toHaveBeenCalledTimes(1);
+    expect(mocks.getEmployees).toHaveBeenCalledTimes(2);
     expect(mocks.getDepartments).toHaveBeenCalledTimes(1);
   });
 
@@ -106,6 +108,92 @@ describe("useAdminBootstrap realtime refresh", () => {
       await older.promise;
     });
     expect(result.current.employees).toEqual(refreshed);
+  });
+
+  it("ignores a late bootstrap employee response after a newer revision refresh", async () => {
+    const older = deferred<unknown[]>();
+    mocks.getEmployees.mockReturnValueOnce(older.promise).mockResolvedValueOnce([
+      { employee_id: "emp-1", hidden_sidebar_tabs: ["stocktake"] },
+    ]);
+    const onError = vi.fn();
+    const { result, rerender } = renderHook(
+      () => useAdminBootstrap({ unlocked: true, globalSearch: "", onError }),
+    );
+    await waitFor(() => expect(mocks.getEmployees).toHaveBeenCalledTimes(1));
+
+    mocks.revision = 1;
+    rerender();
+    await waitFor(() => expect(result.current.employees).toEqual([
+      { employee_id: "emp-1", hidden_sidebar_tabs: ["stocktake"] },
+    ]));
+
+    await act(async () => {
+      older.resolve([{ employee_id: "emp-1", hidden_sidebar_tabs: [] }]);
+      await older.promise;
+    });
+    expect(result.current.employees[0]?.hidden_sidebar_tabs).toEqual(["stocktake"]);
+  });
+
+  it("ignores an older revision employee response after a newer loadData response", async () => {
+    const older = deferred<unknown[]>();
+    const initial = [{ employee_id: "emp-1", hidden_sidebar_tabs: [] }];
+    const latest = [{ employee_id: "emp-1", hidden_sidebar_tabs: ["stocktake"] }];
+    mocks.getEmployees.mockResolvedValueOnce(initial).mockReturnValueOnce(older.promise)
+      .mockResolvedValueOnce(latest);
+    const onError = vi.fn();
+    const { result, rerender } = renderHook(
+      () => useAdminBootstrap({ unlocked: true, globalSearch: "", onError }),
+    );
+    await waitFor(() => expect(result.current.employees).toEqual(initial));
+    mocks.revision = 1;
+    rerender();
+    await waitFor(() => expect(mocks.getEmployees).toHaveBeenCalledTimes(2));
+
+    await act(async () => { await result.current.loadData(); });
+    expect(result.current.employees).toEqual(latest);
+    await act(async () => {
+      older.resolve(initial);
+      await older.promise;
+    });
+    expect(result.current.employees).toEqual(latest);
+  });
+
+  it("keeps a successful personal save and clean form when an earlier employee refresh arrives late", async () => {
+    const older = deferred<Employee[]>();
+    const initial = {
+      employee_id: "emp-1", name: "직원", role: "사원", department: "조립",
+      hidden_sidebar_tabs: ["stocktake"],
+    } as Employee;
+    const saved = { ...initial, hidden_sidebar_tabs: [] };
+    mocks.getEmployees.mockResolvedValueOnce([initial]).mockReturnValueOnce(older.promise);
+    const onError = vi.fn();
+    const { result, rerender } = renderHook(() => {
+      const bootstrap = useAdminBootstrap({ unlocked: true, globalSearch: "", onError });
+      const form = useAdminEmployeesForm(bootstrap.employees);
+      return { bootstrap, form };
+    });
+    await waitFor(() => expect(result.current.bootstrap.employees).toEqual([initial]));
+    await act(async () => { result.current.form.setSelectedEmployee(initial); });
+    mocks.revision = 1;
+    rerender();
+    await waitFor(() => expect(mocks.getEmployees).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      result.current.bootstrap.setEmployees((current) => current.map((entry) =>
+        entry.employee_id === saved.employee_id ? saved : entry,
+      ));
+      result.current.form.setSelectedEmployee(saved);
+    });
+    expect(result.current.form.dirty).toBe(false);
+    await act(async () => {
+      older.resolve([initial]);
+      await older.promise;
+    });
+
+    expect(result.current.bootstrap.employees).toEqual([saved]);
+    expect(result.current.form.selectedEmployee).toBe(saved);
+    expect(result.current.form.editForm.hidden_sidebar_tabs).toEqual([]);
+    expect(result.current.form.dirty).toBe(false);
   });
 
   it("ignores an older item response that finishes after a newer revision response", async () => {

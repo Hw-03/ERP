@@ -27,9 +27,11 @@ type PinStep = "idle" | "current" | "new" | "confirm";
 export function MobileUserMenuSheet({
   open,
   onClose,
+  onBeforeLogout,
 }: {
   open: boolean;
   onClose: () => void;
+  onBeforeLogout?: () => Promise<void>;
 }) {
   const operator = useCurrentOperator();
 
@@ -44,6 +46,8 @@ export function MobileUserMenuSheet({
 
   // 로그아웃 확인
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
 
   function resetPin() {
     setPinStep("idle");
@@ -226,6 +230,7 @@ export function MobileUserMenuSheet({
           <div className="flex flex-col gap-2">
             <div className={`${TYPO.caption} font-semibold`} style={{ color: LEGACY_COLORS.muted2 }}>
               로그아웃하시겠습니까?
+              {logoutError && <p role="alert" className="mt-3 text-sm text-[var(--c-red)]">{logoutError}</p>}
             </div>
             <div className="flex gap-2">
               <button
@@ -238,7 +243,14 @@ export function MobileUserMenuSheet({
               </button>
               <button
                 type="button"
-                onClick={() => { clearCurrentOperator(); window.location.reload(); }}
+                disabled={logoutBusy}
+                onClick={async () => {
+                  if (logoutBusy) return;
+                  setLogoutBusy(true); setLogoutError("");
+                  try { await onBeforeLogout?.(); await clearCurrentOperator(); window.location.reload(); }
+                  catch { setLogoutError("저장 결과를 확인하지 못해 로그아웃하지 않았습니다."); }
+                  finally { setLogoutBusy(false); }
+                }}
                 className="flex-1 rounded-[14px] py-2.5 text-sm font-semibold transition-opacity active:opacity-70"
                 style={{
                   background: `color-mix(in srgb, ${LEGACY_COLORS.red} 18%, transparent)`,

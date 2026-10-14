@@ -1,5 +1,9 @@
+import type { StocktakeMenuVisibility } from "@/lib/api/types/stocktake";
+import { canManageStocktakeRounds } from "./stocktake/stocktakeAuthority";
+
 export const SIDEBAR_TAB_IDS = [
   "dashboard",
+  "stocktake",
   "warehouse",
   "shipping",
   "warehouseMap",
@@ -16,10 +20,12 @@ export type DesktopTabId = SidebarTabId | "settings";
 
 export const IO_RELATED_SIDEBAR_TAB_IDS = ["warehouse", "defect"] as const;
 
-export const MOBILE_MORE_ENTRY_TAB_IDS = ["dailyReport", "weekly", "shipping", "warehouseMap"] as const;
+export const MOBILE_MORE_ENTRY_TAB_IDS = ["stocktake", "dailyReport", "weekly", "shipping", "warehouseMap"] as const;
 
 type TabAccessSource = {
   hidden_sidebar_tabs?: readonly string[] | null;
+  department?: string;
+  department_role?: string;
 } | null | undefined;
 
 const SIDEBAR_TAB_ID_SET = new Set<string>(SIDEBAR_TAB_IDS);
@@ -42,20 +48,28 @@ export function normalizeHiddenSidebarTabs(raw: readonly string[] | null | undef
   return normalizeIoRelatedHiddenTabs(tabs);
 }
 
-export function isSidebarTabVisible(tab: SidebarTabId, source: TabAccessSource): boolean {
-  return !normalizeHiddenSidebarTabs(source?.hidden_sidebar_tabs).includes(tab);
+/** Bulk saves update personal settings; the token-bound response resolves stale login snapshots. */
+export function isSidebarTabVisible(tab: SidebarTabId, source: TabAccessSource, stocktakeMenu?: StocktakeMenuVisibility): boolean {
+  if (tab === "stocktake") {
+    if (!source) return false;
+    if (stocktakeMenu) return stocktakeMenu.employee_visible;
+    return canManageStocktakeRounds(source)
+      && !normalizeHiddenSidebarTabs(source.hidden_sidebar_tabs).includes(tab);
+  }
+  if (normalizeHiddenSidebarTabs(source?.hidden_sidebar_tabs).includes(tab)) return false;
+  return true;
 }
 
-export function filterVisibleSidebarTabs<T extends SidebarTabId>(tabs: readonly T[], source: TabAccessSource): T[] {
-  return tabs.filter((tab) => isSidebarTabVisible(tab, source));
+export function filterVisibleSidebarTabs<T extends SidebarTabId>(tabs: readonly T[], source: TabAccessSource, stocktakeMenu?: StocktakeMenuVisibility): T[] {
+  return tabs.filter((tab) => isSidebarTabVisible(tab, source, stocktakeMenu));
 }
 
 export function firstVisibleSidebarTab(source: TabAccessSource): SidebarTabId {
   return filterVisibleSidebarTabs(SIDEBAR_TAB_IDS, source)[0] ?? "dashboard";
 }
 
-export function mobileMoreHasVisibleEntries(source: TabAccessSource): boolean {
-  return MOBILE_MORE_ENTRY_TAB_IDS.some((tab) => isSidebarTabVisible(tab, source));
+export function mobileMoreHasVisibleEntries(source: TabAccessSource, stocktakeMenu?: StocktakeMenuVisibility): boolean {
+  return MOBILE_MORE_ENTRY_TAB_IDS.some((tab) => isSidebarTabVisible(tab, source, stocktakeMenu));
 }
 export function setSidebarTabVisible(
   hiddenTabs: readonly string[] | null | undefined,
