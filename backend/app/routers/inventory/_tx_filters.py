@@ -352,6 +352,21 @@ def _plain_tx_clause(*codes: str) -> ColumnElement:
             IoBatch.sub_type.notin_(list(_DETERMINING_SUBTYPES)),
         ),
         not_(_legacy_defect_rework_filter()),
+        not_(_stocktake_operation_filter()),
+    )
+
+
+def _stocktake_operation_filter() -> ColumnElement[bool]:
+    """Classify linked observations by immutable operation source, not memo text."""
+    return (
+        select(InventoryOperation.operation_id)
+        .where(
+            InventoryOperation.operation_id == TransactionLog.operation_id,
+            InventoryOperation.domain == "stocktake",
+            InventoryOperation.action == "apply",
+        )
+        .correlate(TransactionLog)
+        .exists()
     )
 
 
@@ -368,6 +383,7 @@ def _operation_keys_filter(operation_keys: Optional[str]) -> Optional[ColumnElem
     no_shipping_phase = TransactionLog.shipping_phase.is_(None)
     key_clauses: dict[str, ColumnElement] = {
         "tube_material": and_(IoBatch.work_type == "tube_material", IoBatch.sub_type.in_(["tube_receive_supplier", "tube_outbound_supplier"]), no_shipping_phase),
+        "stocktake": _stocktake_operation_filter(),
         "warehouse": or_(
             and_(
                 IoBatch.sub_type.in_(
@@ -457,7 +473,6 @@ def _history_requester_employee_id_expr() -> ColumnElement:
         else_=func.coalesce(workflow_requester, batch_requester, reference_requester, IoBatch.requester_employee_id,
                             submission_requester, operation_actor, TransactionLog.producer_employee_id),
     )
-
 
 
 def _apply_common_filters(
@@ -619,6 +634,7 @@ def _history_list_operation_label_expr() -> ColumnElement[str]:
         TransactionLog.reference_no.like("DEPT-CORRECTION-%"),
     )
     base_label = case(
+        (_stocktake_operation_filter(), "재고 전수조사"),
         (department_correction, "부서 위치 조정"),
         (TransactionLog.transaction_type == TransactionTypeEnum.UNMARK_DEFECTIVE, "불량 정상 복귀"),
         (TransactionLog.transaction_type == TransactionTypeEnum.SUPPLIER_RETURN, "반품"),
@@ -927,6 +943,8 @@ def _to_log_response(
         operation_id=log.operation_id,
         operation_role=log.operation_role.value if log.operation_role else None,
         operation_kind=operation.kind.value if operation else None,
+        operation_domain=operation.domain if operation else None,
+        operation_action=operation.action if operation else None,
         operation_display_label=operation.display_label if operation else None,
         operation_effective_status=(
             "cancellation"

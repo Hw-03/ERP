@@ -20,8 +20,8 @@ from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import String, and_, case, cast, func, literal, or_, select
 from sqlalchemy.orm import Session
-from sqlalchemy.engine import Row
 from sqlalchemy.sql.elements import ColumnElement
+from sqlalchemy.engine import Row
 
 from app.database import get_db
 from app.models import (
@@ -33,6 +33,7 @@ from app.models import (
     TransactionEditLog,
     TransactionLog,
     TransactionTypeEnum,
+    StocktakeApplication,
 )
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
@@ -49,6 +50,8 @@ from app.services import inventory_operation_cancellation as operation_cancellat
 from app.services import legacy_inventory_operation_adoption as legacy_adoption_svc
 from app.services.transaction_display_groups import DisplayGroup, DisplayGroupRecord, group_display_records
 from app.services.request_order_stock import load_request_order_stock
+from app.services.stocktake_history import observation_groups, hydrate_observation_groups
+from app.services import inventory_operation_history
 from app.services.export_helpers import csv_streaming_response
 from app.services.pin_auth import verify_pin
 from app.utils.search import build_normalized_search_filter
@@ -105,7 +108,6 @@ class TransactionSummaryResponse(BaseModel):
     department_counts: dict[str, int] = {}
 
 
-
 class DisplayCalendarDayResponse(BaseModel):
     """Counts whole visible work units, not quantities or physical log rows."""
     total: int = 0
@@ -115,18 +117,16 @@ class DisplayCalendarDayResponse(BaseModel):
     other_count: int = 0
 
 
-
 class DisplayCalendarResponse(BaseModel):
     """KST day counts for the selected month and all twelve month counts."""
     days: dict[str, DisplayCalendarDayResponse]
     months: dict[str, int]
 
 
-
 @dataclass
 class _DisplayWorkQuery:
     """Shared lightweight grouping pass; only the list hydrates detail rows."""
-    groups: list[DisplayGroup[DisplayGroupRecord]]
+    groups: list[TransactionDisplayGroupResponse | DisplayGroup[DisplayGroupRecord]]
     rows: list[Row[Any]]
     batch_map: dict[uuid.UUID, Any]
     stock_request_map: dict[str, Any]
@@ -176,6 +176,12 @@ def _decode_display_group_cursor(cursor: str) -> dict[str, str | None]:
 def _display_group_sort_tuple(
     group: TransactionDisplayGroupResponse | DisplayGroup[DisplayGroupRecord],
 ) -> tuple[str, str, str]:
+    if isinstance(group, TransactionDisplayGroupResponse) and group.operation:
+        stamp = group.operation["effective_at"].isoformat()
+        return (stamp, stamp, group.key)
+    if isinstance(group, TransactionDisplayGroupResponse) and group.stocktake:
+        stamp = group.stocktake['created_at'].removesuffix('Z')
+        return (stamp, stamp, group.key)
     # 불량 lifecycle은 화면 의미상 부모→후속 로그 순서를 보존한다. 다만 대표 행의
     # 정렬·커서는 실제 목록에서 먼저 나타나는(가장 최신인) 후속 로그를 기준으로 삼아야
     # 그 사이에 생긴 다른 대표 행이 다음 페이지에서 누락되지 않는다.
@@ -548,11 +554,18 @@ def _load_display_work_groups(
                 "active" if operation else None
             ),
         ))
-    groups = group_display_records(records, include_submissions=True)
+    stocktake_groups = observation_groups(db, search=search, department=department, model=model,
+        process_step=process_step, date_from=date_from, date_to=date_to, operation_keys=operation_keys,
+        transaction_types=transaction_types or (transaction_type.value if transaction_type else None),
+        include_archived=include_archived, item_id=item_id, reference_no=reference_no,
+        operation_batch_id=operation_batch_id, requester_employee_id=requester_employee_id)
+    # Remove log projections only for operations carrying typed observation evidence.
+    typed_ids = {str(row[0]) for row in db.query(StocktakeApplication.operation_id).all()}
+    groups = group_display_records([row for row in records if str(row.operation_id) not in typed_ids], include_submissions=True)
     if matched_log_ids is not None:
         groups = [group for group in groups if any(log.log_id in matched_log_ids for log in group.logs)]
+    groups = sorted([*groups, *stocktake_groups], key=_display_group_sort_tuple, reverse=True)
     return _DisplayWorkQuery(groups, rows, batch_map, stock_request_map, operation_map, queried_at, matched_log_ids)
-
 
 
 @router.get(
@@ -574,11 +587,16 @@ def list_transaction_display_groups(
     date_to: Optional[date] = Query(None),
     include_archived: bool = Query(False),
     requester_employee_id: Optional[uuid.UUID] = Query(None, description="등록·요청 직원 ID로 내역 조회"),
+    include_operation_only: bool = Query(False, description="품목 최근 이력 전용. item_id 필수이며 추가 필터와 함께 사용할 수 없습니다."),
     cursor: Optional[str] = Query(None),
     limit: int = Query(DISPLAY_GROUP_PAGE_SIZE, ge=1, le=DISPLAY_GROUP_PAGE_SIZE),
     db: Session = Depends(get_db),
 ) -> TransactionDisplayGroupPageResponse:
     """검색 일치 로그가 속한 작업을 보존하고 완결된 그룹 단위로 반환한다."""
+    if include_operation_only and (item_id is None or any((operation_batch_id, transaction_type,
+            transaction_types, operation_keys, reference_no, search, department, model,
+            process_step, date_from, date_to, requester_employee_id))):
+        raise http_error(400, ErrorCode.BAD_REQUEST, "작업 전용 이력은 품목 ID만 지정하여 조회해 주세요.")
     started = perf_counter()
     data = _load_display_work_groups(db, item_id=item_id, operation_batch_id=operation_batch_id,
         transaction_type=transaction_type, transaction_types=transaction_types, operation_keys=operation_keys,
@@ -587,8 +605,20 @@ def list_transaction_display_groups(
         requester_employee_id=requester_employee_id)
     groups, rows = data.groups, data.rows
     batch_map, stock_request_map, operation_map = data.batch_map, data.stock_request_map, data.operation_map
-    queried_at, matched_log_ids = data.queried_at, data.matched_log_ids
+    queried_at = data.queried_at
+    matched_log_ids = data.matched_log_ids
     requested_at_order = _history_request_date_expr()
+    if include_operation_only:
+        # 전체 대표 행에 이미 나타난 작업을 먼저 제외해야 페이지 경계에서 중복되지 않는다.
+        represented_ids = {log.operation_id for group in groups for log in group.logs if log.operation_id}
+        represented_ids.update(uuid.UUID(group.stocktake["operation_id"]) for group in groups
+            if isinstance(group, TransactionDisplayGroupResponse) and group.stocktake)
+        item = db.get(Item, item_id)
+        matching_ids = inventory_operation_history.item_operation_ids(db, item_id) if item and (include_archived or item.deleted_at is None) else set()
+        operation_rows = db.query(InventoryOperation).filter(InventoryOperation.operation_id.in_(matching_ids - represented_ids)).all() if matching_ids else []
+        groups = [*groups, *(TransactionDisplayGroupResponse(type="operation", key=str(operation.operation_id), logs=[],
+            operation={"effective_at": operation.effective_at, "operation_id": str(operation.operation_id)}) for operation in operation_rows)]
+        groups.sort(key=_display_group_sort_tuple, reverse=True)
     if cursor:
         cursor_value = _decode_display_group_cursor(cursor)
         groups = [group for group in groups if _is_after_display_group_cursor(group, cursor_value)]
@@ -622,7 +652,7 @@ def list_transaction_display_groups(
                 history_batch=_history_batch_response(batch_map.get(log.operation_batch_id)),
             )
     page_groups = [
-        TransactionDisplayGroupResponse(
+        group if isinstance(group, TransactionDisplayGroupResponse) else TransactionDisplayGroupResponse(
             type=group.type, key=group.key, logs=[details[log.log_id] for log in group.logs],
             matched_log_ids=(
                 [log.log_id for log in group.logs if log.log_id in matched_log_ids]
@@ -641,6 +671,11 @@ def list_transaction_display_groups(
         )
         for group in selected_groups
     ]
+    hydrate_observation_groups(db, page_groups)
+    for group in page_groups:
+        if group.operation:
+            operation = db.get(InventoryOperation, uuid.UUID(group.key))
+            group.operation = inventory_operation_history.operation_payload(db, operation, selected_item_id=item_id)
     hydrated_at = perf_counter()
     request_order_stock = load_request_order_stock(
         db, {log.item_id for group in page_groups for log in group.logs},
@@ -734,11 +769,13 @@ def list_reference_summaries(
 
 
 def _display_work_categories(
-    group: DisplayGroup[DisplayGroupRecord],
+    group: TransactionDisplayGroupResponse | DisplayGroup[DisplayGroupRecord],
     rows_by_id: dict[uuid.UUID, Row[Any]],
     operation_map: dict[uuid.UUID, Any],
 ) -> set[str]:
     """Keep existing category membership while counting each work only once per category."""
+    if isinstance(group, TransactionDisplayGroupResponse) and group.stocktake:
+        return {"adjust_count"}
     categories: set[str] = set()
     for log in group.logs:
         row = rows_by_id[log.log_id]
@@ -760,7 +797,6 @@ def _display_work_categories(
         ):
             categories.add("adjust_count")
     return categories
-
 
 
 @router.get("/transactions/display-calendar", response_model=DisplayCalendarResponse)
@@ -802,7 +838,6 @@ def get_transaction_display_calendar(
         if not categories:
             counts.other_count += 1
     return DisplayCalendarResponse(days=days, months=months)
-
 
 
 @router.get("/transactions/summary", response_model=TransactionSummaryResponse)
@@ -853,6 +888,18 @@ def get_transactions_summary(
         include_archived=include_archived,
         requester_employee_id=requester_employee_id,
     )
+
+    # Typed census evidence includes unchanged counts and replaces its adjustment logs.
+    stocktake_groups = observation_groups(
+        db, transaction_types=transaction_types, operation_keys=operation_keys,
+        search=search, department=department, model=model, process_step=process_step,
+        date_from=date_from, date_to=date_to, include_archived=include_archived,
+        requester_employee_id=requester_employee_id,
+    )
+    query = query.filter(or_(
+        TransactionLog.operation_id.is_(None),
+        ~TransactionLog.operation_id.in_(select(StocktakeApplication.operation_id)),
+    ))
 
     # 신규 원장은 operation_id, 레거시 묶음은 operation_batch_id를 한 작업으로 센다.
     # 취소 시 레거시 묶음이 원장 작업으로 편입되어도 원 작업 카운트가 흔들리지 않는다.
@@ -926,12 +973,15 @@ def get_transactions_summary(
         .all()
     )
     department_counts = {r.dept: int(r.c) for r in dept_rows if r.dept is not None}
+    for group in stocktake_groups:
+        location = group.stocktake["department"]
+        department_counts[location] = department_counts.get(location, 0) + 1
 
     return TransactionSummaryResponse(
-        total=int(agg.total or 0),
+        total=int(agg.total or 0) + len(stocktake_groups),
         warehouse_count=int(agg.warehouse_count or 0),
         dept_count=int(agg.dept_count or 0),
-        adjust_count=int(agg.adjust_count or 0),
+        adjust_count=int(agg.adjust_count or 0) + len(stocktake_groups),
         department_counts=department_counts,
     )
 

@@ -39,6 +39,28 @@ from app.services import inventory_operations as operation_svc
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
 
+def test_pool_only_operation_detail_identifies_item_and_physical_scope(client, db_session, make_item):
+    from app.models import DefectStockMovement
+    from tests.services.test_defect_pool import pool_environment
+
+    item = make_item(name="Pool evidence item")
+    actor, pool = pool_environment(db_session, item)
+    operation = operation_svc.create_business_operation(db_session, domain="pool", action="move", display_label="Pool evidence", actor_name=actor.name, actor_employee_id=actor.employee_id)
+    db_session.flush()
+    db_session.add(DefectStockMovement(pool_id=pool.pool_id, operation_id=operation.operation_id, effect_ordinal=0, delta=3, before_quantity=1, after_quantity=4, reason="fixture evidence"))
+    db_session.commit()
+    response = client.get(f"/api/inventory/operations/{operation.operation_id}")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["lines"] == []
+    movement = body["pool_movements"][0]
+    assert movement["item_name"] == item.item_name
+    assert movement["mes_code"] == item.mes_code
+    assert movement["physical_department"] == "창고"
+    assert movement["category"] == "DEFECT"
+    assert (movement["before_quantity"], movement["after_quantity"]) == (1, 4)
+
+
 def _seed_operation(db_session, make_item):
     item = make_item(name="작업 API 입고", warehouse_qty=Decimal("0"))
     actor = Employee(

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     DefectInventoryMovement,
+    DefectStockMovement,
     InventoryOperation,
     InventoryOperationEffect,
     InventoryOperationEffectKindEnum,
@@ -209,8 +210,15 @@ def record_defect_movement(
     role: str,
     actor_name: str,
     actor_employee_id: Optional[uuid.UUID],
-) -> Optional[DefectInventoryMovement]:
+) -> DefectInventoryMovement | DefectStockMovement | None:
     """활성 작업이 바꾼 격리 건 잔량을 append-only 이동으로 남긴다."""
+    from app.services import defect_pool
+
+    if defect_pool.is_pool_mode(db):
+        return defect_pool.record_occurrence_effect(
+            db, record_id=record_id, delta=quantity_delta,
+            operation=operation, reason=movement_type,
+        )
     if operation is None:
         return None
     movement = DefectInventoryMovement(

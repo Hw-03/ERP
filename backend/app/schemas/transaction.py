@@ -113,6 +113,8 @@ class TransactionLogResponse(BaseModel):
     operation_id: Optional[uuid.UUID] = None
     operation_role: Optional[str] = None
     operation_kind: Optional[str] = None
+    operation_domain: Optional[str] = None
+    operation_action: Optional[str] = None
     operation_display_label: Optional[str] = None
     operation_effective_status: Optional[str] = None
     reversal_operation_id: Optional[uuid.UUID] = None
@@ -137,6 +139,8 @@ class TransactionDisplayGroupResponse(BaseModel):
     logs: list[TransactionLogResponse]
     matched_log_ids: Optional[list[uuid.UUID]] = None
     work_groups: list["TransactionDisplayGroupResponse"] = Field(default_factory=list)
+    stocktake: Optional[dict[str, Any]] = None
+    operation: Optional[dict[str, Any]] = Field(default=None, exclude_if=lambda operation: operation is None)
 
 
 class TransactionDisplayGroupPageResponse(BaseModel):

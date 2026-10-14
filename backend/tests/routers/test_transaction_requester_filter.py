@@ -151,6 +151,19 @@ def test_requester_calendar_counts_beyond_one_page_at_kst_year_boundary(client: 
     assert client.get("/api/inventory/transactions/display-calendar", params={**params, "year": 2025, "month": 12}).json()["months"]["2025-12"] == 0
 
 
+def test_requester_filter_covers_unchanged_stocktake_work(client: TestClient, db_session: Session, make_item: Any) -> None:
+    """거래 로그가 없는 전수조사도 실제 등록 직원에게만 표시한다."""
+    from tests.services.test_stocktake_counts import setup_round
+    from tests.services.test_stocktake_application import confirm, preview, apply
+    env = setup_round(db_session, make_item)
+    count = confirm(db_session, env)
+    apply(db_session, env, preview(db_session, env, count))
+    for employee_id, expected_count in [(env[1].employee_id, 1), (uuid.uuid4(), 0)]:
+        params = {"requester_employee_id": str(employee_id)}
+        page = client.get("/api/inventory/transactions/display-groups", params=params)
+        assert page.status_code == 200, page.text
+        assert len(page.json()["groups"]) == expected_count
+        assert client.get("/api/inventory/transactions/summary", params=params).json()["total"] == expected_count
 
 
 @pytest.mark.parametrize("endpoint", ["display-groups", "display-calendar", "summary", "reference-summaries"])
@@ -176,3 +189,11 @@ def test_cancellation_without_actor_is_not_attributed_to_original_author(client:
     params = {"requester_employee_id": str(actor.employee_id)}
     assert client.get("/api/inventory/transactions/display-groups", params=params).json()["groups"] == []
     assert client.get("/api/inventory/transactions/summary", params=params).json()["total"] == 0
+
+
+def test_requester_filter_cannot_be_combined_with_item_operation_only_mode(client: TestClient, make_item: Any) -> None:
+    """품목 최근 이력의 필터 미지원 모드로 조회 조건을 우회할 수 없다."""
+    item = make_item()
+    response = client.get("/api/inventory/transactions/display-groups", params={"item_id": str(item.item_id),
+        "include_operation_only": True, "requester_employee_id": str(uuid.uuid4())})
+    assert response.status_code == 400

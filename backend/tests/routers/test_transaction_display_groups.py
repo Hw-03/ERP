@@ -9,6 +9,147 @@ import pytest
 from app.models import Employee, InventoryOperation, IoBatch, TransactionLog, TransactionTypeEnum
 
 
+def _add_correction(db_session, item, *, stamp, source_kind="operation"):
+    from app.models import BusinessCorrection, BusinessCorrectionSource
+
+    original = InventoryOperation(kind="BUSINESS", domain="inventory_io", action="receive", display_label="original", actor_name="Tester", effective_at=stamp)
+    correction_op = InventoryOperation(kind="BUSINESS", domain="inventory", action="business_correction", display_label="correction", actor_name="Tester", effective_at=stamp)
+    actor = Employee(employee_code=f"COR-{len(db_session.new)}-{id(correction_op)}", name="Tester", role="operator", department="조립")
+    db_session.add_all([original, correction_op, actor])
+    db_session.flush()
+    log = _add_log(db_session, item, created_at=stamp)
+    log.operation_id = original.operation_id
+    correction = BusinessCorrection(source_type="InventoryOperation", source_id=original.operation_id, atomic_group_key=str(original.operation_id), scope={}, scope_hash="a" * 64, target_status="CANCELLED", reason="fix", evidence="proof", requester_id=actor.employee_id, requester_name=actor.name, status="APPLIED", application_operation_id=correction_op.operation_id)
+    db_session.add(correction)
+    db_session.flush()
+    db_session.add(BusinessCorrectionSource(source_kind=source_kind, source_id=log.log_id if source_kind == "transaction" else original.operation_id, correction_id=correction.correction_id))
+    return original, correction_op
+
+
+@pytest.mark.parametrize("source_kind", ["operation", "transaction"])
+def test_item_history_opt_in_adds_only_associated_unrepresented_operations(client, db_session, make_item, source_kind):
+    item, sibling = make_item(name="correction item"), make_item(name="other correction item")
+    original, correction = _add_correction(db_session, item, stamp=datetime(2026, 9, 1), source_kind=source_kind)
+    _, unrelated = _add_correction(db_session, sibling, stamp=datetime(2026, 9, 1))
+    db_session.commit()
+    params = {"item_id": str(item.item_id)}
+    default = client.get("/api/inventory/transactions/display-groups", params=params).json()
+    assert len(default["groups"]) == 1
+    assert "operation" not in default["groups"][0]
+    expanded = client.get("/api/inventory/transactions/display-groups", params={**params, "include_operation_only": True})
+    assert expanded.status_code == 200, expanded.text
+    groups = expanded.json()["groups"]
+    operations = [group["operation"] for group in groups if group.get("operation")]
+    assert [row["operation_id"] for row in operations] == [str(correction.operation_id)]
+    assert str(unrelated.operation_id) not in str(groups)
+    assert len(groups) == 2
+    assert operations[0]["business_correction"]["source_operation_ids"] == [str(original.operation_id)]
+
+
+def test_item_history_operation_only_ties_cursor_and_page_hydration(client, db_session, make_item, monkeypatch):
+    from app.services import inventory_operation_history
+
+    item = make_item(name="mixed page ties")
+    corrections = [_add_correction(db_session, item, stamp=datetime(2026, 9, 1)) for _ in range(5)]
+    db_session.commit()
+    hydrated = []
+    payload = inventory_operation_history.operation_payload
+
+    def tracked(db, operation, **kwargs):
+        hydrated.append(str(operation.operation_id))
+        return payload(db, operation, **kwargs)
+
+    monkeypatch.setattr(inventory_operation_history, "operation_payload", tracked)
+    params = {"item_id": str(item.item_id), "include_operation_only": True, "limit": 2}
+    groups = []
+    while True:
+        before = len(hydrated)
+        response = client.get("/api/inventory/transactions/display-groups", params=params)
+        assert response.status_code == 200, response.text
+        page = response.json()
+        assert len(hydrated) - before == sum(bool(group.get("operation")) for group in page["groups"])
+        groups.extend(page["groups"])
+        if not page["has_more"]:
+            break
+        params["cursor"] = page["next_cursor"]
+    assert len(groups) == 10
+    assert len({(group["type"], group["key"]) for group in groups}) == 10
+    assert set(hydrated) == {str(correction.operation_id) for _, correction in corrections}
+
+
+def test_operation_only_requires_item_and_rejects_log_filters(client, make_item):
+    item = make_item(name="bounded opt in")
+    for params in ({}, {"item_id": str(item.item_id), "search": "term"}, {"item_id": str(item.item_id), "transaction_types": "ADJUST"}, {"item_id": str(item.item_id), "requester_employee_id": str(item.item_id)}):
+        response = client.get("/api/inventory/transactions/display-groups", params={**params, "include_operation_only": True})
+        assert response.status_code == 400
+
+
+def test_display_group_default_wire_omits_only_empty_operation_projection():
+    from app.schemas import TransactionDisplayGroupResponse
+
+    child = TransactionDisplayGroupResponse(type="solo", key="child", logs=[])
+    group = TransactionDisplayGroupResponse(type="submission", key="parent", logs=[], work_groups=[child])
+    payload = group.model_dump(mode="json")
+    assert "operation" not in payload
+    assert "operation" not in payload["work_groups"][0]
+    assert payload["stocktake"] is None
+    assert payload["matched_log_ids"] is None
+
+
+def test_item_history_mixes_observation_transaction_and_correction_without_duplicates(client, db_session, make_item):
+    from app import models
+    from tests.services.test_stocktake_counts import setup_round
+    from tests.services.test_stocktake_application import confirm, preview, apply
+
+    env = setup_round(db_session, make_item)
+    count = confirm(db_session, env)
+    apply(db_session, env, preview(db_session, env, count))
+    item = env[2]
+    original, correction = _add_correction(db_session, item, stamp=datetime(2026, 9, 1))
+    observation = db_session.query(models.InventoryOperation).filter_by(domain="stocktake", action="apply").one()
+    observation.effective_at = datetime(2026, 9, 1)
+    db_session.commit()
+    groups, cursor = [], None
+    for _ in range(3):
+        params = {"item_id": str(item.item_id), "include_operation_only": True, "limit": 1}
+        if cursor:
+            params["cursor"] = cursor
+        response = client.get("/api/inventory/transactions/display-groups", params=params)
+        assert response.status_code == 200, response.text
+        page = response.json()
+        assert len(page["groups"]) == 1
+        groups.extend(page["groups"])
+        cursor = page["next_cursor"]
+    assert cursor is None
+    assert sum(bool(group["logs"]) for group in groups) == 1
+    assert sum(bool(group["stocktake"]) for group in groups) == 1
+    assert [group["operation"]["operation_id"] for group in groups if group.get("operation")] == [str(correction.operation_id)]
+    assert groups[next(i for i, g in enumerate(groups) if g["stocktake"])]["stocktake"]["operation_id"] == str(observation.operation_id)
+    assert not any(group.get("operation") and group["operation"]["operation_id"] == str(original.operation_id) for group in groups)
+
+
+def test_item_history_operation_only_pool_projection_keeps_real_quantities(client, db_session, make_item):
+    from app.models import DefectStockMovement
+    from tests.services.test_defect_pool import pool_environment
+
+    item = make_item(name="pool item")
+    actor, pool = pool_environment(db_session, item)
+    operation = InventoryOperation(kind="BUSINESS", domain="pool", action="move", display_label="pool movement", actor_name=actor.name, effective_at=datetime(2026, 9, 1))
+    db_session.add(operation)
+    db_session.flush()
+    db_session.add(DefectStockMovement(pool_id=pool.pool_id, operation_id=operation.operation_id, effect_ordinal=0, delta=3, before_quantity=1, after_quantity=4, reason="fixture movement"))
+    db_session.commit()
+    params = {"item_id": str(item.item_id)}
+    assert client.get("/api/inventory/transactions/display-groups", params=params).json()["groups"] == []
+    response = client.get("/api/inventory/transactions/display-groups", params={**params, "include_operation_only": True})
+    assert response.status_code == 200, response.text
+    groups = response.json()["groups"]
+    assert len(groups) == 1 and groups[0]["logs"] == []
+    movement = groups[0]["operation"]["pool_movements"][0]
+    assert movement["item_id"] == str(item.item_id)
+    assert (movement["delta"], movement["before_quantity"], movement["after_quantity"]) == (3, 1, 4)
+
+
 def test_display_groups_only_hydrates_selected_page(client, db_session, make_item, monkeypatch):
     """Detail conversion must scale with the page, not all matching history."""
     from app.routers.inventory import transactions

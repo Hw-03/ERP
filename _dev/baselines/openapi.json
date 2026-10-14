@@ -1394,6 +1394,26 @@
         "title": "BulkQuarantineResult",
         "type": "object"
       },
+      "BulkSelectionBody": {
+        "additionalProperties": false,
+        "description": "The service bounds whole-round selections using actual admitted membership.",
+        "properties": {
+          "confirmation_revision_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Confirmation Revision Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "confirmation_revision_ids"
+        ],
+        "title": "BulkSelectionBody",
+        "type": "object"
+      },
       "BulkUnquarantineLine": {
         "properties": {
           "department": {
@@ -1404,6 +1424,18 @@
             "format": "uuid",
             "title": "Item Id",
             "type": "string"
+          },
+          "pool_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool Id"
           },
           "quantity": {
             "anyOf": [
@@ -1418,13 +1450,19 @@
             "title": "Quantity"
           },
           "record_id": {
-            "format": "uuid",
-            "title": "Record Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Record Id"
           }
         },
         "required": [
-          "record_id",
           "item_id",
           "department",
           "quantity"
@@ -1965,6 +2003,282 @@
         "title": "CapacityTopItem",
         "type": "object"
       },
+      "ClosePreviewBody": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmation_revision_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Confirmation Revision Ids",
+            "type": "array"
+          },
+          "mode": {
+            "enum": [
+              "FULL",
+              "PARTIAL"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "reason": {
+            "default": "",
+            "maxLength": 1000,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "ClosePreviewBody",
+        "type": "object"
+      },
+      "CommandResolution": {
+        "additionalProperties": false,
+        "properties": {
+          "command_payload": {
+            "additionalProperties": true,
+            "title": "Command Payload",
+            "type": "object"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "command_payload",
+          "reason"
+        ],
+        "title": "CommandResolution",
+        "type": "object"
+      },
+      "CorrectionApproveBody": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "preview_hash": {
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Preview Hash",
+            "type": "string"
+          },
+          "preview_id": {
+            "format": "uuid",
+            "title": "Preview Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_version",
+          "preview_id",
+          "preview_hash"
+        ],
+        "title": "CorrectionApproveBody",
+        "type": "object"
+      },
+      "CorrectionDecisionBody": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_version",
+          "reason"
+        ],
+        "title": "CorrectionDecisionBody",
+        "type": "object"
+      },
+      "CorrectionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence": {
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Evidence",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "source_id": {
+            "format": "uuid",
+            "title": "Source Id",
+            "type": "string"
+          },
+          "source_type": {
+            "enum": [
+              "InventoryOperation",
+              "ShippingRequest",
+              "StockRequest",
+              "HandoverDoc"
+            ],
+            "title": "Source Type",
+            "type": "string"
+          },
+          "target_status": {
+            "enum": [
+              "PREPARING",
+              "CANCELLED"
+            ],
+            "title": "Target Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_type",
+          "source_id",
+          "target_status",
+          "reason",
+          "evidence"
+        ],
+        "title": "CorrectionRequest",
+        "type": "object"
+      },
+      "CorrectionVersionBody": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_version"
+        ],
+        "title": "CorrectionVersionBody",
+        "type": "object"
+      },
+      "CountReleaseBody": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "minimum": 0.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "fence": {
+            "minimum": 0.0,
+            "title": "Fence",
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "reason_code": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Reason Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_version",
+          "fence",
+          "reason_code",
+          "reason"
+        ],
+        "title": "CountReleaseBody",
+        "type": "object"
+      },
+      "CountSaveBody": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "minimum": 0.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "fence": {
+            "minimum": 0.0,
+            "title": "Fence",
+            "type": "integer"
+          },
+          "quantities": {
+            "$ref": "#/components/schemas/Quantities"
+          }
+        },
+        "required": [
+          "expected_version",
+          "fence",
+          "quantities"
+        ],
+        "title": "CountSaveBody",
+        "type": "object"
+      },
+      "CountStartBody": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_target_version": {
+            "minimum": 0.0,
+            "title": "Expected Target Version",
+            "type": "integer"
+          },
+          "round_epoch": {
+            "minimum": 0.0,
+            "title": "Round Epoch",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_target_version",
+          "round_epoch"
+        ],
+        "title": "CountStartBody",
+        "type": "object"
+      },
+      "CountVersionBody": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "minimum": 0.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "fence": {
+            "minimum": 0.0,
+            "title": "Fence",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_version",
+          "fence"
+        ],
+        "title": "CountVersionBody",
+        "type": "object"
+      },
       "DailyWorkActivityResponse": {
         "properties": {
           "cancelled_count": {
@@ -2136,9 +2450,25 @@
       },
       "DefectKpi": {
         "properties": {
+          "basis": {
+            "default": "RECORD",
+            "enum": [
+              "RECORD",
+              "POOL"
+            ],
+            "title": "Basis",
+            "type": "string"
+          },
           "over_one_year": {
-            "title": "Over One Year",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Over One Year"
           },
           "quarantined": {
             "title": "Quarantined",
@@ -2226,15 +2556,34 @@
             "title": "Mes Code"
           },
           "original_quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-            "title": "Original Quantity",
-            "type": "string"
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Quantity"
           },
           "pending_quantity": {
             "default": "0",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Pending Quantity",
             "type": "string"
+          },
+          "pool_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool Id"
           },
           "process_type_code": {
             "anyOf": [
@@ -2310,9 +2659,16 @@
             "title": "Reason Memo"
           },
           "record_id": {
-            "format": "uuid",
-            "title": "Record Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Record Id"
           },
           "return_supplier_scope": {
             "default": "warehouse",
@@ -2322,10 +2678,29 @@
             ],
             "title": "Return Supplier Scope",
             "type": "string"
+          },
+          "source_kind": {
+            "default": "RECORD",
+            "enum": [
+              "RECORD",
+              "POOL"
+            ],
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
           }
         },
         "required": [
-          "record_id",
           "item_id",
           "item_name",
           "mes_code",
@@ -3728,6 +4103,23 @@
           "pin"
         ],
         "title": "EmployeePinResetRequest",
+        "type": "object"
+      },
+      "EmployeePinSessionResponse": {
+        "description": "New tab-aware PIN response; legacy EmployeeResponse stays unchanged.",
+        "properties": {
+          "employee": {
+            "$ref": "#/components/schemas/EmployeeResponse"
+          },
+          "operator_session": {
+            "$ref": "#/components/schemas/OperatorSessionIssued"
+          }
+        },
+        "required": [
+          "employee",
+          "operator_session"
+        ],
+        "title": "EmployeePinSessionResponse",
         "type": "object"
       },
       "EmployeeResponse": {
@@ -7471,6 +7863,51 @@
         "title": "LocationStatusEnum",
         "type": "string"
       },
+      "MenuVisibilityResponse": {
+        "properties": {
+          "employee_visible": {
+            "title": "Employee Visible",
+            "type": "boolean"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "participant_count": {
+            "title": "Participant Count",
+            "type": "integer"
+          },
+          "participant_departments": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Participant Departments",
+            "type": "array"
+          }
+        },
+        "required": [
+          "enabled",
+          "employee_visible",
+          "participant_departments",
+          "participant_count"
+        ],
+        "title": "MenuVisibilityResponse",
+        "type": "object"
+      },
+      "MenuVisibilityUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "MenuVisibilityUpdate",
+        "type": "object"
+      },
       "MesCodeGenerateRequest": {
         "properties": {
           "process_type": {
@@ -7823,6 +8260,88 @@
         "title": "OperationCancelRequest",
         "type": "object"
       },
+      "OperatorSessionCreate": {
+        "properties": {
+          "employee_id": {
+            "format": "uuid",
+            "title": "Employee Id",
+            "type": "string"
+          },
+          "pin": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Pin",
+            "type": "string"
+          },
+          "tab_id": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Tab Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "employee_id",
+          "pin",
+          "tab_id"
+        ],
+        "title": "OperatorSessionCreate",
+        "type": "object"
+      },
+      "OperatorSessionCurrent": {
+        "properties": {
+          "employee_code": {
+            "title": "Employee Code",
+            "type": "string"
+          },
+          "employee_id": {
+            "format": "uuid",
+            "title": "Employee Id",
+            "type": "string"
+          },
+          "employee_name": {
+            "title": "Employee Name",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "tab_id": {
+            "title": "Tab Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "employee_id",
+          "employee_code",
+          "employee_name",
+          "tab_id",
+          "expires_at"
+        ],
+        "title": "OperatorSessionCurrent",
+        "type": "object"
+      },
+      "OperatorSessionIssued": {
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "expires_at"
+        ],
+        "title": "OperatorSessionIssued",
+        "type": "object"
+      },
       "PinVerifyRequest": {
         "properties": {
           "pin": {
@@ -7830,12 +8349,99 @@
             "minLength": 1,
             "title": "Pin",
             "type": "string"
+          },
+          "tab_id": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tab Id"
           }
         },
         "required": [
           "pin"
         ],
         "title": "PinVerifyRequest",
+        "type": "object"
+      },
+      "PoolManagementCategoryUpdateRequest": {
+        "properties": {
+          "actor_employee_id": {
+            "format": "uuid",
+            "title": "Actor Employee Id",
+            "type": "string"
+          },
+          "expected_version": {
+            "minimum": 0.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "management_category": {
+            "enum": [
+              "DEFECT",
+              "B_GRADE",
+              "OBSOLETE"
+            ],
+            "title": "Management Category",
+            "type": "string"
+          },
+          "memo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memo"
+          },
+          "pin": {
+            "title": "Pin",
+            "type": "string"
+          },
+          "quantity": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 2147483647.0,
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "management_category",
+          "quantity",
+          "expected_version",
+          "actor_employee_id",
+          "pin"
+        ],
+        "title": "PoolManagementCategoryUpdateRequest",
+        "type": "object"
+      },
+      "PreviewRef": {
+        "additionalProperties": false,
+        "properties": {
+          "preview_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Preview Hash",
+            "type": "string"
+          },
+          "preview_id": {
+            "format": "uuid",
+            "title": "Preview Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "preview_id",
+          "preview_hash"
+        ],
+        "title": "PreviewRef",
         "type": "object"
       },
       "ProcessTypeResponse": {
@@ -8340,6 +8946,71 @@
           "transaction_ids"
         ],
         "title": "ProductionReceiptResponse",
+        "type": "object"
+      },
+      "Quantities": {
+        "additionalProperties": false,
+        "properties": {
+          "b_grade": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "B Grade"
+          },
+          "defect": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Defect"
+          },
+          "normal": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normal"
+          },
+          "obsolete": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Obsolete"
+          }
+        },
+        "required": [
+          "normal",
+          "defect",
+          "b_grade",
+          "obsolete"
+        ],
+        "title": "Quantities",
         "type": "object"
       },
       "QuarantineRequest": {
@@ -8856,6 +9527,42 @@
           "created_at"
         ],
         "title": "ReservationLineResponse",
+        "type": "object"
+      },
+      "RoundStartPreview": {
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "RoundStartPreview",
+        "type": "object"
+      },
+      "SelectionBody": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmation_revision_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Confirmation Revision Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "confirmation_revision_ids"
+        ],
+        "title": "SelectionBody",
         "type": "object"
       },
       "ShippingAllocationResponse": {
@@ -11310,6 +12017,18 @@
             "title": "Item Id",
             "type": "string"
           },
+          "pool_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool Id"
+          },
           "quantity": {
             "exclusiveMinimum": 0.0,
             "title": "Quantity",
@@ -11408,6 +12127,18 @@
               }
             ],
             "title": "Operation Line Id"
+          },
+          "pool_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool Id"
           },
           "quantity": {
             "title": "Quantity",
@@ -12113,6 +12844,30 @@
             ],
             "title": "Matched Log Ids"
           },
+          "operation": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation"
+          },
+          "stocktake": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stocktake"
+          },
           "type": {
             "enum": [
               "solo",
@@ -12441,6 +13196,17 @@
             ],
             "title": "Notes"
           },
+          "operation_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Action"
+          },
           "operation_batch_id": {
             "anyOf": [
               {
@@ -12463,6 +13229,17 @@
               }
             ],
             "title": "Operation Display Label"
+          },
+          "operation_domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Domain"
           },
           "operation_effective_status": {
             "anyOf": [
@@ -12958,6 +13735,18 @@
             "format": "uuid",
             "title": "Item Id",
             "type": "string"
+          },
+          "pool_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool Id"
           },
           "qty": {
             "anyOf": [
@@ -17019,6 +17808,62 @@
         ]
       }
     },
+    "/api/defects/pools/{pool_id}/management-category": {
+      "put": {
+        "description": "Move an explicit quantity after the existing active-worker PIN check.",
+        "operationId": "update_pool_management_category_api_defects_pools__pool_id__management_category_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pool_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pool Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PoolManagementCategoryUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Pool Management Category Api Defects Pools  Pool Id  Management Category Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Pool Management Category",
+        "tags": [
+          "Defects"
+        ]
+      }
+    },
     "/api/defects/quarantine": {
       "post": {
         "description": "격리 (즉시, 결재 없음). mark_defective 래퍼 + defective_at 채움.",
@@ -19122,7 +19967,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EmployeeResponse"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/EmployeeResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/EmployeePinSessionResponse"
+                    }
+                  ],
+                  "title": "Response Verify Employee Pin Api Employees  Employee Id  Verify Pin Post"
                 }
               }
             },
@@ -19726,6 +20579,624 @@
         ]
       }
     },
+    "/api/inventory/business-corrections": {
+      "get": {
+        "description": "Return recent requests including terminal decisions.",
+        "operationId": "corrections_api_inventory_business_corrections_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Corrections Api Inventory Business Corrections Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Corrections",
+        "tags": [
+          "Inventory"
+        ]
+      },
+      "post": {
+        "description": "Original workflow authority is checked again inside the service.",
+        "operationId": "request_correction_api_inventory_business_corrections_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Request Correction Api Inventory Business Corrections Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Correction",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/inventory/business-corrections/{correction_id}": {
+      "get": {
+        "description": "Expose the frozen original group for an informed decision.",
+        "operationId": "detail_api_inventory_business_corrections__correction_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "correction_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Correction Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Detail Api Inventory Business Corrections  Correction Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Detail",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/inventory/business-corrections/{correction_id}/approve": {
+      "post": {
+        "description": "Require a fresh PIN and the unchanged complete preview.",
+        "operationId": "approve_api_inventory_business_corrections__correction_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "correction_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Correction Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": true,
+            "schema": {
+              "title": "X-Admin-Pin",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionApproveBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Approve Api Inventory Business Corrections  Correction Id  Approve Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/inventory/business-corrections/{correction_id}/events": {
+      "get": {
+        "description": "Return immutable request and decision evidence with the verified actor.",
+        "operationId": "events_api_inventory_business_corrections__correction_id__events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "correction_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Correction Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Events Api Inventory Business Corrections  Correction Id  Events Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Events",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/inventory/business-corrections/{correction_id}/previews": {
+      "post": {
+        "description": "Approval uses current physical stock and reservations, never old quantities.",
+        "operationId": "preview_api_inventory_business_corrections__correction_id__previews_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "correction_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Correction Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": true,
+            "schema": {
+              "title": "X-Admin-Pin",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionVersionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Preview Api Inventory Business Corrections  Correction Id  Previews Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/inventory/business-corrections/{correction_id}/reject": {
+      "post": {
+        "description": "Rejection records its reason without changing the original workflow.",
+        "operationId": "reject_api_inventory_business_corrections__correction_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "correction_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Correction Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": true,
+            "schema": {
+              "title": "X-Admin-Pin",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionDecisionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Reject Api Inventory Business Corrections  Correction Id  Reject Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/inventory/business-corrections/{correction_id}/withdraw": {
+      "post": {
+        "description": "Only the original requester can withdraw an undecided request.",
+        "operationId": "withdraw_api_inventory_business_corrections__correction_id__withdraw_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "correction_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Correction Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionDecisionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Withdraw Api Inventory Business Corrections  Correction Id  Withdraw Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Withdraw",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
     "/api/inventory/locations/{item_id}": {
       "get": {
         "description": "품목의 부서×상태 분포 조회 (수량 0 인 행 포함, 모든 분포 노출).",
@@ -19881,6 +21352,136 @@
           }
         },
         "summary": "List Operations",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/inventory/operations/export.csv": {
+      "get": {
+        "operationId": "export_operations_csv_api_inventory_operations_export_csv_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Operations Csv",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/inventory/operations/export.xlsx": {
+      "get": {
+        "operationId": "export_operations_xlsx_api_inventory_operations_export_xlsx_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Operations Xlsx",
         "tags": [
           "Inventory"
         ]
@@ -20798,6 +22399,18 @@
               ],
               "description": "등록·요청 직원 ID로 내역 조회",
               "title": "Requester Employee Id"
+            }
+          },
+          {
+            "description": "품목 최근 이력 전용. item_id 필수이며 추가 필터와 함께 사용할 수 없습니다.",
+            "in": "query",
+            "name": "include_operation_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "품목 최근 이력 전용. item_id 필수이며 추가 필터와 함께 사용할 수 없습니다.",
+              "title": "Include Operation Only",
+              "type": "boolean"
             }
           },
           {
@@ -23985,6 +25598,139 @@
         ]
       }
     },
+    "/api/operator-sessions": {
+      "post": {
+        "description": "Issue a token after the same employee PIN and rate-limit checks as login.",
+        "operationId": "create_operator_session_api_operator_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorSessionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorSessionIssued"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Operator Session",
+        "tags": [
+          "Employees"
+        ]
+      }
+    },
+    "/api/operator-sessions/current": {
+      "delete": {
+        "description": "Revoke only the token explicitly supplied for this tab.",
+        "operationId": "delete_operator_session_api_operator_sessions_current_delete",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Operator Session",
+        "tags": [
+          "Employees"
+        ]
+      },
+      "get": {
+        "description": "Return the authenticated actor and tab without re-exposing its token.",
+        "operationId": "get_operator_session_api_operator_sessions_current_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorSessionCurrent"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Operator Session",
+        "tags": [
+          "Employees"
+        ]
+      }
+    },
     "/api/production/bom-check/{item_id}": {
       "get": {
         "operationId": "check_production_feasibility_api_production_bom_check__item_id__get",
@@ -26707,6 +28453,2731 @@
         ]
       }
     },
+    "/api/stocktakes/close-previews/{preview_id}/entries": {
+      "get": {
+        "description": "Only sealed chunks are exposed; expired previews remain historical evidence.",
+        "operationId": "close_entries_api_stocktakes_close_previews__preview_id__entries_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "preview_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Preview Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Close Entries Api Stocktakes Close Previews  Preview Id  Entries Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close Entries",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/commands/{key}": {
+      "get": {
+        "description": "Resolve an uncertain response with the same employee, kind and external key.",
+        "operationId": "receipt_api_stocktakes_commands__key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Receipt Api Stocktakes Commands  Key  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Receipt",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/commands/{key}/resolve": {
+      "post": {
+        "description": "Resolve only this authenticated actor's original key; never cancel completed work.",
+        "operationId": "resolve_command_api_stocktakes_commands__key__resolve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandResolution"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Resolve Command Api Stocktakes Commands  Key  Resolve Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolve Command",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/counts/{count_id}": {
+      "get": {
+        "description": "Read the current attempt and its previous-attempt link after release as well.",
+        "operationId": "get_count_api_stocktakes_counts__count_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "count_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Count Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Count Api Stocktakes Counts  Count Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Count",
+        "tags": [
+          "Stocktakes"
+        ]
+      },
+      "patch": {
+        "description": "A successful save advances only the draft, never inventory.",
+        "operationId": "save_count_api_stocktakes_counts__count_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "count_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Count Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CountSaveBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Save Count Api Stocktakes Counts  Count Id  Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Count",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/counts/{count_id}/abandon": {
+      "post": {
+        "description": "The owner releases a count with an immutable reason and invalidated revision.",
+        "operationId": "abandon_count_api_stocktakes_counts__count_id__abandon_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "count_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Count Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CountReleaseBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Abandon Count Api Stocktakes Counts  Count Id  Abandon Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Abandon Count",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/counts/{count_id}/confirm": {
+      "post": {
+        "description": "Freeze a complete four-category count for a later selected application.",
+        "operationId": "confirm_count_api_stocktakes_counts__count_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "count_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Count Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CountVersionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Confirm Count Api Stocktakes Counts  Count Id  Confirm Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Count",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/counts/{count_id}/force-release": {
+      "post": {
+        "description": "Only an authenticated administrator may force another employee's count release.",
+        "operationId": "force_release_api_stocktakes_counts__count_id__force_release_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "count_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Count Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": true,
+            "schema": {
+              "title": "X-Admin-Pin",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CountReleaseBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Force Release Api Stocktakes Counts  Count Id  Force Release Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Force Release",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/counts/{count_id}/resume": {
+      "post": {
+        "description": "Invalidate the previous confirmation while retaining the entered quantities.",
+        "operationId": "resume_count_api_stocktakes_counts__count_id__resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "count_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Count Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CountReleaseBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Resume Count Api Stocktakes Counts  Count Id  Resume Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume Count",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/menu-visibility": {
+      "get": {
+        "description": "Every authenticated worker can resolve menu visibility before entering census.",
+        "operationId": "get_menu_visibility_api_stocktakes_menu_visibility_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MenuVisibilityResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Menu Visibility",
+        "tags": [
+          "Stocktakes"
+        ]
+      },
+      "put": {
+        "description": "Reapply each participant's menu bit atomically; later personal edits remain independent.",
+        "operationId": "update_menu_visibility_api_stocktakes_menu_visibility_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MenuVisibilityUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MenuVisibilityResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Menu Visibility",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/round-start-previews": {
+      "post": {
+        "description": "Prepare all target rows before acquiring the short activation lock.",
+        "operationId": "start_preview_api_stocktakes_round_start_previews_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoundStartPreview"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Start Preview Api Stocktakes Round Start Previews Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Preview",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/rounds": {
+      "get": {
+        "description": "Workers bootstrap active rounds; department approvers may also list history.",
+        "operationId": "rounds_api_stocktakes_rounds_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "active_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Active Only",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Rounds Api Stocktakes Rounds Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rounds",
+        "tags": [
+          "Stocktakes"
+        ]
+      },
+      "post": {
+        "description": "Activate the sealed set with an exclusive Control lock from the outset.",
+        "operationId": "start_round_api_stocktakes_rounds_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewRef"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Start Round Api Stocktakes Rounds Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Round",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/rounds/{round_id}": {
+      "get": {
+        "description": "Expose the active boundary and admitted target generation.",
+        "operationId": "get_round_api_stocktakes_rounds__round_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "round_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Round Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Round Api Stocktakes Rounds  Round Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Round",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/rounds/{round_id}/application-bulk-previews": {
+      "post": {
+        "description": "Seal one employee's exact selection across all admitted locations.",
+        "operationId": "bulk_application_preview_api_stocktakes_rounds__round_id__application_bulk_previews_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "round_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Round Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkSelectionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Bulk Application Preview Api Stocktakes Rounds  Round Id  Application Bulk Previews Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bulk Application Preview",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/rounds/{round_id}/application-previews": {
+      "post": {
+        "description": "Expose exact selected differences, reservations and per-category hold reasons.",
+        "operationId": "application_preview_api_stocktakes_rounds__round_id__application_previews_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "round_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Round Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelectionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Application Preview Api Stocktakes Rounds  Round Id  Application Previews Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Application Preview",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/rounds/{round_id}/applications": {
+      "post": {
+        "description": "Apply the entire sealed selection or roll back it together with the receipt.",
+        "operationId": "apply_counts_api_stocktakes_rounds__round_id__applications_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "round_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Round Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewRef"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Apply Counts Api Stocktakes Rounds  Round Id  Applications Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Apply Counts",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/rounds/{round_id}/bulk-applications": {
+      "post": {
+        "description": "Commit all selected scopes together with one recoverable receipt.",
+        "operationId": "bulk_apply_counts_api_stocktakes_rounds__round_id__bulk_applications_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "round_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Round Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewRef"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Bulk Apply Counts Api Stocktakes Rounds  Round Id  Bulk Applications Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bulk Apply Counts",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/rounds/{round_id}/close": {
+      "post": {
+        "description": "Close and optionally apply up to 100 confirmations in at most three scopes.",
+        "operationId": "close_round_api_stocktakes_rounds__round_id__close_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "round_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Round Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewRef"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Close Round Api Stocktakes Rounds  Round Id  Close Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close Round",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/rounds/{round_id}/close-evidence": {
+      "get": {
+        "description": "Resolve the committed seal and actor without scanning any target rows.",
+        "operationId": "close_evidence_api_stocktakes_rounds__round_id__close_evidence_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "round_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Round Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Close Evidence Api Stocktakes Rounds  Round Id  Close Evidence Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close Evidence",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/rounds/{round_id}/close-previews": {
+      "post": {
+        "description": "Prepare all close exclusions without holding the exclusive inventory boundary.",
+        "operationId": "close_preview_api_stocktakes_rounds__round_id__close_previews_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "round_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Round Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClosePreviewBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Close Preview Api Stocktakes Rounds  Round Id  Close Previews Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close Preview",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/rounds/{round_id}/events": {
+      "get": {
+        "description": "Immutable count releases and closing reasons remain readable after invalidation.",
+        "operationId": "round_events_api_stocktakes_rounds__round_id__events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "round_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Round Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "count_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Count Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "default": "legacy",
+              "enum": [
+                "legacy",
+                "latest"
+              ],
+              "title": "Order",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_saves",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Include Saves",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Round Events Api Stocktakes Rounds  Round Id  Events Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Round Events",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/rounds/{round_id}/progress": {
+      "get": {
+        "description": "Closed rounds retain their actual closing statistics, including exclusions.",
+        "operationId": "round_progress_api_stocktakes_rounds__round_id__progress_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "round_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Round Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Round Progress Api Stocktakes Rounds  Round Id  Progress Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Round Progress",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/rounds/{round_id}/target-append-previews": {
+      "post": {
+        "description": "Prepare additions under the round's frozen membership policy, including zero cells.",
+        "operationId": "append_preview_api_stocktakes_rounds__round_id__target_append_previews_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "round_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Round Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Append Preview Api Stocktakes Rounds  Round Id  Target Append Previews Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Append Preview",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/rounds/{round_id}/target-appends": {
+      "post": {
+        "description": "Publish an unchanged prepared addition as one target generation.",
+        "operationId": "append_targets_api_stocktakes_rounds__round_id__target_appends_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "round_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Round Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewRef"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Append Targets Api Stocktakes Rounds  Round Id  Target Appends Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Append Targets",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/rounds/{round_id}/targets": {
+      "get": {
+        "description": "Filters affect the page, never the round's denominator.",
+        "operationId": "targets_api_stocktakes_rounds__round_id__targets_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "round_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Round Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 200,
+              "title": "Search",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope_kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "code",
+                    "warehouse"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Kind"
+            }
+          },
+          {
+            "in": "query",
+            "name": "model_slots",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model Slots"
+            }
+          },
+          {
+            "in": "query",
+            "name": "departments",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "튜브",
+                      "고압",
+                      "진공",
+                      "튜닝",
+                      "조립",
+                      "출하"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Departments"
+            }
+          },
+          {
+            "in": "query",
+            "name": "process_steps",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "R",
+                      "A",
+                      "F",
+                      "DEFECT",
+                      "OBSOLETE"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Process Steps"
+            }
+          },
+          {
+            "in": "query",
+            "name": "logic",
+            "required": false,
+            "schema": {
+              "default": "AND",
+              "enum": [
+                "AND",
+                "OR"
+              ],
+              "title": "Logic",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status_group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "UNCONFIRMED",
+                    "CONFIRMED_ALL",
+                    "CONFIRMED_WAITING"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status Group"
+            }
+          },
+          {
+            "in": "query",
+            "name": "group_by_item",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Group By Item",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Targets Api Stocktakes Rounds  Round Id  Targets Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Targets",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/rounds/{round_id}/waiting-selection": {
+      "get": {
+        "description": "Select every matching owned confirmation without a page-size boundary.",
+        "operationId": "waiting_selection_api_stocktakes_rounds__round_id__waiting_selection_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "round_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Round Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 200,
+              "title": "Search",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "departments",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "튜브",
+                      "고압",
+                      "진공",
+                      "튜닝",
+                      "조립",
+                      "출하"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Departments"
+            }
+          },
+          {
+            "in": "query",
+            "name": "model_slots",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model Slots"
+            }
+          },
+          {
+            "in": "query",
+            "name": "process_steps",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "R",
+                      "A",
+                      "F",
+                      "DEFECT",
+                      "OBSOLETE"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Process Steps"
+            }
+          },
+          {
+            "in": "query",
+            "name": "logic",
+            "required": false,
+            "schema": {
+              "default": "AND",
+              "enum": [
+                "AND",
+                "OR"
+              ],
+              "title": "Logic",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Waiting Selection Api Stocktakes Rounds  Round Id  Waiting Selection Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Waiting Selection",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/rounds/{round_id}/waiting-targets": {
+      "get": {
+        "description": "A caller cannot select someone else's identity through query parameters.",
+        "operationId": "waiting_targets_api_stocktakes_rounds__round_id__waiting_targets_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "round_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Round Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 200,
+              "title": "Search",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "departments",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "튜브",
+                      "고압",
+                      "진공",
+                      "튜닝",
+                      "조립",
+                      "출하"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Departments"
+            }
+          },
+          {
+            "in": "query",
+            "name": "model_slots",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model Slots"
+            }
+          },
+          {
+            "in": "query",
+            "name": "process_steps",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "R",
+                      "A",
+                      "F",
+                      "DEFECT",
+                      "OBSOLETE"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Process Steps"
+            }
+          },
+          {
+            "in": "query",
+            "name": "logic",
+            "required": false,
+            "schema": {
+              "default": "AND",
+              "enum": [
+                "AND",
+                "OR"
+              ],
+              "title": "Logic",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Waiting Targets Api Stocktakes Rounds  Round Id  Waiting Targets Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Waiting Targets",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
+    "/api/stocktakes/targets/{target_id}/counts": {
+      "post": {
+        "description": "Count and recount are available to every active authenticated employee.",
+        "operationId": "start_count_api_stocktakes_targets__target_id__counts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Target Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CountStartBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Start Count Api Stocktakes Targets  Target Id  Counts Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Count",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
     "/api/suppliers": {
       "get": {
         "operationId": "list_suppliers_api_suppliers_get",
@@ -28309,6 +32780,10 @@
     {
       "description": "재고 요청과 결재 처리.",
       "name": "Stock Requests"
+    },
+    {
+      "description": "재고 전수조사 회차·계수·확인·반영과 종료 증빙.",
+      "name": "Stocktakes"
     },
     {
       "description": "창고 배치도 관리.",
