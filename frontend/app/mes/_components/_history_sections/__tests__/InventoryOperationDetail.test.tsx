@@ -30,8 +30,8 @@ describe("직원용 작업 상세", () => {
       request_order_stock: { status, reason: status === "unavailable" ? "ambiguous_order" : null, warehouse_qty_before: 0, warehouse_qty_after: 0, department_qty_before: 60, department_qty_after: 54 },
       created_at: "2026-10-13T02:44:00Z" } as TransactionLog;
     mount(operation({ action: "adjust_out", lines: [line({ historyLog })] }));
-    expect(await screen.findByLabelText("튜브 40 −6→34")).toBeVisible();
-    expect(screen.queryByLabelText("튜브 60 −6→54")).not.toBeInTheDocument();
+    expect(await screen.findByLabelText("부서 합계 40 −6→34")).toBeVisible();
+    expect(screen.queryByLabelText(/60 −6→54/)).not.toBeInTheDocument();
     expect(screen.queryByText("요청 순 재고")).not.toBeInTheDocument();
     expect(screen.queryByText(/계산 불가/)).not.toBeInTheDocument();
   });
@@ -44,7 +44,7 @@ describe("직원용 작업 상세", () => {
       created_at: "2026-10-13T02:44:00Z" } as TransactionLog;
     mount(operation({ action: "adjust_out", lines: [line({ historyLog })] }));
     expect(await screen.findByText("기록 없음")).toBeVisible();
-    expect(screen.queryByLabelText("부서 60 −6→54")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/60 −6→54/)).not.toBeInTheDocument();
   });
 
   it("결과를 먼저 표시하고 처리 상태·취소 제한은 접힌 영역에서 확인한다", async () => {

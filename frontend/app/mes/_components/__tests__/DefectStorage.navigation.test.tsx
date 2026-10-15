@@ -51,10 +51,13 @@ async function complete(qty: number): Promise<void> {
   const expectedTransactions = api.unquarantine.mock.calls.length + 1;
   const expectedReads = api.listDefects.mock.calls.length + 1;
   fireEvent.change(screen.getByRole("spinbutton"), { target: { value: qty } });
-  fireEvent.change(screen.getByRole("combobox", { name: "사유 카테고리" }), { target: { value: "검사 통과" } });
-  fireEvent.click(screen.getByRole("button", { name: "정상 복귀 →" }));
+  expect(screen.queryByRole("combobox", { name: "사유 카테고리" })).not.toBeInTheDocument();
+  const submit = screen.getByRole("button", { name: "정상 복귀 →" });
+  expect(submit).toBeEnabled();
+  fireEvent.click(submit);
   fireEvent.click(await screen.findByRole("button", { name: "즉시 복귀" }));
   await waitFor(() => expect(api.unquarantine).toHaveBeenCalledTimes(expectedTransactions));
+  expect(api.unquarantine).toHaveBeenLastCalledWith(expect.objectContaining({ qty, reason_category: null, reason_category_id: null }));
   await waitFor(() => expect(api.listDefects).toHaveBeenCalledTimes(expectedReads));
 }
 
