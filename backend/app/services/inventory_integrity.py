@@ -11,7 +11,7 @@ from decimal import Decimal
 from typing import Iterable, Optional
 
 from sqlalchemy import String, cast, func, inspect, select
-from sqlalchemy.orm import InstrumentedAttribute, Session, load_only
+from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from app.models import (
     DefectInventoryMovement,
@@ -832,7 +832,8 @@ def _collect_integrity_snapshot(db: Session) -> InventoryIntegritySnapshot:
         if any(isinstance(row, model) for collection in (
             db.identity_map.values(), db.new, db.dirty, db.deleted,
         ) for row in collection):
-            return db.query(model).options(load_only(*columns, raiseload=True)).all()
+            # Later evidence readers reuse these identities and need the full ORM contract.
+            return db.query(model).all()
         rows = db.query(*columns).all()
         seen = set()
         unique = []

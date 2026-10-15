@@ -158,7 +158,9 @@ def test_snapshot_and_response_preserve_live_identity_values(
     assert db_session.get(Inventory, inventory.inventory_id) is inventory
     assert db_session.get(InventoryOperation, operation.operation_id) is operation
     assert not {"quantity", "warehouse_qty", "pending_quantity"} & inspect(inventory).unloaded
-    assert not {"contract_version", "effective_at", "reverses_operation_id"} & inspect(operation).unloaded
+    # Stocktake evidence consumes these fields through the same session identity.
+    assert not {"contract_version", "effective_at", "reverses_operation_id",
+                "domain", "action", "actor_employee_id"} & inspect(operation).unloaded
     assert snapshot.inventories[0].quantity == Decimal(8 if state == "dirty" else 5)
     assert snapshot.operations[0].contract_version == (2 if state == "dirty" else 1)
     assert set(db_session.dirty) == dirty_before
