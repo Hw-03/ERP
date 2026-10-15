@@ -488,16 +488,44 @@ def _postgres_text_column(table: sa.Table, name: str) -> bool:
     )
 
 
+def _postgres_conjuncts(tokens: tuple[str, ...]) -> tuple[tuple[str, ...], ...]:
+    """Split only top-level AND; keep OR expressions and nested precedence intact."""
+    parts: list[tuple[str, ...]] = []
+    depth = start = 0
+    for index, token in enumerate(tokens):
+        depth += (token == "(") - (token == ")")
+        if depth == 0 and token == "or":
+            return (tokens,)
+        if depth == 0 and token == "and":
+            parts.append(tokens[start:index])
+            start = index + 1
+    return (*parts, tokens[start:])
+
+
 def _postgres_check_matches(table: sa.Table, expected: object, actual: object) -> bool:
     """Recognize only the PostgreSQL rewrites seen for this metadata's CHECKs."""
     expected_tokens = _postgres_sql_tokens(expected)
     actual_tokens = _postgres_sql_tokens(actual)
     if expected_tokens is None or actual_tokens is None:
         return False
-    expected_tokens = _postgres_outer_parens(expected_tokens)
-    actual_tokens = _postgres_outer_parens(actual_tokens)
+    expected_tokens = _postgres_outer_parens(tuple("<>" if token == "!=" else token for token in expected_tokens))
+    actual_tokens = _postgres_outer_parens(tuple("<>" if token == "!=" else token for token in actual_tokens))
     if expected_tokens == actual_tokens:
         return True
+    if table.name in {"stocktake_application_lines", "stocktake_effect_epochs"}:
+        expected_parts = _postgres_conjuncts(expected_tokens)
+        actual_parts = _postgres_conjuncts(actual_tokens)
+        if len(expected_parts) > 1:
+            return len(expected_parts) == len(actual_parts) and all(
+                _postgres_check_matches(table, " ".join(left), " ".join(right))
+                for left, right in zip(expected_parts, actual_parts)
+            )
+    if table.name == "stocktake_application_lines" and expected_tokens == (
+        "observation_epoch_after", "=", "observation_epoch_before", "+", "1",
+    ):
+        return actual_tokens == (
+            "observation_epoch_after", "=", "(", "observation_epoch_before", "+", "1", ")",
+        )
     if len(expected_tokens) >= 5 and expected_tokens[1:3] == ("in", "("):
         column_name = expected_tokens[0]
         if not _postgres_text_column(table, column_name) or expected_tokens[-1] != ")":
