@@ -13,7 +13,7 @@
 }
 
 .desktopFields {
-  --reason-actions-width: 164px;
+  --reason-actions-width: 328px;
   display: flex;
   min-width: 0;
   flex-direction: column;

@@ -154,6 +154,7 @@ function DesktopMesShellInner({
   const [adminPinEntryNonce, setAdminPinEntryNonce] = useState(0);
   const [warehouseMapFullscreen, setWarehouseMapFullscreen] = useState(false);
   const [itemPickerFullscreen, setItemPickerFullscreen] = useState(false);
+  const [defectItemPickerFullscreen, setDefectItemPickerFullscreen] = useState(false);
   const [dailyReportTopbarControls, setDailyReportTopbarControls] = useState<ReactNode>(null);
   const autoRevertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUrlTabRef = useRef<DesktopTabId | null>(null);
@@ -339,6 +340,12 @@ function DesktopMesShellInner({
   }, [activeTab, itemPickerFullscreen]);
 
   useEffect(() => {
+    if (activeTab !== "defect" && defectItemPickerFullscreen) {
+      setDefectItemPickerFullscreen(false);
+    }
+  }, [activeTab, defectItemPickerFullscreen]);
+
+  useEffect(() => {
     if (activeTab !== "dailyReport") setDailyReportTopbarControls(null);
   }, [activeTab]);
 
@@ -406,17 +413,20 @@ function DesktopMesShellInner({
   } = useProductionCapacityQuery();
   const [capacityModal, setCapacityModal] = useState(false);
   useDesktopTabHome("shell-overlays", {
-    isHome: !capacityModal && !(activeTab === "warehouse" && (warehousePreselected || warehouseIntent || itemPickerFullscreen)),
+    isHome: !capacityModal && !(activeTab === "warehouse" && (warehousePreselected || warehouseIntent || itemPickerFullscreen)) && !(activeTab === "defect" && defectItemPickerFullscreen),
     returnHome: () => {
       setCapacityModal(false);
       clearWarehouseEntry();
       setItemPickerFullscreen(false);
+      setDefectItemPickerFullscreen(false);
     },
   });
   const [stockWarnings, setStockWarnings] = useState<{ low: number; zero: number } | null>(null);
 
   const activeMeta = TAB_META[activeTab];
   const isItemPickerFullscreen = activeTab === "warehouse" && itemPickerFullscreen;
+  const isDefectItemPickerFullscreen = activeTab === "defect" && defectItemPickerFullscreen;
+  const hideTopbar = warehouseMapFullscreen || isItemPickerFullscreen || isDefectItemPickerFullscreen;
 
   const canOpenWarehouse = canOpenTab("warehouse");
   const canReceive = canSeeWorkType("receive", operator) && canOpenWarehouse;
@@ -493,6 +503,8 @@ function DesktopMesShellInner({
           operator={operator}
           defectDeptFilter={defectDeptFilter}
           onStatusChange={handleStatusChange}
+          itemPickerFullscreen={isDefectItemPickerFullscreen}
+          onItemPickerFullscreenChange={setDefectItemPickerFullscreen}
         />
       );
     }
@@ -521,7 +533,7 @@ function DesktopMesShellInner({
     // setStockWarnings/setCapacityModal(setter), handleTabChange 는 안정적이거나 결과에
     // 영향이 없어 의도적으로 제외 — 누락이 아니라 최소 deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, capacityLoading, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen, isItemPickerFullscreen, preferences, savePreferences, canOpenTab, handleOpenAdminPinEntry, handleDailyReportTopbarControlsChange, retainStocktake, stocktakeAccessPending]);
+  }, [contentTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, capacityLoading, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen, isItemPickerFullscreen, isDefectItemPickerFullscreen, preferences, savePreferences, canOpenTab, handleOpenAdminPinEntry, handleDailyReportTopbarControlsChange, retainStocktake, stocktakeAccessPending]);
 
   return (
     <>
@@ -549,7 +561,7 @@ function DesktopMesShellInner({
           />
 
           <div className="min-w-0 flex-1 flex flex-col">
-            {!warehouseMapFullscreen && !isItemPickerFullscreen && (
+            {!hideTopbar && (
               <DesktopTopbar
                 title={activeMeta.title}
               icon={activeMeta.icon}
@@ -571,7 +583,7 @@ function DesktopMesShellInner({
               />
             )}
 
-            <div className={`${warehouseMapFullscreen || isItemPickerFullscreen ? "" : "mt-3"} desktop-tab-content min-h-0 flex-1 overflow-hidden flex`}>
+            <div className={`${hideTopbar ? "" : "mt-3"} desktop-tab-content min-h-0 flex-1 overflow-hidden flex`}>
               <div
                 key={activeTab}
                 ref={homeMotionRef}

@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useCallback, useState } from "react";
 import { DesktopDefectView } from "../DesktopDefectView";
 import type { Operator } from "../login/useCurrentOperator";
 import type { Item } from "../_warehouse_v2/types";
@@ -20,6 +21,18 @@ const item = {
   model_slots: [],
 } as unknown as Item;
 const operator = { employee_id: "tester", name: "테스터", department: "조립", warehouse_role: "none", department_role: "none" } as Operator;
+
+function FullscreenDesktopHarness({ onFullscreenChange }: { onFullscreenChange: (fullscreen: boolean) => void }) {
+  const [fullscreen, setFullscreen] = useState(false);
+  const changeFullscreen = useCallback((next: boolean): void => {
+    setFullscreen(next);
+    onFullscreenChange(next);
+  }, [onFullscreenChange]);
+  return <>
+    <output aria-label="부모 전체 화면 상태">{fullscreen ? "확대" : "기본"}</output>
+    <DesktopDefectView operator={operator} itemPickerFullscreen={fullscreen} onItemPickerFullscreenChange={changeFullscreen} />
+  </>;
+}
 
 async function mountDesktop(): Promise<ReturnType<typeof render>> {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -44,6 +57,38 @@ beforeEach(() => {
 });
 
 describe("데스크톱 불량 작업·출처 통합 선택", async () => {
+  it("실제 작성 흐름의 전체 화면 제어를 부모로 전달하고 단계 이동과 해제 때 초기화한다", async () => {
+    const onFullscreenChange = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    let mounted!: ReturnType<typeof render>;
+    await act(async () => {
+      mounted = render(<QueryClientProvider client={client}><FullscreenDesktopHarness onFullscreenChange={onFullscreenChange} /></QueryClientProvider>);
+    });
+    fireEvent.click(screen.getByRole("button", { name: /불량 처리/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^격리 등록/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^부서 재고/ }));
+    finishExit();
+    fireEvent.change(screen.getByRole("textbox", { name: "검색" }), { target: { value: "조립 시험" } });
+    fireEvent.click(screen.getByRole("button", { name: "조립 시험 품목 장바구니에 추가" }));
+    fireEvent.click(screen.getByRole("button", { name: "전체 화면", exact: true }));
+    expect(onFullscreenChange).toHaveBeenLastCalledWith(true);
+    expect(screen.getByLabelText("부모 전체 화면 상태")).toHaveTextContent("확대");
+    expect(screen.queryByRole("navigation", { name: "불량 처리 단계" })).not.toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.getByLabelText("부모 전체 화면 상태")).toHaveTextContent("기본");
+    expect(screen.getByRole("textbox", { name: "검색" })).toHaveValue("조립 시험");
+    expect(screen.getByText("선택 1품목")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "전체 화면", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "수량·처리 정보 →", exact: true }));
+    expect(screen.getByLabelText("부모 전체 화면 상태")).toHaveTextContent("기본");
+    expect(screen.getByRole("navigation", { name: "불량 처리 단계" })).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole("navigation", { name: "불량 처리 단계" })).getByRole("button", { name: /품목 선택/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "전체 화면", exact: true }));
+    expect(onFullscreenChange).toHaveBeenLastCalledWith(true);
+    mounted.unmount();
+    expect(onFullscreenChange).toHaveBeenLastCalledWith(false);
+  });
+
   it("완료한 작업·출처 단계와 불량 메뉴 칸으로 각각 돌아간다", async () => {
     await openWork();
     const navigation = within(screen.getByRole("navigation", { name: "불량 처리 단계" }));
@@ -83,7 +128,7 @@ describe("데스크톱 불량 작업·출처 통합 선택", async () => {
       mounted.unmount();
       mounted = await mountDesktop();
       expect(window.history.state).toMatchObject({ defect: "cart", step: 2 });
-      expect(screen.getByText("왼쪽에서 품목을 추가하세요.")).toBeInTheDocument();
+      expect(screen.getByText("선택 0품목")).toBeInTheDocument();
     }
     if (exitStep === 4) {
       await enterBom();
@@ -165,7 +210,7 @@ describe("데스크톱 불량 작업·출처 통합 선택", async () => {
     expect(window.history.state).toMatchObject({ defect: "work-choice", action: "rework", source: "production" });
     fireEvent.click(screen.getByRole("button", { name: /^즉시 재작업/ }));
     finishExit();
-    expect(screen.getByText("왼쪽에서 품목을 추가하세요.")).toBeInTheDocument();
+    expect(screen.getByText("선택 0품목")).toBeInTheDocument();
   });
 
   it("모션 감소 설정에서는 기다리지 않고 진행한다", async () => {

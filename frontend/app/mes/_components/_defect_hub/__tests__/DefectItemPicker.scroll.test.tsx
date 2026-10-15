@@ -1,8 +1,12 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Item } from "../../_warehouse_v2/types";
 import { DefectItemPicker } from "../DefectItemPicker";
-const preferences = vi.hoisted(() => ({ order: undefined as undefined | { item_id: string; display_order: number }[] }));
+const preferences = vi.hoisted(() => ({
+  order: undefined as undefined | { item_id: string; display_order: number }[],
+  save: vi.fn(),
+  reset: vi.fn(),
+}));
 
 vi.mock("../../_warehouse_v2/useItemOrderDrag", () => ({
   useItemOrderDrag: () => ({
@@ -14,8 +18,8 @@ vi.mock("../../_warehouse_v2/useItemOrderDrag", () => ({
 
 vi.mock("@/lib/queries/useMyItemOrderQuery", () => ({
   useMyItemOrderQuery: () => ({ data: preferences.order }),
-  usePutMyItemOrderMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useResetMyItemOrderMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  usePutMyItemOrderMutation: () => ({ mutateAsync: preferences.save, isPending: false }),
+  useResetMyItemOrderMutation: () => ({ mutateAsync: preferences.reset, isPending: false }),
 }));
 
 vi.mock("../../login/useCurrentOperator", () => ({
@@ -41,6 +45,100 @@ function makeItem(index: number): Item {
 }
 
 describe("DefectItemPicker mobile scroll", () => {
+  beforeEach(() => {
+    preferences.order = undefined;
+    preferences.save.mockClear();
+    preferences.reset.mockClear();
+  });
+
+  it("PC 표 머리글 전체 화면 전환은 검색·선택·스크롤을 유지한다", () => {
+    const onFullscreenChange = vi.fn();
+    const props = { items: [makeItem(1), makeItem(2)], productModels: [], source: "warehouse" as const, selectedIds: new Set(["item-2"]), onAdd: vi.fn(), onRemove: vi.fn(), onFullscreenChange };
+    const { rerender } = render(<DefectItemPicker {...props} />);
+    const input = screen.getByRole("textbox", { name: "검색" });
+    fireEvent.change(input, { target: { value: "SOLO item 2" } });
+    const scroll = screen.getByTestId("defect-picker-scroll");
+    scroll.scrollTop = 78;
+    const enterButton = screen.getByRole("button", { name: "전체 화면" });
+    expect(enterButton.closest("th")).toHaveTextContent("품목명");
+    expect(enterButton).toHaveClass("absolute", "left-1/2", "top-1/2", "hidden", "lg:inline-flex");
+    fireEvent.click(enterButton);
+    expect(onFullscreenChange).toHaveBeenLastCalledWith(true);
+
+    rerender(<DefectItemPicker {...props} fullscreen />);
+    expect(screen.getByRole("textbox", { name: "검색" })).toBe(input);
+    expect(input).toHaveValue("SOLO item 2");
+    expect(screen.queryByText("SOLO item 1")).not.toBeInTheDocument();
+    expect(screen.getByTestId("defect-picker-row-item-2")).toHaveAttribute("data-added", "true");
+    expect(screen.getByTestId("defect-picker-scroll")).toBe(scroll);
+    expect(scroll.scrollTop).toBe(78);
+    fireEvent.click(screen.getByRole("button", { name: "전체 화면 해제" }));
+    expect(onFullscreenChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("전체 화면 전환은 편집 중인 순서와 검색·스크롤을 보존하고 저장하지 않는다", () => {
+    const onFullscreenChange = vi.fn();
+    const props = { items: [makeItem(1), makeItem(2)], productModels: [], source: "warehouse" as const, selectedIds: new Set<string>(), onAdd: vi.fn(), onRemove: vi.fn(), onFullscreenChange };
+    const { container, rerender } = render(<DefectItemPicker {...props} />);
+    fireEvent.change(screen.getByRole("textbox", { name: "검색" }), { target: { value: "item 2" } });
+    fireEvent.click(screen.getByRole("button", { name: "순서 편집" }));
+    const originalRows = Array.from(container.querySelectorAll("tbody tr"));
+    const scroll = screen.getByTestId("defect-picker-scroll");
+    scroll.scrollTop = 64;
+    preferences.order = [{ item_id: "item-2", display_order: 0 }];
+    fireEvent.click(screen.getByRole("button", { name: "전체 화면" }));
+    rerender(<DefectItemPicker {...props} fullscreen />);
+
+    expect(screen.getByRole("button", { name: "취소" })).toBeInTheDocument();
+    expect(Array.from(container.querySelectorAll("tbody tr"))).toEqual(originalRows);
+    expect(scroll.scrollTop).toBe(64);
+    expect(screen.getByRole("textbox", { name: "검색" })).toHaveValue("item 2");
+    const exitButton = screen.getByRole("button", { name: "전체 화면 해제" });
+    expect(exitButton.closest("th")).toHaveTextContent("품목명");
+    fireEvent.click(exitButton);
+    expect(onFullscreenChange).toHaveBeenLastCalledWith(false);
+    rerender(<DefectItemPicker {...props} />);
+    expect(screen.getByRole("button", { name: "취소" })).toBeInTheDocument();
+    expect(preferences.save).not.toHaveBeenCalled();
+    expect(preferences.reset).not.toHaveBeenCalled();
+  });
+
+  it("모바일은 전체 화면 버튼과 Escape 종료를 노출하지 않는다", () => {
+    const onFullscreenChange = vi.fn();
+    render(<DefectItemPicker mobilePresentation fullscreen onFullscreenChange={onFullscreenChange} items={[makeItem(1)]} productModels={[]} source="warehouse" selectedIds={new Set()} onAdd={vi.fn()} onRemove={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: /전체 화면/ })).not.toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onFullscreenChange).not.toHaveBeenCalled();
+  });
+
+  it("선택기가 소비한 Escape는 전체 화면을 유지하고 다음 Escape로 종료한다", async () => {
+    const onFullscreenChange = vi.fn();
+    render(<DefectItemPicker fullscreen onFullscreenChange={onFullscreenChange} items={[makeItem(1)]} productModels={[]} source="warehouse" selectedIds={new Set()} onAdd={vi.fn()} onRemove={vi.fn()} />);
+    const department = screen.getByRole("combobox", { name: "부서" });
+    fireEvent.click(department);
+    await screen.findByRole("listbox");
+    fireEvent.keyDown(department, { key: "Escape" });
+    expect(onFullscreenChange).not.toHaveBeenCalled();
+    await waitFor(() => expect(department).toHaveAttribute("aria-expanded", "false"));
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onFullscreenChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("Escape 종료 시 비어 있는 포커스는 버튼으로 복구하되 검색 포커스는 유지한다", () => {
+    const onFullscreenChange = vi.fn();
+    const props = { items: [makeItem(1)], productModels: [], source: "warehouse" as const, selectedIds: new Set<string>(), onAdd: vi.fn(), onRemove: vi.fn(), onFullscreenChange };
+    const { rerender } = render(<DefectItemPicker {...props} fullscreen />);
+    fireEvent.keyDown(window, { key: "Escape" });
+    rerender(<DefectItemPicker {...props} />);
+    expect(screen.getByRole("button", { name: "전체 화면" })).toHaveFocus();
+    rerender(<DefectItemPicker {...props} fullscreen />);
+    const input = screen.getByRole("textbox", { name: "검색" });
+    input.focus();
+    fireEvent.keyDown(input, { key: "Escape" });
+    rerender(<DefectItemPicker {...props} />);
+    expect(input).toHaveFocus();
+  });
+
   it("PC 전체 목록은 로그인 부서를 우선하고 모바일 순서는 유지한다", () => {
     const items = [{ ...makeItem(1), process_type_code: "TR" }, { ...makeItem(2), process_type_code: "AR" }];
     const props = { items, productModels: [], source: "warehouse" as const, selectedIds: new Set<string>(), onAdd: vi.fn(), onRemove: vi.fn() };

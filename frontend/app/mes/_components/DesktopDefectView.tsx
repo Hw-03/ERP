@@ -63,6 +63,8 @@ interface Props {
   operator: Operator | null;
   defectDeptFilter?: string | null;
   onStatusChange?: (status: string) => void;
+  itemPickerFullscreen?: boolean;
+  onItemPickerFullscreenChange?: (fullscreen: boolean) => void;
 }
 
 /**
@@ -70,7 +72,7 @@ interface Props {
  * list 모드는 KPI·퀵액션·필터·부서별 목록(다중선택). 액션 시 좌측을 덮는 전폭 흐름으로
  * 전환(새 불량 추가 / R 바로 폐기·반품 / 일괄 처리 / PA·PF 분해).
  */
-export function DesktopDefectView({ operator, defectDeptFilter, onStatusChange }: Props) {
+export function DesktopDefectView({ operator, defectDeptFilter, onStatusChange, itemPickerFullscreen, onItemPickerFullscreenChange }: Props) {
   if (!operator) {
     return (
       <div className="flex h-full min-h-0 flex-1 items-center justify-center px-6">
@@ -86,6 +88,8 @@ export function DesktopDefectView({ operator, defectDeptFilter, onStatusChange }
       operator={operator}
       defectDeptFilter={defectDeptFilter}
       onStatusChange={onStatusChange}
+      itemPickerFullscreen={itemPickerFullscreen}
+      onItemPickerFullscreenChange={onItemPickerFullscreenChange}
     />
   );
 }
@@ -94,10 +98,14 @@ function DefectViewInner({
   operator,
   defectDeptFilter,
   onStatusChange,
+  itemPickerFullscreen,
+  onItemPickerFullscreenChange,
 }: {
   operator: Operator;
   defectDeptFilter?: string | null;
   onStatusChange?: (status: string) => void;
+  itemPickerFullscreen?: boolean;
+  onItemPickerFullscreenChange?: (fullscreen: boolean) => void;
 }) {
   const realtimeRevision = useRealtimeRevision();
   const { config: searchConfig } = useItemSearch();
@@ -464,6 +472,8 @@ function DefectViewInner({
                 items={items}
                 productModels={productModels}
                 currentEmployee={employee}
+                itemPickerFullscreen={itemPickerFullscreen}
+                onItemPickerFullscreenChange={onItemPickerFullscreenChange}
                 onCancel={(historyDepth) => window.history.go(-historyDepth)}
                 onDone={(directAction) =>
                   handleProcessed(

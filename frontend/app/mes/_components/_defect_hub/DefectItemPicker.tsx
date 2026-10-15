@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type JSX } from "react";
-import { Check, GripVertical, Plus, RotateCcw, Save, Settings2 } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX, type ReactNode } from "react";
+import { Check, GripVertical, Maximize2, Minimize2, Plus, RotateCcw, Save, Settings2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
@@ -55,6 +55,8 @@ interface Props {
   disabled?: boolean;
   addingDisabled?: boolean;
   mobilePresentation?: boolean;
+  fullscreen?: boolean;
+  onFullscreenChange?: (fullscreen: boolean) => void;
 }
 
 /**
@@ -78,6 +80,8 @@ export function DefectItemPicker({
   disabled = false,
   addingDisabled = false,
   mobilePresentation = false,
+  fullscreen = false,
+  onFullscreenChange,
 }: Props): JSX.Element {
   const [dept, setDept] = useState("ALL");
   const [model, setModel] = useState("\uc804\uccb4");
@@ -87,12 +91,66 @@ export function DefectItemPicker({
   const [editMode, setEditMode] = useState(false);
   const [editItems, setEditItems] = useState<Item[]>([]);
   const tableRef = useRef<HTMLDivElement | null>(null);
+  const fullscreenButtonRef = useRef<HTMLButtonElement | null>(null);
+  const restoreFullscreenFocus = useRef(false);
+  const fullscreenScrollTop = useRef<number | null>(null);
   const operator = useCurrentOperator();
   const selectedCountDigits = String(Math.max(1, ...(selectedLineCounts?.values() ?? []))).length;
 
   const { data: myOrderData } = useMyItemOrderQuery(operator?.employee_id);
   const putMyOrder = usePutMyItemOrderMutation();
   const resetMyOrder = useResetMyItemOrderMutation();
+
+  /** 전체 화면 종료로 포커스가 비는 경우에만 헤더 버튼으로 복귀한다. */
+  function changeFullscreen(next: boolean): void {
+    fullscreenScrollTop.current = tableRef.current?.scrollTop ?? null;
+    restoreFullscreenFocus.current = !next && (
+      document.activeElement === document.body || document.activeElement === fullscreenButtonRef.current
+    );
+    onFullscreenChange?.(next);
+  }
+
+  useEffect(() => {
+    if (!fullscreen || mobilePresentation) return;
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      fullscreenScrollTop.current = tableRef.current?.scrollTop ?? null;
+      restoreFullscreenFocus.current = document.activeElement === document.body ||
+        document.activeElement === fullscreenButtonRef.current;
+      onFullscreenChange?.(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [fullscreen, mobilePresentation, onFullscreenChange]);
+
+  useLayoutEffect(() => {
+    const viewport = tableRef.current;
+    const previousTop = fullscreenScrollTop.current;
+    if (mobilePresentation || !viewport || previousTop === null) return;
+    viewport.scrollTop = previousTop;
+    fullscreenScrollTop.current = null;
+  }, [fullscreen, mobilePresentation]);
+
+  useEffect(() => {
+    if (fullscreen || mobilePresentation || !restoreFullscreenFocus.current) return;
+    restoreFullscreenFocus.current = false;
+    if (document.activeElement === document.body || document.activeElement === fullscreenButtonRef.current) {
+      fullscreenButtonRef.current?.focus({ preventScroll: true });
+    }
+  }, [fullscreen, mobilePresentation]);
+
+  const fullscreenToggle = !mobilePresentation && (
+    <button
+      ref={fullscreenButtonRef}
+      type="button"
+      onClick={() => changeFullscreen(!fullscreen)}
+      className="absolute left-1/2 top-1/2 z-20 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-[8px] border px-2 py-1 text-[11px] font-bold normal-case tracking-normal shadow-sm lg:inline-flex"
+      style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+    >
+      {fullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+      {fullscreen ? "전체 화면 해제" : "전체 화면"}
+    </button>
+  );
 
   const keyword = search.trim().toLowerCase();
   const { matchesItem: matchesSearch } = useItemSearch();
@@ -274,13 +332,14 @@ export function DefectItemPicker({
         <div
           ref={tableRef}
           data-testid="defect-picker-scroll"
-          className={mobilePresentation ? `${scrollFrameStyles.viewport} flex min-w-0 flex-col touch-pan-y overscroll-contain` : "absolute inset-y-0 left-0 right-0 touch-pan-y overflow-y-auto overflow-x-auto overscroll-contain lg:-right-2.5 lg:[scrollbar-gutter:stable]"}
+          className={mobilePresentation ? `${scrollFrameStyles.viewport} flex min-w-0 flex-col touch-pan-y overscroll-contain` : "absolute inset-y-0 left-0 right-0 touch-pan-y overflow-y-auto overflow-x-auto overscroll-contain [overflow-anchor:none] lg:-right-2.5 lg:[scrollbar-gutter:stable]"}
           style={mobilePresentation ? { WebkitOverflowScrolling: "touch", background: LEGACY_COLORS.s2, backgroundClip: "content-box" } : { WebkitOverflowScrolling: "touch" }}
         >
         <div className="flex min-h-full min-w-full flex-col" style={{ background: LEGACY_COLORS.s2 }}>
         {editMode ? (
           <DefectEditOrderTable
             mobilePresentation={mobilePresentation}
+            headerAction={fullscreenToggle}
             items={editItems}
             dragId={dragId}
             dropTargetId={dropTargetId}
@@ -294,7 +353,7 @@ export function DefectItemPicker({
             <col className="w-0 sm:w-[8%]" />
             <col className="w-auto sm:w-[10%]" /></>}
           </colgroup>
-          <thead className="sticky top-0 z-10">
+          <thead className="sticky top-0 z-10 relative">
             <tr
               className="text-left text-[11px] font-bold uppercase tracking-[1.5px]"
               style={{ color: LEGACY_COLORS.muted2 }}
@@ -315,6 +374,7 @@ export function DefectItemPicker({
                   }}
                 >
                   {h}
+                  {i === 0 && fullscreenToggle}
                 </th>
               ) : null)}
             </tr>
@@ -444,12 +504,14 @@ export function DefectItemPicker({
 
 function DefectEditOrderTable({
   mobilePresentation,
+  headerAction,
   items,
   dragId,
   dropTargetId,
   makeHandlers,
 }: {
   mobilePresentation: boolean;
+  headerAction: ReactNode;
   items: Item[];
   dragId: string | null;
   dropTargetId: string | null;
@@ -462,7 +524,7 @@ function DefectEditOrderTable({
         <col style={{ width: mobilePresentation ? undefined : "66%" }} />
         {!mobilePresentation && <col style={{ width: "30%" }} />}
       </colgroup>
-      <thead className="sticky top-0 z-10">
+      <thead className="sticky top-0 z-10 relative">
         <tr
           className="text-left text-[11px] font-bold uppercase tracking-[1.5px]"
           style={{ color: LEGACY_COLORS.muted2 }}
@@ -476,6 +538,7 @@ function DefectEditOrderTable({
             style={{ background: "var(--c-popup-bg)", borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
           >
             품목명
+            {headerAction}
           </th>
           {!mobilePresentation && <th className="px-3 py-2" style={{ background: "var(--c-popup-bg)", borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>품목 코드</th>}
         </tr>

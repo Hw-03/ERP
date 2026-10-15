@@ -60,6 +60,8 @@ interface Props {
   onDone: (directAction: DirectAction | null) => void;
   /** 새로고침으로 화면 단계가 바뀌어도 목표 화면까지의 실제 이력 거리를 전달한다. */
   onCancel: (historyDepth: number) => void;
+  itemPickerFullscreen?: boolean;
+  onItemPickerFullscreenChange?: (fullscreen: boolean) => void;
 }
 
 /** 오래된 이력은 원래 단계에서 거리를 추정하고 이후에는 저장된 실제 거리를 유지한다. */
@@ -87,6 +89,8 @@ export function DefectCartFlow({
   currentEmployee,
   onDone,
   onCancel,
+  itemPickerFullscreen = false,
+  onItemPickerFullscreenChange,
 }: Props): JSX.Element {
   const queryClient = useQueryClient();
   const [directAction, setDirectAction] = useState<DirectAction>(mode === "add" ? "scrap" : initialAction);
@@ -139,6 +143,10 @@ export function DefectCartFlow({
   }, [mode, initialAction, initialSource]);
 
   useEffect(() => { headingRef.current?.focus(); }, [step]);
+  useEffect(() => {
+    if (step !== 2) onItemPickerFullscreenChange?.(false);
+  }, [step, onItemPickerFullscreenChange]);
+  useEffect(() => () => onItemPickerFullscreenChange?.(false), [onItemPickerFullscreenChange]);
   useEffect(() => {
     const pending = pendingFocusRef.current;
     if (!pending) return;
@@ -402,12 +410,12 @@ export function DefectCartFlow({
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
       <h2 ref={headingRef} tabIndex={-1} className="sr-only">{title}</h2>
-      <DefectFlowStepper action={mode === "add" ? "add" : directAction} source={source} currentStep={step} busy={busy} onMenuSelect={() => goToStep(0)} onStepSelect={goToStep} />
+      {!(step === 2 && itemPickerFullscreen) && <DefectFlowStepper action={mode === "add" ? "add" : directAction} source={source} currentStep={step} busy={busy} onMenuSelect={() => goToStep(0)} onStepSelect={goToStep} />}
 
       {step === 2 && (
         <div key="step2" className="animate-desktop-navigation-enter flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-          <div data-testid="defect-step2-grid" className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[1.3fr_1fr]">
-            <div data-testid="defect-picker-pane" className="h-full min-h-0">
+          <div data-testid="defect-step2-grid" className="flex min-h-0 flex-1">
+            <div data-testid="defect-picker-pane" className="h-full min-h-0 min-w-0 flex-1">
               <DefectItemPicker
                 items={pickerItems}
                 productModels={productModels}
@@ -417,25 +425,9 @@ export function DefectCartFlow({
                 onRemove={removeItemById}
                 disabled={busy}
                 addingDisabled={atLineLimit}
+                fullscreen={itemPickerFullscreen}
+                onFullscreenChange={onItemPickerFullscreenChange}
               />
-            </div>
-
-            <div data-testid="defect-cart-pane" className="flex h-full min-h-0 flex-col gap-3">
-              <div className="flex h-[50px] shrink-0 items-center px-4 text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-                장바구니 {groups.length}품목
-              </div>
-              <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto rounded-[16px] border p-3" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
-                {groups.length === 0 ? <div className="px-4 py-8 text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>왼쪽에서 품목을 추가하세요.</div> : groups.map((group) => (
-                  <div key={group.item.item_id} className="flex shrink-0 items-center justify-between gap-3 rounded-[12px] border p-4" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-                    <div className="min-w-0">
-                      <div className="break-words text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{group.item.item_name}</div>
-                      <div className="mt-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{group.item.mes_code ?? "(코드 없음)"} · {source === "warehouse" ? "창고" : itemDepartment(group.item) ?? "부서 미지정"}</div>
-                    </div>
-                    <button type="button" disabled={busy} onClick={() => removeItemById(group.item)} aria-label={`${group.item.item_name} 선택 해제`}
-                      className="standard-hover no-btn-inset flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] disabled:opacity-50" style={{ color: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 10) }}><Trash2 className="h-4 w-4" /></button>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
           <button type="button" onClick={() => pushStep(3)} disabled={groups.length === 0 || busy}
@@ -482,7 +474,7 @@ export function DefectCartFlow({
                                   min={0} step="1" value={line.qty} onChange={(event) => updateLine(line.key, { qty: event.target.value, decisions: [], parentNormalQty: undefined })} placeholder="예: 3"
                                   className="h-11 min-h-11 w-20 rounded-[10px] border px-2 text-sm font-bold outline-none focus-visible:ring-2" />
                               </div>,
-                              management: <DefectManagementCategoryControl value={line.managementCategory} onChange={(managementCategory) => updateLine(line.key, { managementCategory })} />,
+                              management: <DefectManagementCategoryControl fullWidth value={line.managementCategory} onChange={(managementCategory) => updateLine(line.key, { managementCategory })} />,
                               add: index === group.lines.length - 1 ? <button type="button" disabled={busy || atLineLimit} onClick={() => addReason(group.item)}
                                 className="standard-hover flex min-h-11 items-center justify-center gap-1 rounded-[10px] border px-1 text-xs font-bold outline-none focus-visible:ring-2 disabled:opacity-50" style={{ color: LEGACY_COLORS.blue, borderColor: LEGACY_COLORS.blue, background: tint(LEGACY_COLORS.blue, 8) }}><Plus className="h-4 w-4 shrink-0" />다른 사유 추가</button> : undefined,
                               remove: <button type="button" disabled={busy} onClick={() => removeLine(line.key)} aria-label={`${group.item.item_name} 사유 ${index + 1} 삭제`}
