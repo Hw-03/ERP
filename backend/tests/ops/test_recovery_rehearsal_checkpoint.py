@@ -17,7 +17,7 @@ from bootstrap import schema
 
 
 OLD_REVISION = "20260928_0038"
-HEAD_REVISION = "20261008_0044"
+HEAD_REVISION = "20261015_0047"
 
 
 def _adapter() -> ModuleType:
