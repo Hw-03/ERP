@@ -164,7 +164,6 @@ export function getInternalUseHistoryLineEffectLabel(
   if (line.bom_stock_exempt) return "재고 미반영";
   if (!line.included) return "변동 없음";
   const isReturn =
-    !(line.selected ?? line.included) &&
     line.direction === "in" &&
     line.from_bucket === "none" &&
     line.to_bucket === "production";
@@ -576,8 +575,11 @@ export function getHistoryDisplaySubLabel(
   if (log.transaction_type === "MATERIAL_OUT" || (log.transaction_type === "SUPPLIER_RETURN" && supplierName)) {
     return getHistoryFlowLabel(log, batch);
   }
-  if (_internalUseReturnLine(log, batch)) {
-    return "선택 해제 자재를 소속 부서에 재입고";
+  const returnLine = _internalUseReturnLine(log, batch);
+  if (returnLine) {
+    return returnLine.selected
+      ? "선택 자재를 소속 부서에 재입고"
+      : "선택 해제 자재를 소속 부서에 재입고";
   }
   if (batch?.sub_type) {
     const fromSub = _DISPLAY_SUB_LABEL[_historySubType(batch)];
@@ -620,7 +622,7 @@ export function getHistoryFlowLabel(
   const returnLine = _internalUseReturnLine(log, batch);
   if (returnLine) {
     const department = _deptName(returnLine.to_department) ?? log.department?.trim() ?? null;
-    return `사용출고 해제 → ${_internalUseDestination(department)}`;
+    return `사용출고 ${returnLine.selected ? "반환" : "해제"} → ${_internalUseDestination(department)}`;
   }
   if (batch?.sub_type === "internal_use_out" || log.transaction_type === "INTERNAL_USE") {
     return `창고 → ${_internalUseDestination(_internalUseDepartment(log, batch))}`;

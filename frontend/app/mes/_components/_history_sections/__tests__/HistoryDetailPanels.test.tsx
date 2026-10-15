@@ -896,7 +896,10 @@ describe("desktop history detail panels", () => {
     expect(screen.queryByText("제외된 구성품")).not.toBeInTheDocument();
   });
 
-  it("shows internal-use mode and return effects without treating unchanged lines as exclusions", () => {
+  it.each([
+    ["parent_and_children", "상·하위 차감"],
+    ["parent_with_returns", "상위 차감·하위 반환"],
+  ] as const)("shows internal-use %s mode and return effects without treating unchanged lines as exclusions", (mode, label) => {
     vi.mocked(productionApi.getTransactions).mockReturnValue(new Promise(() => {}));
     const batch = makeBatch({
       work_type: "internal_use",
@@ -922,7 +925,7 @@ describe("desktop history detail panels", () => {
       from_department: null,
       to_bucket: "production" as const,
       to_department: "가공",
-      selected: false,
+      selected: mode === "parent_with_returns",
       included: true,
     };
     const unchanged = {
@@ -935,7 +938,7 @@ describe("desktop history detail panels", () => {
     };
     batch.bundles[0] = {
       ...batch.bundles[0],
-      internal_use_bom_mode: "parent_and_children",
+      internal_use_bom_mode: mode,
       lines: [parent, returned, unchanged],
     };
     const logs = [
@@ -965,7 +968,7 @@ describe("desktop history detail panels", () => {
       />,
     );
 
-    expect(screen.getByText("상·하위 차감")).toBeInTheDocument();
+    expect(screen.getByText(label)).toBeInTheDocument();
     expect(screen.getByText("재입고 하위")).toBeInTheDocument();
     expect(screen.getByText("변동 없는 하위")).toBeInTheDocument();
     expect(screen.getByText("소속 부서 재입고")).toBeInTheDocument();

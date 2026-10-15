@@ -399,7 +399,7 @@ describe("useIoDraftRestore", () => {
     expect(restored[0].lines[0].selected).toBe(true);
   });
 
-  it("하위만 차감 임시저장의 하위 수량을 기준수량 또는 0으로 정규화한다", () => {
+  it.each(["children_only", "parent_with_returns"] as const)("%s 임시저장의 선택을 보존하고 하위 수량을 기준수량 또는 0으로 정규화한다", (mode) => {
     const draft = {
       ...makeDraft("internal_use_out"),
       work_type: "internal_use" as const,
@@ -412,7 +412,7 @@ describe("useIoDraftRestore", () => {
           source_mes_code: null,
           quantity: 2,
           expanded_level: 1,
-          internal_use_bom_mode: "children_only" as const,
+          internal_use_bom_mode: mode,
           source_location: "warehouse" as const,
           lines: [
             {
@@ -421,11 +421,11 @@ describe("useIoDraftRestore", () => {
               item_name: "선택 하위",
               mes_code: null,
               unit: "EA",
-              direction: "out" as const,
-              from_bucket: "warehouse" as const,
+              direction: mode === "parent_with_returns" ? "in" as const : "out" as const,
+              from_bucket: mode === "parent_with_returns" ? "none" as const : "warehouse" as const,
               from_department: null,
-              to_bucket: "none" as const,
-              to_department: "연구",
+              to_bucket: mode === "parent_with_returns" ? "production" as const : "none" as const,
+              to_department: mode === "parent_with_returns" ? "고압" : "연구",
               quantity: 31,
               bom_expected: 4,
               included: true,
@@ -467,12 +467,13 @@ describe("useIoDraftRestore", () => {
       (line) => (line.item_id === "selected-item" ? 2 : 0),
     );
 
+    expect(restored[0].internal_use_bom_mode).toBe(mode);
     expect(restored[0].lines[0]).toMatchObject({
       quantity: 4,
       included: true,
       selected: true,
       edited: false,
-      shortage: 2,
+      shortage: mode === "parent_with_returns" ? 0 : 2,
     });
     expect(restored[0].lines[1]).toMatchObject({
       quantity: 0,
@@ -483,7 +484,7 @@ describe("useIoDraftRestore", () => {
     });
   });
 
-  it("상하위 차감 재입고와 재고 미반영 행은 기준수량을 보존한다", () => {
+  it.each(["parent_and_children", "parent_with_returns"] as const)("%s 재입고와 재고 미반영 행은 기준수량을 보존한다", (mode) => {
     const draft = {
       ...makeDraft("internal_use_out"),
       work_type: "internal_use" as const,
@@ -496,7 +497,7 @@ describe("useIoDraftRestore", () => {
           source_mes_code: null,
           quantity: 1,
           expanded_level: 1,
-          internal_use_bom_mode: "parent_and_children" as const,
+          internal_use_bom_mode: mode,
           source_location: "warehouse" as const,
           lines: [
             {
@@ -513,7 +514,7 @@ describe("useIoDraftRestore", () => {
               quantity: 99,
               bom_expected: 3,
               included: true,
-              selected: false,
+              selected: mode === "parent_with_returns",
               origin: "bom_auto" as const,
               edited: true,
               has_children: false,
@@ -549,10 +550,15 @@ describe("useIoDraftRestore", () => {
 
     const restored = restoreInternalUseBundles(draft, () => 0);
 
+    expect(restored[0].internal_use_bom_mode).toBe(mode);
     expect(restored[0].lines[0]).toMatchObject({
       quantity: 3,
       included: true,
-      selected: false,
+      selected: mode === "parent_with_returns",
+      direction: "in",
+      from_bucket: "none",
+      to_bucket: "production",
+      to_department: "조립",
       edited: false,
       shortage: 0,
     });

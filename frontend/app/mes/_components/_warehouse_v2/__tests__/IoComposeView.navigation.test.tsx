@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Item, ItemConversionResult } from "@/lib/api";
+import type { IoBundle, IoInternalUseBomMode, Item, ItemConversionResult } from "@/lib/api";
 import { api } from "@/lib/api";
 import { IoComposeView } from "../IoComposeView";
 
@@ -43,8 +43,21 @@ vi.mock("@/lib/api", () => ({
 }));
 
 vi.mock("../IoBundleCart", () => ({
-  IoBundleCart: ({ onAdvance }: { onAdvance: () => void }) => (
-    <button type="button" data-testid="draft-step-advance" onClick={onAdvance}>advance</button>
+  IoBundleCart: ({ onAdvance, bundles, onInternalUseBomModeChange, onToggleLine, onBundleQuantityChange }: {
+    onAdvance: () => void;
+    bundles: IoBundle[];
+    onInternalUseBomModeChange: (bundleId: string, mode: IoInternalUseBomMode) => void;
+    onToggleLine: (bundleId: string, lineId: string) => void;
+    onBundleQuantityChange: (bundleId: string, quantity: number) => void;
+  }) => (
+    <>
+      <button type="button" data-testid="draft-step-advance" onClick={onAdvance}>advance</button>
+      {bundles[0]?.source_kind === "bom_parent" && <>
+        <button type="button" onClick={() => onInternalUseBomModeChange(bundles[0].bundle_id, "parent_with_returns")}>반환 방식</button>
+        <button type="button" onClick={() => onToggleLine(bundles[0].bundle_id, bundles[0].lines[0].line_id)}>반환 하위 체크</button>
+        <button type="button" onClick={() => onBundleQuantityChange(bundles[0].bundle_id, 3)}>반환 기준수량 변경</button>
+      </>}
+    </>
   ),
 }));
 
@@ -257,6 +270,33 @@ beforeEach(() => {
 });
 
 describe("IoComposeView navigation chrome", () => {
+  it("반환 방식 진입 후 하위 선택·동일 방식 재클릭·수량 변경은 선택을 보존해 미리보기를 요청한다", async () => {
+    const initial: IoBundle = {
+      bundle_id: "returns-bundle", source_kind: "bom_parent", source_item_id: "parent", source_mes_code: null,
+      title: "반환 BOM", quantity: 2, expanded_level: 1, source_location: "warehouse", internal_use_bom_mode: "children_only",
+      lines: [{ line_id: "returns-child", item_id: "child", item_name: "반환 하위", mes_code: null, unit: "EA", direction: "out", from_bucket: "warehouse", from_department: null, to_bucket: "none", to_department: "AS", quantity: 4, bom_expected: 4, included: true, selected: true, origin: "bom_auto", edited: false, has_children: false, shortage: 0, exclusion_note: null }],
+    };
+    vi.mocked(api.preview).mockImplementation(async (request) => {
+      const target = request.targets[0];
+      const selected = target.component_selections?.[0].selected ?? false;
+      return { bundles: [{ ...initial, quantity: target.quantity, internal_use_bom_mode: target.internal_use_bom_mode, lines: [{ ...initial.lines[0], selected, included: selected, quantity: selected ? 6 : 0, direction: "in", from_bucket: "none", to_bucket: "production", to_department: "고압" }] }] } as never;
+    });
+    render(<IoComposeView globalSearch="" operator={{ ...operator, department: "AS" }} employees={[]} items={[]} setItems={vi.fn()} onStatusChange={vi.fn()} restoreStep={4} restoreDraft={{ batch_id: "returns-draft", work_type: "internal_use", sub_type: "internal_use_out", to_department: "AS", bundles: [initial] } as never} />);
+    fireEvent.click(await screen.findByRole("button", { name: "반환 방식" }));
+    await waitFor(() => expect(api.preview).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(api.preview).mock.calls[0][0].targets[0]).toMatchObject({ internal_use_bom_mode: "parent_with_returns", component_selections: [{ item_id: "child", selected: false }] });
+    fireEvent.click(screen.getByRole("button", { name: "반환 하위 체크" }));
+    await waitFor(() => expect(api.preview).toHaveBeenCalledTimes(2));
+    fireEvent.click(screen.getByRole("button", { name: "반환 방식" }));
+    await waitFor(() => expect(api.preview).toHaveBeenCalledTimes(3));
+    fireEvent.click(screen.getByRole("button", { name: "반환 기준수량 변경" }));
+    await waitFor(() => expect(api.preview).toHaveBeenCalledTimes(4));
+    for (const [request] of vi.mocked(api.preview).mock.calls.slice(1)) {
+      expect(request.targets[0].component_selections).toEqual([{ item_id: "child", selected: true }]);
+    }
+    expect(vi.mocked(api.preview).mock.calls[3][0].targets[0].quantity).toBe(3);
+  });
+
   it("튜브 작업자는 전용 카드와 업체 scope를 사용하며 URL 방향 단계를 공유한다", async () => {
     window.history.replaceState(null, "", "/mes?tab=warehouse&step=1");
     vi.mocked(api.listSuppliers).mockResolvedValue([{ supplier_id: "tube-supplier", name: "튜브 업체", scope: "tube", is_active: true, created_at: "", updated_at: "" }]);

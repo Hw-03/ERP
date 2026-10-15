@@ -54,6 +54,19 @@ function makeLine(overrides: Partial<IoLine> = {}): IoLine {
 }
 
 describe("IoLineRow quantity", () => {
+  it("체크한 반환 하위는 입고 위치와 재입고 및 증가 재고를 표시한다", () => {
+    render(<IoLineRow line={makeLine({ origin: "bom_auto", selected: true, direction: "in", to_bucket: "production", to_department: "고압", quantity: 4, bom_expected: 4 })} subType="internal_use_out" isChild available={3} onToggle={vi.fn()} onQuantityChange={vi.fn()} onRemove={vi.fn()} />);
+    expect(screen.getByText("소속 부서 재입고")).toBeInTheDocument();
+    expect(screen.getByLabelText("입고 위치: 고압")).toBeInTheDocument();
+    expect(screen.getByText("7")).toBeInTheDocument();
+    expect(screen.queryByText(/재고 부족/)).not.toBeInTheDocument();
+  });
+
+  it("가용 재고를 아직 몰라도 반환 하위의 오래된 shortage로 부족 표시하지 않는다", () => {
+    render(<IoLineRow line={makeLine({ origin: "bom_auto", selected: true, direction: "in", to_bucket: "production", to_department: "고압", quantity: 4, bom_expected: 4, shortage: 4 })} subType="internal_use_out" isChild available={null} onToggle={vi.fn()} onQuantityChange={vi.fn()} onRemove={vi.fn()} />);
+    expect(screen.queryByText(/부족/)).not.toBeInTheDocument();
+  });
+
   it("튜브 입고의 수량 조정은 튜브 재고 라벨과 수량을 표시한다", () => {
     render(<IoLineRow line={makeLine({ to_bucket: "production", to_department: "튜브", quantity: 3 })} subType="tube_receive_supplier" isChild={false} available={7} item={{ quantity: 100, warehouse_qty: 80 } as Item} onToggle={vi.fn()} onQuantityChange={vi.fn()} onRemove={vi.fn()} />);
     expect(screen.getByText("튜브 수량")).toBeInTheDocument();

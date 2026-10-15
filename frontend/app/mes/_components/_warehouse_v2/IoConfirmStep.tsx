@@ -28,6 +28,8 @@ import {
 } from "./ioWorkType";
 import { formatQty } from "@/lib/mes/format";
 import { ConfirmModal, type ConfirmTone } from "@/lib/ui/ConfirmModal";
+import { IoLocationBadge } from "./IoLocationBadge";
+import { lineInventoryLocation } from "./ioInventoryLocation";
 import { ReasonFormFields } from "../_defect_hub/ReasonFormFields";
 import { hasDefectReason } from "../_defect_hub/defectCartValidation";
 import panelStyles from "../mobile/screens/mobileWarehousePanels.module.css";
@@ -235,6 +237,9 @@ export function IoConfirmStep({
     : subTypeLabel(subType);
   const allLines = bundles.flatMap((bundle) => bundle.lines);
   const includedLines = allLines.filter((line) => line.included);
+  const hasReturnsMode = subType === "internal_use_out" && bundles.some(
+    (bundle) => bundle.internal_use_bom_mode === "parent_with_returns",
+  );
   const internalUseHasWarehouse = subType === "internal_use_out" &&
     includedLines.some((line) => line.from_bucket === "warehouse");
   const internalUseHasDepartment = subType === "internal_use_out" &&
@@ -319,6 +324,11 @@ export function IoConfirmStep({
           <div className="text-lg lg:text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
             {headerSummary}
           </div>
+          {hasReturnsMode && (
+            <p className="mt-2 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
+              연결 승인 모두 통과 시 전체 반영
+            </p>
+          )}
         </div>
         {isApproval ? (
           <span
@@ -437,7 +447,9 @@ export function IoConfirmStep({
         tone={copy.tone}
         cautionMessage={autoApprove
           ? "제출 즉시 승인되어 재고에 반영됩니다."
-          : isApproval
+          : isApproval && hasReturnsMode
+            ? "연결 승인 모두 통과 시 전체 반영됩니다."
+            : isApproval
             ? "승인이 완료되면 재고에 반영됩니다."
             : "제출 즉시 재고에 반영됩니다."}
         confirmLabel={copy.confirmLabel}
@@ -570,7 +582,11 @@ function ConfirmBundleCard({
   const headerQty = headerLine ? formatQty(headerLine.quantity) : "";
   const headerDeductionSource = showDeductionSource
     ? bundle.source_kind === "bom_parent"
-      ? deductionSourceSummary(visibleLines)
+      ? deductionSourceSummary(
+          bundle.internal_use_bom_mode === "parent_with_returns" && directParentLine
+            ? [directParentLine]
+            : visibleLines,
+        )
       : headerLine
         ? deductionSourceName(headerLine)
         : null
@@ -727,6 +743,9 @@ function ConfirmLineRow({
     ? subType === "produce" ? "선택 입고" : "선택 출고"
     : null;
   const routeLabel = automaticLineRouteLabel(subType, line);
+  const returnLocation = showInternalUseEffect && line.direction === "in"
+    ? lineInventoryLocation(line, subType)
+    : null;
   const dir = showInternalUseEffect && !line.included
     ? { sign: null as null, color: LEGACY_COLORS.muted2 }
     : signFor(line);
@@ -793,6 +812,9 @@ function ConfirmLineRow({
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-3">
+        {returnLocation && (
+          <IoLocationBadge label={returnLocation.label} value={returnLocation.value} variant="field" />
+        )}
         {showDeductionSource &&
           (line.from_bucket === "warehouse" || line.from_bucket === "production") && (
           <IoDeductionSourceBadge

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { IoBundle, Item } from "@/lib/api";
+import type { IoBundle, IoInternalUseBomMode, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { IoBundleCard } from "../IoBundleCard";
 
@@ -51,7 +51,7 @@ const bundle = {
 } satisfies IoBundle;
 
 function makeInternalUseBundle(
-  mode: "parent_and_children" | "children_only" | null,
+  mode: IoInternalUseBomMode | null,
 ): IoBundle {
   return {
     ...bundle,
@@ -66,7 +66,7 @@ function makeInternalUseBundle(
         to_bucket: "none",
         to_department: null,
         quantity: 11,
-        included: mode === "parent_and_children",
+        included: mode === "parent_and_children" || mode === "parent_with_returns",
       },
       {
         ...childLine,
@@ -443,6 +443,9 @@ describe("IoBundleCard", () => {
     );
     const parentAndChildren = screen.getByRole("button", { name: "상·하위 차감" });
     const childrenOnly = screen.getByRole("button", { name: "하위만 차감" });
+    const parentWithReturns = screen.getByRole("button", { name: "상위 차감·하위 반환" });
+    expect(parentWithReturns).toHaveClass("min-h-[44px]", "min-w-[168px]", "whitespace-normal");
+    expect(parentWithReturns.parentElement).toHaveClass("flex", "flex-wrap", "w-full");
     expect(within(parentAndChildren).getByText("상·하위 차감")).toBeInTheDocument();
     expect(within(childrenOnly).getByText("하위만 차감")).toBeInTheDocument();
     expect(parentAndChildren).toHaveClass(
@@ -467,15 +470,67 @@ describe("IoBundleCard", () => {
     expect(screen.queryByText("상위 자재 재고 요약")).not.toBeInTheDocument();
 
     fireEvent.click(parentAndChildren);
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "확인" }));
     fireEvent.click(childrenOnly);
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "확인" }));
+    fireEvent.click(parentWithReturns);
 
     expect(onModeChange).toHaveBeenNthCalledWith(1, "parent_and_children");
     expect(onModeChange).toHaveBeenNthCalledWith(2, "children_only");
+    expect(onModeChange).toHaveBeenNthCalledWith(3, "parent_with_returns");
+  });
+
+  it.each([
+    ["parent_and_children", "상·하위 차감", ["차감", "차감", "반환"]],
+    ["children_only", "하위만 차감", ["변동 없음", "차감", "변동 없음"]],
+    ["parent_with_returns", "상위 차감·하위 반환", ["차감", "반환", "변동 없음"]],
+  ] as const)("%s 선택 시 대상별 재고 처리 안내를 매번 보여준다", (mode, label, effects) => {
+    const onModeChange = vi.fn();
+    const props = {
+      bundle: makeInternalUseBundle(null),
+      subType: "internal_use_out" as const,
+      itemMap,
+      getAvailable: () => 60,
+      onToggleLine: vi.fn(),
+      onQuantityChange: vi.fn(),
+      onInternalUseBomModeChange: onModeChange,
+      onRemoveLine: vi.fn(),
+      onRemoveBundle: vi.fn(),
+    };
+    const { rerender } = render(<IoBundleCard {...props} />);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: label, exact: true }));
+    expect(onModeChange).toHaveBeenLastCalledWith(mode);
+    const dialog = screen.getByRole("dialog", { name: `${label} 방식 안내` });
+    ["상위 품목", "체크한 하위", "체크 해제한 하위"].forEach((target, index) => {
+      const card = within(dialog).getByRole("group", { name: target });
+      expect(within(card).getByText(effects[index], { exact: true })).toBeInTheDocument();
+    });
+    expect(dialog).toHaveTextContent("재고 미반영 품목은 처리 대상에서 제외됩니다.");
+    if (mode === "parent_with_returns") {
+      expect(within(dialog).getByText("이 방식으로 바꾸면 하위 체크가 모두 해제됩니다. 반환할 부품만 체크하세요.")).toBeInTheDocument();
+    }
+
+    // 미리보기 응답으로 카드가 갱신되어도 사용자가 확인할 때까지 안내를 유지한다.
+    rerender(<IoBundleCard {...props} bundle={makeInternalUseBundle(mode)} />);
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "확인" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: label, exact: true }));
+    expect(screen.getByRole("dialog", { name: `${label} 방식 안내` })).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "확인" }));
+
+    const otherMode = mode === "children_only" ? "parent_and_children" : "children_only";
+    rerender(<IoBundleCard {...props} bundle={makeInternalUseBundle(otherMode)} />);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: label, exact: true }));
+    expect(screen.getByRole("dialog", { name: `${label} 방식 안내` })).toBeInTheDocument();
   });
 
   it.each([
     ["parent_and_children", "49"],
     ["children_only", "60"],
+    ["parent_with_returns", "49"],
   ] as const)("사용출고 BOM %s 모드의 상위 실행 후 재고를 헤더에 표시한다", (mode, expected) => {
     render(
       <IoBundleCard

@@ -5752,7 +5752,8 @@
               {
                 "enum": [
                   "parent_and_children",
-                  "children_only"
+                  "children_only",
+                  "parent_with_returns"
                 ],
                 "type": "string"
               },
@@ -6273,7 +6274,8 @@
               {
                 "enum": [
                   "parent_and_children",
-                  "children_only"
+                  "children_only",
+                  "parent_with_returns"
                 ],
                 "type": "string"
               },

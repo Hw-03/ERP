@@ -50,7 +50,7 @@ WORK_TYPES = {
 INTERNAL_USE_WORK_TYPE = "internal_use"
 INTERNAL_USE_SUB_TYPE = "internal_use_out"
 INTERNAL_USE_SOURCE_LOCATIONS = frozenset({"warehouse", "department"})
-INTERNAL_USE_BOM_MODES = frozenset({"parent_and_children", "children_only"})
+INTERNAL_USE_BOM_MODES = frozenset({"parent_and_children", "children_only", "parent_with_returns"})
 INTERNAL_USE_RETURN_NOTE = "소속 부서 재입고"
 INTERNAL_USE_NO_CHANGE_NOTE = "변동 없음"
 INTERNAL_USE_DEPARTMENTS = frozenset(
@@ -297,7 +297,7 @@ def _validate_internal_use_bom_bundle(
 
     if set(child_lines) != set(children):
         raise ValueError("사용출고 BOM 구성이 현재 BOM과 일치하지 않습니다.")
-    expected_parent_count = 1 if mode == "parent_and_children" else 0
+    expected_parent_count = 1 if mode in {"parent_and_children", "parent_with_returns"} else 0
     if len(parent_lines) != expected_parent_count:
         raise ValueError("사용출고 BOM 차감 방식과 상위 자재 구성이 일치하지 않습니다.")
 
@@ -342,7 +342,9 @@ def _validate_internal_use_bom_bundle(
             if included or selected:
                 raise ValueError("재고 미반영 BOM 하위 자재는 재고에 반영할 수 없습니다.")
             continue
-        if mode == "parent_and_children" and not selected:
+        if (mode == "parent_and_children" and not selected) or (
+            mode == "parent_with_returns" and selected
+        ):
             expected_route = (
                 "in",
                 "none",
@@ -1140,7 +1142,7 @@ def _internal_use_bom_lines(
         raise ValueError("지원하지 않는 사용출고 BOM 차감 방식입니다.")
     selected_by_item = _internal_use_component_selection_map(children, component_selections)
     lines: list[dict] = []
-    if mode == "parent_and_children":
+    if mode in {"parent_and_children", "parent_with_returns"}:
         lines.append(
             _routed_line(
                 db,
@@ -1158,8 +1160,10 @@ def _internal_use_bom_lines(
     for child_id, per_unit_qty in children:
         child = _get_item(db, child_id)
         expected = _d(per_unit_qty) * quantity
-        selected = selected_by_item.get(child_id, True)
-        if mode == "parent_and_children" and not selected:
+        selected = selected_by_item.get(child_id, mode != "parent_with_returns")
+        if (mode == "parent_and_children" and not selected) or (
+            mode == "parent_with_returns" and selected
+        ):
             lines.append(
                 _line_dict(
                     db,
@@ -1173,7 +1177,7 @@ def _internal_use_bom_lines(
                     origin="bom_auto",
                     bom_expected=expected,
                     included=True,
-                    selected=False,
+                    selected=selected,
                     edited=False,
                     exclusion_note=INTERNAL_USE_RETURN_NOTE,
                 )
@@ -1186,6 +1190,7 @@ def _internal_use_bom_lines(
                 quantity=(
                     Decimal("0")
                     if mode != "parent_and_children" and not selected
+                    and not (mode == "parent_with_returns" and child.bom_stock_exempt)
                     else expected
                 ),
                 sub_type=INTERNAL_USE_SUB_TYPE,
