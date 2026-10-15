@@ -19,6 +19,7 @@ logs/
 .env.production.local
 
 # TypeScript
+next-env.d.ts
 *.tsbuildinfo
 
 # OS

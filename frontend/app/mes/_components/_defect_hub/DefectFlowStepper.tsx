@@ -21,7 +21,7 @@ export function DefectFlowStepper({ action, source, currentStep, onMenuSelect, b
   const workLabel = action === "add" ? "격리 등록" : action === "scrap" ? "즉시 폐기" : action === "rework" ? "즉시 재작업" : "";
   const summary = [workLabel, source === "warehouse" ? "창고 재고" : source === "production" ? "부서 재고" : ""].filter(Boolean).join(" · ");
   return <nav aria-label="불량 처리 단계" data-testid="defect-flow-stepper" className="iwp shrink-0" style={{ gridTemplateColumns: `repeat(${labels.length + 1}, minmax(0, 1fr))` }}>
-    <button type="button" className="iwpb done" disabled={busy} onClick={onMenuSelect}><span className="iwpl">불량 메뉴</span></button>
+    <button type="button" className="iwpb done" disabled={busy} onClick={onMenuSelect}><span className="iwpl">불량</span></button>
     {labels.map((label, index) => {
       const number = index + 1;
       const active = currentStep === number;
