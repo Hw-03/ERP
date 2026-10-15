@@ -174,7 +174,7 @@ it("화살표로 펼친 제출도 하나의 표를 쓰며 하위 배치를 선�
   expect(work.querySelector("button[aria-expanded]")).toHaveAttribute("aria-expanded", "true");
 });
 
-it("접힌 PC 제출의 하위 레거시 배치도 조회해 대표 품목과 분류를 표시한다", async () => {
+it("접힌 PC 제출은 자재 행이 먼저 와도 대표 품목과 생산 입고 분류를 표시한다", async () => {
   const primary = makeLog({ operation_batch_id: "batch-1" });
   const child = makeLog({ log_id: "component", item_id: "COMP-1", item_name: "BOM 구성품", transaction_type: "BACKFLUSH", operation_batch_id: "batch-1" });
   const group: LogGroup = { type: "submission", key: "submission:legacy", logs: [child, primary], workGroups: [
@@ -189,7 +189,7 @@ it("접힌 PC 제출의 하위 레거시 배치도 조회해 대표 품목과 �
   const { container } = render(<CachedTable />);
   await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
   await screen.findByText(primary.item_name);
-  await screen.findByText("부서 입출고");
+  await screen.findByText("생산 입고");
   expect(screen.queryByText("작업 정보 확인 중")).not.toBeInTheDocument();
   expect(container.querySelectorAll("table")).toHaveLength(1);
   fetch.mockRestore();

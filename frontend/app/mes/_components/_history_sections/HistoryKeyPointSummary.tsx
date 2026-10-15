@@ -8,7 +8,7 @@ import { FlowBadge } from "./historyTableHelpers";
 import { formatQty } from "@/lib/mes/format";
 import { Tooltip } from "@/lib/ui/Tooltip";
 import { useDesktopRightPanelBody } from "../DesktopRightPanel";
-import { formatHistoryDateTimeLong } from "./historyFormat";
+import { formatHistoryDate, formatHistoryDateTimeLong } from "./historyFormat";
 import type {
   HistoryDetailSummary,
   HistoryDetailSummaryTone,
@@ -29,6 +29,8 @@ export function HistoryKeyPointSummary({
   fillHeight = false,
   compactMetadata = false,
   stocktakeOperation,
+  variant = "card",
+  department,
 }: {
   summary: HistoryDetailSummary;
   operation?: Pick<TransactionLog, "operation_domain" | "operation_action">;
@@ -37,6 +39,8 @@ export function HistoryKeyPointSummary({
   fillHeight?: boolean;
   compactMetadata?: boolean;
   stocktakeOperation?: InventoryOperation;
+  variant?: "card" | "plain";
+  department?: string | null;
 }) {
   const statusColor = STATUS_COLORS[summary.status.tone];
   const isStocktake = !!operation && isStocktakeOperation(operation);
@@ -91,15 +95,15 @@ export function HistoryKeyPointSummary({
   return (
     <section
       data-testid="history-key-point-summary"
-      className={`${fillHeight ? "min-h-0 flex-1 " : ""}overflow-hidden rounded-[20px] border`}
-      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+      className={variant === "plain" ? "min-w-0 space-y-1" : `${fillHeight ? "min-h-0 flex-1 " : ""}overflow-hidden rounded-[20px] border`}
+      style={variant === "plain" ? undefined : { background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
     >
-      <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+      <div className={variant === "plain" ? "flex items-start justify-between gap-3" : "flex items-center justify-between gap-3 px-4 py-3.5"}>
         <div data-testid="history-operation-summary" className="flex min-w-0 items-center gap-2">
           {operation && isStocktakeOperation(operation) ? (
             <FlowBadge type={null} operation={operation} label={summary.operationLabel} color={LEGACY_COLORS.green} variant="panel" />
           ) : (
-            <div className="truncate text-base font-black" style={{ color: LEGACY_COLORS.text }}>
+            <div className={variant === "plain" ? "break-words text-base font-bold" : "truncate text-base font-black"} style={{ color: LEGACY_COLORS.text }}>
               {summary.operationLabel}
             </div>
           )}
@@ -115,7 +119,11 @@ export function HistoryKeyPointSummary({
         </span>
       </div>
 
-      <div className="border-t px-4 py-3 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+      {variant === "plain" ? <div className="space-y-1 text-xs leading-5" style={{ color: LEGACY_COLORS.muted2 }}>
+        {participants.map(participant => <p key={`${participant.label}:${participant.name}:${participant.at}`} data-testid="history-participant-row" className="break-words">
+          {(participants.length > 1 || participant.label === "취소자") && `${participant.label} `}{participant.name}{department ? ` · ${department}` : ""} · <time dateTime={participant.at}>{formatHistoryDate(participant.at)}</time>
+        </p>)}
+      </div> : <div className="border-t px-4 py-3 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
         <div className="grid gap-2">
           {participants.map((participant) => (
             <div
@@ -139,7 +147,7 @@ export function HistoryKeyPointSummary({
             </div>
           ))}
         </div>
-      </div>
+      </div>}
 
       {(summary.flow || changedActualStockLines.length > 0) && (
         <div

@@ -242,6 +242,25 @@
   white-space: normal;
 }
 
+.plainStockDetails {
+  text-align: left;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.plainStockDetails :global(.history-stock-panel),
+.plainStockDetails :global(.history-stock-panel-line) {
+  width: 100%;
+}
+
+.plainStockDetails :global(.history-stock-panel-line) {
+  grid-template-columns: minmax(0, 1fr) auto auto 16px auto;
+}
+
+.plainStockDetails :global(.history-stock-panel-location) {
+  max-width: none;
+}
+
 @media (max-width: 360px) {
   .bundleHeader.compositionRow,
   .singleLine {

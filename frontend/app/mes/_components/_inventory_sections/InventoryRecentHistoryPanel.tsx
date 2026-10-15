@@ -113,6 +113,10 @@ function HistoryRows({ entries, mobilePresentation, onSelect }: { entries: Recen
         </div>
       </li>;
         const log = entry.log!;
+        // 요청 연결이 없는 이전 직접 처리 기록만 기록자의 이름을 사용한다.
+        const requester = log.requester_name?.trim()
+          || (!log.operation_batch_id && !log.history_batch && !log.approver_name?.trim() ? log.produced_by?.trim() : null)
+          || "요청자 기록 없음";
         return (
         <RecentLine
           key={log.log_id}
@@ -121,7 +125,7 @@ function HistoryRows({ entries, mobilePresentation, onSelect }: { entries: Recen
           type={log.transaction_type}
           label={getHistoryLabel(log)}
           log={log}
-          context={[log.department, log.executor_name ?? log.requester_name ?? log.produced_by]
+          context={[log.department, requester]
             .filter((value): value is string => Boolean(value?.trim()))
             .join(" · ") || log.reference_no || "업무 정보 없음"}
           effectiveAt={log.requested_at ?? log.created_at}
