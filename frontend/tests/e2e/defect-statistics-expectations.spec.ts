@@ -88,9 +88,14 @@ test("DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위
   }
   await expect(page.getByRole("list", { name: "부서별 집계 목록" }).getByRole("listitem")).toHaveCount(2);
   await expect(page.getByRole("list", { name: "사유별 집계 목록" }).getByRole("listitem")).toHaveCount(1);
-  for (const department of ["튜브", "조립"]) await expect(page.getByRole("button", { name: `부서 ${department} 선택`, exact: true })).toContainText("9개 · 50% · 3건");
-  await expect(selectedReason).toContainText("18개 · 100% · 6건");
-  const ranked = page.getByRole("region", { name: "품목 비교 스크롤 영역" }).getByRole("row").filter({ has: page.getByRole("button") });
+  for (const department of ["튜브", "조립"]) {
+    const entry = page.getByRole("button", { name: `부서 ${department} 선택`, exact: true });
+    await expect(entry.getByText("9개", { exact: true })).toBeVisible();
+    await expect(entry.getByText("50% · 3건", { exact: true })).toBeVisible();
+  }
+  await expect(selectedReason.getByText("18개", { exact: true })).toBeVisible();
+  await expect(selectedReason.getByText("100% · 6건", { exact: true })).toBeVisible();
+  const ranked = page.getByRole("table", { name: "품목 비교 목록", exact: true }).getByRole("row").filter({ has: page.getByRole("button") });
   expect(await ranked.getByRole("button").allTextContents()).toEqual(original.items.map((row: { label: string; mes_code: string }) => row.label + row.mes_code));
   for (const row of await ranked.all()) {
     await expect(row.getByRole("cell").nth(1)).toHaveText("9개");
@@ -111,7 +116,7 @@ test("DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위
   await expect(page.locator(".recharts-tooltip-wrapper")).toContainText("18");
   const repeated = await report(() => page.getByRole("button", { name: "새로고침", exact: true }).click());
   expect(repeated.items).toEqual(original.items);
-  await page.getByRole("button", { name: "분류 조건 펼치기", exact: true }).click();
+  await page.getByRole("button", { name: "필터 펼치기", exact: true }).click();
   filters.department = "튜브";
   let filtered = await report(() => page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "튜브", exact: true }).click());
   filters.model = data.model.model_name;
@@ -126,7 +131,8 @@ test("DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위
   }
   await expect(card).toContainText("9개"); await expect(card).toContainText("3건 등록");
   await expect(page.getByRole("list", { name: "부서별 집계 목록" }).getByRole("listitem")).toHaveCount(1);
-  await expect(selectedReason).toContainText("9개 · 100% · 3건");
+  await expect(selectedReason.getByText("9개", { exact: true })).toBeVisible();
+  await expect(selectedReason.getByText("100% · 3건", { exact: true })).toBeVisible();
   await expect(ranked).toHaveCount(1);
   await expect(ranked.getByRole("cell").nth(1)).toHaveText("9개");
   await expect(ranked.getByRole("cell").nth(2)).toHaveText("3건");

@@ -42,6 +42,7 @@ for (const source of ["warehouse", "production"] as const) {
       await picker.getByPlaceholder("품목명 · 품목 코드").fill(item.mes_code!);
       await picker.getByRole("button", { name: `${item.item_name} 장바구니에 추가`, exact: true }).click();
     }
+    await page.getByRole("button", { name: "수량·처리 정보 →", exact: true }).click();
     const cart = page.getByTestId("defect-cart-panel").filter({ visible: true });
     for (let index = 0; index < 3; index++) {
       await cart.getByRole("spinbutton").nth(index).fill("1");

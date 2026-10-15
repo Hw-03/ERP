@@ -50,6 +50,7 @@ test("DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상�
     await expect(option.getByRole("cell").nth(2)).toHaveText("3");
     await option.getByRole("button", { name: `${parent.item_name} 장바구니에 추가`, exact: true }).click();
   }
+  await page.getByRole("button", { name: "수량·처리 정보 →", exact: true }).click();
   const cart = page.getByTestId("defect-cart-panel").filter({ visible: true });
   await expect(cart.getByRole("spinbutton")).toHaveCount(1);
   await expect(cart).toContainText(parts[1].item_name);

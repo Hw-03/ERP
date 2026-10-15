@@ -30,6 +30,7 @@ test("DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격
   await loginUi(page, actors.requester);
   await page.goto("/mes?tab=defect");
   await page.getByRole("button").filter({ hasText: "격리 목록", visible: true }).click();
+  if (await page.getByRole("button", { name: "필터 펼치기", exact: true }).isVisible()) await page.getByRole("button", { name: "필터 펼치기", exact: true }).click();
   await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "전체", exact: true }).click();
   const grouped = page.getByTestId("defect-item-group-summary").filter({ hasText: item.item_name, visible: true });
   await expect.poll(async () => await grouped.count() + await page.getByRole("article", { name: `${item.item_name} 격리 기록` }).filter({ visible: true }).count()).toBeGreaterThan(0);
@@ -133,6 +134,7 @@ test("DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 �
   await loginUi(page, actors.requester);
   await page.goto("/mes?tab=defect");
   await page.getByRole("button").filter({ hasText: "격리 목록", visible: true }).click();
+  if (await page.getByRole("button", { name: "필터 펼치기", exact: true }).isVisible()) await page.getByRole("button", { name: "필터 펼치기", exact: true }).click();
   await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "전체", exact: true }).click();
   const grouped = page.getByTestId("defect-item-group-summary").filter({ hasText: item.item_name, visible: true });
   await expect.poll(async () => await grouped.count() + await page.getByRole("article", { name: `${item.item_name} 격리 기록` }).filter({ visible: true }).count()).toBeGreaterThan(0);

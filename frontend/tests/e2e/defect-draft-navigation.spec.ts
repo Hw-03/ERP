@@ -54,6 +54,7 @@ test("PC-DELTA-DEFECT-03 두 행 사유·기타메모는 실제 Back·새로고�
     await picker.getByPlaceholder("품목명 · 품목 코드").fill(item.mes_code!);
     await picker.getByRole("button", { name: `${item.item_name} 장바구니에 추가`, exact: true }).click();
   }
+  await page.getByRole("button", { name: "수량·처리 정보 →", exact: true }).click();
   const cart = page.getByTestId("defect-cart-panel").filter({ visible: true });
   const categories = ["외관 불량", "기타"];
   const memos = ["첫 행 외관 사유 보존", "둘째 행 기타 상세 보존"];
@@ -108,7 +109,12 @@ test("PC-DELTA-DEFECT-03 두 행 사유·기타메모는 실제 Back·새로고�
   expect(await Promise.all(items.map((item) => stock(request, item.item_id)))).toEqual(before);
   await sidebar(page, "불량");
   await openScrap(page);
-  await expect(cart.getByRole("spinbutton")).toHaveCount(0);
-  await expect(cart).toContainText("왼쪽에서 품목을 추가하세요.");
+  await expect(picker).toBeVisible();
+  await expect(page.getByText("선택 0품목", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "수량·처리 정보 →", exact: true })).toBeDisabled();
+  for (const item of items) {
+    await picker.getByPlaceholder("품목명 · 품목 코드").fill(item.mes_code!);
+    await expect(picker.getByTestId(`defect-picker-row-${item.item_id}`)).toHaveAttribute("data-added", "false");
+  }
   expect(mutations).toEqual([]);
 });

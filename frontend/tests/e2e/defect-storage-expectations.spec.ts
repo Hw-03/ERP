@@ -45,6 +45,7 @@ for (const selected of [{ category: "B_GRADE", label: "B급", other: "OBSOLETE" 
     await page.getByRole("listbox").getByRole("option", { name: "전체", exact: true }).click();
     await picker.getByPlaceholder("품목명 · 품목 코드").fill(item.mes_code);
     await picker.getByRole("button", { name: `${item.item_name} 장바구니에 추가`, exact: true }).click();
+    await page.getByRole("button", { name: "수량·처리 정보 →", exact: true }).click();
     const cart = page.getByTestId("defect-cart-panel").filter({ visible: true });
     await cart.getByRole("spinbutton").fill("2");
     await cart.getByRole("button", { name: "사유 카테고리 선택", exact: true }).click();
@@ -70,8 +71,9 @@ for (const selected of [{ category: "B_GRADE", label: "B급", other: "OBSOLETE" 
     expect(created.management_category).toBe(selected.category);
     expect(Number(created.available_quantity)).toBe(2);
     await page.getByRole("button").filter({ hasText: "B급·구형 자재", visible: true }).click();
+    if (await page.getByRole("button", { name: "필터 펼치기", exact: true }).isVisible()) await page.getByRole("button", { name: "필터 펼치기", exact: true }).click();
     await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "전체", exact: true }).click();
-    await page.getByRole("textbox", { name: "B급·구형 검색", exact: true }).fill(item.item_name);
+    await page.getByLabel("B급·구형 검색", { exact: true }).filter({ visible: true }).fill(item.item_name);
     const filters = page.getByRole("group", { name: "보관 분류 필터" });
     await filters.getByRole("button", { name: /^전체 보관/ }).click();
     await expect(filters.getByRole("button", { name: /^전체 보관/ })).toContainText("2건");
@@ -111,8 +113,9 @@ test("DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터
   await loginUi(page, actors.requester);
   await page.goto("/mes?tab=defect");
   await page.getByRole("button").filter({ hasText: "B급·구형 자재", visible: true }).click();
+  if (await page.getByRole("button", { name: "필터 펼치기", exact: true }).isVisible()) await page.getByRole("button", { name: "필터 펼치기", exact: true }).click();
   await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "전체", exact: true }).click();
-  await page.getByRole("textbox", { name: "B급·구형 검색", exact: true }).fill(item.item_name);
+  await page.getByLabel("B급·구형 검색", { exact: true }).filter({ visible: true }).fill(item.item_name);
   await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "창고", exact: true }).click();
   const filters = page.getByRole("group", { name: "보관 분류 필터" });
   const all = filters.getByRole("button", { name: /^전체 보관/ });
@@ -168,13 +171,13 @@ test("DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터
   for (const expectedRemaining of [1, 0]) {
     await firstRow.getByRole("button", { name: "정상 복귀", exact: true }).click();
     await page.getByRole("spinbutton").filter({ visible: true }).fill("1");
-    await page.getByRole("button", { name: "사유 카테고리 선택", exact: true }).filter({ visible: true }).click();
-    await page.getByRole("dialog", { name: "사유 카테고리", exact: true }).getByRole("button", { name: "검사 통과", exact: true }).click();
+    await expect(page.getByRole("button", { name: "사유 카테고리 선택", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "정상 복귀 →", exact: true }).filter({ visible: true })).toBeEnabled();
     await page.getByRole("button", { name: "정상 복귀 →", exact: true }).filter({ visible: true }).click();
     const restored = page.waitForResponse((response) => response.request().method() === "POST" && response.url().endsWith("/api/defects/unquarantine"));
     await page.getByRole("dialog", { name: "정상 복귀 확인", exact: true }).getByRole("button", { name: "즉시 복귀", exact: true }).click();
     expect((await restored).status()).toBe(200);
-    await expect(page.getByRole("textbox", { name: "B급·구형 검색", exact: true })).toHaveValue(item.item_name);
+    await expect(page.getByLabel("B급·구형 검색", { exact: true }).filter({ visible: true })).toHaveValue(item.item_name);
     await expect(all).toContainText(`${expectedRemaining ? 2 : 1}건`);
     await expect(o).toContainText(`${expectedRemaining ? 2 : 1}건`);
     await expect(b).toContainText("0건");

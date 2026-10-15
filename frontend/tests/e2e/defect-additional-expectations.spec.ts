@@ -51,7 +51,10 @@ async function quarantine(request: APIRequestContext, actors: CommonActors, item
 async function openList(page: Page, itemName: string, storage = false) {
   await page.goto("/mes?tab=defect");
   await page.getByRole("button").filter({ hasText: storage ? "B급·구형 자재" : "격리 목록", visible: true }).click();
-  if (!storage) await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "전체", exact: true }).click();
+  if (!storage) {
+    if (await page.getByRole("button", { name: "필터 펼치기", exact: true }).isVisible()) await page.getByRole("button", { name: "필터 펼치기", exact: true }).click();
+    await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "전체", exact: true }).click();
+  }
   const summary = page.getByTestId("defect-item-group-summary").filter({ hasText: itemName, visible: true });
   const records = page.getByRole("article", { name: `${itemName} 격리 기록` }).filter({ visible: true });
   await expect.poll(async () => await summary.count() + await records.count()).toBeGreaterThan(0);
@@ -83,8 +86,10 @@ for (const source of ["warehouse", "production"] as const) {
       await page.getByRole("listbox").getByRole("option", { name: "전체", exact: true }).click();
       await picker.getByPlaceholder("품목명 · 품목 코드").fill(item.mes_code);
       await picker.getByRole("button", { name: `${item.item_name} 장바구니에 추가`, exact: true }).click();
+      await page.getByRole("button", { name: "수량·처리 정보 →", exact: true }).click();
       const cart = page.getByTestId("defect-cart-panel").filter({ visible: true });
-      await expect(cart).toContainText(`자동 부서 · ${source === "warehouse" ? "창고" : "튜브"}`);
+      if (action === "격리 등록") await expect(cart.getByText(`${item.mes_code} · ${source === "warehouse" ? "창고" : "튜브"}`, { exact: true })).toBeVisible();
+      else await expect(cart).toContainText(`자동 부서 · ${source === "warehouse" ? "창고" : "튜브"}`);
       await cart.getByRole("spinbutton").fill("2");
       await reason(page, "외관 불량");
       const memo = `실행 독립 메모 ${randomUUID().slice(0, 6)}`;
@@ -185,6 +190,7 @@ for (const source of ["warehouse", "production"] as const) {
       await picker.getByPlaceholder("품목명 · 품목 코드").fill(item.mes_code);
       await picker.getByRole("button", { name: `${item.item_name} 장바구니에 추가`, exact: true }).click();
     }
+    await page.getByRole("button", { name: "수량·처리 정보 →", exact: true }).click();
     const cart = page.getByTestId("defect-cart-panel").filter({ visible: true });
     const submit = page.getByRole("button", { name: /^즉시 폐기 \(2건\) →$/ }).filter({ visible: true });
     const calls: string[] = [];
@@ -207,7 +213,7 @@ for (const source of ["warehouse", "production"] as const) {
       await cart.getByRole("button", { name: "사유 카테고리 선택", exact: true }).nth(index).click();
       await page.getByRole("dialog", { name: "사유 카테고리", exact: true }).getByRole("button", { name: "기타", exact: true }).click();
     }
-    for (let index = 0; index < 2; index++) await expect(cart.getByRole("spinbutton").nth(index).locator("../..")).toContainText("기타를 선택하면 메모를 입력하세요.");
+    for (let index = 0; index < 2; index++) await expect(cart.getByRole("textbox", { name: "메모", exact: true }).nth(index).locator("..")).toContainText("기타를 선택하면 메모를 입력하세요.");
     await expect(submit).toBeDisabled();
     await expect(page.getByRole("dialog", { name: "즉시 폐기 확인" })).toHaveCount(0);
     expect(calls).toEqual([]);
@@ -226,7 +232,8 @@ test("DEFECT-RESTORE-BUSY 8.6-06 지연 응답 중 버튼잠금·정상복귀 AP
   const rows = await openList(page, item.item_name);
   await rows.getByRole("button", { name: "처리", exact: true }).click();
   await page.getByRole("spinbutton").filter({ visible: true }).fill("1");
-  await reason(page, "검사 통과");
+  await expect(page.getByRole("button", { name: "사유 카테고리 선택", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "정상 복귀 →", exact: true }).filter({ visible: true })).toBeEnabled();
   await page.getByRole("button", { name: "정상 복귀 →", exact: true }).filter({ visible: true }).click();
   let calls = 0;
   let release!: () => void;

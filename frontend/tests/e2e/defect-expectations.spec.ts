@@ -52,14 +52,16 @@ test.describe("불량 확정 기대값의 독립 브라우저 조건", () => {
         const picker = page.getByTestId("defect-picker-pane").filter({ visible: true });
         await expect(picker.getByRole("columnheader", { name: source === "창고 재고" ? "창고 가용" : "부서 가용" })).toBeVisible();
         await addItem(page, seed.rawItem);
-        const cart = page.getByTestId("defect-cart-panel").filter({ visible: true });
-        await expect(cart).toContainText(`자동 부서 · ${source === "창고 재고" ? "창고" : "튜브"}`);
         expect(await page.evaluate(() => history.state.source)).toBe(source === "창고 재고" ? "warehouse" : "production");
         const row = picker.getByTestId(`defect-picker-row-${seed.rawItem.item_id}`);
         const available = source === "창고 재고"
           ? Number(before.item.warehouse_qty) - Number(before.item.pending_quantity ?? 0)
           : Number(before.locations.find((location: { department: string; status: string }) => location.department === "튜브" && location.status === "PRODUCTION")?.available_quantity ?? 0);
         await expect(row.getByRole("cell").nth(2)).toHaveText(String(available));
+        await page.getByRole("button", { name: "수량·처리 정보 →", exact: true }).click();
+        const cart = page.getByTestId("defect-cart-panel").filter({ visible: true });
+        if (action === "격리 등록") await expect(cart.getByText(`${seed.rawItem.mes_code} · ${source === "창고 재고" ? "창고" : "튜브"}`, { exact: true })).toBeVisible();
+        else await expect(cart).toContainText(`자동 부서 · ${source === "창고 재고" ? "창고" : "튜브"}`);
         expect(await stockEvidence(page.request, seed.rawItem.item_id)).toEqual(before);
       });
     }
@@ -71,6 +73,7 @@ test.describe("불량 확정 기대값의 독립 브라우저 조건", () => {
     const before = await stockEvidence(page.request, seed.rawItem.item_id);
     await openCart(page, "격리 등록", "창고 재고");
     await addItem(page, seed.rawItem);
+    await page.getByRole("button", { name: "수량·처리 정보 →", exact: true }).click();
     const cart = page.getByTestId("defect-cart-panel").filter({ visible: true });
     const submit = page.getByRole("button", { name: /^격리하기 \(\d+건\) →$/ }).filter({ visible: true });
     await cart.getByRole("spinbutton").fill("1");
@@ -94,6 +97,7 @@ test.describe("불량 확정 기대값의 독립 브라우저 조건", () => {
     const before = await stockEvidence(page.request, seed.rawItem.item_id);
     await openCart(page, "즉시 폐기", "창고 재고");
     await addItem(page, seed.rawItem);
+    await page.getByRole("button", { name: "수량·처리 정보 →", exact: true }).click();
     const cart = page.getByTestId("defect-cart-panel").filter({ visible: true });
     await cart.getByRole("spinbutton").fill("1");
     await selectReason(page, "외관 불량");
@@ -122,6 +126,7 @@ test.describe("불량 확정 기대값의 독립 브라우저 조건", () => {
     const before = await Promise.all(items.map((item) => stockEvidence(page.request, item.item_id)));
     await openCart(page, "격리 등록", "창고 재고");
     for (const item of items) await addItem(page, item);
+    await page.getByRole("button", { name: "수량·처리 정보 →", exact: true }).click();
     const cart = page.getByTestId("defect-cart-panel").filter({ visible: true });
     const submit = page.getByRole("button", { name: /^격리하기 \(\d+건\) →$/ }).filter({ visible: true });
     await cart.getByRole("spinbutton").nth(0).fill("0");
@@ -169,7 +174,7 @@ test.describe("불량 확정 기대값의 독립 브라우저 조건", () => {
     try {
     await page.goto("/mes?tab=defect");
     await page.getByRole("button").filter({ hasText: "불량 통계", visible: true }).click();
-    await page.getByRole("button", { name: "분류 조건 펼치기", exact: true }).filter({ visible: true }).click();
+    await page.getByRole("button", { name: "필터 펼치기", exact: true }).filter({ visible: true }).click();
     const filters = page.locator("#statistics-category-filters").filter({ visible: true });
     const department = filters.getByRole("group", { name: "부서 구분" }).getByRole("button").filter({ hasNotText: "전체" }).first();
     await expect(department).toBeVisible();

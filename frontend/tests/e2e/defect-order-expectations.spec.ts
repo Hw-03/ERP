@@ -72,6 +72,7 @@ test("DEFECT-ORDER PC-DELTA-DEFECTORDER-01 실제 포인터 드래그 저장·�
     await picker(page, family);
     await expect(pane.locator('tr[data-testid^="defect-picker-row-"]').first()).toHaveAttribute("data-testid", `defect-picker-row-${items[1].item_id}`);
     await pane.getByRole("button", { name: `${items[1].item_name} 장바구니에 추가`, exact: true }).click();
+    await page.getByRole("button", { name: "수량·처리 정보 →", exact: true }).click();
     const cart = page.getByTestId("defect-cart-panel").filter({ visible: true });
     await expect(cart).toContainText(items[1].item_name);
     await expect(cart).not.toContainText(items[0].item_name);

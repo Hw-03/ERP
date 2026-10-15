@@ -18,13 +18,13 @@ async function createItem(request: APIRequestContext, process = "TR", quantity =
 }
 
 function search(page: Page) {
-  return page.locator('input[aria-label="자재 검색"]:not(:disabled),input[placeholder="품명 · 코드 · 위치 · 공급처"]:not(:disabled)').filter({ visible: true });
+  return page.locator('input[aria-label="자재 검색"]:not(:disabled),input[placeholder="품명 · 코드 · 검색용 이름"]:not(:disabled)').filter({ visible: true });
 }
 function row(page: Page, name: string) { return page.locator("tr[role=button]").filter({ hasText: name }); }
 function detail(page: Page, name: string) { return page.getByRole("dialog", { name: new RegExp(name) }); }
 async function revealInventoryRows(page: Page, count: number): Promise<void> {
   await expect.poll(async () => {
-    const sentinel = page.getByTestId("inventory-list-card").locator('table + div[aria-hidden="true"]');
+    const sentinel = page.getByTestId("inventory-list-card").locator('div:has(> table) + div[aria-hidden="true"]');
     // 다음 묶음이 렌더되면 사라지는 표식은 조회와 스크롤을 같은 DOM 작업에서 처리한다.
     await sentinel.evaluateAll(elements => elements[0]?.scrollIntoView({ block: "end" }));
     return page.locator("tr[role=button]").count();
@@ -149,11 +149,11 @@ test("DASHBOARD02 최근 작업은 한국어로 표시하며 사진과 부분 �
   await lightbox.getByRole("button", { name: "닫기", exact: true }).click();
   await expect(panel).toBeVisible();
   await expect(search(page)).toHaveValue(item.item_name);
-  await page.route("**/api/inventory/operations?**", (route) => route.fulfill({ status: 503, json: { detail: "QA recent history failure" } }));
+  await page.route("**/api/inventory/transactions/display-groups?**", (route) => route.fulfill({ status: 503, json: { detail: "QA recent history failure" } }));
   await panel.getByRole("tab", { name: "최근 내역", exact: true }).click();
   await expect(panel.getByRole("button", { name: "다시 시도", exact: true })).toBeVisible();
   await expect(panel).toContainText(item.item_name);
-  await page.unroute("**/api/inventory/operations?**");
+  await page.unroute("**/api/inventory/transactions/display-groups?**");
   await panel.getByRole("button", { name: "다시 시도", exact: true }).click();
   const history = panel.getByRole("tabpanel", { name: "최근 내역", exact: true });
   await expect(history).toContainText("원자재 입고");

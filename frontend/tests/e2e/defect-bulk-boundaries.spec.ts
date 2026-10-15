@@ -41,7 +41,7 @@ async function openList(page: Page, mobile = false, storage = false, navigate = 
   if (mobile) await page.setViewportSize({ width: 390, height: 844 });
   if (navigate) await page.goto("/mes?tab=defect");
   await page.getByRole("button").filter({ hasText: storage ? "B급·구형 자재" : "격리 목록", visible: true }).click();
-  if (mobile) await page.getByRole("button", { name: "필터 펼치기", exact: true }).click();
+  if (await page.getByRole("button", { name: "필터 펼치기", exact: true }).isVisible()) await page.getByRole("button", { name: "필터 펼치기", exact: true }).click();
   await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "전체", exact: true }).click();
 }
 function group(page: Page, item: Item, mobile = false) {
@@ -151,7 +151,7 @@ for (const mobile of [false, true]) {
     await page.unroute("**/api/defects/locations");
     await page.getByRole("button", { name: /^(?:← )?작업 선택$/, exact: true }).filter({ visible: true }).click();
     await openList(page, mobile, true, false);
-    await page.getByRole("textbox", { name: "B급·구형 검색", exact: true }).fill(item.item_name);
+    await page.getByLabel("B급·구형 검색", { exact: true }).filter({ visible: true }).fill(item.item_name);
     await expect(group(page, item, mobile)).toHaveCount(2);
     await page.getByRole("group", { name: "보관 분류 필터" }).getByRole("button", { name: /^B급/ }).click();
     await expect(group(page, item, mobile)).toHaveCount(1);
@@ -248,7 +248,8 @@ test("DEFECT-BULK-STALE 처리중 실제 두 원건 잔량변경은 모든 오�
   await openList(page);
   await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "창고", exact: true }).click();
   await selectBulk(page, item, ["경합 첫째", "경합 둘째"]);
-  await reason(page);
+  await expect(page.getByRole("button", { name: "사유 카테고리 선택", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "정상 복귀 →", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "정상 복귀 →", exact: true }).click();
   let release!: () => void;
   let arrived = false;
@@ -299,7 +300,8 @@ test("DEFECT-BULK-MOBILE 실제 전량 복귀 제출은 원건·위치를 보존
   await expect(reviewed.getByRole("article")).toHaveCount(2);
   await expect(reviewed.locator(`[data-record-id="${first.record_id}"]`)).toContainText("잔량 전체 2개");
   await expect(reviewed.locator(`[data-record-id="${second.record_id}"]`)).toContainText("잔량 전체 3개");
-  await reason(page);
+  await expect(page.getByRole("button", { name: "사유 카테고리 선택", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "정상 복귀 →", exact: true }).filter({ visible: true })).toBeEnabled();
   await page.getByRole("button", { name: "정상 복귀 →", exact: true }).filter({ visible: true }).click();
   const confirmation = page.getByRole("dialog", { name: "정상 복귀 확인", exact: true });
   await expect(confirmation).toContainText("5개 (2건)");

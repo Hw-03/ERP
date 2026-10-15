@@ -22,7 +22,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
     const name = await login(page);
     const filter = viewport.width >= 1024
       ? page.getByRole("textbox", { name: "자재 검색" })
-      : page.getByPlaceholder("품명 · 코드 · 위치 · 공급처");
+      : page.getByPlaceholder("품명 · 코드 · 검색용 이름");
     await filter.fill("작성 내용 유지 확인");
     const confirmation = page.getByRole("dialog", { name: confirmationTitle });
     await page.clock.fastForward(299_000);
@@ -89,7 +89,7 @@ test("지연된 타이머의 첫 Enter를 소비하고 낮은 다크 화면에�
   await page.setViewportSize({ width: 390, height: 420 });
   await page.clock.install();
   const name = await login(page);
-  const filter = page.getByPlaceholder("품명 · 코드 · 위치 · 공급처");
+  const filter = page.getByPlaceholder("품명 · 코드 · 검색용 이름");
   await filter.focus();
   await page.evaluate(() => document.documentElement.classList.add("dark"));
   await page.clock.setSystemTime(new Date(await page.evaluate(() => Date.now()) + 300_000));

@@ -19,6 +19,8 @@ async function openList(page: Page) {
   const defectState = await page.evaluate(() => history.state?.defect ?? null);
   if (defectState === "list") {
     await expect(listHeading).toBeVisible();
+    const expand = page.getByRole("button", { name: "필터 펼치기", exact: true }).filter({ visible: true });
+    if (await expand.isVisible()) await expand.click();
     await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "전체", exact: true }).click();
     return;
   }
@@ -28,6 +30,7 @@ async function openList(page: Page) {
     .filter({ hasText: "격리 항목" })
     .click();
   await expect(listHeading).toBeVisible();
+  await page.getByRole("button", { name: "필터 펼치기", exact: true }).filter({ visible: true }).click();
   await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "전체", exact: true }).click();
 }
 
@@ -418,7 +421,7 @@ test.describe("불량 격리 건별 원장", () => {
           const hubCard = page.getByRole("button").filter({ hasText: "B급·구형 자재", visible: true });
           await expect(hubCard).toBeVisible({ timeout: 30_000 });
           await hubCard.click();
-          const storageSearch = page.getByRole("textbox", { name: "B급·구형 검색" }).filter({ visible: true });
+          const storageSearch = page.getByLabel("B급·구형 검색", { exact: true }).filter({ visible: true });
           await expect(storageSearch).toBeVisible();
           const storageState = await page.evaluate(() => history.state);
           const storageLength = await page.evaluate(() => history.length);
@@ -451,8 +454,9 @@ test.describe("불량 격리 건별 원장", () => {
           await expect.poll(() => page.evaluate(() => history.state?.defect)).toBe("storage");
           await openRestore();
           await page.getByRole("spinbutton").filter({ visible: true }).fill(String(restoreQty));
-          await page.getByRole("button", { name: "사유 카테고리 선택", exact: true }).filter({ visible: true }).click();
-          await page.getByRole("dialog", { name: "사유 카테고리", exact: true }).getByRole("button", { name: "검사 통과", exact: true }).click();
+          await expect(page.getByRole("button", { name: "사유 카테고리 선택", exact: true }).filter({ visible: true })).toHaveCount(0);
+          await page.getByRole("textbox", { name: "메모", exact: true }).filter({ visible: true }).fill(`${memo}-restore`);
+          expect(await transactionCount()).toBe(transactionsBefore);
           await page.getByRole("button", { name: "정상 복귀 →", exact: true }).filter({ visible: true }).click();
           await page.getByRole("dialog").getByRole("button", { name: "즉시 복귀", exact: true }).click();
           await expect(storageSearch).toBeVisible();

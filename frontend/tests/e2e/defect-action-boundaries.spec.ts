@@ -39,7 +39,7 @@ for (const mobile of [false, true]) {
       { storage: true, memo: "구형 복귀 옵션", department: "창고", returnAllowed: false },
     ]) {
       await page.getByRole("button").filter({ hasText: entry.storage ? "B급·구형 자재" : "격리 목록", visible: true }).click();
-      if (mobile) await page.getByRole("button", { name: "필터 펼치기", exact: true }).click();
+      if (await page.getByRole("button", { name: "필터 펼치기", exact: true }).isVisible()) await page.getByRole("button", { name: "필터 펼치기", exact: true }).click();
       const department = page.getByRole("group", { name: "부서 구분" });
       await department.getByRole("button", { name: "전체", exact: true }).click();
       await department.getByRole("button", { name: entry.department, exact: true }).click();
@@ -95,7 +95,7 @@ for (const mobile of [false, true]) {
       if (mobile) await page.setViewportSize({ width: 390, height: 844 });
       await page.goto("/mes?tab=defect");
       await page.getByRole("button").filter({ hasText: "격리 목록", visible: true }).click();
-      if (mobile) await page.getByRole("button", { name: "필터 펼치기", exact: true }).click();
+      if (await page.getByRole("button", { name: "필터 펼치기", exact: true }).isVisible()) await page.getByRole("button", { name: "필터 펼치기", exact: true }).click();
       await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "튜브", exact: true }).click();
       if (mobile) await page.getByTestId("defect-mobile-item-summary").filter({ hasText: item.item_name }).click();
       const row = page.getByRole("article", { name: `${item.item_name} 격리 기록` }).filter({ visible: true });

@@ -299,7 +299,7 @@ test("SHELL04 CtrlS는 저장 동작 차단하고 일반s는 실제검색 입력
   await input.fill("");
   await input.press("s");
   await expect(input).toHaveValue("s");
-  await expect(page.getByRole("button", { name: "검색 지우기", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "검색어 지우기", exact: true })).toBeVisible();
 });
 
 test("SETTINGS01 취소는 설정을 적용하지 않고 실패는 쌍 모두 보존", async ({ page, actors }) => {

@@ -37,6 +37,7 @@ async function quarantine(request: APIRequestContext, actors: CommonActors, item
 async function openList(page: Page, itemName: string) {
   await page.goto("/mes?tab=defect");
   await page.getByRole("button").filter({ hasText: "격리 목록", visible: true }).click();
+  if (await page.getByRole("button", { name: "필터 펼치기", exact: true }).isVisible()) await page.getByRole("button", { name: "필터 펼치기", exact: true }).click();
   await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "전체", exact: true }).click();
   const summary = page.getByTestId("defect-item-group-summary").filter({ hasText: itemName, visible: true });
   const rows = page.getByRole("article", { name: `${itemName} 격리 기록` }).filter({ visible: true });
@@ -151,7 +152,11 @@ test("DEFECT-LIVE 8.6-03 8.7-07 PC-DELTA-DEFECT-02 격리 부분·전량 복귀�
     await rows.filter({ hasText: step.memo }).getByRole("button", { name: "처리", exact: true }).click();
     if (step.action === "scrap") await page.getByRole("button", { name: /^전체 폐기/ }).filter({ visible: true }).click();
     await page.getByRole("spinbutton").filter({ visible: true }).fill(String(step.quantity));
-    await reason(page);
+    if (step.action === "scrap") await reason(page);
+    else {
+      await expect(page.getByRole("button", { name: "사유 카테고리 선택", exact: true })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "정상 복귀 →", exact: true }).filter({ visible: true })).toBeEnabled();
+    }
     await page.getByPlaceholder("예: 스크래치 다수 / 우측 끝단").fill(`선택 원건 ${step.memo} ${step.action} ${step.quantity}`);
     await page.getByRole("button", { name: step.action === "restore" ? "정상 복귀 →" : "즉시 폐기 →", exact: true }).filter({ visible: true }).click();
     const dialog = page.getByRole("dialog", { name: step.action === "restore" ? "정상 복귀 확인" : "폐기 확인", exact: true });
@@ -161,6 +166,7 @@ test("DEFECT-LIVE 8.6-03 8.7-07 PC-DELTA-DEFECT-02 격리 부분·전량 복귀�
     await dialog.getByRole("button", { name: step.action === "restore" ? "즉시 복귀" : "즉시 폐기", exact: true }).click();
     expect((await submitted).status()).toBe(step.action === "restore" ? 200 : 201);
     await page.getByRole("button").filter({ hasText: "격리 목록", visible: true }).click();
+    if (await page.getByRole("button", { name: "필터 펼치기", exact: true }).isVisible()) await page.getByRole("button", { name: "필터 펼치기", exact: true }).click();
     await expect(mine).toHaveAttribute("aria-pressed", "true");
     await expect(count).toContainText(`${step.count}건`);
     if (await summary.count() && await summary.getAttribute("aria-expanded") !== "true") await summary.getByRole("button", { name: /격리/ }).click();
@@ -210,7 +216,8 @@ test("DEFECT-BULK 8.18-01/03/04/07 같은품목 독립원건 전체잔량·각�
     const parts = Object.fromEntries(new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(at).map((part) => [part.type, part.value]));
     await expect(reviewed.locator(`[data-record-id="${origin.record_id}"]`)).toContainText(`${parts.year}년 ${parts.month}월 ${parts.day}일 ${parts.hour}시 ${parts.minute}분`);
   }
-  await reason(page);
+  await expect(page.getByRole("button", { name: "사유 카테고리 선택", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "정상 복귀 →", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "정상 복귀 →", exact: true }).click();
   const confirmation = page.getByRole("dialog", { name: "정상 복귀 확인", exact: true });
   await expect(confirmation).toContainText("일괄 첫째 메모");
