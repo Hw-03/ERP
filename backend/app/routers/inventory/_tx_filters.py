@@ -541,6 +541,7 @@ def _history_search_filter(search: Optional[str]) -> Optional[ColumnElement[bool
         Item.mes_code,
         TransactionLog.reference_no,
         TransactionLog.notes,
+        TransactionLog.reason_memo,
         TransactionLog.produced_by,
         TransactionLog.supplier_name_snapshot,
         IoBatch.requester_name,
