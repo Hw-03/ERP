@@ -251,15 +251,19 @@ def test_solo_guard_preserves_sqlite_limits(db_session: Session, make_item: Call
 
 
 @pytest.mark.parametrize("with_cursor", [False, True])
+@pytest.mark.parametrize("extra_projection", [False, True])
 def test_non_sqlite_solo_preserves_original_cursor_sql(db_session: Session,
                                                        monkeypatch: pytest.MonkeyPatch,
-                                                       with_cursor: bool) -> None:
+                                                       with_cursor: bool,
+                                                       extra_projection: bool) -> None:
     """PostgreSQL keeps the previous typed cursor and limit without SQLite guard SQL."""
     from uuid import UUID
     from sqlalchemy.dialects import postgresql
 
     query = _submission_metadata_query(db_session).order_by(
         TransactionLog.created_at.desc(), TransactionLog.log_id.desc())
+    if extra_projection:
+        query = query.add_columns(TransactionLog.department.label("history_department"))
     cursor = (BASE, BASE, UUID(int=1)) if with_cursor else None
     expected = query
     if cursor:

@@ -350,7 +350,10 @@ def _bounded_solo_metadata(
     if db.get_bind().dialect.name != "sqlite":
         if sql_cursor is not None:
             sort_at, created_at, log_id = sql_cursor
-            requested_at_order = query.column_descriptions[-1]["expr"].element
+            requested_at_order = next(
+                column["expr"].element for column in query.column_descriptions
+                if column["name"] == "request_order_at"
+            )
             query = query.filter(or_(
                 requested_at_order < sort_at,
                 and_(requested_at_order == sort_at, TransactionLog.created_at < created_at),
