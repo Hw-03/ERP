@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
+from typing import Callable
 
 import pytest
+from sqlalchemy.orm import Session
+from starlette.testclient import TestClient
 
 from app.models import (
     BOM,
@@ -15,7 +18,9 @@ from app.models import (
     IoBatch,
     IoBundle,
     IoLine,
+    Item,
     LocationStatusEnum,
+    Notification,
     ShippingRequest,
     ShippingRequestStatusEnum,
     StockRequest,
@@ -29,6 +34,313 @@ from app.models import (
 )
 from app.services import shipping as shipping_svc
 from app.services.pin_auth import DEFAULT_PIN_HASH
+
+
+def _parent_return_payload(
+    client: TestClient, db_session: Session, make_item: Callable[..., Item],
+    make_bom: Callable[..., BOM], *, source: str = "warehouse", mixed: bool = False,
+) -> tuple[dict, Item, Item, Item, Employee, Employee, Employee, Employee]:
+    """반환 모드의 미리보기와 결재 종류별 테스트 입력을 만든다."""
+    parent = make_item(process_type_code="AF", warehouse_qty=Decimal("10"))
+    child = make_item(process_type_code="HF")
+    untouched = make_item(process_type_code="TF")
+    make_bom(parent.item_id, child.item_id, Decimal("2"))
+    make_bom(parent.item_id, untouched.item_id, Decimal("3"))
+    requester = _make_employee(db_session, code="RETURN-REQ", department=DepartmentEnum.RESEARCH)
+    warehouse = _make_employee(db_session, code="RETURN-WH", warehouse_role="primary")
+    department = _make_employee(db_session, code="RETURN-DEPT", department=DepartmentEnum.RESEARCH, department_role="primary")
+    special = _make_employee(db_session, code="RETURN-SP", as_research_approver=True)
+    targets = [{"item_id": str(parent.item_id), "quantity": 2, "source_location": source,
+                "internal_use_bom_mode": "parent_with_returns",
+                "component_selections": [{"item_id": str(child.item_id), "selected": True}]}]
+    if mixed:
+        single = make_item(process_type_code="AR", warehouse_qty=Decimal("5"))
+        targets.append({"source_kind": "manual", "item_id": str(single.item_id), "quantity": 1})
+        old_parent = make_item(process_type_code="AF", warehouse_qty=Decimal("5"))
+        old_child = make_item(process_type_code="AR", warehouse_qty=Decimal("5"))
+        make_bom(old_parent.item_id, old_child.item_id, Decimal("1"))
+        targets.append({"item_id": str(old_parent.item_id), "quantity": 1,
+                        "internal_use_bom_mode": "children_only"})
+    db_session.commit()
+    response = client.post("/api/io/preview", json={
+        "requester_employee_id": str(requester.employee_id), "work_type": "internal_use",
+        "sub_type": "internal_use_out", "to_department": "연구", "targets": targets,
+    })
+    assert response.status_code == 200, response.text
+    payload = {"requester_employee_id": str(requester.employee_id), "work_type": "internal_use",
+               "sub_type": "internal_use_out", "to_department": "연구", "bundles": response.json()["bundles"]}
+    return payload, parent, child, untouched, requester, warehouse, department, special
+
+
+@pytest.mark.parametrize("return_first", [True, False])
+def test_parent_with_returns_draft_and_approval_execute_once(
+    client, db_session, make_item, make_bom, return_first,
+):
+    payload, parent, child, untouched, _, warehouse, department, _ = _parent_return_payload(
+        client, db_session, make_item, make_bom,
+    )
+    draft = client.put("/api/io/draft", json=payload)
+    assert draft.status_code == 200, draft.text
+    assert draft.json()["bundles"][0]["internal_use_bom_mode"] == "parent_with_returns"
+    submitted = client.post(
+        f"/api/io/draft/{draft.json()['batch_id']}/submit",
+        params={"requester_employee_id": payload["requester_employee_id"]},
+    )
+    assert submitted.status_code == 201, submitted.text
+    requests = db_session.query(StockRequest).all()
+    outbound = next(row for row in requests if row.requires_warehouse_approval)
+    returned = next(row for row in requests if row.requires_department_approval)
+    approvals = [(_approve_stock_request, outbound, warehouse), (_approve_department_request, returned, department)]
+    if return_first:
+        approvals.reverse()
+    for index, (approve, request, actor) in enumerate(approvals):
+        response = approve(client, request.request_id, actor)
+        assert response.status_code == 200, response.text
+        db_session.expire_all()
+        assert db_session.query(TransactionLog).count() == (0 if index == 0 else 2)
+    assert db_session.query(IoBatch).one().status == "completed"
+    assert db_session.query(Inventory).filter_by(item_id=parent.item_id).one().warehouse_qty == 8
+    assert db_session.query(InventoryLocation).filter_by(item_id=child.item_id).one().quantity == 4
+    assert db_session.query(InventoryLocation).filter_by(item_id=untouched.item_id).count() == 0
+    approve, request, actor = approvals[-1]
+    approve(client, request.request_id, actor)
+    assert db_session.query(TransactionLog).count() == 2
+
+
+@pytest.mark.parametrize("first_approved", [True, False])
+@pytest.mark.parametrize("reject_kind", ["warehouse", "department"])
+@pytest.mark.parametrize("mixed", [True, False])
+def test_parent_with_returns_first_rejection_cancels_entire_batch(
+    client, db_session, make_item, make_bom, first_approved, reject_kind, mixed,
+):
+    payload, parent, child, _, _, warehouse, department, _ = _parent_return_payload(
+        client, db_session, make_item, make_bom, mixed=mixed,
+    )
+    submitted = client.post("/api/io/submit", json=payload)
+    assert submitted.status_code == 201, submitted.text
+    requests = db_session.query(StockRequest).all()
+    outbound = next(row for row in requests if row.requires_warehouse_approval)
+    returned = next(row for row in requests if row.requires_department_approval)
+    rejected, sibling = (outbound, returned) if reject_kind == "warehouse" else (returned, outbound)
+    assert db_session.query(Notification).filter_by(is_read=False, type="approval_request").count() > 0
+    if first_approved:
+        approve = _approve_department_request if reject_kind == "warehouse" else _approve_stock_request
+        actor = department if reject_kind == "warehouse" else warehouse
+        response = approve(client, sibling.request_id, actor)
+        assert response.status_code == 200, response.text
+    endpoint = "reject" if reject_kind == "warehouse" else "department-reject"
+    actor = warehouse if reject_kind == "warehouse" else department
+    response = client.post(f"/api/stock-requests/{rejected.request_id}/{endpoint}", json={
+        "actor_employee_id": str(actor.employee_id), "pin": "0000", "reason": "반환 취소",
+    })
+    assert response.status_code == 200, response.text
+    db_session.expire_all()
+    batch = db_session.query(IoBatch).one()
+    assert batch.status == "rejected"
+    assert batch.completed_at is None
+    assert rejected.status == StockRequestStatusEnum.REJECTED
+    assert rejected.rejected_reason == "반환 취소"
+    assert sibling.status == StockRequestStatusEnum.CANCELLED
+    assert sibling.cancelled_at is not None
+    if first_approved:
+        assert (sibling.approved_at if sibling.requires_warehouse_approval else sibling.department_approved_at) is not None
+    assert all(line.status == StockRequestStatusEnum.CANCELLED for line in sibling.lines)
+    assert db_session.query(TransactionLog).count() == 0
+    assert db_session.query(Inventory).filter_by(item_id=parent.item_id).one().warehouse_qty == 10
+    assert all(row.pending_quantity == 0 for row in db_session.query(Inventory).all())
+    assert db_session.query(InventoryLocation).filter_by(item_id=child.item_id).count() == 0
+    assert db_session.query(Notification).filter_by(is_read=False, type="approval_request").count() == 0
+
+
+@pytest.mark.parametrize("tamper", ["parent_missing", "parent_quantity", "parent_direction", "child_quantity", "child_selected", "child_included", "child_route", "token", "extra_item"])
+def test_parent_with_returns_rejects_tampered_draft_without_writes(
+    client, db_session, make_item, make_bom, tamper,
+):
+    payload, parent, child, _, _, _, _, _ = _parent_return_payload(client, db_session, make_item, make_bom)
+    bundle = payload["bundles"][0]
+    parent_line = next(line for line in bundle["lines"] if line["item_id"] == str(parent.item_id))
+    child_line = next(line for line in bundle["lines"] if line["item_id"] == str(child.item_id))
+    if tamper == "parent_missing":
+        bundle["lines"].remove(parent_line)
+    elif tamper == "parent_quantity":
+        parent_line["quantity"] += 1
+    elif tamper == "parent_direction":
+        parent_line["direction"] = "in"
+    elif tamper == "child_quantity":
+        child_line["quantity"] += 1
+    elif tamper == "child_selected":
+        child_line["selected"] = False
+    elif tamper == "child_included":
+        child_line["included"] = False
+    elif tamper == "child_route":
+        child_line["to_department"] = "튜브"
+    elif tamper == "token":
+        child_line["bom_auto_token"] = "0" * 64
+    else:
+        child_line["item_id"] = str(make_item().item_id)
+    response = client.put("/api/io/draft", json=payload)
+    assert response.status_code == 422, response.text
+    assert db_session.query(IoBatch).count() == 0
+    assert db_session.query(StockRequest).count() == 0
+
+
+@pytest.mark.parametrize("self_kind", ["warehouse", "department", "all"])
+def test_parent_with_returns_self_approval_waits_for_every_kind(
+    client, db_session, make_item, make_bom, self_kind,
+):
+    payload, parent, child, _, requester, warehouse, department, _ = _parent_return_payload(
+        client, db_session, make_item, make_bom,
+    )
+    requester.warehouse_role = "primary" if self_kind in {"warehouse", "all"} else "none"
+    requester.department_role = "primary" if self_kind in {"department", "all"} else "none"
+    db_session.commit()
+    submitted = client.post("/api/io/submit", json=payload)
+    assert submitted.status_code == 201, submitted.text
+    requests = db_session.query(StockRequest).all()
+    outbound = next(row for row in requests if row.requires_warehouse_approval)
+    returned = next(row for row in requests if row.requires_department_approval)
+    assert (outbound.approved_at is not None) == (self_kind in {"warehouse", "all"})
+    assert (returned.department_approved_at is not None) == (self_kind in {"department", "all"})
+    assert db_session.query(TransactionLog).count() == (2 if self_kind == "all" else 0)
+    if self_kind != "all":
+        assert db_session.query(Inventory).filter_by(item_id=parent.item_id).one().warehouse_qty == 10
+        assert db_session.query(InventoryLocation).filter_by(item_id=child.item_id).count() == 0
+        approve = _approve_department_request if self_kind == "warehouse" else _approve_stock_request
+        pending, actor = (returned, department) if self_kind == "warehouse" else (outbound, warehouse)
+        result = approve(client, pending.request_id, actor)
+        assert result.status_code == 200, result.text
+    assert db_session.query(TransactionLog).count() == 2
+
+
+def test_parent_with_returns_department_source_consumes_parent_and_returns_child(
+    client, db_session, make_item, make_bom, make_location,
+):
+    payload, parent, child, _, _, _, department, _ = _parent_return_payload(
+        client, db_session, make_item, make_bom, source="department",
+    )
+    parent_location = make_location(parent.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("5"))
+    db_session.commit()
+    submitted = client.post("/api/io/submit", json=payload)
+    assert submitted.status_code == 201, submitted.text
+    request = db_session.query(StockRequest).one()
+    assert request.requires_department_approval is True
+    assert request.requires_warehouse_approval is False
+    assert db_session.query(TransactionLog).count() == 0
+    assert parent_location.quantity == 5 and parent_location.pending_quantity == 2
+    approved = _approve_department_request(client, request.request_id, department)
+    assert approved.status_code == 200, approved.text
+    db_session.expire_all()
+    assert parent_location.quantity == 3 and parent_location.pending_quantity == 0
+    assert db_session.query(Inventory).filter_by(item_id=parent.item_id).one().warehouse_qty == 10
+    assert db_session.query(InventoryLocation).filter_by(item_id=child.item_id).one().quantity == 4
+    assert db_session.query(TransactionLog).count() == 2
+
+
+def test_parent_with_returns_special_rejection_cancels_other_kinds(
+    client, db_session, make_item, make_bom, make_location,
+):
+    payload, parent, child, _, requester, warehouse, department, special = _parent_return_payload(
+        client, db_session, make_item, make_bom,
+    )
+    special_item = make_item(process_type_code="AR")
+    location = make_location(special_item.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("5"))
+    db_session.commit()
+    response = client.post("/api/io/preview", json={
+        "requester_employee_id": str(requester.employee_id), "work_type": "internal_use",
+        "sub_type": "internal_use_out", "to_department": "연구",
+        "targets": [{"item_id": str(special_item.item_id), "source_kind": "manual", "source_location": "department"}],
+    })
+    assert response.status_code == 200, response.text
+    payload["bundles"].extend(response.json()["bundles"])
+    submitted = client.post("/api/io/submit", json=payload)
+    assert submitted.status_code == 201, submitted.text
+    requests = db_session.query(StockRequest).all()
+    assert len(requests) == 3
+    outbound = next(row for row in requests if row.requires_warehouse_approval)
+    returned = next(row for row in requests if row.requires_department_approval)
+    rejected = next(row for row in requests if row.requires_as_research_approval)
+    assert _approve_stock_request(client, outbound.request_id, warehouse).status_code == 200
+    assert _approve_department_request(client, returned.request_id, department).status_code == 200
+    response = client.post(f"/api/stock-requests/{rejected.request_id}/as-research-reject", json={
+        "actor_employee_id": str(special.employee_id), "pin": "0000", "reason": "전용 반려",
+    })
+    assert response.status_code == 200, response.text
+    db_session.expire_all()
+    assert db_session.query(IoBatch).one().status == "rejected"
+    assert rejected.status == StockRequestStatusEnum.REJECTED
+    assert outbound.status == returned.status == StockRequestStatusEnum.CANCELLED
+    assert outbound.approved_at is not None and returned.department_approved_at is not None
+    assert location.quantity == 5 and location.pending_quantity == 0
+    assert db_session.query(Inventory).filter_by(item_id=parent.item_id).one().warehouse_qty == 10
+    assert db_session.query(InventoryLocation).filter_by(item_id=child.item_id).count() == 0
+    assert db_session.query(TransactionLog).count() == 0
+    assert db_session.query(Notification).filter_by(is_read=False, type="approval_request").count() == 0
+
+
+def test_parent_with_returns_rejection_release_failure_rolls_back_savepoint_and_cleans_pending(
+    client, db_session, make_item, make_bom, monkeypatch,
+):
+    from app.services import internal_use_approval, sr_approval
+
+    payload, parent, _, _, _, _, department, _ = _parent_return_payload(
+        client, db_session, make_item, make_bom,
+    )
+    assert client.post("/api/io/submit", json=payload).status_code == 201
+    returned = db_session.query(StockRequest).filter_by(requires_department_approval=True).one()
+    release = internal_use_approval.release_reservation
+    cleanup = sr_approval._release_pending_best_effort
+    restored_pending = []
+
+    def fail_after_release(db: Session, request: StockRequest) -> None:
+        release(db, request)
+        if request.requires_warehouse_approval:
+            raise RuntimeError("반환 예약 해제 실패")
+
+    def observe_cleanup(db: Session, request: StockRequest) -> None:
+        restored_pending.append(db.query(Inventory).filter_by(item_id=parent.item_id).one().pending_quantity)
+        cleanup(db, request)
+
+    monkeypatch.setattr(internal_use_approval, "release_reservation", fail_after_release)
+    monkeypatch.setattr(sr_approval, "_release_pending_best_effort", observe_cleanup)
+    response = _reject_department_request(client, returned.request_id, department)
+    assert response.status_code == 409, response.text
+    db_session.expire_all()
+    assert restored_pending == [Decimal("2")]
+    assert db_session.query(IoBatch).one().status == "failed"
+    assert returned.status == StockRequestStatusEnum.REJECTED
+    assert returned.rejected_reason is not None
+    assert db_session.query(StockRequest).filter_by(requires_warehouse_approval=True).one().status == StockRequestStatusEnum.FAILED_APPROVAL
+    inventory = db_session.query(Inventory).filter_by(item_id=parent.item_id).one()
+    assert inventory.warehouse_qty == 10 and inventory.pending_quantity == 0
+    assert db_session.query(TransactionLog).count() == 0
+
+
+@pytest.mark.parametrize("insufficient", [True, False])
+def test_parent_with_returns_completion_cancel_is_atomic_and_checks_returned_stock(
+    client, db_session, make_item, make_bom, insufficient,
+):
+    payload, parent, child, _, requester, warehouse, department, _ = _parent_return_payload(
+        client, db_session, make_item, make_bom,
+    )
+    assert client.post("/api/io/submit", json=payload).status_code == 201
+    outbound = db_session.query(StockRequest).filter_by(requires_warehouse_approval=True).one()
+    returned = db_session.query(StockRequest).filter_by(requires_department_approval=True).one()
+    assert _approve_stock_request(client, outbound.request_id, warehouse).status_code == 200
+    assert _approve_department_request(client, returned.request_id, department).status_code == 200
+    location = db_session.query(InventoryLocation).filter_by(item_id=child.item_id).one()
+    log = db_session.query(TransactionLog).filter_by(item_id=parent.item_id).one()
+    if insufficient:
+        location.quantity = Decimal("1")
+        db_session.query(Inventory).filter_by(item_id=child.item_id).one().quantity = Decimal("1")
+        db_session.commit()
+    response = client.post(f"/api/inventory/transactions/{log.log_id}/cancel", json={
+        "reason": "반환 사용출고 취소", "employee_code": requester.employee_code, "pin": "0000",
+    })
+    assert response.status_code == (422 if insufficient else 200), response.text
+    db_session.expire_all()
+    assert db_session.query(Inventory).filter_by(item_id=parent.item_id).one().warehouse_qty == (8 if insufficient else 10)
+    assert location.quantity == (1 if insufficient else 0)
+    assert all(row.cancelled == (not insufficient) for row in db_session.query(TransactionLog).all())
 
 
 @pytest.mark.parametrize("invalid", ["non_raw", "deleted"])
@@ -909,8 +1221,10 @@ def test_internal_use_bom_draft_allows_unselected_mode_but_fresh_submit_rejects_
     assert "차감 방식" in submitted.text
 
 
+@pytest.mark.parametrize("mode", ["parent_and_children", "parent_with_returns"])
+@pytest.mark.parametrize("selection", [None, False, True])
 def test_internal_use_stock_exempt_bom_child_can_be_drafted_and_submitted(
-    client, db_session, make_item, make_bom
+    client, db_session, make_item, make_bom, mode, selection,
 ):
     parent = make_item(
         name="재고 미반영 하위가 있는 조립품",
@@ -944,7 +1258,10 @@ def test_internal_use_stock_exempt_bom_child_can_be_drafted_and_submitted(
                     "source_location": "warehouse",
                     "item_id": str(parent.item_id),
                     "quantity": 1,
-                    "internal_use_bom_mode": "parent_and_children",
+                    "internal_use_bom_mode": mode,
+                    "component_selections": [] if selection is None else [
+                        {"item_id": str(child.item_id), "selected": selection}
+                    ],
                 }
             ],
         },

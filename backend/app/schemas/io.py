@@ -14,7 +14,7 @@ class IoPreviewTarget(BaseModel):
     quantity: int = Field(1, gt=0)
     source_location: Optional[Literal["warehouse", "department"]] = None
     internal_use_bom_mode: Optional[
-        Literal["parent_and_children", "children_only"]
+        Literal["parent_and_children", "children_only", "parent_with_returns"]
     ] = None
     component_selections: List["IoComponentSelection"] = Field(default_factory=list)
 
@@ -59,7 +59,7 @@ class IoBundlePayload(BaseModel):
     quantity: int
     expanded_level: int = 1
     internal_use_bom_mode: Optional[
-        Literal["parent_and_children", "children_only"]
+        Literal["parent_and_children", "children_only", "parent_with_returns"]
     ] = None
     source_location: Optional[Literal["warehouse", "department"]] = None
     lines: List[IoLinePayload] = Field(default_factory=list)

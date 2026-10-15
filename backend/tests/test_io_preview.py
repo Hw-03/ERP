@@ -54,6 +54,42 @@ def _target(
     )
 
 
+@pytest.mark.parametrize("source_location", ["warehouse", "department"])
+def test_preview_parent_with_returns_only_returns_selected_children(
+    db_session, make_item, make_bom, source_location,
+):
+    parent = make_item(process_type_code="AF", warehouse_qty=D("10"))
+    returned = make_item(process_type_code="HF")
+    untouched = make_item(process_type_code="TF")
+    make_bom(parent.item_id, returned.item_id, D("2"))
+    make_bom(parent.item_id, untouched.item_id, D("3"))
+    db_session.flush()
+    bundle = iop.preview(
+        db_session, work_type="internal_use", sub_type="internal_use_out",
+        to_department="AS", targets=[_target(
+            parent.item_id, "2", source_location=source_location,
+            internal_use_bom_mode="parent_with_returns",
+            component_selections=[SimpleNamespace(item_id=returned.item_id, selected=True)],
+        )],
+    )["bundles"][0]
+    lines = {line["item_id"]: line for line in bundle["lines"]}
+    assert lines[parent.item_id]["quantity"] == D("2")
+    assert lines[parent.item_id]["direction"] == "out"
+    assert lines[parent.item_id]["from_bucket"] == (
+        "warehouse" if source_location == "warehouse" else "production"
+    )
+    assert lines[returned.item_id]["quantity"] == D("4")
+    assert lines[returned.item_id]["direction"] == "in"
+    assert lines[returned.item_id]["from_bucket"] == "none"
+    assert lines[returned.item_id]["to_bucket"] == "production"
+    assert lines[returned.item_id]["to_department"] == "고압"
+    assert lines[returned.item_id]["selected"] is True
+    assert lines[returned.item_id]["included"] is True
+    assert lines[untouched.item_id]["quantity"] == 0
+    assert lines[untouched.item_id]["selected"] is False
+    assert lines[untouched.item_id]["included"] is False
+
+
 # ──────────────────── _route_for_sub_type (순수 라우팅 규칙) ────────────────────
 
 def test_route_receive_supplier(make_item):

@@ -756,13 +756,16 @@ describe("BomBatchDetail", () => {
     expect(within(rejectedRow).getByText("반려 · 재고 미차감")).toBeInTheDocument();
   });
 
-  it("shows the internal-use BOM mode and every child inventory effect", () => {
+  it.each([
+    ["parent_and_children", "상·하위 차감"],
+    ["parent_with_returns", "상위 차감·하위 반환"],
+  ] as const)("shows the internal-use BOM %s mode and every child inventory effect", (mode, label) => {
     const batch = makeBatch();
     batch.work_type = "internal_use";
     batch.sub_type = "internal_use_out";
     batch.bundles[0] = {
       ...batch.bundles[0],
-      internal_use_bom_mode: "parent_and_children",
+      internal_use_bom_mode: mode,
       lines: [
         makeLine({
           line_id: "parent-line",
@@ -791,7 +794,7 @@ describe("BomBatchDetail", () => {
           from_department: null,
           to_bucket: "production",
           to_department: "가공",
-          selected: false,
+          selected: mode === "parent_with_returns",
         }),
         makeLine({
           line_id: "unchanged-child",
@@ -807,7 +810,7 @@ describe("BomBatchDetail", () => {
       <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} /></tbody></table>,
     );
 
-    expect(screen.getByText("상·하위 차감")).toBeInTheDocument();
+    expect(screen.getByText(label)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
 
     expect(screen.getByText("재입고 하위")).toBeInTheDocument();

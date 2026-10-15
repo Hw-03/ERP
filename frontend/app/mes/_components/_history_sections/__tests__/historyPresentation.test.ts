@@ -271,6 +271,22 @@ describe("historyPresentation", () => {
     expect(row.flow).toMatchObject({ label: "튜브 → AS", from: "튜브", to: "AS" });
   });
 
+  it.each([true, false])("사용출고 반환행은 실제 입고 부서를 표시하고 취소 방향을 뒤집는다: selected=%s", (selected) => {
+    const batch = makeBatch({
+      work_type: "internal_use", sub_type: "internal_use_out", to_department: "연구",
+      bundles: [makeBundle({ lines: [makeLine({ selected, to_department: "가공" })] })],
+    });
+    const log = makeLog({
+      transaction_type: "PRODUCE", department: "가공", quantity_change: 2,
+      inventory_effect: [{ scope: "location", department: "가공", status: "PRODUCTION", delta: 2 }],
+    });
+    const source = selected ? "사용출고 반환" : "사용출고 해제";
+    expect(getHistoryRowPresentation(log, batch).flow).toMatchObject({ label: `${source} → 가공`, from: source, to: "가공" });
+    expect(getHistoryRowPresentation({ ...log, operation_kind: "CANCELLATION", quantity_change: -2,
+      inventory_effect: [{ scope: "location", department: "가공", status: "PRODUCTION", delta: -2 }],
+    }, batch).flow).toMatchObject({ label: `가공 → ${source}`, from: "가공", to: source });
+  });
+
   it("8.20-08 gives cancellations their real type and reverse direction", () => {
     const batch = makeBatch({
       work_type: "warehouse",

@@ -99,6 +99,31 @@ it("8.17-05 원자재 최종확인은 창고 권한 즉시 입고를 명시한�
   expect(screen.queryByText(/부서 결재|BOM 결재|창고 결재 요청/)).not.toBeInTheDocument();
 });
 
+it("반환 방식이 섞인 배치는 전체 연결 승인 안내와 실제 입고 위치·부호를 표시한다", () => {
+  render(<IoConfirmStep workType="internal_use" subType="internal_use_out" bundles={[
+    { ...bundle, bundle_id: "old-mode", internal_use_bom_mode: "children_only", title: "기존 방식", lines: [{ ...childLine, line_id: "old-child" }] },
+    { ...bundle, internal_use_bom_mode: "parent_with_returns", lines: [
+      { ...parentLine, to_bucket: "none", to_department: "연구", quantity: 2 },
+      { ...childLine, direction: "in", from_bucket: "none", to_bucket: "production", to_department: "고압", selected: true, quantity: 3 },
+      { ...childLine, line_id: "no-change", item_name: "미반환 하위", direction: "in", from_bucket: "none", to_bucket: "production", to_department: "튜브", included: false, selected: false, quantity: 0 },
+    ] },
+  ]} notes="반환 작업" hasShortage={false} hasInvalidQuantity={false} submitting={false} saving={false} approvalKind="warehouse" onNotesChange={vi.fn()} onSubmit={vi.fn()} onSaveDraft={vi.fn()} />);
+  expect(screen.getByText("연결 승인 모두 통과 시 전체 반영")).toBeInTheDocument();
+  const card = screen.getByRole("button", { name: /히팅 싱크 \+ 방열팬/ });
+  expect(within(card).getByText("상위 차감·하위 반환")).toBeInTheDocument();
+  expect(within(card).getByText("-2")).toBeInTheDocument();
+  fireEvent.click(card);
+  const returned = screen.getByText("ADX6000 BODY RIGHT ASSY").closest("li")!;
+  expect(within(returned).getByText("소속 부서 재입고")).toBeInTheDocument();
+  expect(within(returned).getByText("+3")).toBeInTheDocument();
+  expect(within(returned).getByLabelText("입고 위치: 고압")).toBeInTheDocument();
+  expect(within(returned).queryByText("차감 위치")).not.toBeInTheDocument();
+  const unchanged = screen.getByText("미반환 하위").closest("li")!;
+  expect(within(unchanged).getByText("변동 없음")).toBeInTheDocument();
+  expect(within(unchanged).getByText("0")).toBeInTheDocument();
+  expect(within(unchanged).queryByText("입고 위치")).not.toBeInTheDocument();
+});
+
 it("원자재 출고의 빈 사유는 저장을 허용하고 확정만 차단한다", () => {
   const onSaveDraft = vi.fn();
   render(<IoConfirmStep workType="receive" subType="outbound_supplier" bundles={[{ ...bundle, source_kind: "direct_item", lines: [{ ...parentLine, to_bucket: "none" }] }]} notes="" hasShortage={false} hasInvalidQuantity={false} submitting={false} saving={false} approvalKind="none" onNotesChange={vi.fn()} onSubmit={vi.fn()} onSaveDraft={onSaveDraft} />);

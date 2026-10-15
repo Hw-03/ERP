@@ -1344,7 +1344,7 @@ describe("internal use history", () => {
     expect(classifyHistoryScope(log, batch)).toBe("warehouse_involved");
   });
 
-  it("상·하위 차감의 해제 자재를 소속 부서 재입고로 해석한다", () => {
+  it.each(["parent_and_children", "parent_with_returns"] as const)("%s 반환 자재를 소속 부서 재입고로 해석한다", (mode) => {
     const parent = makeLine({
       line_id: "parent",
       item_id: "PARENT",
@@ -1378,12 +1378,12 @@ describe("internal use history", () => {
       to_bucket: "production",
       to_department: "가공",
       quantity: 3,
-      selected: false,
+      selected: mode === "parent_with_returns",
     });
     const bundle = makeBundle({
       source_kind: "bom_parent",
       source_item_id: "PARENT",
-      internal_use_bom_mode: "parent_and_children",
+      internal_use_bom_mode: mode,
       lines: [parent, selectedChild, returnedChild],
     });
     const batch = makeBatch({
@@ -1399,8 +1399,8 @@ describe("internal use history", () => {
     };
 
     expect(getHistoryDisplayLabel(returnLog, batch)).toBe("가공 재입고");
-    expect(getHistoryDisplaySubLabel(returnLog, batch)).toBe("선택 해제 자재를 소속 부서에 재입고");
-    expect(getHistoryFlowLabel(returnLog, batch)).toBe("사용출고 해제 → 가공");
+    expect(getHistoryDisplaySubLabel(returnLog, batch)).toBe(mode === "parent_with_returns" ? "선택 자재를 소속 부서에 재입고" : "선택 해제 자재를 소속 부서에 재입고");
+    expect(getHistoryFlowLabel(returnLog, batch)).toBe(mode === "parent_with_returns" ? "사용출고 반환 → 가공" : "사용출고 해제 → 가공");
     expect(getHistoryLineSignedQuantity(returnedChild, batch, bundle)).toMatchObject({
       sign: "+",
       label: "+3 EA",

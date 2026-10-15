@@ -96,10 +96,10 @@ export function IoLineRow({
   const stepperDisabled = (!isInternalUse && disabled) || bomStockExempt;
   // 조절기를 사용하는 기존 행은 미체크 상태에서도 + 버튼으로 다시 포함할 수 있다.
   const incrementDisabled = bomStockExempt;
-  const shortage = !noInventoryEffect && line.included && (
+  const shortage = !noInventoryEffect && line.included && isOutgoing(effectLine) && (
     available === null
       ? effectLine.shortage > 0
-      : isOutgoing(effectLine) && Number(effectLine.quantity) > available
+      : Number(effectLine.quantity) > available
   );
   const titleColor = disabled ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text;
   const isExcluded = !line.included && !bomStockExempt;
@@ -125,7 +125,7 @@ export function IoLineRow({
       ? line.exclusion_note || "이번 작업 제외"
       : noInventoryEffect || Number(effectLine.quantity) <= 0
         ? "변동 없음"
-        : isInternalUse && !selected && effectLine.direction === "in"
+        : isInternalUse && effectLine.direction === "in"
           ? "소속 부서 재입고"
           : null;
   const expectedColor =

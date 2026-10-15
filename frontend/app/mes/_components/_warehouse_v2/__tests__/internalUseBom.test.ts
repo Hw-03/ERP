@@ -47,6 +47,28 @@ function bundle(lines: IoLine[]): IoBundle {
 }
 
 describe("internalUseBom", () => {
+  it("하위 반환 방식에 처음 진입할 때만 모든 하위 체크를 해제한다", () => {
+    const source = bundle([line(), line({ line_id: "child-2", item_id: "item-2", selected: false })]);
+    expect(buildInternalUseBomPreviewTarget(source, { mode: "parent_with_returns" }).component_selections).toEqual([
+      { item_id: "item-1", selected: false },
+      { item_id: "item-2", selected: false },
+    ]);
+    const returns = { ...source, internal_use_bom_mode: "parent_with_returns" as const };
+    for (const options of [{ mode: "parent_with_returns" as const }, { bundleQuantity: 3 }, {}]) {
+      expect(buildInternalUseBomPreviewTarget(returns, options).component_selections).toEqual([
+        { item_id: "item-1", selected: true },
+        { item_id: "item-2", selected: false },
+      ]);
+    }
+    expect(buildInternalUseBomPreviewTarget(returns, { toggleLineId: "child-2" }).component_selections?.[1].selected).toBe(true);
+    expect(buildInternalUseBomPreviewTarget(returns, { mode: "children_only" }).component_selections?.[0].selected).toBe(true);
+  });
+
+  it("선택된 반환 하위도 실제 입고 방향으로 소속 부서 재입고를 표시한다", () => {
+    expect(internalUseLineEffectLabel(line({ selected: true, direction: "in", included: true }))).toBe("소속 부서 재입고");
+    expect(internalUseLineEffectLabel(line({ selected: true, direction: "in", bom_stock_exempt: true }))).toBe("재고 미반영");
+  });
+
   it("방식 전환은 하위 체크 상태만 미리보기 요청에 싣는다", () => {
     const target = buildInternalUseBomPreviewTarget(
       bundle([

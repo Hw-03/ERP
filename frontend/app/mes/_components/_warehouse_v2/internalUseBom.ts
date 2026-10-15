@@ -8,6 +8,7 @@ import type {
 export const INTERNAL_USE_BOM_MODE_LABEL: Record<IoInternalUseBomMode, string> = {
   parent_and_children: "상·하위 차감",
   children_only: "하위만 차감",
+  parent_with_returns: "상위 차감·하위 반환",
 };
 
 export function isInternalUseBomBundle(bundle: IoBundle): boolean {
@@ -26,11 +27,8 @@ export function lineSelected(line: IoLine): boolean {
 
 export function internalUseLineEffectLabel(line: IoLine): string {
   if (line.bom_stock_exempt) return "재고 미반영";
-  if (!lineSelected(line)) {
-    return line.included && line.direction === "in"
-      ? "소속 부서 재입고"
-      : "변동 없음";
-  }
+  if (line.included && line.direction === "in") return "소속 부서 재입고";
+  if (!lineSelected(line)) return "변동 없음";
   return "출고";
 }
 
@@ -46,13 +44,17 @@ export function buildInternalUseBomPreviewTarget(
     throw new Error("사용출고 BOM 원본 품목을 확인할 수 없습니다.");
   }
   const nextBundleQuantity = options.bundleQuantity ?? (Number(bundle.quantity) || 0);
+  const enteringReturns = options.mode === "parent_with_returns" &&
+    bundle.internal_use_bom_mode !== "parent_with_returns";
   const componentSelections = bundle.lines
     .filter((line) => line.origin === "bom_auto")
     .map((line) => {
       return {
         item_id: line.item_id,
         selected:
-          options.toggleLineId === line.line_id
+          enteringReturns
+            ? false
+            : options.toggleLineId === line.line_id
             ? !lineSelected(line)
             : lineSelected(line),
       };

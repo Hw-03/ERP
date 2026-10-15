@@ -198,6 +198,66 @@ test("IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모
   } finally { await cleanup(request, requester, ids); }
 });
 
+test("IO-RESEARCH-RETURNS 상위 차감·선택 하위 반환은 연결 승인 완료 후 실제 부서에 함께 반영한다", async ({ page, request, actors }) => {
+  test.setTimeout(120_000);
+  const requester = await changeEmployee(request, actors.requester, { department: "연구", warehouse_role: "none", department_role: "none" });
+  const parent = await makeItem(request, "반환상위", "AA", "조립");
+  const child = await makeItem(request, "반환선택", "AR", "조립");
+  const omitted = await makeItem(request, "반환미선택", "AR", "조립");
+  for (const item of [child, omitted]) {
+    const response = await request.post("/api/bom", { headers: admin, data: { parent_item_id: parent.item_id, child_item_id: item.item_id, quantity: 2 } });
+    expect(response.status(), await response.text()).toBe(201);
+  }
+  const items = [parent, child, omitted];
+  const before = await Promise.all(items.map(item => read(request, `/api/items/${item.item_id}`)));
+  const ids: string[] = [];
+  try {
+    await begin(page, requester, "연구");
+    await pick(page, parent, "조립", "BOM");
+    await advanceToQuantityStep(page);
+    const bundle = page.locator("[data-io-cart]").filter({ visible: true }).locator("[data-io-bundle]").filter({ hasText: parent.item_name });
+    const mode = "상위 차감·하위 반환";
+    await bundle.getByRole("button", { name: mode, exact: true }).click();
+    await page.getByRole("dialog", { name: `${mode} 방식 안내` }).getByRole("button", { name: "확인", exact: true }).click();
+    await expect(bundle.getByRole("button", { name: mode, exact: true })).toHaveAttribute("aria-pressed", "true");
+    const header = bundle.locator("[data-io-bundle-header]");
+    if (await header.getAttribute("aria-expanded") === "false") await header.click();
+    const selected = bundle.locator("[data-io-line]").filter({ hasText: child.item_name });
+    const excluded = bundle.locator("[data-io-line]").filter({ hasText: omitted.item_name });
+    await expect(selected).toContainText("변동 없음");
+    await selected.getByRole("button", { name: "재고 반영 변경", exact: true }).click();
+    await expect(selected).toContainText("소속 부서 재입고");
+    await expect(selected.locator("[data-io-stock]")).toContainText(/실행 후.*9/);
+    await expect(excluded.locator("[data-io-stock]")).toContainText(/실행 후.*7/);
+    const result = await submitUi(page, "연구 상위 차감·선택 반환 검증", "연구", mode);
+    ids.push(...result.stock_requests.map((entry: { stock_request_id: string }) => entry.stock_request_id));
+    expect(result.stock_requests).toHaveLength(2);
+    const routes = [];
+    for (const id of ids) routes.push(...(await read(request, `/api/stock-requests/${id}`)).lines);
+    expect(routes).toHaveLength(2);
+    expect(routes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ item_id: parent.item_id, from_bucket: "production", from_department: "조립", to_bucket: "none", to_department: "연구" }),
+      expect.objectContaining({ item_id: child.item_id, from_bucket: "none", to_bucket: "production", to_department: "조립" }),
+    ]));
+    await logoutUi(page, requester); await loginUi(page, actors.approver);
+    const approvals = [...result.stock_requests].sort((a, b) => Number(b.approval_kind === "as_research") - Number(a.approval_kind === "as_research"));
+    await approveUi(page, approvals[0].stock_request_id, approvals[0].approval_kind);
+    const pending = await Promise.all(items.map(item => read(request, `/api/items/${item.item_id}`)));
+    expect(pending.map(item => location(item, "조립"))).toEqual([7, 7, 7]);
+    expect(pending.map(item => item.warehouse_qty)).toEqual(before.map(item => item.warehouse_qty));
+    await approveUi(page, approvals[1].stock_request_id, approvals[1].approval_kind);
+    const after = await Promise.all(items.map(item => read(request, `/api/items/${item.item_id}`)));
+    expect(after.map(item => location(item, "조립"))).toEqual([6, 9, 7]);
+    expect(after.map(item => item.warehouse_qty)).toEqual(before.map(item => item.warehouse_qty));
+    expect(after.map(item => item.defective_total)).toEqual(before.map(item => item.defective_total));
+    const logs = await read(request, `/api/inventory/transactions?item_id=${child.item_id}&limit=1000`);
+    const log = logs.find((entry: { operation_batch_id: string }) => entry.operation_batch_id === result.batch.batch_id);
+    expect(log.inventory_effect).toEqual([expect.objectContaining({ scope: "location", department: "조립", quantity_before: 7, quantity_after: 9 })]);
+    const audit = await openHistory(page, request, child, log.operation_id, /조립 7 \+2→9/);
+    await expect(audit.summary.getByLabel("조립 재고 7 +2→9 EA", { exact: true })).toBeVisible();
+  } finally { await cleanup(request, requester, ids); }
+});
+
 for (const mode of ["상·하위 차감", "하위만 차감"] as const) {
   test(`IO-RESEARCH-BOM 8.15-01/03 ${mode} 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다`, async ({ page, request, actors }) => {
     test.setTimeout(120_000);
@@ -223,6 +283,7 @@ for (const mode of ["상·하위 차감", "하위만 차감"] as const) {
       await expect(bundle.getByRole("button", { name: "상·하위 차감", exact: true })).toBeEnabled();
       await expect(bundle.getByRole("button", { name: "하위만 차감", exact: true })).toBeEnabled();
       await bundle.getByRole("button", { name: mode, exact: true }).click();
+      await page.getByRole("dialog", { name: `${mode} 방식 안내` }).getByRole("button", { name: "확인", exact: true }).click();
       await expect(bundle.getByRole("button", { name: mode, exact: true })).toHaveAttribute("aria-pressed", "true");
       const header = bundle.locator("[data-io-bundle-header]");
       if (await header.getAttribute("aria-expanded") === "false") await header.click();

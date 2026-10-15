@@ -239,9 +239,33 @@ def settle_if_decided(
     requests: Sequence[StockRequest],
     actor: Employee,
 ) -> bool:
-    """모든 요청이 결정됐을 때 승인 라인을 한 트랜잭션에서 정확히 한 번 실행한다."""
+    """반환 모드는 첫 반려에 전체 취소하고 전부 승인 시 한 번 실행하며, 기존 모드는 부분 승인한다."""
     if batch.status in {"completed", "partially_completed", "rejected", "failed", "cancelled"}:
         return False
+    if any(bundle.internal_use_bom_mode == "parent_with_returns" for bundle in batch.bundles) and any(
+        request.status == StockRequestStatusEnum.REJECTED for request in requests
+    ):
+        # 반려 요청은 호출 경계에서 이미 해제됐으며 형제 예약은 상태를 바꾸기 전에 해제한다.
+        for request in requests:
+            release_reservation(db, request)
+
+        from app.services import notifications
+
+        now = datetime.utcnow()
+        for request in requests:
+            if request.status not in _REJECTED_STATUSES:
+                request.status = StockRequestStatusEnum.CANCELLED
+                request.cancelled_at = now
+                for line in request.lines:
+                    line.status = StockRequestStatusEnum.CANCELLED
+            notifications.mark_approval_request_notifications_read(
+                db, request_id=request.request_id,
+            )
+        batch.status = "rejected"
+        batch.completed_at = None
+        batch.updated_at = now
+        db.flush()
+        return True
     if not all(_is_decided(request) for request in requests):
         batch.status = (
             "reserved"

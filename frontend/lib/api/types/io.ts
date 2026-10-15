@@ -32,7 +32,7 @@ export type IoSubType =
 
 export type IoSourceKind = "direct_item" | "bom_parent" | "manual";
 export type IoSourceLocation = "warehouse" | "department";
-export type IoInternalUseBomMode = "parent_and_children" | "children_only";
+export type IoInternalUseBomMode = "parent_and_children" | "children_only" | "parent_with_returns";
 export type IoLineOrigin = "direct" | "bom_auto" | "package_auto" | "manual";
 export type IoLineDirection = "in" | "out" | "move" | "defective" | "adjust";
 export type IoBucket = "warehouse" | "production" | "defective" | "none";

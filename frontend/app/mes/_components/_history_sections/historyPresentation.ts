@@ -13,6 +13,7 @@ import {
   getHistoryDisplayTransactionType,
   getHistoryDisplaySubLabel,
   getHistoryFlowLabel,
+  getInternalUseReturnLine,
   getHistoryMovementSummary,
   getHistoryWorkTypeLabel,
   isShippingCompanionNote,
@@ -566,6 +567,14 @@ function getInternalUseInventoryEffectFlow(
   const stockLocation = stockCell.scope === "warehouse"
     ? "창고"
     : stockCell.department?.trim() || batch?.from_department?.trim() || "부서";
+  const returnLine = getInternalUseReturnLine(log, batch);
+  if (returnLine) {
+    const source = returnLine.selected ? "사용출고 반환" : "사용출고 해제";
+    const isCancellation = log.operation_kind === "CANCELLATION";
+    const from = isCancellation ? stockLocation : source;
+    const to = isCancellation ? source : stockLocation;
+    return { label: `${from} → ${to}`, from, to };
+  }
   const useLocation = batch?.to_department?.trim() || log.department?.trim();
   if (!useLocation) return null;
   const isCancellation = log.operation_kind === "CANCELLATION";

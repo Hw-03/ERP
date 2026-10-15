@@ -18,6 +18,30 @@ import { INTERNAL_USE_BOM_MODE_LABEL } from "./internalUseBom";
 import { isBomForced, isCustomProcessBomBundle, processBomEffectLine } from "./ioWorkType";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 
+const INTERNAL_USE_BOM_GUIDE = {
+  parent_and_children: [
+    ["상위 품목", "차감", "선택한 위치에서 출고"],
+    ["체크한 하위", "차감", "각 하위의 차감 위치에서 출고"],
+    ["체크 해제한 하위", "반환", "품목 소속 부서로 재입고"],
+  ],
+  children_only: [
+    ["상위 품목", "변동 없음", "상위 재고는 그대로 유지"],
+    ["체크한 하위", "차감", "각 하위의 차감 위치에서 출고"],
+    ["체크 해제한 하위", "변동 없음", "체크하지 않은 하위 재고는 그대로 유지"],
+  ],
+  parent_with_returns: [
+    ["상위 품목", "차감", "선택한 위치에서 출고"],
+    ["체크한 하위", "반환", "품목 소속 부서로 재입고"],
+    ["체크 해제한 하위", "변동 없음", "체크하지 않은 하위 재고는 그대로 유지"],
+  ],
+} as const;
+
+const BOM_GUIDE_EFFECT = {
+  차감: { color: LEGACY_COLORS.red, Icon: ArrowUpFromLine },
+  반환: { color: LEGACY_COLORS.green, Icon: ArrowDownToLine },
+  "변동 없음": { color: LEGACY_COLORS.muted2, Icon: Equal },
+} as const;
+
 interface Props {
   bundle: IoBundle;
   subType: IoSubType;
@@ -60,6 +84,7 @@ export function IoBundleCard({
   const [collapsed, setCollapsed] = useState(true);
   const customBomGuideShownRef = useRef(false);
   const [customBomGuideOpen, setCustomBomGuideOpen] = useState(false);
+  const [internalUseGuideMode, setInternalUseGuideMode] = useState<IoInternalUseBomMode | null>(null);
 
   // 단일 라인 비-BOM 묶음(낱개 manual + "이 품목만" direct_item) 은 헤더/카드 래퍼 생략하고
   // IoLineRow 만 단독 노출. trash 는 forceShowRemove 로 항상 보이게 하고 onRemoveBundle 연결.
@@ -174,7 +199,8 @@ export function IoBundleCard({
       ? null
       : parentSourceAvailable - (Number(bundle.quantity) || 0);
   const parentModeExpected =
-    bundle.internal_use_bom_mode === "parent_and_children"
+    bundle.internal_use_bom_mode === "parent_and_children" ||
+    bundle.internal_use_bom_mode === "parent_with_returns"
       ? parentSummaryExpected
       : bundle.internal_use_bom_mode === "children_only"
         ? parentSourceAvailable
@@ -313,9 +339,9 @@ export function IoBundleCard({
             >
               차감 방식
             </span>
-            <div className="grid h-11 min-h-[44px] w-full grid-cols-2 gap-1">
+            <div className="flex w-full flex-wrap gap-1">
               {(
-                ["parent_and_children", "children_only"] as IoInternalUseBomMode[]
+                ["parent_and_children", "children_only", "parent_with_returns"] as IoInternalUseBomMode[]
               ).map((mode) => {
                 const active = bundle.internal_use_bom_mode === mode;
                 return (
@@ -325,8 +351,11 @@ export function IoBundleCard({
                     aria-label={INTERNAL_USE_BOM_MODE_LABEL[mode]}
                     aria-pressed={active}
                     disabled={internalUseBomBusy || !onInternalUseBomModeChange}
-                    onClick={() => onInternalUseBomModeChange?.(mode)}
-                    className="standard-hover h-11 min-h-[44px] rounded-[10px] border px-2 py-2 text-sm font-black whitespace-nowrap transition-[transform,filter,opacity] active:scale-[0.98] disabled:opacity-50"
+                    onClick={() => {
+                      onInternalUseBomModeChange?.(mode);
+                      setInternalUseGuideMode(mode);
+                    }}
+                    className={`standard-hover min-h-[44px] flex-1 rounded-[10px] border px-2 py-2 text-sm font-black whitespace-normal transition-[transform,filter,opacity] active:scale-[0.98] disabled:opacity-50 ${mode === "parent_with_returns" ? "min-w-[168px]" : "h-11 min-w-[100px]"}`}
                     style={{
                       background: active ? tint(LEGACY_COLORS.blue, 16) : LEGACY_COLORS.s2,
                       borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
@@ -488,6 +517,53 @@ export function IoBundleCard({
             );
           })}
         </ul>
+      )}
+      {internalUseGuideMode && (
+        <ConfirmModal
+          open
+          acknowledgeOnly
+          wide
+          title={`${INTERNAL_USE_BOM_MODE_LABEL[internalUseGuideMode]} 방식 안내`}
+          confirmLabel="확인"
+          onClose={() => setInternalUseGuideMode(null)}
+          onConfirm={() => setInternalUseGuideMode(null)}
+        >
+          <div className="max-h-[calc(100dvh-220px)] overflow-y-auto overscroll-contain">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {INTERNAL_USE_BOM_GUIDE[internalUseGuideMode].map(([target, effect, description]) => {
+                const { color, Icon } = BOM_GUIDE_EFFECT[effect];
+                return (
+                  <div
+                    key={target}
+                    role="group"
+                    aria-label={target}
+                    className="flex min-h-[120px] flex-col items-center justify-center rounded-[16px] border p-3 text-center sm:min-h-[180px]"
+                    style={{ background: tint(color, 10), borderColor: tint(color, 35) }}
+                  >
+                    <span
+                      className="mb-2 flex h-10 w-10 items-center justify-center rounded-full"
+                      style={{ background: tint(color, 14), color }}
+                    >
+                      <Icon className="h-6 w-6" aria-hidden="true" />
+                    </span>
+                    <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{target}</span>
+                    <strong className="mt-1 text-xl font-black" style={{ color }}>{effect}</strong>
+                    <span className="mt-1 break-keep text-sm font-semibold" style={{ color: LEGACY_COLORS.muted }}>{description}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-3 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
+              하위 수량은 상위 기준 수량 × BOM 소요량으로 계산합니다.
+              <br />재고 미반영 품목은 처리 대상에서 제외됩니다.
+            </p>
+            {internalUseGuideMode === "parent_with_returns" && (
+              <p className="mt-2 text-sm font-bold" style={{ color: LEGACY_COLORS.blue }}>
+                이 방식으로 바꾸면 하위 체크가 모두 해제됩니다. 반환할 부품만 체크하세요.
+              </p>
+            )}
+          </div>
+        </ConfirmModal>
       )}
       <ConfirmModal
         open={customBomGuideOpen}
