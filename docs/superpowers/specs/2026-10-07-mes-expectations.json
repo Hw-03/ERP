@@ -373,25 +373,25 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert forbidden_preview.status_code == 403, forbidden_preview.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert drafted.status_code == 403, drafted.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert submitted.status_code == 403, submitted.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert db_session.query(TransactionLog).count() == 0",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             }
           ],
           "execution": {
@@ -466,6 +466,34 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert forbidden_preview.status_code == 403, forbidden_preview.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert drafted.status_code == 403, drafted.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert submitted.status_code == 403, submitted.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert db_session.query(TransactionLog).count() == 0",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ]
           ]
         },
         {
@@ -482,25 +510,25 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert response.status_code == expected_status, response.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert inventory.warehouse_qty == Decimal(\"0\")",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert db_session.query(IoBatch).count() == 0",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert db_session.query(TransactionLog).count() == 0",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             }
           ],
           "execution": {
@@ -575,6 +603,34 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert response.status_code == expected_status, response.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert inventory.warehouse_qty == Decimal(\"0\")",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert db_session.query(IoBatch).count() == 0",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert db_session.query(TransactionLog).count() == 0",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ]
           ]
         },
         {
@@ -591,7 +647,7 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_internal_use_unauthorized_write_rejected_without_preview",
               "assertion": "assert response.status_code == 403, response.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             }
           ],
           "execution": {
@@ -666,6 +722,16 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_internal_use_unauthorized_write_rejected_without_preview",
+                "assertion": "assert response.status_code == 403, response.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ]
           ]
         },
         {
@@ -857,31 +923,31 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_draft_reads_recalculate_shortage_from_current_inventory",
               "assertion": "assert preview_component[\"shortage\"] == 2",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_draft_reads_recalculate_shortage_from_current_inventory",
               "assertion": "assert listed_line[\"shortage\"] == 0",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_draft_reads_recalculate_shortage_from_current_inventory",
               "assertion": "assert fetched_line[\"shortage\"] == 0",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_draft_reads_recalculate_shortage_from_current_inventory",
               "assertion": "assert persisted_line.shortage == Decimal(\"2\")",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_draft_reads_recalculate_shortage_from_current_inventory",
               "assertion": "assert depleted_line[\"shortage\"] == 2",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             }
           ],
           "execution": {
@@ -956,6 +1022,40 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_draft_reads_recalculate_shortage_from_current_inventory",
+                "assertion": "assert preview_component[\"shortage\"] == 2",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_draft_reads_recalculate_shortage_from_current_inventory",
+                "assertion": "assert listed_line[\"shortage\"] == 0",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_draft_reads_recalculate_shortage_from_current_inventory",
+                "assertion": "assert fetched_line[\"shortage\"] == 0",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_draft_reads_recalculate_shortage_from_current_inventory",
+                "assertion": "assert persisted_line.shortage == Decimal(\"2\")",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_draft_reads_recalculate_shortage_from_current_inventory",
+                "assertion": "assert depleted_line[\"shortage\"] == 2",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ]
           ]
         },
         {
@@ -972,25 +1072,25 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
               "assertion": "assert result.status_code == 422, result.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
               "assertion": "assert db_session.query(TransactionLog).count() == 0",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
               "assertion": "assert db_session.query(StockRequest).count() == 0",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
               "assertion": "assert batch.status == \"draft\"",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             }
           ],
           "execution": {
@@ -1065,6 +1165,34 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
+                "assertion": "assert result.status_code == 422, result.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
+                "assertion": "assert db_session.query(TransactionLog).count() == 0",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
+                "assertion": "assert db_session.query(StockRequest).count() == 0",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
+                "assertion": "assert batch.status == \"draft\"",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ]
           ]
         },
         {
@@ -56315,25 +56443,25 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert forbidden_preview.status_code == 403, forbidden_preview.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert drafted.status_code == 403, drafted.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert submitted.status_code == 403, submitted.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert db_session.query(TransactionLog).count() == 0",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             }
           ],
           "execution": {
@@ -56408,6 +56536,34 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert forbidden_preview.status_code == 403, forbidden_preview.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert drafted.status_code == 403, drafted.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert submitted.status_code == 403, submitted.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert db_session.query(TransactionLog).count() == 0",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ]
           ]
         },
         {
@@ -56596,25 +56752,25 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert forbidden_preview.status_code == 403, forbidden_preview.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert drafted.status_code == 403, drafted.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert submitted.status_code == 403, submitted.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert db_session.query(TransactionLog).count() == 0",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             }
           ],
           "execution": {
@@ -56689,6 +56845,34 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert forbidden_preview.status_code == 403, forbidden_preview.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert drafted.status_code == 403, drafted.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert submitted.status_code == 403, submitted.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert db_session.query(TransactionLog).count() == 0",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ]
           ]
         },
         {
@@ -56705,25 +56889,25 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert response.status_code == expected_status, response.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert inventory.warehouse_qty == Decimal(\"0\")",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert db_session.query(IoBatch).count() == 0",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert db_session.query(TransactionLog).count() == 0",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             }
           ],
           "execution": {
@@ -56798,6 +56982,34 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert response.status_code == expected_status, response.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert inventory.warehouse_qty == Decimal(\"0\")",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert db_session.query(IoBatch).count() == 0",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert db_session.query(TransactionLog).count() == 0",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ]
           ]
         }
       ],
@@ -56893,7 +57105,7 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_internal_use_unauthorized_write_rejected_without_preview",
               "assertion": "assert response.status_code == 403, response.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             }
           ],
           "execution": {
@@ -56968,6 +57180,16 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_internal_use_unauthorized_write_rejected_without_preview",
+                "assertion": "assert response.status_code == 403, response.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ]
           ]
         }
       ],
@@ -58120,7 +58342,7 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_internal_use_fresh_submit_rejects_invalid_destination",
               "assertion": "assert response.status_code == 422, response.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             }
           ],
           "execution": {
@@ -58195,6 +58417,16 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_internal_use_fresh_submit_rejects_invalid_destination",
+                "assertion": "assert response.status_code == 422, response.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ]
           ]
         },
         {
@@ -58211,43 +58443,43 @@
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "expect(await begin(page, requester, \"AS\")).toBe(true);",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-RESEARCH-BOM 8.15-01/03 ${mode} 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
               "assertion": "expect(await begin(page, requester, \"연구\")).toBe(true);",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
-              "line": 202
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
+              "line": 262
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "for (const line of submittedRequest.lines) expect(line).toMatchObject({ to_bucket: \"none\", to_department: \"AS\" });",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-RESEARCH-BOM 8.15-01/03 ${mode} 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
               "assertion": "expect(routes.sort((a, b) => a.item_id.localeCompare(b.item_id))).toEqual(expectedRoutes.sort((a, b) => a.item_id.localeCompare(b.item_id)));",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
-              "line": 202
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
+              "line": 262
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "await expect(audit.summary.getByTestId(\"history-stock-movement-summary\")).toContainText(\"AS\");",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-RESEARCH-BOM 8.15-01/03 ${mode} 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
               "assertion": "await expect(audit.summary.getByTestId(\"history-stock-movement-summary\")).toContainText(\"연구\");",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
-              "line": 202
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
+              "line": 262
             }
           ],
           "execution": {
@@ -58322,6 +58554,52 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "expect(await begin(page, requester, \"AS\")).toBe(true);",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-RESEARCH-BOM 8.15-01/03 ${mode} 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
+                "assertion": "expect(await begin(page, requester, \"연구\")).toBe(true);",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 202
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "for (const line of submittedRequest.lines) expect(line).toMatchObject({ to_bucket: \"none\", to_department: \"AS\" });",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-RESEARCH-BOM 8.15-01/03 ${mode} 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
+                "assertion": "expect(routes.sort((a, b) => a.item_id.localeCompare(b.item_id))).toEqual(expectedRoutes.sort((a, b) => a.item_id.localeCompare(b.item_id)));",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 202
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "await expect(audit.summary.getByTestId(\"history-stock-movement-summary\")).toContainText(\"AS\");",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-RESEARCH-BOM 8.15-01/03 ${mode} 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
+                "assertion": "await expect(audit.summary.getByTestId(\"history-stock-movement-summary\")).toContainText(\"연구\");",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 202
+              }
+            ]
           ]
         }
       ],
@@ -58606,13 +58884,13 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_internal_use_children_only_consumes_selected_children_without_parent_change",
               "assertion": "assert [line.item_id for line in request.lines] == [selected_child.item_id]",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_internal_use_children_only_consumes_selected_children_without_parent_change",
               "assertion": "assert quantities == {\n        parent.item_id: Decimal(\"5\"),\n        selected_child.item_id: Decimal(\"4\"),\n        unselected_child.item_id: Decimal(\"5\"),\n    }",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             }
           ],
           "execution": {
@@ -58687,6 +58965,22 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_internal_use_children_only_consumes_selected_children_without_parent_change",
+                "assertion": "assert [line.item_id for line in request.lines] == [selected_child.item_id]",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_internal_use_children_only_consumes_selected_children_without_parent_change",
+                "assertion": "assert quantities == {\n        parent.item_id: Decimal(\"5\"),\n        selected_child.item_id: Decimal(\"4\"),\n        unselected_child.item_id: Decimal(\"5\"),\n    }",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ]
           ]
         },
         {
@@ -58703,43 +58997,43 @@
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "for (const [index, item] of items.entries()) expect(await pick(page, item, departments[index], \"낱개\")).toEqual({ bomEnabled: false, singleEnabled: true });",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-RESEARCH-BOM 8.15-01/03 ${mode} 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
               "assertion": "expect(await pick(page, parent, \"조립\", \"BOM\")).toEqual({ bomEnabled: true, singleEnabled: true });",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
-              "line": 202
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
+              "line": 262
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-RESEARCH-BOM 8.15-01/03 ${mode} 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
               "assertion": "await expect(bundle.getByRole(\"button\", { name: mode, exact: true })).toHaveAttribute(\"aria-pressed\", \"true\");",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
-              "line": 202
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
+              "line": 262
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-RESEARCH-BOM 8.15-01/03 ${mode} 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
               "assertion": "await expect(selected.getByRole(\"textbox\", { name: \"수량\", exact: true })).toHaveAttribute(\"aria-readonly\", \"true\");",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
-              "line": 202
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
+              "line": 262
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-RESEARCH-BOM 8.15-01/03 ${mode} 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
               "assertion": "} else await expect(excluded).toContainText(\"소속 부서 재입고\");",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
-              "line": 202
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
+              "line": 262
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-RESEARCH-BOM 8.15-01/03 ${mode} 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
               "assertion": "expect(after.map(item => location(item, \"조립\"))).toEqual(mode === \"상·하위 차감\" ? [6, 5, 9, 6] : [7, 5, 7, 7]);",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
-              "line": 202
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
+              "line": 262
             }
           ],
           "execution": {
@@ -58814,6 +59108,52 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "for (const [index, item] of items.entries()) expect(await pick(page, item, departments[index], \"낱개\")).toEqual({ bomEnabled: false, singleEnabled: true });",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-RESEARCH-BOM 8.15-01/03 ${mode} 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
+                "assertion": "expect(await pick(page, parent, \"조립\", \"BOM\")).toEqual({ bomEnabled: true, singleEnabled: true });",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 202
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-RESEARCH-BOM 8.15-01/03 ${mode} 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
+                "assertion": "await expect(bundle.getByRole(\"button\", { name: mode, exact: true })).toHaveAttribute(\"aria-pressed\", \"true\");",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 202
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-RESEARCH-BOM 8.15-01/03 ${mode} 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
+                "assertion": "await expect(selected.getByRole(\"textbox\", { name: \"수량\", exact: true })).toHaveAttribute(\"aria-readonly\", \"true\");",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 202
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-RESEARCH-BOM 8.15-01/03 ${mode} 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
+                "assertion": "} else await expect(excluded).toContainText(\"소속 부서 재입고\");",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 202
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-RESEARCH-BOM 8.15-01/03 ${mode} 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
+                "assertion": "expect(after.map(item => location(item, \"조립\"))).toEqual(mode === \"상·하위 차감\" ? [6, 5, 9, 6] : [7, 5, 7, 7]);",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 202
+              }
+            ]
           ]
         }
       ],
@@ -59207,13 +59547,13 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_internal_use_bom_child_uses_actual_child_process_for_special_approval",
               "assertion": "assert request.requires_as_research_approval is True",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_internal_use_bom_child_uses_actual_child_process_for_special_approval",
               "assertion": "assert request.requires_department_approval is False",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             }
           ],
           "execution": {
@@ -59288,6 +59628,22 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_internal_use_bom_child_uses_actual_child_process_for_special_approval",
+                "assertion": "assert request.requires_as_research_approval is True",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_internal_use_bom_child_uses_actual_child_process_for_special_approval",
+                "assertion": "assert request.requires_department_approval is False",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ]
           ]
         },
         {
@@ -59584,13 +59940,13 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_approval_uses_only_included_lines",
               "assertion": "assert db_session.query(StockRequestLine).count() == 1",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_approval_uses_only_included_lines",
               "assertion": "assert inv_b.pending_quantity == Decimal(\"0\")",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             }
           ],
           "execution": {
@@ -59665,6 +60021,22 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_approval_uses_only_included_lines",
+                "assertion": "assert db_session.query(StockRequestLine).count() == 1",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_approval_uses_only_included_lines",
+                "assertion": "assert inv_b.pending_quantity == Decimal(\"0\")",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ]
           ]
         }
       ],
@@ -59975,42 +60347,42 @@
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "await expect(line.locator(\"[data-io-stock]\")).toContainText(/가능 재고.*7.*실행 후.*-1.*재고 부족/);",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "await expect(cart.getByText(\"재고 부족\", { exact: true })).toHaveCount(2);",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "await expect(page.getByRole(\"button\", { name: /제출확인/ }).filter({ visible: true })).toBeDisabled();",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "expect(rejected.status()).toBe(422);",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "expect(await Promise.all(items.map(item => read(request, `/api/inventory/transactions?item_id=${item.item_id}&limit=1000`)))).toEqual(beforeLogs);",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "expect(await Promise.all(items.map(item => read(request, `/api/items/${item.item_id}`)))).toEqual(before);",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             }
           ],
@@ -60086,6 +60458,52 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "await expect(line.locator(\"[data-io-stock]\")).toContainText(/가능 재고.*7.*실행 후.*-1.*재고 부족/);",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "await expect(cart.getByText(\"재고 부족\", { exact: true })).toHaveCount(2);",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "await expect(page.getByRole(\"button\", { name: /제출확인/ }).filter({ visible: true })).toBeDisabled();",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "expect(rejected.status()).toBe(422);",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "expect(await Promise.all(items.map(item => read(request, `/api/inventory/transactions?item_id=${item.item_id}&limit=1000`)))).toEqual(beforeLogs);",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "expect(await Promise.all(items.map(item => read(request, `/api/items/${item.item_id}`)))).toEqual(before);",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              }
+            ]
           ]
         }
       ],
@@ -60396,64 +60814,64 @@
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "expect(log).toMatchObject({ requester_name: requester.name, approver_name: approver.name, department: \"AS\", history_batch: { to_department: \"AS\" } });",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "expect(log.inventory_effect).toEqual([expect.objectContaining({ scope: \"location\", department: departments[index], quantity_before: 7, quantity_after: 6 })]);",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "await expect(audit.row.getByLabel(new RegExp(`^${departments[index]} 7 [−-]1→6$`))).toBeVisible();",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "await expect(audit.summary.getByLabel(`${departments[index]} 재고 7 -1→6 EA`, { exact: true })).toBeVisible();",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "await expect(audit.summary.getByTestId(\"history-stock-movement-summary\")).toContainText(\"AS\");",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "await expect(audit.summary.getByTestId(\"history-stock-movement-summary\")).not.toContainText(\"창고\");",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "await expect(audit.summary.getByTestId(\"history-participant-row\").filter({ hasText: \"요청자\" })).toContainText(requester.name);",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "await expect(audit.summary.getByTestId(\"history-participant-row\").filter({ hasText: \"승인자\" })).toContainText(approver.name);",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-RESEARCH-BOM 8.15-01/03 ${mode} 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
               "assertion": "await expect(audit.summary.getByTestId(\"history-stock-movement-summary\")).toContainText(\"연구\");",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
-              "line": 202
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
+              "line": 262
             }
           ],
           "execution": {
@@ -60528,6 +60946,73 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "expect(log).toMatchObject({ requester_name: requester.name, approver_name: approver.name, department: \"AS\", history_batch: { to_department: \"AS\" } });",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "expect(log.inventory_effect).toEqual([expect.objectContaining({ scope: \"location\", department: departments[index], quantity_before: 7, quantity_after: 6 })]);",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "await expect(audit.row.getByLabel(new RegExp(`^${departments[index]} 7 [−-]1→6$`))).toBeVisible();",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "await expect(audit.summary.getByLabel(`${departments[index]} 재고 7 -1→6 EA`, { exact: true })).toBeVisible();",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "await expect(audit.summary.getByTestId(\"history-stock-movement-summary\")).toContainText(\"AS\");",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "await expect(audit.summary.getByTestId(\"history-stock-movement-summary\")).not.toContainText(\"창고\");",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "await expect(audit.summary.getByTestId(\"history-participant-row\").filter({ hasText: \"요청자\" })).toContainText(requester.name);",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "await expect(audit.summary.getByTestId(\"history-participant-row\").filter({ hasText: \"승인자\" })).toContainText(approver.name);",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-RESEARCH-BOM 8.15-01/03 ${mode} 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
+                "assertion": "await expect(audit.summary.getByTestId(\"history-stock-movement-summary\")).toContainText(\"연구\");",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 202
+              }
+            ]
           ]
         }
       ],
@@ -60734,64 +61219,64 @@
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "expect(log).toMatchObject({ requester_name: requester.name, approver_name: approver.name, department: \"AS\", history_batch: { to_department: \"AS\" } });",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "expect(log.inventory_effect).toEqual([expect.objectContaining({ scope: \"location\", department: departments[index], quantity_before: 7, quantity_after: 6 })]);",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "await expect(audit.row.getByLabel(new RegExp(`^${departments[index]} 7 [−-]1→6$`))).toBeVisible();",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "await expect(audit.summary.getByLabel(`${departments[index]} 재고 7 -1→6 EA`, { exact: true })).toBeVisible();",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "await expect(audit.summary.getByTestId(\"history-stock-movement-summary\")).toContainText(\"AS\");",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "await expect(audit.summary.getByTestId(\"history-stock-movement-summary\")).not.toContainText(\"창고\");",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "await expect(audit.summary.getByTestId(\"history-participant-row\").filter({ hasText: \"요청자\" })).toContainText(requester.name);",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
               "assertion": "await expect(audit.summary.getByTestId(\"history-participant-row\").filter({ hasText: \"승인자\" })).toContainText(approver.name);",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
               "line": 130
             },
             {
               "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
               "selector": "IO-RESEARCH-BOM 8.15-01/03 ${mode} 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
               "assertion": "await expect(audit.summary.getByTestId(\"history-stock-movement-summary\")).toContainText(\"연구\");",
-              "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
-              "line": 202
+              "sourceHash": "265f818345f31482373cec90aeb95ee5ec266bfb9f159eb5396d8231b89d6854",
+              "line": 262
             }
           ],
           "execution": {
@@ -60866,6 +61351,73 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "expect(log).toMatchObject({ requester_name: requester.name, approver_name: approver.name, department: \"AS\", history_batch: { to_department: \"AS\" } });",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "expect(log.inventory_effect).toEqual([expect.objectContaining({ scope: \"location\", department: departments[index], quantity_before: 7, quantity_after: 6 })]);",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "await expect(audit.row.getByLabel(new RegExp(`^${departments[index]} 7 [−-]1→6$`))).toBeVisible();",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "await expect(audit.summary.getByLabel(`${departments[index]} 재고 7 -1→6 EA`, { exact: true })).toBeVisible();",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "await expect(audit.summary.getByTestId(\"history-stock-movement-summary\")).toContainText(\"AS\");",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "await expect(audit.summary.getByTestId(\"history-stock-movement-summary\")).not.toContainText(\"창고\");",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "await expect(audit.summary.getByTestId(\"history-participant-row\").filter({ hasText: \"요청자\" })).toContainText(requester.name);",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-AS-AUDIT 8.15-01/03/07/08/09 목적지 미선택·두 부서 부족 모두 차단하고 최종 승인 후 실제 부서→AS·참여자·전후값을 보존한다",
+                "assertion": "await expect(audit.summary.getByTestId(\"history-participant-row\").filter({ hasText: \"승인자\" })).toContainText(approver.name);",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 130
+              },
+              {
+                "file": "frontend/tests/e2e/io-as-research-audit.spec.ts",
+                "selector": "IO-RESEARCH-BOM 8.15-01/03 ${mode} 허용 방식·제외 하위·혼합 낱개와 실제 연구 목적지 재고를 일치시킨다",
+                "assertion": "await expect(audit.summary.getByTestId(\"history-stock-movement-summary\")).toContainText(\"연구\");",
+                "sourceHash": "601dd01de56ba871bf8fc8e191202dc979321e3cd0524e284f38014ff39437af",
+                "line": 202
+              }
+            ]
           ]
         }
       ],
@@ -61236,25 +61788,25 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert forbidden_preview.status_code == 403, forbidden_preview.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert drafted.status_code == 403, drafted.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert submitted.status_code == 403, submitted.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert db_session.query(TransactionLog).count() == 0",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             }
           ],
           "execution": {
@@ -61329,6 +61881,34 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert forbidden_preview.status_code == 403, forbidden_preview.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert drafted.status_code == 403, drafted.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert submitted.status_code == 403, submitted.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert db_session.query(TransactionLog).count() == 0",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ]
           ]
         }
       ],
@@ -65240,25 +65820,25 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
               "assertion": "assert result.status_code == 422, result.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
               "assertion": "assert db_session.query(TransactionLog).count() == 0",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
               "assertion": "assert db_session.query(StockRequest).count() == 0",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
               "assertion": "assert batch.status == \"draft\"",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             }
           ],
           "execution": {
@@ -65333,6 +65913,34 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
+                "assertion": "assert result.status_code == 422, result.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
+                "assertion": "assert db_session.query(TransactionLog).count() == 0",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
+                "assertion": "assert db_session.query(StockRequest).count() == 0",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
+                "assertion": "assert batch.status == \"draft\"",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ]
           ]
         },
         {
@@ -104237,19 +104845,19 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_mixed_production_inbound_requires_memo_and_dept_approval",
               "assertion": "assert logs[parent.item_id].transaction_type == TransactionTypeEnum.PRODUCE",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_mixed_production_inbound_requires_memo_and_dept_approval",
               "assertion": "assert logs[component.item_id].transaction_type == TransactionTypeEnum.BACKFLUSH",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_mixed_production_inbound_requires_memo_and_dept_approval",
               "assertion": "assert len({log.operation_id for log in mixed_logs}) == 1",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             }
           ],
           "execution": {
@@ -104324,6 +104932,28 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_mixed_production_inbound_requires_memo_and_dept_approval",
+                "assertion": "assert logs[parent.item_id].transaction_type == TransactionTypeEnum.PRODUCE",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_mixed_production_inbound_requires_memo_and_dept_approval",
+                "assertion": "assert logs[component.item_id].transaction_type == TransactionTypeEnum.BACKFLUSH",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_mixed_production_inbound_requires_memo_and_dept_approval",
+                "assertion": "assert len({log.operation_id for log in mixed_logs}) == 1",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ]
           ]
         },
         {
@@ -107776,25 +108406,25 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert forbidden_preview.status_code == 403, forbidden_preview.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert drafted.status_code == 403, drafted.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert submitted.status_code == 403, submitted.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert db_session.query(TransactionLog).count() == 0",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             }
           ],
           "execution": {
@@ -107869,6 +108499,34 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert forbidden_preview.status_code == 403, forbidden_preview.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert drafted.status_code == 403, drafted.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert submitted.status_code == 403, submitted.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert db_session.query(TransactionLog).count() == 0",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ]
           ]
         },
         {
@@ -107885,25 +108543,25 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert response.status_code == expected_status, response.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert inventory.warehouse_qty == Decimal(\"0\")",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert db_session.query(IoBatch).count() == 0",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert db_session.query(TransactionLog).count() == 0",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             }
           ],
           "execution": {
@@ -107978,6 +108636,34 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert response.status_code == expected_status, response.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert inventory.warehouse_qty == Decimal(\"0\")",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert db_session.query(IoBatch).count() == 0",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert db_session.query(TransactionLog).count() == 0",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ]
           ]
         },
         {
@@ -111545,19 +112231,19 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_write_rejects_fractional_quantity_without_persisting",
               "assertion": "assert response.status_code == 422, response.text",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_write_rejects_fractional_quantity_without_persisting",
               "assertion": "assert db_session.query(IoBatch).count() == 0",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_write_rejects_fractional_quantity_without_persisting",
               "assertion": "assert db_session.query(IoLine).count() == 0",
-              "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
             }
           ],
           "execution": {
@@ -111632,6 +112318,28 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_write_rejects_fractional_quantity_without_persisting",
+                "assertion": "assert response.status_code == 422, response.text",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_write_rejects_fractional_quantity_without_persisting",
+                "assertion": "assert db_session.query(IoBatch).count() == 0",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_write_rejects_fractional_quantity_without_persisting",
+                "assertion": "assert db_session.query(IoLine).count() == 0",
+                "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ]
           ]
         },
         {
@@ -157037,7 +157745,7 @@
               "file": "frontend/app/mes/_components/_history_sections/__tests__/HistoryDetailPanels.test.tsx",
               "selector": "aborts a prior edit request and ignores its late response after the selected log changes",
               "assertion": "expect(screen.queryByText(\"First editor\")).not.toBeInTheDocument();",
-              "sourceHash": "2ac9139ef5511d7acf115178dd1f0c84951951d3cac89df45200d930257638fe",
+              "sourceHash": "aba25aee42ab87626547145186c48c3d3c8d9cd2dc12a64469c9fdfa04a0532c",
               "line": 736
             }
           ],
@@ -167787,22 +168495,22 @@
               "file": "frontend/app/mes/_components/_defect_hub/__tests__/DefectCartFlow.test.tsx",
               "selector": "PC-DELTA-DEFECT-04 최종확인은 모든 하위 배분을 보여주고 확인 뒤 변경은 실행하지 않는다",
               "assertion": "expect(within(dialog).getByRole(\"button\", { name: \"즉시 재작업\", exact: true })).toBeDisabled();",
-              "sourceHash": "a13aff473fc7880188d335ae2651748c1d4f1732b5eb2e7000815ca8936c5f99",
-              "line": 701
+              "sourceHash": "a4f66f035a8663e6d1edc2e90b911a5279ef37d6118c2964e2ab1cd49d01183c",
+              "line": 718
             },
             {
               "file": "frontend/app/mes/_components/_defect_hub/__tests__/DefectCartFlow.test.tsx",
               "selector": "PC-DELTA-DEFECT-04 최종확인은 모든 하위 배분을 보여주고 확인 뒤 변경은 실행하지 않는다",
               "assertion": "expect(dialog).toHaveTextContent(\"배분이 변경되었습니다. 취소 후 다시 확인하세요.\");",
-              "sourceHash": "a13aff473fc7880188d335ae2651748c1d4f1732b5eb2e7000815ca8936c5f99",
-              "line": 701
+              "sourceHash": "a4f66f035a8663e6d1edc2e90b911a5279ef37d6118c2964e2ab1cd49d01183c",
+              "line": 718
             },
             {
               "file": "frontend/app/mes/_components/_defect_hub/__tests__/DefectCartFlow.test.tsx",
               "selector": "PC-DELTA-DEFECT-04 최종확인은 모든 하위 배분을 보여주고 확인 뒤 변경은 실행하지 않는다",
               "assertion": "expect(stockRequestsApi.createStockRequest).not.toHaveBeenCalled();",
-              "sourceHash": "a13aff473fc7880188d335ae2651748c1d4f1732b5eb2e7000815ca8936c5f99",
-              "line": 701
+              "sourceHash": "a4f66f035a8663e6d1edc2e90b911a5279ef37d6118c2964e2ab1cd49d01183c",
+              "line": 718
             }
           ],
           "execution": {
@@ -168100,22 +168808,22 @@
               "file": "frontend/app/mes/_components/_defect_hub/__tests__/DefectCartFlow.test.tsx",
               "selector": "PC-DELTA-DEFECT-04 최종확인은 모든 하위 배분을 보여주고 확인 뒤 변경은 실행하지 않는다",
               "assertion": "expect(within(dialog).getByRole(\"button\", { name: \"즉시 재작업\", exact: true })).toBeDisabled();",
-              "sourceHash": "a13aff473fc7880188d335ae2651748c1d4f1732b5eb2e7000815ca8936c5f99",
-              "line": 701
+              "sourceHash": "a4f66f035a8663e6d1edc2e90b911a5279ef37d6118c2964e2ab1cd49d01183c",
+              "line": 718
             },
             {
               "file": "frontend/app/mes/_components/_defect_hub/__tests__/DefectCartFlow.test.tsx",
               "selector": "PC-DELTA-DEFECT-04 최종확인은 모든 하위 배분을 보여주고 확인 뒤 변경은 실행하지 않는다",
               "assertion": "expect(dialog).toHaveTextContent(\"배분이 변경되었습니다. 취소 후 다시 확인하세요.\");",
-              "sourceHash": "a13aff473fc7880188d335ae2651748c1d4f1732b5eb2e7000815ca8936c5f99",
-              "line": 701
+              "sourceHash": "a4f66f035a8663e6d1edc2e90b911a5279ef37d6118c2964e2ab1cd49d01183c",
+              "line": 718
             },
             {
               "file": "frontend/app/mes/_components/_defect_hub/__tests__/DefectCartFlow.test.tsx",
               "selector": "PC-DELTA-DEFECT-04 최종확인은 모든 하위 배분을 보여주고 확인 뒤 변경은 실행하지 않는다",
               "assertion": "expect(stockRequestsApi.createStockRequest).not.toHaveBeenCalled();",
-              "sourceHash": "a13aff473fc7880188d335ae2651748c1d4f1732b5eb2e7000815ca8936c5f99",
-              "line": 701
+              "sourceHash": "a4f66f035a8663e6d1edc2e90b911a5279ef37d6118c2964e2ab1cd49d01183c",
+              "line": 718
             }
           ],
           "execution": {
