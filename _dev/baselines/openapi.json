@@ -29505,6 +29505,58 @@
         ]
       }
     },
+    "/api/stocktakes/rounds/latest-summary": {
+      "get": {
+        "description": "Expose only committed aggregate results; historic detail stays role-protected.",
+        "operationId": "latest_round_summary_api_stocktakes_rounds_latest_summary_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Latest Round Summary Api Stocktakes Rounds Latest Summary Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Latest Round Summary",
+        "tags": [
+          "Stocktakes"
+        ]
+      }
+    },
     "/api/stocktakes/rounds/{round_id}": {
       "get": {
         "description": "Expose the active boundary and admitted target generation.",
