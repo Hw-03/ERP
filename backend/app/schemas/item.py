@@ -18,6 +18,7 @@ class InitialLocationInput(BaseModel):
 
 
 class ItemCreate(BaseModel):
+    expected_mes_code: Optional[str] = Field(None, max_length=40, description="직원이 확인한 코드 미리보기; 현재 코드와 다르면 저장하지 않음")
     item_name: str = Field(..., max_length=200, description="품목명")
     process_type_code: Optional[str] = Field(
         None,
@@ -52,6 +53,7 @@ class ItemCreate(BaseModel):
 
 
 class ItemUpdate(BaseModel):
+    expected_mes_code: Optional[str] = Field(None, max_length=40, description="직원이 확인한 코드 미리보기; 현재 코드와 다르면 저장하지 않음")
     item_name: Optional[str] = Field(None, max_length=200)
     process_type_code: Optional[str] = Field(
         None,
@@ -184,6 +186,18 @@ class BOMResponse(BaseModel):
     quantity: int
     unit: str
     notes: Optional[str]
+
+
+class BOMConfigurationLine(BaseModel):
+    child_item_id: uuid.UUID
+    quantity: Decimal = Field(..., allow_inf_nan=False)
+    unit: str = Field("EA", max_length=20)
+    notes: Optional[str] = None
+
+
+class BOMConfigurationUpdate(BaseModel):
+    expected_rows: List[BOMResponse]
+    rows: List[BOMConfigurationLine]
 
 
 class BOMDetailResponse(BaseModel):

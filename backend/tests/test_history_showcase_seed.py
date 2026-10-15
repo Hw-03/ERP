@@ -227,6 +227,25 @@ def test_showcase_apply_creates_searchable_real_inventory_history(db_session, ma
     )
     assert supplier_return.supplier_id == supplier.supplier_id
     assert supplier_return.supplier_name_snapshot == supplier.name
+    assert supplier_return.department == DepartmentEnum.WAREHOUSE
+    return_record = db_session.get(module.DefectQuarantineRecord, supplier_return.defect_quarantine_record_id)
+    assert return_record.department == DepartmentEnum.WAREHOUSE.value
+    assert return_record.original_quantity == module.DEMO_QUANTITY
+    assert return_record.remaining_quantity == 0
+    return_origin = next(
+        log for log in logs
+        if log.transaction_type == module.TransactionTypeEnum.MARK_DEFECTIVE
+        and log.defect_quarantine_record_id == return_record.record_id
+    )
+    assert any(cell["scope"] == "warehouse" and cell["delta"] == -1 for cell in return_origin.inventory_effect)
+    assert any(
+        cell["scope"] == "location" and cell["department"] == DepartmentEnum.WAREHOUSE.value
+        and cell["status"] == "DEFECTIVE" and cell["delta"] == 1
+        for cell in return_origin.inventory_effect
+    )
+    assert {record.department for record in quarantine_records} == {
+        DepartmentEnum.ASSEMBLY.value, DepartmentEnum.WAREHOUSE.value,
+    }
 
 
 def test_showcase_remove_restores_inventory_and_deletes_marked_records(db_session, make_item, make_location, make_bom):

@@ -1,0 +1,17 @@
+{
+  "kind": "browser",
+  "baseUrl": "http://127.0.0.1:3100",
+  "backendUrl": "http://127.0.0.1:8021",
+  "versions": {
+    "node": "v20.20.2",
+    "python": "Python 3.12.0"
+  },
+  "database": {
+    "revision": "20261008_0044",
+    "logicalSnapshotHash": "cb9e291a13d7fbd89e1bd1a436b99726935590dd5617bf0369a426c9ce0f1fac",
+    "path": "C:/Users/user/.codex/worktrees/mes-expectation-closure/ERP/backend/mes_e2e.db",
+    "fixtureHash": "0d66e87cc6218759b5f63c039bdef85504828f6b5d023e5872473af6d68513e6",
+    "bootId": "cf26abac7e17495fb35c78223ec76dae"
+  },
+  "recordedAt": "2026-10-13T10:21:54.752+09:00"
+}

@@ -27,6 +27,7 @@ class ShippingCompanionLineInput(BaseModel):
 
 
 class ShippingRequestCreate(BaseModel):
+    client_request_id: Optional[uuid.UUID] = None
     base_pf_item_id: uuid.UUID
     finalization_mode: Optional[ShippingFinalizationModeEnum] = None
     reuse_pf_item_id: Optional[uuid.UUID] = None

@@ -23,11 +23,11 @@ export function ReadFailure({ message, onRetry, refresh = false }: {
     prefix={refresh ? "최신 정보를 불러오지 못했습니다. 기존 내용을 표시합니다" : "데이터를 불러오지 못했습니다"} />;
 }
 
-export function ReadEmpty({ hasSearch = false, hasFilters = false, onReset, title, description, icon, className, prominent = false, illustrated = false }: {
-  hasSearch?: boolean; hasFilters?: boolean; onReset?: () => void; title?: string; description?: string; icon?: ReactNode; className?: string; prominent?: boolean; illustrated?: boolean;
+export function ReadEmpty({ hasSearch = false, hasFilters = false, onReset, title, description, icon, className, prominent = false, illustrated = false, aboveFold = false }: {
+  hasSearch?: boolean; hasFilters?: boolean; onReset?: () => void; title?: string; description?: string; icon?: ReactNode; className?: string; prominent?: boolean; illustrated?: boolean; aboveFold?: boolean;
 }) {
   const variant = hasSearch ? "no-search-result" : hasFilters ? "filtered-out" : "no-data";
-  return <EmptyState comfortable variant={variant} title={title} icon={icon} className={className} prominent={prominent} illustrated={illustrated}
+  return <EmptyState comfortable variant={variant} title={title} icon={icon} className={className} prominent={prominent} illustrated={illustrated} aboveFold={aboveFold}
     description={description ?? (hasSearch ? "검색어를 바꾸거나 지워서 다시 확인하세요." : hasFilters ? "필터를 초기화해 다시 확인하세요." : "아직 표시할 내역이 없습니다.")}
     action={onReset && (hasSearch || hasFilters) ? { label: hasFilters ? "필터 초기화" : "검색 지우기", onClick: onReset } : undefined} />;
 }

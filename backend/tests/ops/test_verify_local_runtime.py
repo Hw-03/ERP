@@ -54,7 +54,13 @@ def _run_verify(
             *args,
         ],
         cwd=repo,
-        env={**os.environ, "PYTHONUTF8": "1", **(extra_env or {})},
+        env={
+            **os.environ,
+            "PYTHONUTF8": "1",
+            # Each fake repository must resolve its own Node configuration.
+            "MES_RUNTIME_ROOT": str(repo / "_attic" / "runtime"),
+            **(extra_env or {}),
+        },
         capture_output=True,
         timeout=30,
         check=False,
@@ -738,8 +744,16 @@ def test_configured_node20_overrides_path_node_for_frontend_gates(tmp_path: Path
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
-def test_invalid_configured_node20_does_not_fall_back_to_path(tmp_path: Path) -> None:
+def test_invalid_configured_node20_does_not_fall_back_to_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     repo, extra_env = _mock_full_gate_runtime(tmp_path)
+    # App imports can load the outer worktree's runtime path into the test process.
+    outer_runtime = tmp_path / "outer-runtime"
+    outer_runtime.mkdir()
+    outer_node = Path(extra_env["PATH"].split(os.pathsep, 1)[0]) / "node.cmd"
+    (outer_runtime / "frontend-node-path.txt").write_text(str(outer_node), encoding="utf-8")
+    monkeypatch.setenv("MES_RUNTIME_ROOT", str(outer_runtime))
     runtime_root = repo / "_attic" / "runtime"
     runtime_root.mkdir(parents=True)
     missing_node = tmp_path / "missing-node20" / "node.exe"

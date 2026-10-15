@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { DesktopAdminView } from "../DesktopAdminView";
 
 const state = vi.hoisted(() => ({
@@ -8,6 +8,10 @@ const state = vi.hoisted(() => ({
   searchString: "tab=admin",
   selectSection: vi.fn(),
   routerReplace: vi.fn(),
+  loading: false,
+  hasData: true,
+  loadError: null as string | null,
+  loadData: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -40,7 +44,8 @@ vi.mock("../_admin_hooks/useAdminBootstrap", () => ({
     employees: [], setEmployees: vi.fn(),
     productModels: [], setProductModels: vi.fn(),
     departments: [], setDepartments: vi.fn(),
-    allBomRows: [], refreshAllBom: vi.fn(), refreshItems: vi.fn(), loadData: vi.fn(),
+    allBomRows: [], refreshAllBom: vi.fn(), refreshItems: vi.fn(),
+    loading: state.loading, hasData: state.hasData, loadError: state.loadError, loadData: state.loadData,
   }),
 }));
 
@@ -76,6 +81,32 @@ describe("DesktopAdminView", () => {
     state.searchString = "tab=admin";
     state.selectSection.mockReset();
     state.routerReplace.mockReset();
+    state.loading = false;
+    state.hasData = true;
+    state.loadError = null;
+    state.loadData.mockClear();
+  });
+
+  it("최초 관리자 조회 중에는 로딩을 표시하고 빈 본문을 숨긴다", () => {
+    state.loading = true;
+    state.hasData = false;
+    render(<DesktopAdminView globalSearch="" onStatusChange={vi.fn()} />);
+    expect(screen.getByRole("status", { name: "관리자 데이터를 불러오는 중" })).toBeInTheDocument();
+    expect(screen.queryByText("관리자 본문")).not.toBeInTheDocument();
+  });
+
+  it("첫 오류는 본문 없이 재시도하며 성공한 기존 본문은 갱신 오류에도 유지한다", () => {
+    state.hasData = false;
+    state.loadError = "직원 조회 실패";
+    const { rerender } = render(<DesktopAdminView globalSearch="" onStatusChange={vi.fn()} />);
+    expect(screen.getByText(/직원 조회 실패/)).toBeInTheDocument();
+    expect(screen.queryByText("관리자 본문")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(state.loadData).toHaveBeenCalledTimes(1);
+    state.hasData = true;
+    rerender(<DesktopAdminView globalSearch="" onStatusChange={vi.fn()} />);
+    expect(screen.getByText("관리자 본문")).toBeInTheDocument();
+    expect(screen.getByText(/기존 내용을 표시합니다/)).toBeInTheDocument();
   });
 
   it("고정 관리자 사이드 메뉴 대신 상단 섹션 탭을 렌더링한다", () => {

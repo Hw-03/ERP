@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
 from app.database import get_db
+from app.dependencies.employee_actor import require_current_employee_actor
 from app.models import Inventory, SystemSetting
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
@@ -92,6 +93,7 @@ def verify_admin_pin(payload: AdminPinVerifyRequest, db: Session = Depends(get_d
 
 @router.put("/admin-pin", response_model=MessageResponse)
 def update_admin_pin(payload: AdminPinUpdateRequest, request: Request, db: Session = Depends(get_db)):
+    actor = require_current_employee_actor(request, db, required=False)
     setting = ensure_admin_pin(db)
 
     if not _matches_admin_pin(db, setting, payload.current_pin):
@@ -109,6 +111,7 @@ def update_admin_pin(payload: AdminPinUpdateRequest, request: Request, db: Sessi
         target_type="settings",
         target_id="admin_pin",
         payload_summary="관리자 PIN 변경",
+        actor_employee_code=actor.employee_code if actor is not None else None,
     )
 
     commit_only(db)
@@ -185,12 +188,14 @@ def check_inventory_integrity(
 @router.post("/integrity/inventory", response_model=IntegrityCheckResponse)
 def check_inventory_integrity_post(
     payload: IntegrityCheckRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """재고 불변식(quantity == warehouse + Σ locations) 미스매치 목록.
 
     관리자 PIN 은 request body 로 전달한다. 신규 호출의 기준 엔드포인트.
     """
+    require_current_employee_actor(request, db, required=False)
     _require_admin(db, payload.pin)
     return _inventory_integrity_payload(db, payload.limit)
 
@@ -205,6 +210,7 @@ def repair_inventory_integrity(
 
     `dry_run=True` (기본) 로 먼저 확인 후 실제 적용 시 false 로 호출.
     """
+    require_current_employee_actor(request, db, required=False)
     _require_admin(
         db,
         payload.pin,

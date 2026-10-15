@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TransactionLog } from "@/lib/api";
 import { HistoryMobileStockDetails, HistoryMobileContext } from "../HistoryMobileInformation";
@@ -54,9 +54,53 @@ describe("HistoryMobileInformation", () => {
       inventory_effect:[{scope:"location",department:"튜브",status:"PRODUCTION",delta:-2}],
     })]} onSelectLog={vi.fn()} />);
     expect(screen.getByText("요청 순 재고")).toBeInTheDocument();
-    expect(screen.getByLabelText("튜브 7 −2→5")).toBeInTheDocument();
+    expect(screen.getByLabelText("부서 합계 7 −2→5")).toBeInTheDocument();
     expect(screen.getByText("실제 처리 재고")).toBeInTheDocument();
-    expect(screen.getByLabelText("튜브 15 −2→13")).toBeInTheDocument();
+    expect(screen.getByLabelText("부서 합계 15 −2→13")).toBeInTheDocument();
+    expect(screen.queryByLabelText("튜브 7 −2→5")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("튜브 15 −2→13")).not.toBeInTheDocument();
+  });
+  it("실제 위치 전후가 있어도 요청순 합계를 덮지 않고 각 위치의 실제 수량을 보존한다", () => {
+    render(<HistoryMobileStockDetails logs={[log({
+      transaction_type: "ADJUST", quantity_change: -4, quantity_before: 38, quantity_after: 34,
+      warehouse_qty_before: 20, warehouse_qty_after: 18, department_qty_before: 18, department_qty_after: 16,
+      request_order_stock: {status:"available",reason:null,warehouse_qty_before:10,warehouse_qty_after:8,department_qty_before:7,department_qty_after:5},
+      inventory_effect:[
+        {scope:"warehouse",delta:-2,quantity_before:20,quantity_after:18},
+        {scope:"location",department:"튜브",status:"PRODUCTION",delta:-3,quantity_before:15,quantity_after:12},
+        {scope:"location",department:"조립",status:"PRODUCTION",delta:1,quantity_before:3,quantity_after:4},
+      ],
+    })]} onSelectLog={vi.fn()} />);
+    const requested = within(screen.getByText("요청 순 재고").parentElement!);
+    expect(requested.getByLabelText("창고 10 −2→8")).toBeInTheDocument();
+    expect(requested.getByLabelText("부서 합계 7 −2→5")).toBeInTheDocument();
+    expect(requested.queryByLabelText("튜브 15 −3→12")).not.toBeInTheDocument();
+    const actual = within(screen.getByText("실제 처리 재고").parentElement!);
+    expect(actual.getByLabelText("창고 20 −2→18")).toBeInTheDocument();
+    expect(actual.getByLabelText("튜브 15 −3→12")).toBeInTheDocument();
+    expect(actual.getByLabelText("조립 3 +1→4")).toBeInTheDocument();
+    expect([
+      /^창고(?: 재고)? 20 [−-]2→18(?: EA)?$/,
+      /^튜브(?: 재고)? 15 [−-]3→12(?: EA)?$/,
+      /^조립(?: 재고)? 3 \+1→4(?: EA)?$/,
+    ].map((label) => actual.getAllByLabelText(label).length)).toEqual([1, 1, 1]);
+    expect(actual.queryByLabelText("창고 재고 20 -2→18 EA")).not.toBeInTheDocument();
+    expect(actual.queryByLabelText("튜브 재고 15 -3→12 EA")).not.toBeInTheDocument();
+    expect(actual.queryByLabelText("조립 재고 3 +1→4 EA")).not.toBeInTheDocument();
+  });
+  it.each([
+    [{scope:"location",department:"튜브",status:"PRODUCTION",delta:-2}, "튜브 재고 -2 EA"],
+    [{scope:"location",department:"튜브",status:"PRODUCTION",delta:-3,quantity_before:15,quantity_after:13}, "튜브 재고 15 -3→13 EA"],
+    [{scope:"location",department:"튜브",status:"DEFECTIVE",delta:-2,quantity_before:15,quantity_after:13}, "불량 재고 15 -2→13 EA"],
+    [{scope:"warehouse_box",box_id:"box-a",delta:-2,quantity_before:15,quantity_after:13}, "박스 재고 15 -2→13 EA"],
+    [{scope:"location",department:"튜브",delta:-2,quantity_before:15,quantity_after:13}, "튜브 재고 15 -2→13 EA"],
+  ] as const)("실제 재고 요약으로 대체할 수 없는 효과 %j는 보존한다", (effect, label) => {
+    render(<HistoryMobileStockDetails logs={[log({
+      request_order_stock: {status:"available",reason:null,warehouse_qty_before:0,warehouse_qty_after:0,department_qty_before:7,department_qty_after:5},
+      inventory_effect:[effect],
+    })]} onSelectLog={vi.fn()} />);
+    const actual = within(screen.getByText("실제 처리 재고").parentElement!);
+    expect(actual.getAllByLabelText(label)).toHaveLength(1);
   });
   it("요청 순 재고와 실제 재고가 같으면 위치 필드가 달라도 중복하지 않는다", () => {
     render(<HistoryMobileStockDetails logs={[log({transaction_type:"TRANSFER_TO_PROD",department:"창고",

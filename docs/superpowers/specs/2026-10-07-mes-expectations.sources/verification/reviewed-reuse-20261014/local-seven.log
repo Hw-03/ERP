@@ -1,0 +1,31 @@
+[WebServer] (node:3480) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:32424) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+[WebServer]   npx update-browserslist-db@latest
+[WebServer]   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+[WebServer] (node:23432) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:16388) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[e2e:setup] 실 mes.db 해시 기록
+[e2e:setup] bootstrap_db.py --all → sqlite:///C:/Users/user/.codex/worktrees/mes-expectation-closure/ERP/backend/mes_e2e.db
+[e2e:setup] QA 직원 표시 이름 변환: 26
+[e2e:setup] 백엔드 기동(pid 16816) — 헬스 대기
+[e2e:setup] seed 완료 — raw=3-TR-0001 parent=3-TA-0001 wh=E22(primary) dept=E04(primary)
+[e2e:setup] 완료
+
+Running 7 tests using 1 worker
+
+  ok 1 [chromium] › tests\e2e\appearance-sync.spec.ts:22:5 › 같은 직원의 설정 저장은 다른 탭에 반영하고 작성 중인 선택과 PIN은 보존한다 (7.0s)
+  ok 2 [chromium] › tests\e2e\appearance-sync.spec.ts:38:5 › 같은 브라우저의 서로 다른 직원 탭은 계정과 화면 설정을 독립적으로 유지한다 (4.7s)
+  ok 3 [chromium] › tests\e2e\appearance-sync.spec.ts:53:5 › 데스크톱에서 저장한 같은 직원 테마를 모바일 탭도 반영한다 (3.9s)
+  ok 4 [chromium] › tests\e2e\appearance-sync.spec.ts:65:5 › 저장 실패는 다른 탭을 바꾸지 않고 저장 성공 뒤 조회 실패는 저장 실패로 표시하지 않는다 (5.1s)
+  ok 5 [chromium] › tests\e2e\io-request-order-stock.spec.ts:78:7 › 입출고 내역 — 요청 순 재고 › 대표·하위 행은 각 로그의 요청 순 재고를 표시하고 상세는 실제 처리 재고를 보존한다 (2.7s)
+  ok 6 [chromium] › tests\e2e\io-request-order-stock.spec.ts:149:7 › 입출고 내역 — 요청 순 재고 › 계산 불가 응답은 실제 처리 재고로 대체하지 않고 사유를 설명한다 (2.1s)
+  ok 7 [chromium] › tests\e2e\io-request-order-stock.spec.ts:183:7 › 입출고 내역 — 요청 순 재고 › 모바일 응답 fixture UI 계약은 요청 순 합계와 실제 창고·위치별 전후를 상세에서 분리한다 (2.2s)
+[e2e:teardown] 실 mes.db 불변 확인
+[e2e:teardown] 정리 완료
+
+  7 passed (1.1m)

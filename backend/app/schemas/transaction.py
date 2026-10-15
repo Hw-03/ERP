@@ -83,6 +83,9 @@ class TransactionLogResponse(BaseModel):
     item_name: str
     item_process_type_code: Optional[str] = None
     item_unit: str
+    item_snapshot_preserved: bool = False
+    current_item_name: Optional[str] = None
+    current_mes_code: Optional[str] = None
     transaction_type: TransactionTypeEnum
     quantity_change: int
     quantity_before: Optional[int]

@@ -277,6 +277,21 @@ describe("ioComposeOperations", () => {
     });
   });
 
+  it("8.17-07 원자재 즉시 입고 완료는 창고 입고 완료임을 명시한다", async () => {
+    const setResult = vi.fn();
+    await runCompositionSubmit(
+      "warehouse-approver", "receive_supplier", "", async () => {},
+      () => [{ bundle_id: "raw-bundle", lines: [] } as never], { current: null },
+      vi.fn(async () => ({ requires_approval: false, message: "입출고가 반영되었습니다." } as never)),
+      vi.fn(), vi.fn(), setResult, vi.fn(), vi.fn(), vi.fn(), async () => [], vi.fn(),
+    );
+    expect(setResult).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "success", title: "창고 입고 완료",
+      message: "입출고가 반영되었습니다.",
+    }));
+    expect(setResult.mock.calls[0][0].title).not.toMatch(/결재|부서|BOM/);
+  });
+
   it("내용 변경과 작업 교체 세대를 서로 다른 ref로 추적한다", () => {
     const { result, rerender, unmount } = renderHook(
       ({ value, draftId }) => useIoComposeOperationState([value], draftId, 0),

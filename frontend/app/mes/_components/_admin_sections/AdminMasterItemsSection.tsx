@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Box, GripVertical, Plus, Save, Trash2, X } from "lucide-react";
 import type { BOMDetailEntry, Item } from "@/lib/api";
+import { itemsApi, type ItemDeletionDependencies } from "@/lib/api/items";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { formatBomQuantity } from "@/lib/mes/bomFormat";
@@ -53,10 +54,27 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
 
   const [tab, setTab] = useState<DetailTab>("info");
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleteCheck, setDeleteCheck] = useState<ItemDeletionDependencies | null>(null);
+  const [deleteCheckError, setDeleteCheckError] = useState<string | null>(null);
+  const [deleteCheckRetry, setDeleteCheckRetry] = useState(0);
+  const selectedItemId = selectedItem?.item_id;
   const deleteTriggerRef = useRef<HTMLButtonElement>(null);
   const deleteCancelRef = useRef<HTMLButtonElement>(null);
   const previousDeleteConfirmRef = useRef(false);
   const restoreDeleteFocusRef = useRef(false);
+
+  useEffect(() => {
+    if (!deleteConfirm || !selectedItemId) return;
+    let current = true;
+    setDeleteCheck(null);
+    setDeleteCheckError(null);
+    void itemsApi.getItemDeletionDependencies(selectedItemId).then((result) => {
+      if (current) setDeleteCheck(result);
+    }).catch((error: unknown) => {
+      if (current) setDeleteCheckError(error instanceof Error ? error.message : "연결 데이터를 확인하지 못했습니다.");
+    });
+    return () => { current = false; };
+  }, [deleteConfirm, selectedItemId, deleteCheckRetry]);
 
   // 드래그 reorder — Pointer Events 기반 (HTML5 DnD 는 drag 중 wheel 이벤트 차단).
   const [dragId, setDragId] = useState<string | null>(null);
@@ -375,6 +393,18 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                   <span className="text-[12px] font-semibold" style={{ color: LEGACY_COLORS.text }}>
                     정말 삭제하시겠습니까?
                   </span>
+                  {deleteCheckError ? (
+                    <>
+                      <span role="alert" className="text-[12px]" style={{ color: LEGACY_COLORS.red }}>{deleteCheckError}</span>
+                      <button type="button" onClick={() => setDeleteCheckRetry((value) => value + 1)} className="standard-hover rounded-[8px] px-3 py-1.5 text-[12px] font-bold">다시 시도</button>
+                    </>
+                  ) : deleteCheck === null ? (
+                    <span role="status" className="text-[12px]">연결 데이터 확인 중</span>
+                  ) : !deleteCheck.can_delete ? (
+                    <span role="alert" className="text-[12px]" style={{ color: LEGACY_COLORS.red }}>
+                      {deleteCheck.dependencies.map((entry) => `${entry.label} ${entry.count}건`).join(", ")}
+                    </span>
+                  ) : null}
                   <button
                     ref={deleteCancelRef}
                     type="button"
@@ -389,6 +419,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                   </button>
                   <button
                     type="button"
+                    disabled={!deleteCheck?.can_delete}
                     onClick={() => {
                       restoreDeleteFocusRef.current = false;
                       setDeleteConfirm(false);

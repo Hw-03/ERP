@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
 import type { Operator } from "../login/useCurrentOperator";
 import type { ProductModel } from "@/lib/api";
 import type { ReactNode } from "react";
@@ -23,8 +24,8 @@ vi.mock("../_warehouse_hooks/useWarehouseData", () => ({
 }));
 
 vi.mock("../_defect_hub/DefectHubEntry", () => ({
-  DefectHubEntry: ({ onSelect }: { onSelect: (id: "list") => void }) => (
-    <button type="button" onClick={() => onSelect("list")}>Open list</button>
+  DefectHubEntry: ({ onSelect }: { onSelect: (id: "list" | "storage") => void }) => (
+    <><button type="button" onClick={() => onSelect("list")}>Open list</button><button type="button" onClick={() => onSelect("storage")}>Open storage</button></>
   ),
 }));
 
@@ -131,6 +132,13 @@ describe("DesktopDefectView realtime refresh", () => {
     window.localStorage.clear();
   });
 
+  it("loads the empty list artwork immediately in the visible work area", async () => {
+    render(<DesktopDefectView operator={operator} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open list" }));
+    await screen.findByText("격리된 불량 재고가 없습니다.");
+    expect(screen.getByTestId("defect-list").querySelector("img")).toHaveAttribute("loading", "eager");
+  });
+
   it("provides a visible, keyboard-accessible outer statistics scroll rail", async () => {
     window.history.replaceState({ defect: "statistics" }, "");
     render(<DesktopDefectView operator={operator} />);
@@ -144,9 +152,9 @@ describe("DesktopDefectView realtime refresh", () => {
   });
 
   it("returns to storage after a desktop restore-only completion", async () => {
-    window.history.replaceState({ defect: "storage" }, "");
     mocks.listDefects.mockResolvedValue([{ ...location, management_category: "B_GRADE" }]);
     render(<DesktopDefectView operator={operator} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open storage" }));
 
     fireEvent.click(await screen.findByRole("button", { name: "Process D-001" }));
     expect(await screen.findByTestId("process-location")).toHaveTextContent("restore-only");

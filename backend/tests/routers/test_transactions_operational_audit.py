@@ -2,6 +2,8 @@
 
 from decimal import Decimal
 
+import pytest
+
 from app.models import DepartmentEnum, Employee
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
@@ -136,3 +138,39 @@ def test_8_22_10_history_keeps_self_approval_and_executor_roles(
     assert row["requester_name"] == "Self Approver"
     assert row["approver_name"] == "Self Approver"
     assert row["executor_name"] == "Self Approver"
+
+
+@pytest.mark.parametrize("destination", ["AS", "연구"])
+def test_as_research_history_preserves_actual_special_approver(
+    client, db_session, make_item, make_location, destination,
+):
+    """실제 특별 승인 완료 후 사용출고 이력에 승인자와 승인 시각이 남는다."""
+    item = make_item(name="Special audit", process_type_code="AR", warehouse_qty=Decimal("0"))
+    make_location(item.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("7"))
+    requester = _make_employee(db_session, code="ASREQ", name="AS requester", department=DepartmentEnum.AS)
+    approver = _make_employee(db_session, code="ASAPP", name="Special approver", department=DepartmentEnum.RESEARCH)
+    approver.as_research_approver = True
+    db_session.commit()
+    payload = {"requester_employee_id": str(requester.employee_id), "work_type": "internal_use",
+               "sub_type": "internal_use_out", "to_department": destination}
+    preview = client.post("/api/io/preview", json={**payload, "targets": [{
+        "source_kind": "manual", "source_location": "department", "item_id": str(item.item_id), "quantity": 1,
+    }]})
+    assert preview.status_code == 200, preview.text
+    submitted = client.post("/api/io/submit", json={**payload, "bundles": preview.json()["bundles"]})
+    assert submitted.status_code == 201, submitted.text
+    request_id = submitted.json()["stock_requests"][0]["stock_request_id"]
+    approved = client.post(f"/api/stock-requests/{request_id}/as-research-approve", json={
+        "actor_employee_id": str(approver.employee_id), "pin": "0000",
+    })
+    assert approved.status_code == 200, approved.text
+    assert approved.json()["status"] == "completed"
+    history = client.get("/api/inventory/transactions", params={"item_id": str(item.item_id)})
+    assert history.status_code == 200, history.text
+    assert len(history.json()) == 1
+    row = history.json()[0]
+    assert row["requester_name"] == requester.name
+    assert row["approver_name"] == approver.name
+    assert row["approved_at"] == approved.json()["as_research_approved_at"]
+    assert row["history_batch"]["to_department"] == destination
+    assert _effect_by_cell(row) == {("location", "조립", "PRODUCTION"): -1}

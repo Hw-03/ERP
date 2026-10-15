@@ -50,6 +50,36 @@ function setBoxMetrics(
 }
 
 describe("HistoryKeyPointSummary", () => {
+  it.each(["ready", "loading", "error"] as const)("shows verified unchanged warehouse only when effects are %s", (impactStatus) => {
+    render(<HistoryKeyPointSummary summary={summary({ warehouseUnchanged: true })} impactStatus={impactStatus} />);
+    if (impactStatus === "ready") expect(screen.getByText("창고 재고 변동 없음", { exact: true })).toBeVisible();
+    else expect(screen.queryByText("창고 재고 변동 없음", { exact: true })).toBeNull();
+  });
+  it.each([
+    ["창고 재고", "warehouse", null, 18, 19, 1],
+    ["불량 재고", "location", "DEFECTIVE", 2, 1, -1],
+    ["불량 재고", "location", "DEFECTIVE", 0, 1, 1],
+  ] as const)("8.5-10/8.6-08/8.13-12 상세 %s는 실제 전후 수량과 취소 방향을 보존한다", (label, scope, status, before, after, delta) => {
+    render(<HistoryKeyPointSummary summary={summary({
+      impactGroups: [{ key: "actual", label: null, effects: [effect({
+        label, scope, status, quantityBefore: before, quantityAfter: after,
+        delta, deltaLabel: delta > 0 ? `+${delta}` : String(delta),
+      })] }],
+    })} />);
+    const pair = screen.getByLabelText(`${label} ${before} ${delta > 0 ? "+" : ""}${delta}→${after} EA`);
+    expect(pair).toHaveTextContent(`${before} ${delta > 0 ? "+" : ""}${delta} → ${after} EA`);
+    expect(screen.getByText(label)).toBeInTheDocument();
+  });
+
+  it("실제 위치 숫자쌍이 없으면 상세 재고 변동량만 표시한다", () => {
+    render(<HistoryKeyPointSummary summary={summary({
+      impactGroups: [{ key: "actual", label: null, effects: [effect({ quantityBefore: 14 })] }],
+    })} />);
+    expect(screen.getByText("+1 EA")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/조립 재고 14/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/14.*15/)).not.toBeInTheDocument();
+  });
+
   it("renders each key point once without repeating the panel header target or stale stock", () => {
     render(<HistoryKeyPointSummary summary={summary()} />);
 

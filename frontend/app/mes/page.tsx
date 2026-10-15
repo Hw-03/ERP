@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { MobileShell } from "./_components/mobile/MobileShell";
 import { DesktopMesShell } from "./_components/DesktopMesShell";
@@ -30,6 +31,16 @@ export default function MesPage() {
 }
 
 function MesBody() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const isMissingRoute = Boolean(pathname && pathname !== "/mes" && pathname.startsWith("/mes/"));
+  const recoveryContent = isMissingRoute ? <section className="m-auto p-6 text-center" aria-labelledby="missing-mes-title">
+    <h2 id="missing-mes-title">페이지를 찾을 수 없습니다</h2>
+    <p>주소를 확인하거나 메뉴에서 필요한 화면을 선택해 주세요.</p>
+    <button type="button" onClick={() => window.history.back()}>뒤로가기</button>
+    <a href="/mes?tab=dashboard">대시보드로</a>
+  </section> : undefined;
+  const onRecoveryNavigate = isMissingRoute ? (query: string) => router.push(`/mes${query}`) : undefined;
   const [isDesktop, setIsDesktop] = useState<boolean | null>(null);
   const [viewportSwitchError, setViewportSwitchError] = useState(false);
   const isDesktopRef = useRef<boolean | null>(null);
@@ -84,10 +95,10 @@ function MesBody() {
     <>
       {isDesktop ? (
         <Suspense>
-          <DesktopMesShell onBeforeViewportSwitchChange={registerBeforeViewportSwitch} />
+          <DesktopMesShell onBeforeViewportSwitchChange={registerBeforeViewportSwitch} recoveryContent={recoveryContent} onRecoveryNavigate={onRecoveryNavigate} />
         </Suspense>
       ) : (
-        <MobileShell onBeforeViewportSwitchChange={registerBeforeViewportSwitch} />
+        <MobileShell onBeforeViewportSwitchChange={registerBeforeViewportSwitch} recoveryContent={recoveryContent} onRecoveryNavigate={onRecoveryNavigate} />
       )}
       {viewportSwitchError && (
         <div

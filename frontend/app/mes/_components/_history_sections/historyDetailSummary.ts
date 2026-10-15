@@ -52,6 +52,7 @@ export type HistoryDetailSummary = {
   operationLabel: string;
   status: HistoryDetailStatus;
   impactGroups: HistoryImpactGroup[];
+  warehouseUnchanged?: boolean;
   conversion: {
     source: HistoryConversionEndpoint;
     target: HistoryConversionEndpoint;
@@ -250,14 +251,23 @@ function isLegacyReworkReference(logs: TransactionLog[]): boolean {
   return logs.some((log) => log.reference_no?.startsWith("defect-disassemble:"));
 }
 
+/** Zero warehouse movement is a stored fact only when every rework row agrees. */
+function hasUnchangedReworkWarehouse(logs: TransactionLog[]): boolean {
+  if (!isLegacyReworkReference(logs)) return false;
+  return logs.every((log) => Number.isFinite(log.warehouse_qty_before)
+    && Number.isFinite(log.warehouse_qty_after)
+    && log.warehouse_qty_before === log.warehouse_qty_after
+    && !(log.inventory_effect ?? []).some((effect) => effect.scope === "warehouse" && Number(effect.delta) !== 0));
+}
+
 function getLegacyReworkFlow(logs: TransactionLog[]): HistoryDetailSummary["flow"] {
   if (!isLegacyReworkReference(logs)) return null;
 
   const effects = effectsFromLogs(logs);
-  const defectSource = effects.find((effect) => effect.status === "DEFECTIVE" && effect.delta < 0);
+  const source = effects.find((effect) => effect.delta < 0);
   const productionTarget = effects.find((effect) => effect.status === "PRODUCTION" && effect.delta > 0);
   const recoveredLog = logs.find((log) => log.transaction_type === "RECEIVE" && log.quantity_change > 0);
-  const from = defectSource?.label ?? "불량 재고";
+  const from = source?.label ?? "불량 재고";
   const to = productionTarget?.label
     ?? (recoveredLog?.department?.trim() ? `${recoveredLog.department.trim()} 재고` : null);
 
@@ -266,6 +276,8 @@ function getLegacyReworkFlow(logs: TransactionLog[]): HistoryDetailSummary["flow
 }
 
 function getPrimaryLog(logs: TransactionLog[], batch: IoBatch | null): TransactionLog {
+  const internalUse = logs.find((log) => log.transaction_type === "INTERNAL_USE");
+  if (internalUse) return internalUse;
   if (batch?.sub_type === "disassemble" || isLegacyReworkReference(logs)) {
     return logs.find((log) => log.transaction_type === "DISASSEMBLE") ?? logs[0];
   }
@@ -279,8 +291,11 @@ function getPrimaryLog(logs: TransactionLog[], batch: IoBatch | null): Transacti
 }
 
 function getStatus(logs: TransactionLog[], batch: IoBatch | null): HistoryDetailStatus {
-  const cancelledCount = logs.filter((log) => log.cancelled).length;
+  const cancelledCount = logs.filter((log) => log.cancelled || log.operation_effective_status === "cancelled").length;
   const reason = logs.find((log) => log.cancel_reason?.trim())?.cancel_reason?.trim() ?? null;
+  if (logs.length > 0 && logs.every((log) => log.operation_kind === "CANCELLATION" || log.operation_effective_status === "cancellation")) {
+    return { label: "취소 거래", tone: "danger", reason };
+  }
   if (batch?.status === "cancelled" || cancelledCount === logs.length) {
     return { label: "취소됨", tone: "danger", reason };
   }
@@ -319,7 +334,9 @@ function getActualProcessingStock(log: TransactionLog): HistoryDetailSummary["ac
   return {
     warehouseBefore: log.warehouse_qty_before,
     warehouseAfter: log.warehouse_qty_after,
-    departmentName: normalizeDepartment(log.department?.trim() || effectDepartment),
+    departmentName: normalizeDepartment(log.transaction_type === "INTERNAL_USE"
+      ? effectDepartment || log.department?.trim()
+      : log.department?.trim() || effectDepartment),
     departmentBefore: log.department_qty_before,
     departmentAfter: log.department_qty_after,
     requestedAt: log.requested_at ?? log.created_at,
@@ -327,7 +344,8 @@ function getActualProcessingStock(log: TransactionLog): HistoryDetailSummary["ac
   };
 }
 
-function compactParticipants(participants: HistoryDetailActor[]): HistoryDetailActor[] {
+/** 이름은 한 번만 표시하되 부서 작업의 자동 승인 역할은 숨기지 않는다. */
+function compactParticipants(participants: HistoryDetailActor[], preserveApprovalRole: boolean): HistoryDetailActor[] {
   const people = new Map<string, HistoryDetailActor>();
 
   for (const participant of participants) {
@@ -337,6 +355,9 @@ function compactParticipants(participants: HistoryDetailActor[]): HistoryDetailA
       continue;
     }
 
+    if (preserveApprovalRole && participant.label === "승인자") {
+      existing.label = `${existing.label} · 승인자`;
+    }
     existing.at = participant.at;
   }
 
@@ -385,24 +406,34 @@ export function buildHistoryDetailSummary(
     });
   }
 
+  const fallbackEndpoints = isCancellationOperation && !presentation.flow.from && !presentation.flow.to
+    ? presentation.flow.label?.split(" → ")
+    : null;
+  const detailFlow = fallbackEndpoints?.length === 2
+    ? { label: `${fallbackEndpoints[1]} → ${fallbackEndpoints[0]}`, from: fallbackEndpoints[1], to: fallbackEndpoints[0] }
+    : presentation.flow;
+
   return {
     target: {
       itemId: primary.item_id,
       itemName: presentation.target.title,
       mesCode: presentation.target.code,
     },
-    operationLabel: presentation.operation.label,
+    operationLabel: isCancellationOperation
+      ? primary.operation_display_label?.trim() || presentation.operation.label
+      : presentation.operation.label,
     status: getStatus(logs, batch),
     impactGroups: buildImpactGroups(logs, batch),
+    warehouseUnchanged: hasUnchangedReworkWarehouse(logs),
     conversion: getItemConversion(logs),
     requester,
-    participants: compactParticipants(participants),
+    participants: compactParticipants(participants, batch?.work_type === "process"),
     actualStock: getActualProcessingStock(primary),
-    flow: reworkFlow ?? (presentation.flow.label
+    flow: reworkFlow ?? (detailFlow.label
       ? {
-        label: presentation.flow.label,
-        from: presentation.flow.from ?? null,
-        to: presentation.flow.to ?? null,
+        label: detailFlow.label,
+        from: detailFlow.from ?? null,
+        to: detailFlow.to ?? null,
       }
       : null),
     composition: batch ? getBatchLineStats(batch) : null,

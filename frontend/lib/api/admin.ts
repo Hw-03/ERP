@@ -46,6 +46,10 @@ export interface InventoryIntegrityIssue {
 }
 
 export interface InventoryIntegrityResult {
+  contract?: "inventory-integrity/v1";
+  blocking_count?: number;
+  warning_count?: number;
+  checks?: { check_id: string; severity: "blocking" | "warning"; count: number; samples: Record<string, unknown>[] }[];
   generated_at: string;
   is_consistent: boolean;
   issue_count: number;

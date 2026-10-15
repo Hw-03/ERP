@@ -1,0 +1,26 @@
+{
+  "CONTRACT": {
+    "total": 270,
+    "eligibleCases": 270,
+    "deferredCases": 0,
+    "reviewedCases": 270,
+    "eligibleConditions": 666,
+    "linkedCases": 270,
+    "linkedConditions": 666,
+    "totalConditions": 666,
+    "executedCases": 0,
+    "baselineCases": 270
+  },
+  "DELTA": {
+    "total": 81,
+    "eligibleCases": 75,
+    "deferredCases": 6,
+    "reviewedCases": 75,
+    "eligibleConditions": 392,
+    "linkedCases": 75,
+    "linkedConditions": 392,
+    "totalConditions": 398,
+    "executedCases": 0,
+    "baselineCases": 75
+  }
+}

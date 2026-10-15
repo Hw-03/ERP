@@ -11,9 +11,9 @@ vi.mock("@/lib/ui/dirty-guard", () => ({ useRegisterDirty: vi.fn() }));
 
 const author = { report_id: "report-1", work_date: toKstDateKey(), employee_id: "employee-2", employee_name: "김작성", department: "조립", content: "확인된 작업", created_at: "2026-09-29T00:00:00Z", updated_at: "2026-09-29T00:00:00Z" };
 
-function renderMobile() {
+function renderMobile(mobile = true) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
-  const view = render(<QueryClientProvider client={client}><DailyWorkReportScreen employeeId="employee-1" mobile /></QueryClientProvider>);
+  const view = render(<QueryClientProvider client={client}><DailyWorkReportScreen employeeId="employee-1" mobile={mobile} /></QueryClientProvider>);
   return { client, ...view };
 }
 
@@ -24,6 +24,15 @@ beforeEach(() => {
 });
 
 describe("모바일 일보 실제 QueryClient 로딩 계약", () => {
+  it("PC 최초 placeholder는 빈 작성자 성공으로 표시하지 않는다", async () => {
+    vi.mocked(dailyWorkReportsApi.list).mockReturnValue(new Promise(() => {}));
+    const { client } = renderMobile(false);
+    fireEvent.click(screen.getByRole("tab", { name: "전체 일보" }));
+    expect(screen.getByRole("status", { name: "작성자 목록 불러오는 중" })).toBeInTheDocument();
+    expect(screen.queryByText("작성된 일보가 없습니다.")).not.toBeInTheDocument();
+    expect(screen.queryByText("0명", { exact: true })).not.toBeInTheDocument();
+    client.clear();
+  });
   it("미조회 날짜에서는 작성자 칩 크기와 목록 높이를 유지하고 완료 후 해제한다", async () => {
     vi.mocked(dailyWorkReportsApi.list).mockResolvedValue(Array.from({ length: 13 }, (_, index) => ({ ...author, employee_id: `employee-${index}`, employee_name: `김작성${index}` })));
     const { client } = renderMobile();
@@ -86,9 +95,9 @@ describe("모바일 일보 실제 QueryClient 로딩 계약", () => {
     expect(screen.getByText("0명")).toBeInTheDocument();
     client.clear();
   });
-  it("작성자 최초 실패를 다시 시도해 같은 날짜 목록을 복구한다", async () => {
+  it.each([true, false])("작성자 최초 실패를 다시 시도해 같은 날짜 목록을 복구한다 mobile=%s", async (mobile) => {
     vi.mocked(dailyWorkReportsApi.list).mockRejectedValueOnce(new Error("initial failed"));
-    const { client } = renderMobile();
+    const { client } = renderMobile(mobile);
     fireEvent.click(screen.getByRole("tab", { name: "전체 일보" }));
     const alert = await screen.findByText("작성자 목록을 불러오지 못했습니다.");
     expect(screen.queryByText("0명")).not.toBeInTheDocument();
@@ -99,10 +108,10 @@ describe("모바일 일보 실제 QueryClient 로딩 계약", () => {
     client.clear();
   });
 
-  it("일보와 MES 최초 실패는 각각 해당 조회를 다시 시도한다", async () => {
+  it.each([true, false])("일보와 MES 최초 실패는 각각 해당 조회를 다시 시도한다 mobile=%s", async (mobile) => {
     vi.mocked(dailyWorkReportsApi.get).mockRejectedValue(new Error("initial failed"));
     vi.mocked(dailyWorkReportsApi.activity).mockRejectedValue(new Error("initial failed"));
-    const { client } = renderMobile();
+    const { client } = renderMobile(mobile);
     const reportAlert = await screen.findByText("일보를 불러오지 못했습니다.");
     const activityAlert = await screen.findByText("MES 거래를 불러오지 못했습니다.");
     vi.mocked(dailyWorkReportsApi.get).mockResolvedValue(author);
@@ -111,7 +120,7 @@ describe("모바일 일보 실제 QueryClient 로딩 계약", () => {
     await waitFor(() => expect(screen.queryByText("일보를 불러오지 못했습니다.")).not.toBeInTheDocument());
     expect(screen.getByText("MES 거래를 불러오지 못했습니다.")).toBeInTheDocument();
     fireEvent.click(within(activityAlert.closest("[role=alert]")!).getByRole("button", { name: "다시 시도" }));
-    expect(await screen.findByText("작업 기록이 없습니다.")).toBeInTheDocument();
+    expect(await screen.findByText(mobile ? "작업 기록이 없습니다." : "완료된 MES 거래가 생기면 작업 종류와 수량이 이곳에 자동으로 나타납니다.")).toBeInTheDocument();
     expect(screen.queryByText("MES 거래를 불러오지 못했습니다.")).not.toBeInTheDocument();
     client.clear();
   });

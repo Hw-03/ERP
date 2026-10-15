@@ -97,7 +97,7 @@ function _internalUseOperationLabel(
   log: { transaction_type: string; department?: string | null; item_id?: string | null },
   batch?: IoBatch | null,
 ): string {
-  const returnLine = _internalUseReturnLine(log, batch);
+  const returnLine = getInternalUseReturnLine(log, batch);
   if (returnLine) {
     const department = _deptName(returnLine.to_department) ?? log.department?.trim() ?? null;
     return `${_internalUseDestination(department)} 재입고`;
@@ -123,7 +123,8 @@ function _internalUseLineForLog(
     ?? matches[0];
 }
 
-function _internalUseReturnLine(
+/** 거래 품목과 입고 경로가 일치하는 사용출고 반환행만 선택한다. */
+export function getInternalUseReturnLine(
   log: { transaction_type: string; item_id?: string | null },
   batch?: IoBatch | null,
 ): IoLine | null {
@@ -575,7 +576,7 @@ export function getHistoryDisplaySubLabel(
   if (log.transaction_type === "MATERIAL_OUT" || (log.transaction_type === "SUPPLIER_RETURN" && supplierName)) {
     return getHistoryFlowLabel(log, batch);
   }
-  const returnLine = _internalUseReturnLine(log, batch);
+  const returnLine = getInternalUseReturnLine(log, batch);
   if (returnLine) {
     return returnLine.selected
       ? "선택 자재를 소속 부서에 재입고"
@@ -619,7 +620,7 @@ export function getHistoryFlowLabel(
   }
   const batchContext = getHistoryChildResultBatchOperationLabel(log, batch);
   if (batchContext) return batchContext;
-  const returnLine = _internalUseReturnLine(log, batch);
+  const returnLine = getInternalUseReturnLine(log, batch);
   if (returnLine) {
     const department = _deptName(returnLine.to_department) ?? log.department?.trim() ?? null;
     return `사용출고 ${returnLine.selected ? "반환" : "해제"} → ${_internalUseDestination(department)}`;

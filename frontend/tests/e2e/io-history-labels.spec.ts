@@ -85,6 +85,7 @@ test.describe("입출고 내역 PC 정보 위계", () => {
     await pickWorkType(submitPage, /창고 입출고/);
     await submitPage.getByRole("button", { name: /창고 → 부서/ }).first().click();
     await clickNextStep(submitPage);
+    await submitPage.getByPlaceholder("품목명 · 품목 코드").fill("E2E원자재튜브");
     await submitPage
       .getByRole("row", { name: /E2E원자재튜브/ })
       .getByRole("button", { name: "낱개", exact: true })

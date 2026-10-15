@@ -10,6 +10,7 @@ import { useAdminSettings } from "./_admin_hooks/useAdminSettings";
 import { useAdminViewState, type AdminSection } from "./_admin_hooks/useAdminViewState";
 import { useConfirmNavigation } from "@/lib/ui/dirty-guard";
 import { StatusTargetNotice, useStatusTargetNotice } from "./common/StatusTargetNotice";
+import { ReadFailure, ReadLoading } from "./common/ReadState";
 
 /**
  * 섹션 헤더와 KPI는 각 섹션이 직접 그린다 (AdminPageHeader / AdminKpiBar 사용).
@@ -65,6 +66,7 @@ export function DesktopAdminView({
     refreshItems,
     refreshEmployees,
     loadData,
+    loading, hasData, loadError,
   } = useAdminBootstrap({
     unlocked,
     globalSearch,
@@ -111,7 +113,8 @@ export function DesktopAdminView({
         <section className="flex min-h-0 flex-1 flex-col overflow-auto pt-1 lg:overflow-hidden">
           {/* 섹션별 콘텐츠 */}
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <AdminSectionContent
+            {loadError && <ReadFailure message={loadError} refresh={hasData} onRetry={() => { void loadData().catch(() => {}); }} />}
+            {!hasData && loading ? <ReadLoading label="관리자 데이터를 불러오는 중" /> : (!loadError || hasData) && <AdminSectionContent
               section={section}
               globalSearch={globalSearch}
               onStatusChange={onStatusChange}
@@ -136,7 +139,7 @@ export function DesktopAdminView({
               isSaving={isSaving}
               changePin={changePin}
               adminPin={adminPin}
-            />
+            />}
           </div>
         </section>
       </div>

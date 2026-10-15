@@ -38,6 +38,8 @@ const apiMocks = vi.hoisted(() => ({
   listStockRequestDrafts: vi.fn(),
   listDrafts: vi.fn(),
   countAsResearchQueue: vi.fn(),
+  countWarehouseQueue: vi.fn(),
+  countDepartmentQueue: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -88,7 +90,9 @@ vi.mock("../../../_warehouse_sections/WarehouseSectionTabs", () => ({
 }));
 
 vi.mock("../../../_warehouse_sections/WarehouseDraftPanelTabs", () => ({
-  WarehouseDraftPanelTabs: ({ onContinueIoDraft, sectionTab, targetRequestId }: { onContinueIoDraft?: (draft: never) => void; sectionTab: string; targetRequestId?: string | null }) => (
+  WarehouseDraftPanelTabs: ({ onContinueIoDraft, sectionTab, targetRequestId, canSeeQueue, canSeeDeptQueue, canSeeAsResearchQueue }: { onContinueIoDraft?: (draft: never) => void; sectionTab: string; targetRequestId?: string | null; canSeeQueue: boolean; canSeeDeptQueue: boolean; canSeeAsResearchQueue: boolean }) => {
+    if ((sectionTab === "queue" && !canSeeQueue) || (sectionTab === "dept-queue" && !canSeeDeptQueue) || (sectionTab === "as-research-queue" && !canSeeAsResearchQueue)) return null;
+    return (
     <div data-testid="draft-panels" data-section-tab={sectionTab} data-target-request-id={targetRequestId ?? ""}>
       <button
         type="button"
@@ -97,7 +101,8 @@ vi.mock("../../../_warehouse_sections/WarehouseDraftPanelTabs", () => ({
         continue adjust draft
       </button>
     </div>
-  ),
+    );
+  },
 }));
 
 vi.mock("../../warehouse/MobileDirtyLeaveSheet", () => ({
@@ -112,11 +117,39 @@ vi.mock("../../warehouse/MobileIoComposeWizard", () => ({
     onDraftSaved?: (batchId: string, step: number, persistInUrl?: boolean) => void;
   }) => {
     currentWizardProps.value = props;
-    return <div data-testid="compose-wizard" />;
+    return <div data-testid="compose-wizard"><input aria-label="작성 중인 수량" defaultValue="7" /></div>;
   },
 }));
 
 describe("MobileWarehouseScreen compact step header", () => {
+  it.each(["queue", "dept-queue", "as-research-queue"])("열린 %s 역할 회수는 빈 업무영역 대신 기본 요청으로 복구한다", (section) => {
+    apiMocks.countAsResearchQueue.mockReturnValue(new Promise(() => {}));
+    operatorState.value = { ...operatorState.value, warehouse_role: "primary", department_role: "deputy", as_research_approver: true };
+    const historyState = { __NA: true, tree: ["mes"], mobileShippingIndex: 4 };
+    window.history.replaceState(historyState, "", `/mes?tab=warehouse&section=${section}&stockRequestId=old-request`);
+    const view = render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} notificationSection={section} />);
+    expect(screen.getByTestId("draft-panels")).toHaveAttribute("data-section-tab", section);
+    operatorState.value = { ...operatorState.value, ...(section === "queue" ? { warehouse_role: "none" } : section === "dept-queue" ? { department_role: "none" } : { as_research_approver: false }) };
+    view.rerender(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} notificationSection={section} />);
+    expect(screen.getByTestId("compose-wizard")).toBeInTheDocument();
+    expect(screen.queryByTestId("draft-panels")).not.toBeInTheDocument();
+    expect(currentTabsProps.active).toBe("compose");
+    expect(window.location.search).toBe("?tab=warehouse");
+    expect(window.history.state).toMatchObject(historyState);
+  });
+
+  it("작성 중 기본 요청에서 역할 갱신은 입력과 복원 URL을 초기화하지 않는다", () => {
+    operatorState.value = { ...operatorState.value, warehouse_role: "primary" };
+    window.history.replaceState({ __NA: true }, "", "/mes?tab=warehouse&step=3");
+    const view = render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
+    const input = screen.getByLabelText("작성 중인 수량");
+    fireEvent.change(input, { target: { value: "13" } });
+    operatorState.value = { ...operatorState.value, warehouse_role: "none" };
+    view.rerender(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
+    expect(screen.getByLabelText("작성 중인 수량")).toBe(input);
+    expect(input).toHaveValue("13");
+    expect(window.location.search).toBe("?tab=warehouse&step=3");
+  });
   it("섹션 이동은 임시저장이 끝날 때까지 기다리고 실패하면 작성 위치를 유지한다", async () => {
     let finish!: () => void;
     const flushDraftRef = { current: vi.fn(() => new Promise<void>((resolve) => { finish = resolve; })) };
@@ -233,6 +266,8 @@ describe("MobileWarehouseScreen compact step header", () => {
     apiMocks.listStockRequestDrafts.mockReturnValue(new Promise(() => {}));
     apiMocks.listDrafts.mockReturnValue(new Promise(() => {}));
     apiMocks.countAsResearchQueue.mockResolvedValue({ count: 0 });
+    apiMocks.countWarehouseQueue.mockReset().mockReturnValue(new Promise(() => {}));
+    apiMocks.countDepartmentQueue.mockReset().mockReturnValue(new Promise(() => {}));
     currentWizardProps.value = null;
     currentTabsProps.showAsResearchQueue = undefined;
     currentTabsProps.active = undefined;

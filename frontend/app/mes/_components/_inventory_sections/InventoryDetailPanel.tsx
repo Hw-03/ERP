@@ -169,7 +169,7 @@ export function InventoryDetailPanel({
                 width={160}
                 height={160}
                 unoptimized
-                className="block rounded-[14px] object-contain"
+                className="block h-40 w-40 rounded-[14px] object-contain"
               />
             </button>
           </section>

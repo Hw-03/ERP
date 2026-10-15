@@ -6,6 +6,7 @@
 export interface DepartmentMaster {
   id: number;
   name: string;
+  display_name?: string | null;
   display_order: number;
   is_active: boolean;
   color_hex: string | null;

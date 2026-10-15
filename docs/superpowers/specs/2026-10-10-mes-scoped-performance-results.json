@@ -1,0 +1,274 @@
+{
+  "schemaVersion": 1,
+  "scope": "REUSED_N5_REAL_U10_WITH_EXACT_186_APP_SOURCE_MATCH",
+  "report_sha256": "c60e4462b8a629f77fdc675d6ab2bd3d61236293986493a11128c7095b956974",
+  "original_native_exit_code": 1,
+  "whole_performance_pass": false,
+  "new_benchmark_executed": false,
+  "runtime_scope": {
+    "n5_source_binding_sha256": "5a445affe61660eb59b82a4cb5a69eb820eeef0387db3b9b633503c3a3f95f1d",
+    "uvicorn_workers": 1,
+    "observer_processes": 0,
+    "relative_regression_requires_both": {
+      "increase_percent_above": 20,
+      "increase_ms_above": 100
+    },
+    "app_source_files_exactly_matched": 186,
+    "source_match_tool_output_id": "25adde"
+  },
+  "comparisons": {
+    "history_list": {
+      "accepted": true,
+      "complete": true,
+      "successful": true,
+      "base_elapsed_p95_ms": 1225.257399957627,
+      "current_elapsed_p95_ms": 815.8601999748498,
+      "regression": false,
+      "absolute_pass": true,
+      "limit_ms": 2000,
+      "same_log_population": true,
+      "body_stable_per_variant": true,
+      "samples_per_variant": {
+        "base": [
+          30,
+          30,
+          30
+        ],
+        "current": [
+          30,
+          30,
+          30
+        ]
+      }
+    },
+    "history_groups": {
+      "accepted": false,
+      "complete": true,
+      "successful": true,
+      "base_elapsed_p95_ms": 15249.238300020806,
+      "current_elapsed_p95_ms": 4116.804499994032,
+      "regression": false,
+      "absolute_pass": false,
+      "limit_ms": 2000,
+      "same_log_population": true,
+      "body_stable_per_variant": true,
+      "samples_per_variant": {
+        "base": [
+          30,
+          30,
+          30
+        ],
+        "current": [
+          30,
+          30,
+          30
+        ]
+      }
+    },
+    "history_search": {
+      "accepted": true,
+      "complete": true,
+      "successful": true,
+      "base_elapsed_p95_ms": 1030.455800006166,
+      "current_elapsed_p95_ms": 963.9254999347031,
+      "regression": false,
+      "absolute_pass": true,
+      "limit_ms": 2000,
+      "same_log_population": true,
+      "body_stable_per_variant": true,
+      "samples_per_variant": {
+        "base": [
+          30,
+          30,
+          30
+        ],
+        "current": [
+          30,
+          30,
+          30
+        ]
+      }
+    },
+    "hot_item": {
+      "accepted": true,
+      "complete": true,
+      "successful": true,
+      "base_elapsed_p95_ms": 820.9720000158995,
+      "current_elapsed_p95_ms": 825.0246000243351,
+      "regression": false,
+      "absolute_pass": true,
+      "limit_ms": 2000,
+      "same_log_population": true,
+      "body_stable_per_variant": true,
+      "samples_per_variant": {
+        "base": [
+          30,
+          30,
+          30
+        ],
+        "current": [
+          30,
+          30,
+          30
+        ]
+      }
+    },
+    "general_item": {
+      "accepted": true,
+      "complete": true,
+      "successful": true,
+      "base_elapsed_p95_ms": 247.93339997995645,
+      "current_elapsed_p95_ms": 313.90940002165735,
+      "regression": false,
+      "absolute_pass": true,
+      "limit_ms": 2000,
+      "same_log_population": true,
+      "body_stable_per_variant": true,
+      "samples_per_variant": {
+        "base": [
+          30,
+          30,
+          30
+        ],
+        "current": [
+          30,
+          30,
+          30
+        ]
+      }
+    },
+    "history_detail": {
+      "accepted": true,
+      "complete": true,
+      "successful": true,
+      "base_elapsed_p95_ms": 323.5769000602886,
+      "current_elapsed_p95_ms": 268.1639000074938,
+      "regression": false,
+      "absolute_pass": true,
+      "limit_ms": 2000,
+      "same_log_population": true,
+      "body_stable_per_variant": true,
+      "samples_per_variant": {
+        "base": [
+          30,
+          30,
+          30
+        ],
+        "current": [
+          30,
+          30,
+          30
+        ]
+      }
+    },
+    "daily": {
+      "accepted": true,
+      "complete": true,
+      "successful": true,
+      "base_elapsed_p95_ms": 1804.7680999152362,
+      "current_elapsed_p95_ms": 1020.1587999472395,
+      "regression": false,
+      "absolute_pass": true,
+      "limit_ms": 2000,
+      "same_log_population": true,
+      "body_stable_per_variant": true,
+      "samples_per_variant": {
+        "base": [
+          30,
+          30,
+          30
+        ],
+        "current": [
+          30,
+          30,
+          30
+        ]
+      }
+    },
+    "inventory": {
+      "accepted": true,
+      "complete": true,
+      "successful": true,
+      "base_elapsed_p95_ms": 595.2987999189645,
+      "current_elapsed_p95_ms": 459.36139998957515,
+      "regression": false,
+      "absolute_pass": true,
+      "limit_ms": 2000,
+      "same_log_population": true,
+      "body_stable_per_variant": true,
+      "samples_per_variant": {
+        "base": [
+          30,
+          30,
+          30
+        ],
+        "current": [
+          30,
+          30,
+          30
+        ]
+      }
+    },
+    "integrity": {
+      "accepted": false,
+      "complete": true,
+      "successful": true,
+      "base_elapsed_p95_ms": 34285.34729999956,
+      "current_elapsed_p95_ms": 14938.240699935704,
+      "regression": false,
+      "absolute_pass": false,
+      "limit_ms": 10000,
+      "same_log_population": true,
+      "body_stable_per_variant": true,
+      "samples_per_variant": {
+        "base": [
+          30,
+          30,
+          30
+        ],
+        "current": [
+          30,
+          30,
+          30
+        ]
+      }
+    },
+    "operation_detail": {
+      "accepted": true,
+      "complete": true,
+      "successful": true,
+      "base_elapsed_p95_ms": 288.2065000012517,
+      "current_elapsed_p95_ms": 346.7493000207469,
+      "regression": false,
+      "absolute_pass": true,
+      "limit_ms": 2000,
+      "same_log_population": true,
+      "body_stable_per_variant": true,
+      "samples_per_variant": {
+        "base": [
+          30,
+          30,
+          30
+        ],
+        "current": [
+          30,
+          30,
+          30
+        ]
+      }
+    }
+  },
+  "deferred": {
+    "heavy_absolute_caps": "FAIL_PRESERVED_FOLLOW_UP",
+    "u30": "NOT_RUN",
+    "full_current_expectation_execution": "NOT_RUN"
+  },
+  "fresh_local_verification": {
+    "pytest_count": 33,
+    "native_exit_code": 0,
+    "tool_output_id": "4a18ad",
+    "ruff_native_exit_code": 0,
+    "diff_check_native_exit_code": 0,
+    "static_tool_output_id": "ed3986"
+  }
+}

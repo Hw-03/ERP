@@ -40,6 +40,7 @@ from app.services.inventory_operation_history import (
     item_operation_ids, operation_payload as _operation_payload,
     _correction_operation_ids,
 )
+from app.services.inventory_operation_ownership import operation_requester_id
 
 
 router = APIRouter()
@@ -117,19 +118,16 @@ def list_operations(
     if has_more and rows:
         last = rows[-1]
         next_cursor = f"{last.effective_at.isoformat()}|{last.operation_id}"
-    page_item_ids = {
-        item_id
-        for (item_id,) in (
-            db.query(TransactionLog.item_id)
-            .filter(TransactionLog.operation_id.in_([row.operation_id for row in rows]))
-            .distinct()
-            .all()
-        )
-    } if rows else set()
+    page_logs = (
+        db.query(TransactionLog.item_id, TransactionLog.log_id)
+        .filter(TransactionLog.operation_id.in_([row.operation_id for row in rows]))
+        .all()
+    ) if rows else []
     request_order_stock = load_request_order_stock(
         db,
-        page_item_ids,
+        {log.item_id for log in page_logs},
         request_date_expr=_history_request_date_expr(),
+        target_log_ids={log.log_id for log in page_logs},
     )
     return {
         "items": [
@@ -247,19 +245,16 @@ def get_operation(
     operation = db.get(InventoryOperation, operation_id)
     if operation is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "작업을 찾을 수 없습니다.")
-    item_ids = {
-        item_id
-        for (item_id,) in (
-            db.query(TransactionLog.item_id)
-            .filter(TransactionLog.operation_id == operation.operation_id)
-            .distinct()
-            .all()
-        )
-    }
+    operation_logs = (
+        db.query(TransactionLog.item_id, TransactionLog.log_id)
+        .filter(TransactionLog.operation_id == operation.operation_id)
+        .all()
+    )
     request_order_stock = load_request_order_stock(
         db,
-        item_ids,
+        {log.item_id for log in operation_logs},
         request_date_expr=_history_request_date_expr(),
+        target_log_ids={log.log_id for log in operation_logs},
     )
     return _operation_payload(
         db,
@@ -294,7 +289,7 @@ def _verified_canceller(
         raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 작업을 취소할 수 없습니다.")
     if not verify_pin(employee.pin_hash, pin):
         raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
-    is_self = operation.actor_employee_id == employee.employee_id
+    is_self = operation_requester_id(db, operation) == employee.employee_id
     is_approver = (
         (employee.warehouse_role or "none").lower() != "none"
         or (employee.department_role or "none").lower() != "none"

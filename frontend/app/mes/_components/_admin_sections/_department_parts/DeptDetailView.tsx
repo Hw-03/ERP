@@ -45,7 +45,7 @@ export function DeptDetailView({
 }: DeptDetailViewProps) {
   const savedColor = deptColor(dept);
   const [editForm, setEditForm] = useState({
-    name: dept.name,
+    name: dept.display_name ?? dept.name,
     color_hex: savedColor,
   });
   const [colorInputError, setColorInputError] = useState<string | null>(null);
@@ -61,15 +61,15 @@ export function DeptDetailView({
   useEffect(() => {
     const color = deptColor(dept);
     setEditForm({
-      name: dept.name,
+      name: dept.display_name ?? dept.name,
       color_hex: color,
     });
     setIsPaletteOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dept.id, dept.color_hex, dept.name]);
+  }, [dept.id, dept.color_hex, dept.name, dept.display_name]);
 
   const dirty =
-    editForm.name !== dept.name ||
+    editForm.name !== (dept.display_name ?? dept.name) ||
     editForm.color_hex.toLowerCase() !== savedColor.toLowerCase();
 
   // dirty 변경 알림
@@ -80,14 +80,14 @@ export function DeptDetailView({
   function save() {
     void api
       .updateDepartment(dept.id, {
-        name: editForm.name.trim() || dept.name,
+        display_name: editForm.name.trim() || dept.display_name || dept.name,
         color_hex: editForm.color_hex,
         pin: adminPin,
       })
       .then((updated) => {
         onSetDepartments((prev) => prev.map((d) => (d.id === dept.id ? updated : d)));
         setSelectedDept(updated);
-        onStatusChange(`'${updated.name}' 부서 정보를 저장했습니다.`);
+        onStatusChange(`'${updated.display_name ?? updated.name}' 부서 정보를 저장했습니다.`);
         void refreshDepartments();
       })
       .catch((err: unknown) =>

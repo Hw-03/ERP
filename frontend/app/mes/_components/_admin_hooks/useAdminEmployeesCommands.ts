@@ -4,7 +4,7 @@
 // 책임: list-level mutation — add (생성) / toggleActive / delete / resetPin.
 // 기존 useAdminEmployees.ts 의 4 async operation 을 hook 으로 추출.
 
-import type { Employee } from "@/lib/api";
+import { api, type Employee } from "@/lib/api";
 import {
   useCreateEmployeeMutation,
   useDeleteEmployeeMutation,
@@ -110,6 +110,17 @@ export function useAdminEmployeesCommands({
         adminPin: adminPin.trim(),
       });
       onStatusChange(`'${employee.name}' PIN을 0000으로 초기화했습니다.`);
+      try {
+        const employees = await api.getEmployees({ activeOnly: false });
+        const refreshed = employees.find((entry) => entry.employee_id === employee.employee_id);
+        if (refreshed) {
+          setEmployees((current) => current.map((entry) =>
+            entry.employee_id === employee.employee_id ? refreshed : entry,
+          ));
+        }
+      } catch {
+        onError("PIN은 초기화했지만 직원 정보를 다시 불러오지 못했습니다.");
+      }
       return true;
     } catch (error) {
       onError(error instanceof Error ? error.message : "PIN 초기화 실패");

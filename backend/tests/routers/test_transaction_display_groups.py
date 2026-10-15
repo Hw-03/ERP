@@ -498,6 +498,35 @@ def test_display_groups_applies_existing_search_filter_and_sort(client, db_sessi
     ]
 
 
+@pytest.mark.parametrize("transaction_type", [
+    TransactionTypeEnum.MARK_DEFECTIVE,
+    TransactionTypeEnum.UNMARK_DEFECTIVE,
+])
+def test_reason_memo_search_matches_list_groups_and_summary(
+    client, db_session, make_item, transaction_type,
+):
+    """불량 화면에서 입력한 메모도 내역의 검색·묶음·집계에 함께 반영한다."""
+    item = make_item(name="메모 검색 대상")
+    wanted = _add_log(
+        db_session, item, created_at=datetime(2026, 7, 15, 12),
+        transaction_type=transaction_type, reason_memo="QA-입력 메모/검색",
+    )
+    _add_log(db_session, item, created_at=datetime(2026, 7, 15, 13),
+             transaction_type=transaction_type, reason_memo="다른 메모")
+    db_session.commit()
+    params = {"search": "QA입력메모검색"}
+
+    rows = client.get("/api/inventory/transactions", params=params)
+    assert rows.status_code == 200, rows.text
+    assert [row["log_id"] for row in rows.json()] == [str(wanted.log_id)]
+    groups = client.get("/api/inventory/transactions/display-groups", params=params)
+    assert groups.status_code == 200, groups.text
+    assert [row["log_id"] for group in groups.json()["groups"] for row in group["logs"]] == [str(wanted.log_id)]
+    summary = client.get("/api/inventory/transactions/summary", params=params)
+    assert summary.status_code == 200, summary.text
+    assert summary.json()["total"] == 1
+
+
 def test_transaction_common_search_ignores_spaces_and_separators(client, db_session, make_item):
     item = make_item(name="Transaction- Item/01")
     log = _add_log(db_session, item, created_at=datetime(2026, 7, 15, 12, 0, 0))

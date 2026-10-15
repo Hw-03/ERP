@@ -2,7 +2,7 @@
 
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class DepartmentCreate(BaseModel):
@@ -15,6 +15,7 @@ class DepartmentCreate(BaseModel):
 
 class DepartmentUpdate(BaseModel):
     name: Optional[str] = Field(None, max_length=50)
+    display_name: Optional[str] = Field(None, min_length=1, max_length=50)
     display_order: Optional[int] = None
     is_active: Optional[bool] = None
     color_hex: Optional[str] = Field(None, max_length=7)
@@ -27,10 +28,17 @@ class DepartmentResponse(BaseModel):
 
     id: int
     name: str
+    display_name: Optional[str] = None
     display_order: int
     is_active: bool
     color_hex: Optional[str] = None
     io_enabled: bool = True
+
+    @model_validator(mode="after")
+    def fill_display_name(self) -> "DepartmentResponse":
+        """Expose the old label for untouched rows without rewriting their location key."""
+        self.display_name = self.display_name or self.name
+        return self
 
 
 class DepartmentReorderItem(BaseModel):

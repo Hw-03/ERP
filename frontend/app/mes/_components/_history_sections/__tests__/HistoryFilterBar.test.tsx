@@ -25,7 +25,7 @@ function renderFilterBar(flatSurface?: boolean, mobile?: boolean) {
 }
 
 describe("HistoryFilterBar", () => {
-  it.each([false, true])("commits search only after IME composition ends (mobile: %s)", (mobile) => {
+  it.each([false, true])("updates search while preserving the IME draft (mobile: %s)", (mobile) => {
     const setSearch = vi.fn();
     render(<HistoryFilterBar search="" setSearch={setSearch} dateFilter="MONTH" setDateFilter={vi.fn()}
       filterPanelOpen={false} onToggleFilterPanel={vi.fn()} activeFilterCount={0}
@@ -34,7 +34,7 @@ describe("HistoryFilterBar", () => {
     const input = screen.getByRole("textbox");
     fireEvent.compositionStart(input);
     fireEvent.change(input, { target: { value: "작" } });
-    expect(setSearch).not.toHaveBeenCalled();
+    expect(setSearch).toHaveBeenLastCalledWith("작");
     expect(input).toHaveValue("작");
     fireEvent.compositionEnd(input, { data: "작업", target: { value: "작업" } });
     expect(setSearch).toHaveBeenLastCalledWith("작업");

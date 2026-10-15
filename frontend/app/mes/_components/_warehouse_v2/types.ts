@@ -46,6 +46,7 @@ export interface IoEntryIntent {
   subType?: IoSubType;
   toDepartment?: string;
   forceManualItem?: boolean;
+  quantity?: number;
 }
 
 export interface IoComposeViewProps {

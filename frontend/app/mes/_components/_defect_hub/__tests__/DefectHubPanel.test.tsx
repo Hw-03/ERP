@@ -453,13 +453,19 @@ describe("DefectHubPanel", () => {
     });
   });
 
-  it("모바일 정상 복귀 완료 뒤 B급·구형 보관 목록으로 돌아오고 전용 상태를 해제한다", async () => {
-    vi.mocked(defectsApi.listDefects).mockResolvedValue([{ ...mockLocations[0], management_category: "B_GRADE" }]);
-    render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} />);
+  it.each([false, true])("모바일 정상 복귀 완료 뒤 B급·구형 보관 목록으로 돌아오고 전용 상태를 해제한다 pool=%s", async (pooled) => {
+    const source = pooled ? { record_id: null, pool_id: "pool-001", source_kind: "POOL" as const, original_quantity: null } : {};
+    vi.mocked(defectsApi.listDefects).mockResolvedValue([{ ...mockLocations[0], ...source, management_category: "B_GRADE" }]);
+    render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} mobilePresentation />);
 
     fireEvent.click(screen.getByRole("button", { name: /B급·구형 자재/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "전극(70kV) 격리 1건" }));
     fireEvent.click(await screen.findByRole("button", { name: "정상 복귀" }));
     expect(await screen.findByText("정상 복귀 전용")).toBeInTheDocument();
+    const restoreState = window.history.state;
+    expect(restoreState.recordId).toBe(pooled ? "pool-001" : "record-001");
+    act(() => window.dispatchEvent(new PopStateEvent("popstate", { state: restoreState })));
+    expect(screen.getByText("정상 복귀 전용")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "처리 완료" }));
     expect(await screen.findByRole("heading", { name: "B급·구형 자재" })).toBeInTheDocument();
@@ -632,7 +638,7 @@ describe("DefectHubPanel", () => {
     realtime.revision = 1;
     rerender(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} />);
     await waitFor(() => expect(vi.mocked(defectsApi.listDefects)).toHaveBeenCalledTimes(2));
-    expect(screen.getByText("TARGET-001")).toBeInTheDocument();
+    expect(await screen.findByText("TARGET-001")).toBeInTheDocument();
     expect(screen.queryByText("OTHER-001")).not.toBeInTheDocument();
   });
 

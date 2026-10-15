@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { adminApi, type InventoryIntegrityCategory, type InventoryIntegrityResult } from "@/lib/api/admin";
 import { Button } from "@/lib/ui/Button";
+import { INTEGRITY_CHECK_LABELS, integrityDisplayIssues } from "./integrityDisplay";
 
 const CATEGORY_LABELS: Record<InventoryIntegrityCategory, string> = {
   DEFECT_STOCK_MISMATCH: "불량 원장·재고",
@@ -33,6 +34,10 @@ export function AdminIntegritySection() {
   useEffect(() => void load(), [load]);
 
   const repairableCount = result?.issues.filter((issue) => issue.repairable).length ?? 0;
+  const displayIssues = result ? integrityDisplayIssues(result) : [];
+  const blockingCount = result?.blocking_count ?? result?.issue_count ?? 0;
+  const warningCount = result?.warning_count ?? 0;
+  const issueCount = blockingCount + warningCount;
 
   return (
     <section className="admin-integrity">
@@ -50,14 +55,17 @@ export function AdminIntegritySection() {
 
       {result && <>
         <div className="admin-integrity-summary">
-          <span>검사 결과: {result.is_consistent ? "정상" : "확인 필요"}</span>
-          <span>· 발견 문제 {result.issue_count}건</span>
+          <span>검사 결과: {issueCount === 0 ? "정상" : "확인 필요"}</span>
+          <span>· 발견 문제 {issueCount}건</span>
+          <span>· 차단 {blockingCount}건 · 경고 {warningCount}건</span>
           <span>· <b>CLI 복구 가능</b> {repairableCount}건</span>
           <span>· {new Date(result.generated_at).toLocaleString("ko-KR")}</span>
         </div>
 
         <div className="admin-integrity-categories">
-          {(Object.keys(CATEGORY_LABELS) as InventoryIntegrityCategory[]).map((category) => <span
+          {result.checks?.length ? result.checks.map((check) => <span key={check.check_id} data-alert={check.count > 0}>
+            {INTEGRITY_CHECK_LABELS[check.check_id] ?? check.check_id} {check.count}건
+          </span>) : (Object.keys(CATEGORY_LABELS) as InventoryIntegrityCategory[]).map((category) => <span
             key={category}
             data-alert={Boolean(result.category_counts[category])}
           >
@@ -66,12 +74,15 @@ export function AdminIntegritySection() {
         </div>
 
         <div className="admin-integrity-results">
-          {result.issues.length === 0 ? <p className="admin-integrity-empty">
+          {(result.checks ?? []).filter((check) => check.count > check.samples.length && !result.issues.some((issue) => issue.category === check.check_id)).map((check) => <p key={check.check_id}>
+            {INTEGRITY_CHECK_LABELS[check.check_id] ?? check.check_id}: 검출 {check.count}건 중 상세 표본 {check.samples.length}건을 표시합니다. 전체 상세는 제공되지 않았습니다.
+          </p>)}
+          {issueCount === 0 ? <p className="admin-integrity-empty">
             발견된 정합성 문제가 없습니다.
           </p> : <ul>
-            {result.issues.map((issue) => <li key={issue.problem_id}>
+            {displayIssues.map((issue) => <li key={issue.problem_id}>
               <div className="admin-integrity-issue-meta">
-                <span>{CATEGORY_LABELS[issue.category]}</span>
+                <span>{INTEGRITY_CHECK_LABELS[issue.category] ?? issue.category}</span>
                 <span>{issue.problem_id}</span>
                 <span data-repairable={issue.repairable}>
                   {issue.repairable ? "CLI 복구 가능" : "수동 검토 필요"}

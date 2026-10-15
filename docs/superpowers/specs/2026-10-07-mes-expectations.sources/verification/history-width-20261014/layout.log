@@ -1,0 +1,27 @@
+[WebServer] (node:55484) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:56560) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+[WebServer]   npx update-browserslist-db@latest
+[WebServer]   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+[WebServer] (node:37036) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:36516) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[e2e:setup] 실 mes.db 해시 기록
+[e2e:setup] bootstrap_db.py --all → sqlite:///C:/Users/user/.codex/worktrees/mes-expectation-closure/ERP/backend/mes_e2e.db
+[e2e:setup] QA 직원 표시 이름 변환: 26
+[e2e:setup] 백엔드 기동(pid 40148) — 헬스 대기
+[e2e:setup] seed 완료 — raw=3-TR-0001 parent=3-TA-0001 wh=E22(primary) dept=E04(primary)
+[e2e:setup] 완료
+
+Running 3 tests using 1 worker
+
+  ok 1 [chromium] › tests\e2e\io-request-order-stock.spec.ts:245:13 › 펼침 사이드바와 상세 패널에서도 품목명과 모든 열을 확인한다 (1280px) (5.7s)
+  ok 2 [chromium] › tests\e2e\io-request-order-stock.spec.ts:245:13 › 펼침 사이드바와 상세 패널에서도 품목명과 모든 열을 확인한다 (1440px) (4.1s)
+  ok 3 [chromium] › tests\e2e\io-request-order-stock.spec.ts:245:13 › 펼침 사이드바와 상세 패널에서도 품목명과 모든 열을 확인한다 (1920px) (3.7s)
+[e2e:teardown] 실 mes.db 불변 확인
+[e2e:teardown] 정리 완료
+
+  3 passed (51.8s)

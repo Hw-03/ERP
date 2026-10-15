@@ -1127,6 +1127,7 @@ def evaluate_inventory_integrity(
     *,
     profile: IntegrityProfile = "modern",
     supplemental_findings: Sequence[IntegrityFinding] = (),
+    sample_limit: int | None = SAMPLE_LIMIT,
 ) -> InventoryIntegrityResult:
     """Evaluate a normalized snapshot and return a stable versioned verdict."""
     if profile not in {"modern", "friday-0033"}:
@@ -1163,7 +1164,7 @@ def evaluate_inventory_integrity(
                 check_id=check_id,
                 severity=severity,
                 count=len(samples),
-                samples=samples[:SAMPLE_LIMIT],
+                samples=samples if sample_limit is None else samples[:sample_limit],
             )
         )
 

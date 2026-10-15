@@ -1,0 +1,6 @@
+# Preserve native log EOF/CRLF and the archived test's original final blank line.
+*.log whitespace=blank-at-eol,space-before-tab,cr-at-eol,-blank-at-eof
+before-4.txt whitespace=blank-at-eol,space-before-tab,-blank-at-eof
+# Native JSON receipts also keep their original Windows bytes and reference hashes.
+completion.json whitespace=trailing-space,space-before-tab,cr-at-eol
+preservation.json whitespace=trailing-space,space-before-tab,cr-at-eol

@@ -5,12 +5,34 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
+import pytest
+
 from app.models import ShippingRequest, TransactionLog, TransactionTypeEnum
 from app.services.pf_shipping_completion import list_pf_shipping_completions
 
 
 WINDOW_START = datetime(2026, 9, 1)
 WINDOW_END = datetime(2026, 10, 1)
+
+
+@pytest.mark.parametrize("cutoff", [datetime(2026, 9, 8, 23, 59), datetime(2026, 9, 9, 10)])
+def test_dynamic_cutoff_matches_fixed_legacy_and_reversal_filters(db_session, make_item, cutoff):
+    final_pf = make_item(name="dynamic cutoff PF", process_type_code="PF", model_symbol="3")
+    request = _request(db_session, final_pf)
+    for quantity in range(1, 5):
+        log = _pickup_log(db_session, request=request, item=final_pf, quantity=quantity, created_at=datetime(2026, 9, 8, 10))
+        if quantity in (2, 3):
+            log.cancelled = True
+            log.cancelled_at = datetime(2026, 9, 9, 10) if quantity == 2 else None
+        if quantity == 4:
+            db_session.add(TransactionLog(item_id=final_pf.item_id, transaction_type=TransactionTypeEnum.SHIP,
+                quantity_change=4, quantity_before=0, quantity_after=4, shipping_request_id=request.request_id,
+                shipping_phase="PICKUP", reverses_log_id=log.log_id, created_at=datetime(2026, 9, 9, 10)))
+    db_session.flush()
+    fixed = list_pf_shipping_completions(db_session, start_at=WINDOW_START, end_at=WINDOW_END, cancellation_as_of=cutoff)
+    dynamic = list_pf_shipping_completions(db_session, start_at=WINDOW_START, end_at=WINDOW_END, cancellation_as_of=lambda _at: cutoff)
+    assert dynamic == fixed
+    assert sorted(row.quantity for row in dynamic) == ([Decimal(1), Decimal(2), Decimal(4)] if cutoff.day == 8 else [Decimal(1)])
 
 
 def _request(db_session, final_pf):

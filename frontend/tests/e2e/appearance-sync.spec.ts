@@ -1,10 +1,12 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
+import { test } from "./_isolated-api-expectations";
 import { loginAsOperator } from "./_helpers";
 
-async function openSettings(page: Page, employeeCode?: string) {
+// Appearance writes belong to disposable actors, never the shared warehouse seed.
+async function openSettings(page: Page, employeeCode: string) {
   await page.setViewportSize({ width: 1440, height: 900 });
-  const employee = await loginAsOperator(page, employeeCode ? { code: employeeCode } : { role: "warehouse" });
-  const response = await page.request.put(`/api/employees/${employee.employee_id}/appearance`, { data: { theme: "light", sidebar_mode: "hover" } });
+  const employee = await loginAsOperator(page, { code: employeeCode });
+  const response = await page.request.put(`/api/employees/${employee.employee_id}/appearance`, { headers: { "X-MES-Employee-Code": employee.employee_code }, data: { theme: "light", sidebar_mode: "hover" } });
   expect(response.ok()).toBeTruthy();
   await page.goto("/mes?tab=settings");
   await expect(page.getByRole("button", { name: "라이트 테마", exact: true })).toHaveAttribute("aria-pressed", "true");
@@ -17,8 +19,8 @@ async function saveDarkExpanded(page: Page) {
   await page.getByRole("button", { name: "저장", exact: true }).click();
 }
 
-test("같은 직원의 설정 저장은 다른 탭에 반영하고 작성 중인 선택과 PIN은 보존한다", async ({ page, context }) => {
-  const employee = await openSettings(page);
+test("같은 직원의 설정 저장은 다른 탭에 반영하고 작성 중인 선택과 PIN은 보존한다", async ({ page, context, actors }) => {
+  const employee = await openSettings(page, actors.approver.employee_code);
   const second = await context.newPage();
   await openSettings(second, employee.employee_code);
   await second.getByRole("button", { name: "접힘 고정", exact: true }).click();
@@ -33,24 +35,23 @@ test("같은 직원의 설정 저장은 다른 탭에 반영하고 작성 중인
   expect(await second.evaluate(() => JSON.parse(sessionStorage.getItem("dexcowin_mes_operator")!).sidebar_mode)).toBe("expanded");
 });
 
-test("같은 브라우저의 서로 다른 직원 탭은 계정과 화면 설정을 독립적으로 유지한다", async ({ page, context }) => {
-  const employee = await openSettings(page);
-  const employees = await (await page.request.get("/api/employees?active_only=true")).json() as { employee_id: string; employee_code: string }[];
-  const other = employees.find((candidate) => candidate.employee_id !== employee.employee_id);
-  expect(other).toBeTruthy();
+test("같은 브라우저의 서로 다른 직원 탭은 계정과 화면 설정을 독립적으로 유지한다", async ({ page, context, actors }) => {
+  const employee = await openSettings(page, actors.approver.employee_code);
+  const other = actors.other;
+  expect(other.employee_id).not.toBe(employee.employee_id);
   const second = await context.newPage();
-  await openSettings(second, other!.employee_code);
+  await openSettings(second, other.employee_code);
   await saveDarkExpanded(page);
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect(second.locator("html")).toHaveAttribute("data-theme", "light");
-  expect(await second.evaluate(() => JSON.parse(sessionStorage.getItem("dexcowin_mes_operator")!).employee_id)).toBe(other!.employee_id);
+  expect(await second.evaluate(() => JSON.parse(sessionStorage.getItem("dexcowin_mes_operator")!).employee_id)).toBe(other.employee_id);
   await expect(second.getByRole("button", { name: "자동 펼침", exact: true })).toHaveAttribute("aria-pressed", "true");
-  const otherPair = await (await second.request.get(`/api/employees/${other!.employee_id}/appearance`)).json();
+  const otherPair = await (await second.request.get(`/api/employees/${other.employee_id}/appearance`)).json();
   expect(otherPair).toMatchObject({ theme: "light", sidebar_mode: "hover" });
 });
 
-test("데스크톱에서 저장한 같은 직원 테마를 모바일 탭도 반영한다", async ({ page, context }) => {
-  const employee = await openSettings(page);
+test("데스크톱에서 저장한 같은 직원 테마를 모바일 탭도 반영한다", async ({ page, context, actors }) => {
+  const employee = await openSettings(page, actors.approver.employee_code);
   const mobile = await context.newPage();
   await loginAsOperator(mobile, { code: employee.employee_code });
   await mobile.setViewportSize({ width: 390, height: 844 });
@@ -61,8 +62,8 @@ test("데스크톱에서 저장한 같은 직원 테마를 모바일 탭도 반�
   expect(await mobile.evaluate(() => JSON.parse(sessionStorage.getItem("dexcowin_mes_operator")!).sidebar_mode)).toBe("expanded");
 });
 
-test("저장 실패는 다른 탭을 바꾸지 않고 저장 성공 뒤 조회 실패는 저장 실패로 표시하지 않는다", async ({ page, context }) => {
-  const employee = await openSettings(page);
+test("저장 실패는 다른 탭을 바꾸지 않고 저장 성공 뒤 조회 실패는 저장 실패로 표시하지 않는다", async ({ page, context, actors }) => {
+  const employee = await openSettings(page, actors.approver.employee_code);
   const second = await context.newPage();
   await openSettings(second, employee.employee_code);
   let failSave = true;

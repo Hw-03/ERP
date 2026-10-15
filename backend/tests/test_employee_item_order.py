@@ -13,6 +13,12 @@ from app.models import Employee
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
 
+@pytest.fixture(autouse=True)
+def _own_tab_actor(client):
+    """Existing successful order writes identify their current tab employee."""
+    client.headers["X-MES-Employee-Code"] = "EMP001"
+
+
 # ---------------------------------------------------------------------------
 # 헬퍼
 # ---------------------------------------------------------------------------

@@ -1,7 +1,14 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render as rtlRender, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import { MobileIoComposeWizard } from "../MobileIoComposeWizard";
+
+function render(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 vi.mock("@/lib/api", () => ({
   api: {
@@ -89,6 +96,19 @@ describe("MobileIoComposeWizard 빠른 원자재 입고", () => {
     expect(api.preview).not.toHaveBeenCalled();
     expect(api.listSuppliers).not.toHaveBeenCalled();
   });
+  it.each([7, undefined])("출하 진입 수량 %s는 모바일 preview에서도 보존된다", async (quantity) => {
+    render(<MobileIoComposeWizard globalSearch=""
+      operator={{ employee_id: "shipping-1", name: "출하 직원", department: "출하", warehouse_role: "none" }}
+      items={[item]} setItems={() => {}} onStatusChange={() => {}}
+      entryIntent={{ workType: "warehouse_io", subType: "warehouse_to_dept", forceManualItem: true, quantity }}
+      preselectedItem={item}
+    />);
+    await waitFor(() => expect(api.preview).toHaveBeenCalledWith(expect.objectContaining({
+      sub_type: "warehouse_to_dept",
+      targets: [expect.objectContaining({ source_kind: "manual", item_id: item.item_id, quantity: quantity ?? 1 })],
+    })));
+  });
+
   it("공급업체 선택 전에는 Step 2에서 품목 미리보기를 보류하고 선택 후 재개한다", async () => {
     render(
       <MobileIoComposeWizard

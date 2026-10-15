@@ -187,6 +187,18 @@ export function MobileWarehouseScreen({
     (operator?.warehouse_role ?? "none") === "deputy";
   const canSeeDeptQueue = isDepartmentApprover(operator);
   const canSeeAsResearchQueue = operator?.as_research_approver === true;
+  // Keep a role refresh from leaving an already open approval section blank.
+  useEffect(() => {
+    if (!((sectionTab === "queue" && !canSeeQueue)
+      || (sectionTab === "dept-queue" && !canSeeDeptQueue)
+      || (sectionTab === "as-research-queue" && !canSeeAsResearchQueue))) return;
+    setSectionTab("compose");
+    setInboxOpen(false);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("section");
+    url.searchParams.delete("stockRequestId");
+    window.history.replaceState({ ...window.history.state, warehouseSection: "compose" }, "", `${url.pathname}${url.search}${url.hash}`);
+  }, [sectionTab, canSeeQueue, canSeeDeptQueue, canSeeAsResearchQueue]);
   // 인수인계: 작성(튜브) 또는 인수 확인(받는 부서 소속)이면 탭 노출 — 데스크톱 동일. 결재권자는 제외.
   const canReceiveHandover = HANDOVER_RECEIVE_DEPTS.includes(operator?.department ?? "");
   const showHandover = (operator?.department ?? "") === "튜브" || canReceiveHandover;

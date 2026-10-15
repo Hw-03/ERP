@@ -11,6 +11,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  expectation-ledger:
+    name: MES expectation evidence
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install evidence test dependency
+        run: python -m pip install "pytest>=8.0"
+
+      - name: Verify evidence tooling
+        run: node --test scripts/dev/normalize-mes-expectations.test.mjs scripts/dev/mes-expectation-evidence.test.mjs scripts/dev/run-mes-expectations.test.mjs scripts/dev/mes-expectation-reviewed-reuse.test.mjs
+
+      - name: Verify current ledger structure and selectors
+        run: node scripts/dev/normalize-mes-expectations.mjs --check
+        # --require-complete follows a new current-source execution and evidence review.
+
   verification-runtime:
     name: Verification policy (Windows PowerShell)
     runs-on: windows-latest
@@ -34,7 +58,21 @@ jobs:
 
   backend:
     name: Backend (pytest + compile + openapi-drift)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: mes_test
+          POSTGRES_PASSWORD: isolated_ci_only
+          POSTGRES_DB: mes_migration_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -51,9 +89,164 @@ jobs:
       - name: Compile check
         run: python -m compileall backend
 
+      - name: Verify bounded isolated recovery readiness
+        working-directory: backend
+        run: pytest ../.agents/skills/mes-browser-regression/scripts/test_recovery_readiness_probe.py --confcutdir=../.agents/skills/mes-browser-regression/scripts -q
+
       - name: Run pytest
         working-directory: backend
         run: pytest -q
+
+      - name: PostgreSQL migration preservation and approval locking
+        working-directory: backend
+        env:
+          TEST_POSTGRES_URL: postgresql+psycopg2://mes_test:isolated_ci_only@localhost:5432/mes_migration_test
+          DEXCOWIN_POSTGRES_TEST_ACK: ALLOW_TEST_DB_MUTATION
+        run: |
+          pytest -q \
+            tests/migrations/test_alembic_foundation.py::test_postgresql_upgrade_opt_in_uses_private_schema_cleanup \
+            tests/migrations/test_alembic_foundation.py::test_postgresql_candidate_repair_preserves_values_and_insert_default \
+            tests/migrations/test_remove_shipping_requested_status.py::test_postgresql_online_upgrade_has_only_supported_shipping_status_labels \
+            tests/migrations/test_remove_shipping_requested_status.py::test_postgresql_enum_repair_allows_index_but_rejects_other_columns \
+            tests/migrations/test_inventory_operations.py::test_postgresql_operation_role_upgrade_creates_or_reuses_enum \
+            tests/migrations/test_postgresql_schema_equivalence.py \
+            tests/migrations/test_closure_postgresql_preservation.py \
+            tests/concurrency/test_internal_use_batch_decision_concurrent.py::test_postgres_failed_last_approval_keeps_batch_lock_until_failed_commit \
+            tests/concurrency/test_display_group_snapshot_postgres.py \
+            tests/concurrency/test_request_order_stock_postgres.py \
+            --junitxml=postgres-contract.xml
+          python -c "import xml.etree.ElementTree as E; r=E.parse('postgres-contract.xml'); assert not r.findall('.//skipped'), 'Required PostgreSQL checks must execute'"
+
+      - name: Prepare PostgreSQL 16 host tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(id -u)" -ne 0
+          pg_bin=/usr/lib/postgresql/16/bin
+          for tool in pg_dump psql createdb dropdb initdb pg_ctl pg_config; do
+            test -x "$pg_bin/$tool"
+            "$pg_bin/$tool" --version | tee -a backend/postgres-tools.txt
+            "$pg_bin/$tool" --version | grep -Eq 'PostgreSQL\)? 16\.'
+          done
+          echo "$pg_bin" >> "$GITHUB_PATH"
+
+      - name: Prepare isolated PostgreSQL cutover tables
+        working-directory: backend
+        env:
+          TEST_POSTGRES_URL: postgresql+psycopg2://mes_test:isolated_ci_only@localhost:5432/mes_migration_test
+          DEXCOWIN_POSTGRES_TEST_ACK: ALLOW_TEST_DB_MUTATION
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import sqlalchemy as sa
+          from alembic import command
+          from alembic.config import Config
+
+          assert os.environ['DEXCOWIN_POSTGRES_TEST_ACK'] == 'ALLOW_TEST_DB_MUTATION'
+          url = sa.engine.make_url(os.environ['TEST_POSTGRES_URL'])
+          assert url.host in {'localhost', '127.0.0.1'} and url.port == 5432
+          assert url.database == 'mes_migration_test' and url.username == 'mes_test'
+          engine = sa.create_engine(url, poolclass=sa.pool.NullPool)
+          try:
+              with engine.connect() as connection:
+                  version = int(connection.scalar(sa.text('SHOW server_version_num')))
+                  superuser = connection.scalar(sa.text('SELECT rolsuper FROM pg_roles WHERE rolname = current_user'))
+              assert 160000 <= version < 170000 and superuser is True
+              config = Config('alembic.ini')
+              config.set_main_option('sqlalchemy.url', url.render_as_string(hide_password=False).replace('%', '%%'))
+              command.upgrade(config, 'head')
+              required = {'shipping_requests', 'shipping_allocations', 'transaction_logs'}
+              with engine.connect() as connection:
+                  assert required <= set(sa.inspect(connection).get_table_names(schema='public'))
+                  revision = connection.scalar(sa.text('SELECT version_num FROM public.alembic_version'))
+              Path('postgres-environment.json').write_text(json.dumps({
+                  'server_version_num': version, 'role_is_superuser': superuser,
+                  'database': url.database, 'alembic_revision': revision,
+                  'cutover_tables': sorted(required), 'preparation_complete': True,
+              }, indent=2) + '\n', encoding='utf-8')
+          finally:
+              engine.dispose()
+          PY
+
+      - name: PostgreSQL restore integrity and writer locking
+        working-directory: backend
+        env:
+          TEST_POSTGRES_URL: postgresql+psycopg2://mes_test:isolated_ci_only@localhost:5432/mes_migration_test
+          DEXCOWIN_POSTGRES_TEST_ACK: ALLOW_TEST_DB_MUTATION
+          PGPASSWORD: isolated_ci_only
+        run: |
+          set +e
+          python -m pytest -q \
+            tests/ops/test_backup_manifest_postgres.py \
+            tests/ops/test_inventory_integrity_postgres.py \
+            tests/ops/test_inventory_cutover_postgres_locking.py::test_postgres_cutover_lock_blocks_shipping_writer_until_rollback \
+            tests/services/test_warehouse_map_postgres_locking.py::test_postgres_concurrent_admin_moves_serialize_target_capacity_and_stack_order \
+            tests/services/test_warehouse_map_postgres_locking.py::test_postgres_outbound_blocks_actual_admin_move_until_commit \
+            --junitxml=postgres-extended-contract.xml
+          pytest_status=$?
+          set -e
+          python - "$pytest_status" <<'PY'
+          import json
+          import sys
+          import xml.etree.ElementTree as ET
+          from collections import Counter
+          from pathlib import Path
+
+          expected = {
+              'postgres-contract.xml': {
+                  'tests.migrations.test_alembic_foundation': 2,
+                  'tests.migrations.test_remove_shipping_requested_status': 4,
+                  'tests.migrations.test_inventory_operations': 2,
+                  'tests.migrations.test_postgresql_schema_equivalence': 13,
+                  'tests.migrations.test_closure_postgresql_preservation': 1,
+                  'tests.concurrency.test_internal_use_batch_decision_concurrent': 1,
+                  'tests.concurrency.test_display_group_snapshot_postgres': 1,
+                  'tests.concurrency.test_request_order_stock_postgres': 4,
+              },
+              'postgres-extended-contract.xml': {
+                  'tests.ops.test_backup_manifest_postgres': 35,
+                  'tests.ops.test_inventory_integrity_postgres': 22,
+                  'tests.ops.test_inventory_cutover_postgres_locking': 1,
+                  'tests.services.test_warehouse_map_postgres_locking': 2,
+              },
+          }
+          receipt = {'additional_native_exit_code': int(sys.argv[1]), 'suites': {}}
+          for filename, counts in expected.items():
+              path = Path(filename)
+              root = ET.parse(path).getroot() if path.exists() else ET.Element('missing')
+              cases = root.findall('.//testcase')
+              actual = dict(Counter(case.get('classname') for case in cases))
+              receipt['suites'][filename] = {
+                  'exists': path.exists(), 'tests': len(cases), 'class_counts': actual,
+                  'expected_class_counts_match': actual == counts,
+                  'skipped': len(root.findall('.//skipped')),
+                  'failures': len(root.findall('.//failure')),
+                  'errors': len(root.findall('.//error')),
+              }
+          receipt['complete_without_skip'] = receipt['additional_native_exit_code'] == 0 and all(
+              suite['exists'] and suite['expected_class_counts_match']
+              and not (suite['skipped'] or suite['failures'] or suite['errors'])
+              for suite in receipt['suites'].values()
+          )
+          Path('postgres-required-contracts.json').write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8')
+          assert receipt['complete_without_skip'], receipt
+          PY
+
+
+      - name: Upload PostgreSQL contract evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: postgres-contract
+          path: |
+            backend/postgres-contract.xml
+            backend/postgres-extended-contract.xml
+            backend/postgres-environment.json
+            backend/postgres-tools.txt
+            backend/postgres-required-contracts.json
+          retention-days: 7
 
       - name: OpenAPI drift check
         working-directory: backend
@@ -81,7 +274,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Install ops test dependencies
         working-directory: backend
@@ -92,6 +285,10 @@ jobs:
         run: |
           pytest tests/ops/test_runtime_paths.py -q -k "profile_resolver_test_root or ops_batches_treat_a_fake_http_503_as_failure_before_success_flow"
           pytest tests/ops/test_employee_release_activation.py -q -k "employee_runtime_profile_is_resolved_by_the_installed_fixed_script or effective_backend_database_must_be_the_canonical_employee_database"
+
+      - name: Verify native Windows release and rollback paths
+        working-directory: backend
+        run: pytest tests/ops/test_employee_frontend_release_long_paths.py tests/ops/test_employee_code_release_long_paths.py tests/ops/test_friday_profile_cutover_long_paths.py -q
 
   frontend:
     name: Frontend (lint + tsc + vitest+coverage + build)
@@ -148,8 +345,18 @@ jobs:
         run: npm run check:bundle-size
 
   e2e:
-    name: E2E (Playwright · 전용 DB)
+    name: E2E (Playwright · ${{ matrix.suite }} · 전용 DB)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: general
+            args: --grep-invert '(^|[ /])as-research-(ui-)?expectations[.]spec[.]ts( |$)'
+          - suite: asr-fallback
+            args: tests/e2e/as-research-expectations.spec.ts
+          - suite: asr-ui
+            args: tests/e2e/as-research-ui-expectations.spec.ts
     steps:
       - uses: actions/checkout@v4
 
@@ -162,6 +369,9 @@ jobs:
       - name: Install backend dependencies
         working-directory: backend
         run: pip install -r requirements.txt
+
+      - name: Verify isolated QA employee anonymization
+        run: python -m pytest frontend/tests/qa/test_qa_employee_names.py --confcutdir=frontend/tests/qa -q
 
       - uses: actions/setup-node@v4
         with:
@@ -177,11 +387,17 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
+      - name: Verify API connection lifecycle without retries
+        if: matrix.suite == 'general'
+        working-directory: frontend
+        run: node --test tests/api-connection-lifecycle.test.mjs
+
       # globalSetup 이 전용 mes_e2e.db 부트스트랩·시드·백엔드(8021) 기동, webServer 가 next dev(3100).
       # 실 backend/mes.db 는 CI 체크아웃에 없음(.gitignore) → 해시 가드 자동 생략.
+      # 마지막 AS·연구 역할 회수는 모든 미결 요청을 재분류하므로 두 파일은 각각 새 DB에서 실행.
       - name: Playwright E2E
         working-directory: frontend
-        run: npm run test:e2e
+        run: npm run test:e2e -- ${{ matrix.args }} --reporter=github,html
         env:
           NEXT_TELEMETRY_DISABLED: "1"
 
@@ -189,6 +405,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.suite }}
           path: frontend/playwright-report
           retention-days: 7
