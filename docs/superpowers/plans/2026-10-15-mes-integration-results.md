@@ -172,3 +172,11 @@ PC에서 같은 실제 원자재의 창고 재고를 새 사유 3건으로 격�
 `scripts/dev/mes_integration_review.py`는 현재 워크트리 코드를 checkout하지 않고, 보존된 두 코드/production 빌드/DB 조합만 선택한다. manifest 해시와 코드·의존성·빌드·Node·설정·초기 DB 해시, 스키마, 미커밋 변경, 프로세스 소유권을 검사한다. 각 버전의 검토 DB를 따로 유지하며 초기화 전 사용자가 만든 검토 자료를 백업한다. 운영 포트나 원본 DB로 바꾸는 설정을 거부한다.
 
 도우미의 경로 이탈·junction·코드/manifest/seed/config 변경·추가 소스·긴 Windows 경로·미커밋 변경·외부 프로세스 소유권 오류·정지 중 DB/WAL 변경·초기화 전 백업 보존 등 국소 14조건을 통과했다(`review-helper-final-v4.log`). 준비 중 Windows의 열린 SQLite 연결 때문에 원자적 교체가 거부되는 문제를 확인해 명시적 연결 종료로 보완했다. 긴 의존성 경로는 Windows extended path로 읽으며 가드를 제거하지 않았다. 실제 기준판→통합판→기준판 전환은 아직 별도 실행할 단계다.
+
+## CP3 두 탭의 중복 제출·완료된 초안 거부
+
+최종 통합판의 별도 `integrated/review.db`에서 창고 보정 출고 1을 새 QA 초안으로 저장하고 같은 초안을 두 브라우저 탭에 열었다. 초안 저장만으로 수량/예약은 바뀌지 않았다. 첫 탭 확정 버튼을 더블 클릭했을 때 완료 작업과 출고 거래는 각각 하나만 생겼다. 창고 90→89, 전체 362→361이고 고압 272 및 무관 재고/예약은 불변이었다.
+
+두 번째 탭은 이전 최종 확인 내용을 그대로 갖고 있었다. 재제출하자 `임시저장 작업을 찾을 수 없습니다` 사유의 제출 실패가 표시됐고 DB는 첫 완료 직후와 같았다. 원작업을 브라우저 내역에서 취소해 창고 90/전체 362로 복원했다. 최종 전체 위치 수량/예약과 모든 기존 업무 행은 시작값과 같으며 QA 원작업 -1/연결 취소 +1 두 거래만 남았다. 이는 두 탭의 순차 재제출과 더블 클릭 결과이며 모든 동시 부하의 보장으로 확대하지 않는다.
+
+근거는 `integrated/review-stock-audit/`의 `initial`, `draft-saved`, `double-click-completed`, `stale-draft-rejected`, `cancel-completed` 및 diff, `review-double-submit-result.json`, `stale-draft-rejected.jpg/.txt`, `cp5-business-backend.log`다. 동일 초안 실제 동시 제출과 완료 후 오래된 상태의 되돌리기, 출하 준비/픽업/취소 중복 실행은 별도 합성 SQLite 검사 6건도 통과했다(`duplicate-stale-local.log`). 이 합성 검사를 직원 자료 브라우저 실행으로 표시하지 않는다.
