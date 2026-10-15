@@ -5,7 +5,7 @@ import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-quer
 import { MapPin } from "lucide-react";
 import { isStocktakeNotApplied, stocktakeApi } from "@/lib/api/stocktake";
 import { formatKstDateTime } from "@/lib/mes-format";
-import type { StocktakeCount, StocktakePage, StocktakeProgress, StocktakeRound, StocktakeTarget, StocktakeWaitingSelection } from "@/lib/api/types/stocktake";
+import type { StocktakeCount, StocktakeLatestSummaryResponse, StocktakePage, StocktakeProgress, StocktakeRound, StocktakeTarget, StocktakeWaitingSelection } from "@/lib/api/types/stocktake";
 import { readOperatorSession, restoreOperatorSession, validateTabOwnership, type StoredOperatorSession } from "@/lib/auth/operator-session";
 import { ApiError } from "@/lib/api-core";
 import { OPERATOR_LOGIN_CHANGED, OPERATOR_LOGIN_REQUIRED, requestOperatorLogin } from "@/lib/auth/login-recovery";
@@ -35,6 +35,7 @@ import { StocktakeSearchHeader } from "./StocktakeSearchHeader";
 import { StocktakeToolbarMenu, type StocktakeSection } from "./StocktakeToolbarMenu";
 import { canManageStocktakeRounds } from "./stocktakeAuthority";
 import { ownedWaitingLocations } from "./stocktakeSelection";
+import { StocktakeIdlePanel } from "./StocktakeIdlePanel";
 
 type Section = StocktakeSection;
 const STOCKTAKE_DEPARTMENTS = ["튜브", "고압", "진공", "튜닝", "조립", "출하"] as const;
@@ -113,6 +114,7 @@ function StocktakeWorkspace({ token, operator, enabled, variant }: { token: stri
   const canManageRounds = canManageStocktakeRounds(operator);
   const [roundId, setRoundId] = useState("");
   const [section, setSection] = useState<Section>("count");
+  const [startRequested, setStartRequested] = useState(false);
   const [search, setSearch] = useState("");
   const [departments, setDepartments] = useState<string[]>([]);
   const [initialReady, setInitialReady] = useState(false);
@@ -156,7 +158,15 @@ function StocktakeWorkspace({ token, operator, enabled, variant }: { token: stri
   const rounds = useQuery({ queryKey: ["stocktake", operator.employee_id, "rounds", canManageRounds ? "history" : "active"],
     queryFn: ({ signal }) => stocktakeApi.read<{ items: StocktakeRound[] }>(`/api/stocktakes/rounds${canManageRounds ? "" : "?active_only=true"}`, token, { signal }), retry: false, enabled });
   const allowedRounds = rounds.data?.items.filter(entry => canManageRounds || entry.status === "ACTIVE") ?? [];
-  const round = allowedRounds.find((entry) => entry.round_id === roundId) ?? allowedRounds.find((entry) => entry.status === "ACTIVE") ?? allowedRounds[0] ?? null;
+  const activeRound = allowedRounds.find(entry => entry.status === "ACTIVE");
+  const round = allowedRounds.find(entry => entry.round_id === roundId) ?? activeRound ?? (section === "rounds" ? allowedRounds[0] : null) ?? null;
+  const showIdle = !activeRound && !roundId && section !== "rounds";
+  const latestSummary = useQuery({ queryKey: ["stocktake", operator.employee_id, "latest-summary"],
+    queryFn: ({ signal }) => stocktakeApi.read<StocktakeLatestSummaryResponse>("/api/stocktakes/rounds/latest-summary", token, { signal }),
+    enabled: enabled && rounds.isSuccess && showIdle, retry: false });
+  const roundStarted = () => {
+    setStartRequested(false); setRoundId(""); setSection("count");
+  };
   const progress = useQuery({ queryKey: ["stocktake", operator.employee_id, round?.round_id, "progress", "item-kpi-v1"],
     queryFn: ({ signal }) => stocktakeApi.read<StocktakeProgress>(`/api/stocktakes/rounds/${round!.round_id}/progress`, token, { signal }), enabled: enabled && !!round, retry: false });
   const filterStatus = status;
@@ -259,6 +269,13 @@ function StocktakeWorkspace({ token, operator, enabled, variant }: { token: stri
   const closeDetail = useCallback(() => navigate(() => setDetailOpen(false)), [navigate]);
   const resetFilters = () => { setSearch(""); setDepartments([]); setStatus(""); setModelSlots([]); setProcessSteps([]); setFilterLogic("AND"); };
   const switchRound = (id: string) => navigate(() => { setRoundId(id); setDepartments([]); setSelectedTarget(null); setDetailOpen(false); setSelection({}); setPreview(null); });
+  const openRoundManagement = (id = "", start = false) => navigate(() => {
+    setRoundId(id); setSection("rounds"); setStartRequested(start); setDetailOpen(false);
+  });
+  const returnToIdle = () => navigate(() => {
+    setRoundId(""); setSection("count"); setStartRequested(false); setDetailOpen(false);
+    setSelectedTarget(null); setSelection({}); setPreview(null);
+  });
   const selectTarget = (target: StocktakeTarget) => navigate(() => {
     if (section === "waiting") {
       if (busyRef.current || unknown || selectingAll) return;
@@ -348,6 +365,7 @@ function StocktakeWorkspace({ token, operator, enabled, variant }: { token: stri
       if (outcome.resolution === "COMPLETED") finishAction(unknown.kind, outcome.result, unknown.target);
       setUnknown(null); setError("");
     }
+    if (startRequested && outcome.entry.kind === "round_start" && outcome.resolution === "COMPLETED") roundStarted();
     onChanged();
   }} />;
   const categoryFilters = working && <InventoryFilters open={filtersOpen} panelId="stocktake-filters" className={variant === "desktop" ? summaryStyles.filters : undefined}
@@ -447,6 +465,15 @@ function StocktakeWorkspace({ token, operator, enabled, variant }: { token: stri
   }
   return <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2" style={{ "--stocktake-header-top": `${headerTop}px` } as CSSProperties}>
     <div className={`shrink-0 space-y-2 empty:hidden ${variant === "mobile" ? "px-3" : "pr-4"}`}>{recovery}{alerts}</div>
+    {showIdle && <div className={`min-h-0 flex-1 overflow-y-auto ${variant === "mobile" ? "px-3 pb-4" : "pr-4 pb-4"}`}>
+      <StocktakeIdlePanel summary={latestSummary.data?.summary} loading={latestSummary.isPending} error={latestSummary.error}
+        disabled={busy || !!unknown} onRetry={() => void latestSummary.refetch()}
+        onStart={canManageRounds ? () => openRoundManagement("", true) : undefined}
+        onHistory={canManageRounds ? () => openRoundManagement(allowedRounds[0]?.round_id) : undefined}
+        onDetails={canManageRounds ? id => openRoundManagement(id) : undefined} />
+    </div>}
+    <div hidden={showIdle} aria-hidden={showIdle || undefined} className={showIdle ? "hidden" : "flex min-h-0 min-w-0 flex-1 flex-col"} inert={showIdle}>
+    {!activeRound && !showIdle && <div className={`pb-2 ${variant === "mobile" ? "px-3" : "pr-4"}`}><button type="button" className={STOCKTAKE_BUTTON} disabled={busy || !!unknown} onClick={returnToIdle}>대기 화면으로</button></div>}
     <StocktakeLayout variant={variant} detailKey={section === "waiting" ? "review" : freshTarget?.target_id} detailOpen={working && detailOpen} detail={detail} onClose={closeDetail}
       detailTone={section === "count" ? stocktakeStatusTone(stocktakeItemStatus(locationTargets)) : undefined}
       detailTitle={section === "waiting" ? "선택 반영 검토" : freshTarget?.current_item_name || freshTarget?.item_name}
@@ -469,8 +496,9 @@ function StocktakeWorkspace({ token, operator, enabled, variant }: { token: stri
       </> : <p className={STOCKTAKE_CARD}>부서 결재 담당자가 회차를 시작하면 조사할 수 있습니다.</p>)}
       {section === "rounds" && canManageRounds && <StocktakeRoundHistory token={token} round={round} rounds={allowedRounds} admin={canManageStocktakeRounds(operator)} disabled={busy || !!unknown} onSelectRound={switchRound}
         menuVisibility={<StocktakeMenuVisibilityCard key={token} operator={operator} token={token} disabled={busy || !!unknown} />}
-        management={<StocktakeManagement token={token} operator={operator} round={round} section="rounds" onChanged={onChanged} recovered={recovered} />} />}
+        management={<StocktakeManagement token={token} operator={operator} round={round} section="rounds" onChanged={onChanged} recovered={recovered} focusStart={startRequested} onStarted={startRequested ? roundStarted : undefined} />} />}
       {section === "progress" && <StocktakeManagement token={token} operator={operator} round={round} section="progress" onChanged={onChanged} recovered={recovered} />}
     </StocktakeLayout>
+    </div>
   </div>;
 }

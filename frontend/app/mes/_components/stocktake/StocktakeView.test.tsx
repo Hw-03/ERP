@@ -21,7 +21,7 @@ vi.mock("@/lib/api/stocktake", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/api/stocktake")>(), stocktakeApi: { read: vi.fn(), command: vi.fn() },
   listPendingStocktakeCommands: () => [], subscribePendingStocktakeCommands: () => () => {}, recoverStocktakeCommand: vi.fn(),
 }));
-vi.mock("./StocktakeManagement", () => ({ StocktakeManagement: () => <p>회차 관리</p> }));
+vi.mock("./StocktakeManagement", () => ({ StocktakeManagement: ({ focusStart, onStarted }: { focusStart?: boolean; onStarted?: () => void }) => <div><p data-focus-start={focusStart}>회차 관리</p>{onStarted && <button onClick={onStarted}>시작 완료 알림</button>}</div> }));
 vi.mock("./StocktakeMenuVisibilityCard", () => ({ StocktakeMenuVisibilityCard: () => <p>참여 직원 메뉴 표시</p> }));
 vi.mock("../_hooks/useItemImageManifest", () => ({ useItemImageManifest: () => ({}) }));
 vi.mock("../DepartmentsContext", () => ({ useDeptColorLookup: () => () => "var(--c-green)" }));
@@ -67,6 +67,7 @@ function isStagePath(path: string, stage: "rounds" | "progress" | "targets"): bo
 
 let targets: StocktakeTarget[];
 function readFixture(path: string): unknown {
+  if (path === "/api/stocktakes/rounds/latest-summary") return { summary: { round_id: "round-b", title: "이전 조사", status: "CLOSED_FULL", closed_at: rounds[1].closed_at, item_summary: { total: 120, confirmed: 100, applied: 90, unconfirmed: 20 } } };
   if (path === "/api/stocktakes/rounds") return { items: rounds };
   if (path === "/api/stocktakes/rounds?active_only=true") return { items: rounds.filter(round => round.status === "ACTIVE") };
   if (path.includes("/events?")) return { items: [], next_cursor: null };
@@ -347,10 +348,101 @@ describe("StocktakeView integration", () => {
   });
 
   it("회차가 없으면 준비 스켈레톤에서 빈 회차 안내로 전환한다", async () => {
-    vi.mocked(stocktakeApi.read).mockResolvedValue({ items: [] });
+    vi.mocked(stocktakeApi.read).mockImplementation(async path => path.endsWith("/latest-summary") ? { summary: null } : { items: [] });
     mount();
-    await screen.findByText("부서 결재 담당자가 회차를 시작하면 조사할 수 있습니다.");
+    await screen.findByRole("heading", { name: "전수조사 시작 대기" });
+    await screen.findByText("아직 완료된 전수조사가 없습니다.");
     expect(screen.queryByRole("status", { name: "재고 전수조사 준비 중" })).not.toBeInTheDocument();
+  });
+
+  it.each(["desktop", "mobile"] as const)("%s 일반 직원에게 과거 상세 대신 최근 요약만 표시한다", async variant => {
+    state.actor.department_role = "none";
+    vi.mocked(stocktakeApi.read).mockImplementation(async path => path.includes("/rounds?") ? { items: [] } : readFixture(path));
+    mount(variant);
+    await screen.findByText("이전 조사");
+    expect(screen.getByRole("region", { name: "최근 회차 결과" })).toHaveTextContent("90");
+    for (const name of ["조사하기", "반영 대기", "진행", "새 회차 시작", "결과 상세 보기", "회차 이력 관리", "필터 열기"]) {
+      expect(screen.queryByRole("button", { name, exact: true })).not.toBeInTheDocument();
+    }
+    expect(vi.mocked(stocktakeApi.read).mock.calls.every(([path]) => !path.includes("/round-b/"))).toBe(true);
+  });
+
+  it("담당자의 과거 회차는 명시적 상세 진입에서만 선택하고 대기 화면으로 복귀한다", async () => {
+    vi.mocked(stocktakeApi.read).mockImplementation(async path => path === "/api/stocktakes/rounds" ? { items: [rounds[1]] } : readFixture(path));
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "결과 상세 보기" }));
+    await screen.findByRole("region", { name: "선택한 조사 회차" });
+    fireEvent.click(screen.getByRole("button", { name: "대기 화면으로" }));
+    await screen.findByRole("heading", { name: "전수조사 시작 대기" });
+    fireEvent.click(screen.getByRole("button", { name: "새 회차 시작" }));
+    expect(await screen.findByText("회차 관리")).toHaveAttribute("data-focus-start", "true");
+    expect(stocktakeApi.command).not.toHaveBeenCalled();
+  });
+
+  it("요약 실패는 빈 상태와 구분하며 재시도하고 새 활성 회차로 전환한다", async () => {
+    let active = false, failed = true;
+    vi.mocked(stocktakeApi.read).mockImplementation(async path => {
+      if (path === "/api/stocktakes/rounds") return { items: active ? rounds : [] };
+      if (path.endsWith("/latest-summary") && failed) throw new Error("최근 결과 조회 실패");
+      return readFixture(path);
+    });
+    const { client } = mount();
+    expect(await screen.findByRole("alert")).toHaveTextContent("최근 결과 조회 실패");
+    expect(screen.queryByText("아직 완료된 전수조사가 없습니다.")).not.toBeInTheDocument();
+    failed = false;
+    fireEvent.click(screen.getByRole("button", { name: "다시 불러오기" }));
+    await screen.findByText("이전 조사");
+    active = true;
+    await act(async () => { await client.invalidateQueries({ queryKey: ["stocktake"] }); });
+    await screen.findByRole("region", { name: "조사 대상 목록" });
+    expect(screen.queryByRole("heading", { name: "전수조사 시작 대기" })).not.toBeInTheDocument();
+  });
+
+  it("직원 전환 후 늦은 요약 응답을 표시하지 않는다", async () => {
+    const delayed = deferred<unknown>();
+    state.actor.department_role = "none";
+    vi.mocked(stocktakeApi.read).mockImplementation(async (path, token) => {
+      if (path.includes("/rounds?")) return { items: [] };
+      if (path.endsWith("/latest-summary")) return token === "token-employee-a" ? delayed.promise
+        : { summary: { ...(readFixture(path) as { summary: object }).summary, title: "새 로그인에서 조회한 회차" } };
+      return readFixture(path);
+    });
+    const { changeOperator } = mount();
+    await screen.findByRole("status", { name: "최근 회차 결과를 불러오는 중입니다" });
+    state.actor = { ...state.actor, employee_id: "employee-b" };
+    changeOperator(state.actor as Operator);
+    await screen.findByText("새 로그인에서 조회한 회차");
+    await act(async () => delayed.resolve(readFixture("/api/stocktakes/rounds/latest-summary")));
+    expect(screen.queryByText("이전 조사")).not.toBeInTheDocument();
+  });
+
+  it("담당자 권한이 회수되면 과거 상세를 닫고 공개 요약만 남긴다", async () => {
+    vi.mocked(stocktakeApi.read).mockImplementation(async path => path === "/api/stocktakes/rounds" ? { items: [rounds[1]] }
+      : path.includes("/rounds?") ? { items: [] } : readFixture(path));
+    const { changeOperator } = mount();
+    fireEvent.click(await screen.findByRole("button", { name: "결과 상세 보기" }));
+    await screen.findByRole("region", { name: "선택한 조사 회차" });
+    state.actor.department_role = "none";
+    changeOperator({ ...state.actor } as Operator);
+    await screen.findByRole("heading", { name: "전수조사 시작 대기" });
+    await screen.findByRole("region", { name: "최근 회차 결과" });
+    expect(screen.queryByRole("button", { name: "결과 상세 보기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "선택한 조사 회차" })).not.toBeInTheDocument();
+  });
+
+  it("대기 중 시작 준비 뒤 새 활성 회차가 생기면 조사 화면으로 이동한다", async () => {
+    let active = false;
+    vi.mocked(stocktakeApi.read).mockImplementation(async path => path === "/api/stocktakes/rounds" ? { items: active ? rounds : [] } : readFixture(path));
+    const { client } = mount();
+    fireEvent.click(await screen.findByRole("button", { name: "새 회차 시작" }));
+    await screen.findByText("회차 관리");
+    active = true;
+    await act(async () => { await client.invalidateQueries({ queryKey: ["stocktake"] }); });
+    // A new round alone must not unmount a possibly unresolved start request.
+    expect(screen.getByText("회차 관리")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "시작 완료 알림" }));
+    await screen.findByRole("region", { name: "조사 대상 목록" });
+    expect(screen.getByRole("button", { name: "조사하기", exact: true })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("빈 대상도 준비를 끝내고 빈 목록으로 표시한다", async () => {
@@ -842,6 +934,8 @@ describe("StocktakeView integration", () => {
     targets = [target({ status: "CLOSED_UNAPPLIED", count: null })];
     vi.mocked(stocktakeApi.read).mockImplementation(async path => path === "/api/stocktakes/rounds" ? { items: [rounds[1]] } : readFixture(path));
     mount();
+    fireEvent.click(await screen.findByRole("button", { name: "결과 상세 보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "조사하기", exact: true }));
     fireEvent.click(await screen.findByRole("button", { name: /시험 품목 A/ }));
     expect(screen.getByText(/종료된 회차입니다/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "계수 시작" })).not.toBeInTheDocument();
