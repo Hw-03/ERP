@@ -17,13 +17,16 @@ import logging
 import os
 import threading
 from collections import defaultdict
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Iterator
 
 from sqlalchemy import event
+from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.orm import Session
 
+from app import database
 from app.database import BACKEND_DIR, SessionLocal
 from app.models import Employee, Item, TransactionLog, TransactionTypeEnum
 
@@ -161,21 +164,12 @@ def _append_rows(rows_by_month: dict[Path, list[list[str]]]) -> None:
 
 
 def _append_logs(
-    logs: Iterable[TransactionLog],
-    items_by_id: dict,
-    emp_code_by_id: dict | None = None,
+    rows: Iterable[tuple[datetime, list[str]]],
 ) -> None:
-    """주어진 TransactionLog 들을 월별로 묶어 한 번에 append."""
+    """DB 연결을 반환한 뒤 완전히 변환된 행만 파일로 기록한다."""
     rows_by_month: dict[Path, list[list[str]]] = defaultdict(list)
-    for log in logs:
-        if log.transaction_type not in AUDIT_TX_TYPES:
-            continue
-        if log.created_at is None:
-            continue
-        item = items_by_id.get(log.item_id)
-        rows_by_month[path_for_month(log.created_at)].append(
-            row_from_log(log, item, emp_code_by_id)
-        )
+    for created_at, row in rows:
+        rows_by_month[path_for_month(created_at)].append(row)
     _append_rows(rows_by_month)
 
 
@@ -269,35 +263,59 @@ def _collect_after_flush(session: Session, _flush_context) -> None:
             bucket.append(log.log_id)
 
 
+@contextmanager
+def _audit_read_session(bind: Engine | Connection) -> Iterator[Session]:
+    """같은 DB의 읽기 엔진을 쓰되 Connection 바인딩의 외부 트랜잭션은 보존한다."""
+    temporary_engine: Engine | None = None
+    read_bind = bind
+    if (
+        isinstance(bind, Engine)
+        and bind.dialect.name == "sqlite"
+        and bind.url.database not in (None, "", ":memory:")
+    ):
+        if bind is database.engine:
+            read_bind = database.read_engine
+        else:
+            temporary_engine = database._create_database_engine(str(bind.url), sqlite_read_only=True)
+            read_bind = temporary_engine
+    try:
+        with Session(bind=read_bind, autoflush=False) as db:
+            yield db
+    finally:
+        if temporary_engine is not None:
+            temporary_engine.dispose()
+
+
 def _emit_after_commit(session: Session) -> None:
+    """커밋된 거래를 읽어 연결을 반환한 후 CSV 미러를 기록한다."""
     log_ids = _pending_log_ids.pop(id(session), None)
     if not log_ids:
         return
-    # 원본 세션과 같은 엔진으로 새 세션 열어서 재조회 — prod/test 둘 다 동작.
-    bind = session.get_bind()
-    from sqlalchemy.orm import Session as _Session
-    db = _Session(bind=bind)
     try:
-        logs = (
-            db.query(TransactionLog)
-            .filter(TransactionLog.log_id.in_(log_ids))
-            .all()
-        )
-        if not logs:
-            return
-        item_ids = {log.item_id for log in logs}
-        items = db.query(Item).filter(Item.item_id.in_(item_ids)).all()
-        items_by_id = {it.item_id: it for it in items}
-        emp_ids = {log.producer_employee_id for log in logs if log.producer_employee_id is not None}
-        emp_code_by_id = {}
-        if emp_ids:
-            emps = db.query(Employee).filter(Employee.employee_id.in_(emp_ids)).all()
-            emp_code_by_id = {e.employee_id: e.employee_code for e in emps}
-        _append_logs(logs, items_by_id, emp_code_by_id)
+        with _audit_read_session(session.get_bind()) as db:
+            logs = (
+                db.query(TransactionLog)
+                .filter(TransactionLog.log_id.in_(log_ids))
+                .all()
+            )
+            if not logs:
+                return
+            item_ids = {log.item_id for log in logs}
+            items = db.query(Item).filter(Item.item_id.in_(item_ids)).all()
+            items_by_id = {it.item_id: it for it in items}
+            emp_ids = {log.producer_employee_id for log in logs if log.producer_employee_id is not None}
+            emp_code_by_id = {}
+            if emp_ids:
+                emps = db.query(Employee).filter(Employee.employee_id.in_(emp_ids)).all()
+                emp_code_by_id = {e.employee_id: e.employee_code for e in emps}
+            rows = [
+                (log.created_at, row_from_log(log, items_by_id.get(log.item_id), emp_code_by_id))
+                for log in logs
+                if log.transaction_type in AUDIT_TX_TYPES and log.created_at is not None
+            ]
+        _append_logs(rows)
     except Exception:
         _log.exception("audit_csv after_commit 처리 실패 log_ids=%s", log_ids)
-    finally:
-        db.close()
 
 
 def _discard_on_rollback(session: Session) -> None:

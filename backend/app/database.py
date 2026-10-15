@@ -1,4 +1,5 @@
 import os
+from collections.abc import Generator
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -6,7 +7,7 @@ from fastapi import HTTPException, Request
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 from app.utils import search as _search  # noqa: F401  # register deterministic SQLite search functions
 
@@ -127,6 +128,11 @@ _WEEKLY_SNAPSHOT_GUARD_PREFIXES = (
     "/api/stocktakes",
 )
 
+_SQLITE_READ_ONLY_PREVIEW_ROUTES = frozenset({
+    "/api/io/preview",
+    "/api/inventory/operations/{operation_id}/cancel/preview",
+})
+
 
 def _requires_weekly_snapshot_guard(request: Request) -> bool:
     """재고 수량이나 완료품 활성 범위에 영향을 줄 수 있는 쓰기인지 판정한다."""
@@ -140,7 +146,13 @@ def _requires_weekly_snapshot_guard(request: Request) -> bool:
     )
 
 
-def get_db(request: Request):
+def get_db(request: Request) -> Generator[Session, None, None]:
+    """확인된 SQLite 미리보기만 읽기 연결로 보내고 실제 변경은 기존 가드로 보호한다."""
+    read_only_preview = (
+        _is_file_sqlite
+        and request.method == "POST"
+        and getattr(request.scope.get("route"), "path", None) in _SQLITE_READ_ONLY_PREVIEW_ROUTES
+    )
     close_preview = request.method == "POST" and request.url.path.startswith("/api/stocktakes/rounds/") and request.url.path.endswith("/close-previews")
     closing = request.method == "POST" and request.url.path.startswith("/api/stocktakes/rounds/") and request.url.path.endswith("/close")
     resolving = request.method == "POST" and request.url.path.startswith("/api/stocktakes/commands/") and request.url.path.endswith("/resolve")
@@ -148,7 +160,7 @@ def get_db(request: Request):
     session_factory = (
         ClosePreviewSessionLocal if close_preview else CloseSessionLocal if bounded else
         ReadSessionLocal
-        if _is_file_sqlite and request.method in {"GET", "HEAD"}
+        if _is_file_sqlite and (request.method in {"GET", "HEAD"} or read_only_preview)
         else SessionLocal
     )
     db = session_factory()
@@ -159,7 +171,7 @@ def get_db(request: Request):
                 db.connection().exec_driver_sql("SET TRANSACTION READ ONLY")
         if bounded:
             db.info["stocktake_close_request"] = True
-        if not close_preview and not resolving and _requires_weekly_snapshot_guard(request):
+        if not close_preview and not resolving and not read_only_preview and _requires_weekly_snapshot_guard(request):
             from app.services.weekly_inventory_snapshot import (
                 WeeklyInventorySnapshotGapError,
                 ensure_due_snapshot_committed,
@@ -175,7 +187,7 @@ def get_db(request: Request):
                         "message": str(exc),
                     },
                 ) from exc
-        if request.method not in {"GET", "HEAD", "OPTIONS"} and (
+        if not read_only_preview and request.method not in {"GET", "HEAD", "OPTIONS"} and (
             _requires_weekly_snapshot_guard(request)
             or request.url.path.startswith(("/api/warehouse-map/", "/api/settings/"))
             or request.url.path == "/api/departments" or request.url.path.startswith("/api/departments/")

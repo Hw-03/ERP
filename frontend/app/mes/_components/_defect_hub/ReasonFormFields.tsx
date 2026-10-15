@@ -28,14 +28,15 @@ export interface ReasonFormFieldsProps {
   mobilePresentation?: boolean;
   showCategory?: boolean;
   animateCategory?: boolean;
-  /** 격리 화면만 수량·분류·삭제를 사유 입력과 함께 배치한다. */
-  quarantineControls?: { quantity: ReactNode; management: ReactNode; remove: ReactNode; add?: ReactNode };
+  categoryPlaceholder?: string;
+  /** 처리 화면의 수량·추가·삭제를 사유 입력과 함께 배치하고 격리는 관리 분류도 표시한다. */
+  quarantineControls?: { quantity: ReactNode; management?: ReactNode; remove: ReactNode; add?: ReactNode };
 }
 
 /** 선택기는 마스터를 공유하고, 개별 이력에 저장된 사유 이름은 보존한다. */
 export function ReasonFormFields({
   employeeId, category, categoryId, memo, onCategoryChange, onMemoChange,
-  required = true, mobilePresentation = false, quarantineControls, showCategory = true, animateCategory = false,
+  required = true, mobilePresentation = false, quarantineControls, showCategory = true, animateCategory = false, categoryPlaceholder = "카테고리 선택",
 }: ReasonFormFieldsProps): ReactElement {
   const queryClient = useQueryClient();
   const revision = useRealtimeRevision();
@@ -168,7 +169,7 @@ export function ReasonFormFields({
         onClick={() => { setSearch(""); setEditingId(null); setError(null); setShowInactive(false); setOpen(true); }}
         className="flex min-h-11 w-full items-center justify-between gap-2 rounded-[12px] border px-3 text-left text-sm outline-none focus-visible:ring-2 disabled:opacity-40"
         style={{ background: LEGACY_COLORS.s2, color: category ? LEGACY_COLORS.text : quarantineControls && required ? LEGACY_COLORS.red : LEGACY_COLORS.muted2, borderColor: LEGACY_COLORS.border }}>
-        <span className="min-w-0 break-words">{selected?.name || category || "카테고리 선택"}</span>
+        <span className="min-w-0 break-words">{selected?.name || category || categoryPlaceholder}</span>
         <ChevronDown size={16} className="shrink-0" />
       </button>
     </div>;
@@ -186,12 +187,12 @@ export function ReasonFormFields({
     {quarantineControls ? mobilePresentation ? <div className={styles.mobileFields}>
       <div className={styles.mobileTop}>
         {quarantineControls.quantity}
-        <div className={styles.mobileRight}>
+        {quarantineControls.management && <div className={styles.mobileRight}>
           <div className={styles.mobileHeading}>
             <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>관리 분류</span>
           </div>
           {quarantineControls.management}
-        </div>
+        </div>}
         <div className={styles.mobileRemove}>{quarantineControls.remove}</div>
       </div>
       {categoryField}
@@ -203,12 +204,12 @@ export function ReasonFormFields({
         <div className={styles.add}>{quarantineControls.add}</div>
         <div className={styles.remove}>{quarantineControls.remove}</div>
       </div>
-      <div className={styles.desktopBottom}>
+      <div className={`${styles.desktopBottom} ${quarantineControls.management ? "" : styles.withoutManagement}`}>
         <div className={styles.memo}>{memoField}</div>
-        <div className={`${styles.management} [&_button]:min-h-11 [&_button]:text-sm`}>
+        {quarantineControls.management && <div className={`${styles.management} [&_button]:min-h-11 [&_button]:text-sm`}>
           <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>관리 분류</span>
           {quarantineControls.management}
-        </div>
+        </div>}
       </div>
     </div> : <>
       {animateCategory ? <div className={`${styles.categoryReveal} ${showCategory ? styles.categoryExpanded : ""}`} aria-hidden={!showCategory} inert={!showCategory}>

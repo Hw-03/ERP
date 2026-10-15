@@ -255,7 +255,8 @@ export function DefectItemPicker({
                 검색
               </span>
               <SearchInput value={search} onChange={setSearch} placeholder="품목명 · 품목 코드"
-                ariaLabel="검색" className="rounded-[10px] px-2" />
+                ariaLabel="검색" className={mobilePresentation ? "rounded-[10px] px-2" : "rounded-[10px] px-2 lg:h-[30px] lg:min-h-0 lg:[&_button]:h-7 lg:[&_button]:min-h-0 lg:[&_button]:min-w-7"}
+                inputProps={{ className: mobilePresentation ? undefined : "lg:h-7" }} />
             </label>
           </div>
           {!mobilePresentation && operator?.employee_id && (

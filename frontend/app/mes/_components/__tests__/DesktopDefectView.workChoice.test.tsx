@@ -100,7 +100,7 @@ describe("데스크톱 불량 작업·출처 통합 선택", async () => {
     fireEvent.click(within(screen.getByRole("navigation", { name: "불량 처리 단계" })).getByRole("button", { name: /^작업·출처/ }));
     await waitFor(() => expect(screen.getByTestId("defect-work-choice")).toBeInTheDocument());
     expect(window.history.state).toMatchObject({ defect: "work-choice", action: "add", source: "production" });
-    fireEvent.click(within(screen.getByRole("navigation", { name: "불량 처리 단계" })).getByRole("button", { name: "불량 메뉴", exact: true }));
+    fireEvent.click(within(screen.getByRole("navigation", { name: "불량 처리 단계" })).getByRole("button", { name: "불량", exact: true }));
     await waitFor(() => expect(screen.getByRole("button", { name: /불량 처리 품목을/ })).toBeInTheDocument());
     expect(window.history.state).toMatchObject({ defect: "hub" });
   });

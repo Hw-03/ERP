@@ -45,6 +45,7 @@
 }
 
 .memo { flex: 1 1 220px; min-width: 0; }
+.withoutManagement { grid-template-columns: minmax(0, 1fr); }
 .add { min-width: 0; }
 .add button { width: 100%; white-space: nowrap; }
 .remove { display: flex; }
