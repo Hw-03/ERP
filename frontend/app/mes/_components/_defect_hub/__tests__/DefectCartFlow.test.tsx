@@ -115,6 +115,23 @@ beforeEach(() => {
 });
 
 describe("DefectCartFlow", () => {
+  it.each([
+    ["production", "부서 가용", "4EA"],
+    ["warehouse", "창고 가용", "7EA"],
+  ] as const)("격리 요약은 %s 출처의 예약을 뺀 가용과 사유 합계를 구분한다", (source, label, available) => {
+    const item = makeItem({ item_id: "summary-stock", mes_code: "3-AR-9001", item_name: "요약 품목", warehouse_qty: 10, pending_quantity: 3,
+      locations: [{ department: "조립", status: "PRODUCTION", quantity: 5, pending_quantity: 1, available_quantity: 4 }] });
+    render(<DefectCartFlow mode="add" initialSource={source} items={[item]} productModels={[]} currentEmployee={{ ...employee, department: "고압" }} onDone={vi.fn()} onCancel={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "요약 품목 장바구니에 추가", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "수량·처리 정보 →", exact: true }));
+    const summary = screen.getByLabelText("품목 수량 요약");
+    expect(within(summary).getByText(label)).toBeInTheDocument();
+    expect(within(summary).getAllByRole("definition").map((node) => node.textContent)).toEqual([available, "1EA", "1건"]);
+    fireEvent.change(screen.getByRole("spinbutton", { name: "수량", exact: true }), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "다른 사유 추가", exact: true }));
+    expect(within(summary).getAllByRole("definition").map((node) => node.textContent)).toEqual([available, "3EA", "2건"]);
+  });
+
   it.each(["scrap", "rework"] as const)("%s는 같은 품목에 다른 사유를 추가하고 삭제·단계 왕복에도 나머지 입력을 보존한다", async (action) => {
     render(<DefectCartFlow mode="scrap" initialAction={action} items={[{ ...fItem, has_bom: true }]} productModels={[]}
       currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />);
@@ -526,7 +543,7 @@ describe("DefectCartFlow", () => {
     fireEvent.change(quantities[2], { target: { value: "3" } });
     fireEvent.change(screen.getAllByPlaceholderText(/스크래치 다수/)[2], { target: { value: "마지막 사유" } });
     const group = screen.getByTestId("defect-quarantine-item-group");
-    expect(group).toHaveTextContent("총 10 EA · 3건");
+    expect(within(screen.getByLabelText("품목 수량 요약")).getAllByRole("definition").map((node) => node.textContent)).toEqual(["100EA", "10EA", "3건"]);
     expect(screen.getAllByTestId("defect-quarantine-item-group")).toHaveLength(1);
     expect(screen.queryByTestId("defect-side-toolbar")).not.toBeInTheDocument();
     expect(screen.getAllByPlaceholderText(/예: 3/)).toHaveLength(3);

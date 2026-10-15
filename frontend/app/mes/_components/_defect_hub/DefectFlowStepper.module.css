@@ -1,0 +1,27 @@
+.root :global(.iwpb.done) {
+  border-color: color-mix(in srgb, var(--c-red) 22%, var(--c-border));
+  background: color-mix(in srgb, var(--c-red) 6%, var(--c-s1));
+  color: color-mix(in srgb, var(--c-red) 70%, var(--c-text));
+}
+
+.root :global(.iwpb.done:hover) {
+  border-color: color-mix(in srgb, var(--c-red) 40%, var(--c-border));
+}
+
+.root :global(.iwpb.done .iwpl) {
+  font-weight: 800;
+}
+
+.root :global(.iwpb.done .iwps) {
+  color: color-mix(in srgb, var(--c-red) 64%, var(--c-muted2));
+}
+
+.root :global(.iwpb.a) {
+  border-color: var(--c-red);
+  background: color-mix(in srgb, var(--c-red) 14%, var(--c-s1));
+  color: color-mix(in srgb, var(--c-red) 84%, var(--c-text));
+}
+
+.root :global(.iwpb.a .iwps) {
+  color: color-mix(in srgb, var(--c-red) 80%, var(--c-muted2));
+}

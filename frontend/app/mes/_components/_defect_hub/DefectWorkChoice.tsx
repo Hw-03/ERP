@@ -86,7 +86,6 @@ export function DefectWorkChoice({ action, source, onActionChange, onProceed, on
 
       <div className={`${styles.content} ${showSource ? styles.withSource : ""}`}>
         <section aria-label="작업 선택" className={styles.workSection}>
-          <h3 className={styles.sectionLabel}>작업 선택</h3>
           <div className={styles.workGrid}>
             {WORK_OPTIONS.map(({ action: option, title, description, icon: Icon, tone }) => {
               const active = action === option;
