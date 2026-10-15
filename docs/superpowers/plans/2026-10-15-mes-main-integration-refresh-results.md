@@ -80,3 +80,13 @@ main 반영·직원 배포·원본 DB 변경·예약 변경은 수행하지 않�
 - 실제 CI 실패 4건은 전용 PostgreSQL 16.15 합성 DB에서도 재현했다. 수정 후 관련 5파일 141건, 실제 PostgreSQL의 스키마·snapshot·승인 동시성 18건, 별도 백업/복구 1건이 통과했다. PostgreSQL 두 결과 XML은 모두 실패·건너뜀 0이다. Python compile과 diff 검사도 통과했다. 읽기 전용 리뷰에 차단 지적은 없었다.
 - 근거: `pg-ci-red.log`, `pg-cursor-unit-red.log`, `pg-check-token-red.log`, `pg-ci-local-green.log`, `pg-ci-real-green.log`, `pg-ci-local-green.xml`, `pg-ci-restore.log`, `pg-ci-restore.xml`. 전용 data_directory와 소유 PID를 확인한 뒤 16435 포트를 해제했다. 기존 검토 서버·원본 DB는 사용하지 않았다.
 - 이번 변경의 네 파일은 현재 기대값 바인딩에 연결되지 않는다. 원장·과거 보고서를 다시 생성하거나 전체 업무 검사를 반복하지 않는다. 프론트 계약·제품 빌드가 같으므로 기존 통과를 재사용한다. 최종 HEAD의 CI 전체 성공은 별도 확인 전까지 미완료다.
+
+### 세 번째 CI와 사유 표시 검사의 검색창 선택
+
+`78956d02`·`de31356d`를 작업 브랜치에 push했다. `de31356d`의 [세 번째 CI](https://github.com/Hw-03/ERP/actions/runs/38707644906)는 일반 E2E를 제외한 일곱 job이 성공했다. `ci-third-postgres/postgres-required-contracts.json`의 필수 28건·확장 60건은 모두 실제 실행됐고 실패·오류·건너뜀 0, 예상 테스트 구성 일치다. 백엔드 전체 pytest·OpenAPI, 프론트 전체 4,581건·커버리지·빌드·번들, 정책·원장·AS/연구 두 job도 통과했다.
+
+일반 E2E는 298건 통과·2건 실패였다. 둘 다 `defect-reason-fields-expectations.spec.ts`에서 내역으로 이동한 직후 placeholder로 검색창을 찾다가, 실제 입력과 사라지는 로딩 덮개의 비활성 입력을 동시에 선택했다. CI의 첫 실행·재시도 로그가 같은 strict mode 오류를 보였고 `DesktopMesShell.tsx`의 전환 덮개는 화면 준비 후 `aria-hidden`·`inert`로 제외되는 구조임을 확인했다.
+
+두 선택만 접근 가능한 `textbox` 역할과 정확한 이름으로 바꿨다. 단순 첫 항목 선택·고정 대기·재시도 추가·단언 삭제는 하지 않았다. 사유/메모 중복 여부·상세 표시·창고 수량·원건 잔량·과거 조회의 무변경 단언을 유지하고 두 검사를 각각 3회, 재시도 0으로 통과했다. 변경 파일 ESLint, 원본 mes.db 불변·전용 서버 종료도 확인했다. 실패 trace·원문은 `ci-third-general-report/`, 새 통과는 `e2e-reason-search-green.log`에 보존한다.
+
+원장에는 현재 파일의 sourceHash 63개만 갱신했다. 다른 모든 필드와 과거 실행·단언 이력은 동일하며 `ledger-reason-search-preservation.json`에 확인 결과를 남겼다. 제품·빌드·의존성·공통 검사 설정은 바뀌지 않아 직전 CI의 유효한 근거를 재사용한다. 최종 HEAD의 원격 CI는 별도로 확인한다.

@@ -21474,147 +21474,147 @@
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "expect(origin.reason_category).toBe(\"외관 불량\");",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "expect(origin.reason_memo || null).toBeNull();",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "await expect(record.getByTestId(\"defect-reason-summary\")).toContainText(\"외관 불량\");",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "await expect(record.getByText(\"메모 없음\", { exact: true })).toBeVisible();",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "await expect(record.getByTestId(\"defect-reason-summary\")).not.toContainText(\"메모 없음\");",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "expect(logs).toHaveLength(4);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "expect(logs.every(log => Boolean(log.reason_category) && !log.reason_memo)).toBe(true);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "await expect(row.getByText(\"메모\", { exact: true })).toHaveCount(0);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "await expect(detail.getByText(\"불량 사유\", { exact: true }).locator(\"..\")).toContainText(log.reason_category!);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "await expect(detail.getByText(\"메모\", { exact: true })).toHaveCount(0);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "await expect(record.getByTestId(\"defect-reason-summary\")).toContainText(\"격리 사유미입력\");",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "await expect(record.getByTestId(\"defect-reason-summary\")).not.toContainText(memo);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "await expect(record.getByText(memo, { exact: true })).toHaveCount(1);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "expect(legacyLogs).toHaveLength(2);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "await expect(row.getByText(\"사유\", { exact: true })).toHaveCount(0);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "await expect(detail.getByText(\"불량 사유\", { exact: true })).toHaveCount(0);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "await expect(detail.getByText(\"메모\", { exact: true }).locator(\"..\")).toContainText(memo);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "await expect(detail.getByText(memo, { exact: true })).toHaveCount(1);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "expect(await read<Item>(request, `/api/items/${item.item_id}`)).toEqual(beforeItem);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "expect(await read<DefectLocation[]>(request, \"/api/defects/locations\")).toEqual(beforeOrigins);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "expect(await read<TransactionLog[]>(request, `/api/inventory/transactions?item_id=${item.item_id}&limit=1000`)).toEqual(beforeLogs);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             }
           ],
@@ -34524,147 +34524,147 @@
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "expect(origin.reason_category).toBe(\"외관 불량\");",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "expect(origin.reason_memo || null).toBeNull();",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "await expect(record.getByTestId(\"defect-reason-summary\")).toContainText(\"외관 불량\");",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "await expect(record.getByText(\"메모 없음\", { exact: true })).toBeVisible();",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "await expect(record.getByTestId(\"defect-reason-summary\")).not.toContainText(\"메모 없음\");",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "expect(logs).toHaveLength(4);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "expect(logs.every(log => Boolean(log.reason_category) && !log.reason_memo)).toBe(true);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "await expect(row.getByText(\"메모\", { exact: true })).toHaveCount(0);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "await expect(detail.getByText(\"불량 사유\", { exact: true }).locator(\"..\")).toContainText(log.reason_category!);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "await expect(detail.getByText(\"메모\", { exact: true })).toHaveCount(0);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "await expect(record.getByTestId(\"defect-reason-summary\")).toContainText(\"격리 사유미입력\");",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "await expect(record.getByTestId(\"defect-reason-summary\")).not.toContainText(memo);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "await expect(record.getByText(memo, { exact: true })).toHaveCount(1);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "expect(legacyLogs).toHaveLength(2);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "await expect(row.getByText(\"사유\", { exact: true })).toHaveCount(0);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "await expect(detail.getByText(\"불량 사유\", { exact: true })).toHaveCount(0);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "await expect(detail.getByText(\"메모\", { exact: true }).locator(\"..\")).toContainText(memo);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "await expect(detail.getByText(memo, { exact: true })).toHaveCount(1);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "expect(await read<Item>(request, `/api/items/${item.item_id}`)).toEqual(beforeItem);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "expect(await read<DefectLocation[]>(request, \"/api/defects/locations\")).toEqual(beforeOrigins);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "expect(await read<TransactionLog[]>(request, `/api/inventory/transactions?item_id=${item.item_id}&limit=1000`)).toEqual(beforeLogs);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             }
           ],
@@ -54469,147 +54469,147 @@
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "expect(origin.reason_category).toBe(\"외관 불량\");",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "expect(origin.reason_memo || null).toBeNull();",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "await expect(record.getByTestId(\"defect-reason-summary\")).toContainText(\"외관 불량\");",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "await expect(record.getByText(\"메모 없음\", { exact: true })).toBeVisible();",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "await expect(record.getByTestId(\"defect-reason-summary\")).not.toContainText(\"메모 없음\");",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "expect(logs).toHaveLength(4);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "expect(logs.every(log => Boolean(log.reason_category) && !log.reason_memo)).toBe(true);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "await expect(row.getByText(\"메모\", { exact: true })).toHaveCount(0);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "await expect(detail.getByText(\"불량 사유\", { exact: true }).locator(\"..\")).toContainText(log.reason_category!);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격리·복귀·폐기·반품은 없는 메모를 만들지 않는다",
               "assertion": "await expect(detail.getByText(\"메모\", { exact: true })).toHaveCount(0);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 20
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "await expect(record.getByTestId(\"defect-reason-summary\")).toContainText(\"격리 사유미입력\");",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "await expect(record.getByTestId(\"defect-reason-summary\")).not.toContainText(memo);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "await expect(record.getByText(memo, { exact: true })).toHaveCount(1);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "expect(legacyLogs).toHaveLength(2);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "await expect(row.getByText(\"사유\", { exact: true })).toHaveCount(0);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "await expect(detail.getByText(\"불량 사유\", { exact: true })).toHaveCount(0);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "await expect(detail.getByText(\"메모\", { exact: true }).locator(\"..\")).toContainText(memo);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "await expect(detail.getByText(memo, { exact: true })).toHaveCount(1);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "expect(await read<Item>(request, `/api/items/${item.item_id}`)).toEqual(beforeItem);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "expect(await read<DefectLocation[]>(request, \"/api/defects/locations\")).toEqual(beforeOrigins);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             },
             {
               "file": "frontend/tests/e2e/defect-reason-fields-expectations.spec.ts",
               "selector": "DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 단독 투영은 사유를 만들어 중복 표시하지 않는다",
               "assertion": "expect(await read<TransactionLog[]>(request, `/api/inventory/transactions?item_id=${item.item_id}&limit=1000`)).toEqual(beforeLogs);",
-              "sourceHash": "b0ddd37cd62581eeff9e8f82eada2d479cd2109955bd5faf4929635d4ede0c64",
+              "sourceHash": "17b28e8c6fb82b554f53b44578c36b8ff22aa2356295daa2d4f62eecbe7e4679",
               "line": 85
             }
           ],

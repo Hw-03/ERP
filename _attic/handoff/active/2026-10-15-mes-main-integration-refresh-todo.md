@@ -50,6 +50,8 @@
 - `9988b473` push 후 [두 번째 CI](https://github.com/Hw-03/ERP/actions/runs/38702851944)에서 프론트 전체 4,581건·커버리지·빌드·번들 및 정책·원장·AS/연구 두 E2E job이 통과했다. 백엔드는 전체 pytest 이후 실제 PostgreSQL 단계의 4건이 실패했고, 일반 E2E는 조사 시점 진행 중이다.
 - [x] PostgreSQL 실패 4건을 전용 합성 DB에서 재현했다. 내역 cursor의 마지막 조회 열 의존을 `request_order_at` 이름 선택으로 수정했고, 제약식의 `!=`/`<>`·두 실사 테이블의 AND/괄호·IN/ANY 표현 차이만 허용했다. 값·연산자·OR 우선순위 변경 거부는 유지한다. 수정 전 cursor 1건·제약식 4건 실패, 수정 후 관련 141건과 실제 PostgreSQL 18건·백업/복구 1건 모두 통과(건너뜀 0). `pg-cursor-unit-red.log`, `pg-check-token-red.log`, `pg-ci-red.log`, `pg-ci-local-green.log`, `pg-ci-real-green.log`, `pg-ci-restore.xml`에 보존했다. 공개 API·재고 계산·스키마는 바꾸지 않았다.
 - 전용 PostgreSQL 16435는 실제 data_directory·PID 소유권을 확인한 뒤 종료했다. 새 수정은 기존 기대값 바인딩의 대상 파일이 아니므로 원장·과거 근거를 다시 생성하지 않는다. 로컬 전체 검사 대신 관련 검사와 변경 전 두 번째 CI의 유효한 결과를 재사용하고, 최종 HEAD 전체 CI는 이어서 확인한다.
+- `78956d02`(내역 cursor)·`de31356d`(PostgreSQL 표현 비교) push 후 [세 번째 CI](https://github.com/Hw-03/ERP/actions/runs/38707644906)의 일곱 job이 통과했다. 실제 PostgreSQL 필수 28건·확장 60건은 영수증상 모두 실행됐고 실패·건너뜀 0이다. 일반 E2E는 298건 통과, 같은 사유 표시 파일의 두 검색창 선택이 실패했다. 전환 종료 중 `aria-hidden`·`inert`인 로딩 덮개의 입력까지 placeholder가 중복 선택했다. 두 줄을 접근 가능한 textbox 선택으로 바꾸고 두 검사 각각 3회(총 6건), 재시도 0 통과·ESLint 통과를 확인했다. 업무/수량/사유/메모 단언은 그대로다 (`ci-third-general.log`, `e2e-reason-search-green.log`).
+- 사유 파일에 연결된 현재 sourceHash 63개만 갱신했다. 나머지 필드와 과거 1,058조건 실행·단언 이력은 동일하다 (`ledger-reason-search-preservation.json`). 제품 코드·공통 설정·빌드가 그대로이므로 직전 CI의 유효한 일곱 job 근거를 재사용하고 최종 원격 CI를 확인한다.
 - [x] 보호 자료 3개 해시·이전 검토판 보존. 최종 production 후보의 로그인·사유 확인·실행 전 취소 후 모든 위치 수량·업무 레코드 동일 확인. 후보 3036/8036 종료, 결과·한계 기록.
 
 결과와 한계: [검증 결과](../../../docs/superpowers/plans/2026-10-15-mes-main-integration-refresh-results.md). PostgreSQL은 최종 CI에서 실제 실행을 확인한다. 과거 기대값은 당시 근거로 보존한다.

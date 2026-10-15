@@ -68,7 +68,7 @@ test("DEFECT-REASON-FIELDS 8.6-09/8.10-04/8.13-07 실제 카테고리 단독 격
   expect(logs).toHaveLength(4);
   expect(logs.every(log => Boolean(log.reason_category) && !log.reason_memo)).toBe(true);
   await page.getByRole("navigation").getByRole("button", { name: "입출고 내역 입출고 이력 조회", exact: true }).click();
-  await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(item.item_name);
+  await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(item.item_name);
   for (const log of logs) {
     const row = page.locator(`[data-log-id="${log.log_id}"]`).filter({ visible: true }).first();
     await expect(row).toBeVisible();
@@ -144,7 +144,7 @@ test("DEFECT-REASON-LEGACY 8.6-09/8.10-04/8.13-07 읽기 전용 과거 메모 �
   await expect(record.getByTestId("defect-reason-summary")).not.toContainText(memo);
   await expect(record.getByText(memo, { exact: true })).toHaveCount(1);
   await page.getByRole("navigation").getByRole("button", { name: "입출고 내역 입출고 이력 조회", exact: true }).click();
-  await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(item.item_name);
+  await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(item.item_name);
   const legacyLogs = beforeLogs.filter(entry => ["MARK_DEFECTIVE", "SUPPLIER_RETURN"].includes(entry.transaction_type));
   expect(legacyLogs).toHaveLength(2);
   for (const entry of legacyLogs) {
