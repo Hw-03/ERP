@@ -156,7 +156,14 @@ test("SHIP-DISCARD 8.4-07 새로고침 경고·머무르기 전체 입력·폐�
 test("SHIP-VARIANT 8.12-01/03 동일 BOM 국가·색상·판매처 이름 후보와 목록 실제 품목", async ({ page, request, actors, parts }) => {
   const original = await (await request.get(`/api/bom/${parts.pa.item_id}`)).json();
   await loginUi(page, actors.requester); await draft(page, parts); await step(page, 2);
-  await page.locator(`[data-bom-line-child="${parts.af.item_id}"]`).getByTestId("shipping-bom-line-controls").fill("2"); await step(page, 3);
+  const quantity = page.locator(`[data-bom-line-child="${parts.af.item_id}"]`).getByTestId("shipping-bom-line-controls");
+  await quantity.fill("2");
+  await expect(quantity).toHaveValue("2");
+  const matched = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/shipping/bom-match" && response.request().method() === "POST");
+  await step(page, 3);
+  const matchResponse = await matched;
+  expect(matchResponse.status()).toBe(200);
+  expect(matchResponse.request().postDataJSON().bom_lines.find((line: { child_item_id: string }) => line.child_item_id === parts.af.item_id)?.quantity).toBe(2);
   const candidate = page.getByTestId(`shipping-bom-candidate-${parts.variant.item_id}`);
   await expect(page.getByTestId(`shipping-bom-candidate-${parts.variantOther.item_id}`)).toContainText("한국 흰색 판매처A");
   await expect(candidate).toContainText("미국 파랑 판매처B"); await candidate.click();

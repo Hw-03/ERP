@@ -9383,7 +9383,7 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-VARIANT 8.12-01/03 동일 BOM 국가·색상·판매처 이름 후보와 목록 실제 품목",
               "assertion": "expect(await (await request.get(`/api/bom/${parts.pa.item_id}`)).json()).toEqual(original);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
               "line": 156
             },
             {
@@ -9474,6 +9474,22 @@
                 "selector": "SHIP-VARIANT 8.12-01/03 동일 BOM 국가·색상·판매처 이름 후보와 목록 실제 품목",
                 "assertion": "expect(await (await request.get(`/api/bom/${parts.pa.item_id}`)).json()).toEqual(original);",
                 "sourceHash": "24eaa58576d2ddb0ba0725b4c8734968bb7ce38fd0f149778f7108088634d723",
+                "line": 156
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-CANDIDATE PC 8.4-03/04 8.12-03/04/05 제외·추가 후보 PA/PF 일치와 원본 BOM 보존",
+                "assertion": "expect(await (await request.get(`/api/bom/${shipping.pa.item_id}`)).json()).toEqual(original);",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 184
+              }
+            ],
+            [
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-VARIANT 8.12-01/03 동일 BOM 국가·색상·판매처 이름 후보와 목록 실제 품목",
+                "assertion": "expect(await (await request.get(`/api/bom/${parts.pa.item_id}`)).json()).toEqual(original);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
                 "line": 156
               },
               {
@@ -9991,29 +10007,29 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-GENERATED-ROLES 8.12-12 기준 PF와 새 PA·PF 역할·실제 저장 식별값 구분",
               "assertion": "await expect(changedComponent).toContainText(parts.af.mes_code!);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 219
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 226
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-GENERATED-ROLES 8.12-12 기준 PF와 새 PA·PF 역할·실제 저장 식별값 구분",
               "assertion": "await expect(changedComponent).toContainText(\"총 3EA\");",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 219
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 226
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-GENERATED-ROLES 8.12-12 기준 PF와 새 PA·PF 역할·실제 저장 식별값 구분",
               "assertion": "await expect(finalChangedComponent).toContainText(parts.af.mes_code!);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 219
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 226
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-GENERATED-ROLES 8.12-12 기준 PF와 새 PA·PF 역할·실제 저장 식별값 구분",
               "assertion": "await expect(finalChangedComponent).toContainText(\"총 3EA\");",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 219
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 226
             },
             {
               "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
@@ -10194,6 +10210,85 @@
                 "selector": "SHIP-GENERATED-ROLES 8.12-12 기준 PF와 새 PA·PF 역할·실제 저장 식별값 구분",
                 "assertion": "await expect(finalChangedComponent).toContainText(\"총 3EA\");",
                 "sourceHash": "24eaa58576d2ddb0ba0725b4c8734968bb7ce38fd0f149778f7108088634d723",
+                "line": 219
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-CANDIDATE PC 8.4-03/04 8.12-03/04/05 제외·추가 후보 PA/PF 일치와 원본 BOM 보존",
+                "assertion": "await expect(candidate).not.toContainText(shipping.cable.item_name);",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 184
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-CANDIDATE PC 8.4-03/04 8.12-03/04/05 제외·추가 후보 PA/PF 일치와 원본 BOM 보존",
+                "assertion": "await expect(page.getByTestId(\"shipping-bom-change-table\")).toContainText(shipping.cable.item_name);",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 184
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-CANDIDATE PC 8.4-03/04 8.12-03/04/05 제외·추가 후보 PA/PF 일치와 원본 BOM 보존",
+                "assertion": "await expect(page.getByTestId(\"shipping-bom-change-table\")).toContainText(shipping.extra.item_name);",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 184
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-CANDIDATE PC 8.4-03/04 8.12-03/04/05 제외·추가 후보 PA/PF 일치와 원본 BOM 보존",
+                "assertion": "await expect(page.getByTestId(\"shipping-final-bom-changes\")).toContainText(shipping.cable.item_name);",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 184
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-CANDIDATE PC 8.4-03/04 8.12-03/04/05 제외·추가 후보 PA/PF 일치와 원본 BOM 보존",
+                "assertion": "await expect(page.getByTestId(\"shipping-final-bom-changes\")).toContainText(shipping.extra.item_name);",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 184
+              }
+            ],
+            [
+              {
+                "file": "frontend/app/mes/_components/mobile/shipping/__tests__/MobileShippingRequestWizard.test.tsx",
+                "selector": "기본 구성품 수량만 바꾸면 매칭과 최종 확인에 수량 변경으로 표시한다",
+                "assertion": "expect(await screen.findByText(\"수량 변경 · 2 → 4\")).toBeInTheDocument();",
+                "sourceHash": "4473a0f57b01e0b310dd08e0eec42a0d35dc86b49e3b98222db665971e1c0dbf",
+                "line": 181
+              },
+              {
+                "file": "frontend/app/mes/_components/mobile/shipping/__tests__/MobileShippingRequestWizard.test.tsx",
+                "selector": "기본 구성품 수량만 바꾸면 매칭과 최종 확인에 수량 변경으로 표시한다",
+                "assertion": "expect(screen.getByText(\"수량 변경 · 2 → 4\")).toBeInTheDocument();",
+                "sourceHash": "4473a0f57b01e0b310dd08e0eec42a0d35dc86b49e3b98222db665971e1c0dbf",
+                "line": 181
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-GENERATED-ROLES 8.12-12 기준 PF와 새 PA·PF 역할·실제 저장 식별값 구분",
+                "assertion": "await expect(changedComponent).toContainText(parts.af.mes_code!);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 219
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-GENERATED-ROLES 8.12-12 기준 PF와 새 PA·PF 역할·실제 저장 식별값 구분",
+                "assertion": "await expect(changedComponent).toContainText(\"총 3EA\");",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 219
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-GENERATED-ROLES 8.12-12 기준 PF와 새 PA·PF 역할·실제 저장 식별값 구분",
+                "assertion": "await expect(finalChangedComponent).toContainText(parts.af.mes_code!);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 219
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-GENERATED-ROLES 8.12-12 기준 PF와 새 PA·PF 역할·실제 저장 식별값 구분",
+                "assertion": "await expect(finalChangedComponent).toContainText(\"총 3EA\");",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
                 "line": 219
               },
               {
@@ -11555,28 +11650,28 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-DOUBLE 8.4-06 실제 최종 버튼 연타는 생성 호출·원건 각각 1회",
               "assertion": "await expect(page.getByTestId(\"shipping-submit-request\")).toBeDisabled();",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
               "line": 107
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-DOUBLE 8.4-06 실제 최종 버튼 연타는 생성 호출·원건 각각 1회",
               "assertion": "await expect.poll(() => calls).toBe(1);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
               "line": 107
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-DOUBLE 8.4-06 실제 최종 버튼 연타는 생성 호출·원건 각각 1회",
               "assertion": "expect((await allRequests(request, actors.requester, parts)).map((row) => row.request_id)).toEqual([created.request_id]);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
               "line": 107
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-DOUBLE 8.4-06 실제 최종 버튼 연타는 생성 호출·원건 각각 1회",
               "assertion": "expect(calls).toBe(1);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
               "line": 107
             }
           ],
@@ -12107,14 +12202,14 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-DISCARD 8.4-07 새로고침 경고·머무르기 전체 입력·폐기 서버 무효과",
               "assertion": "await expect(page.getByText(\"이 화면에서 나갈까요?\", { exact: true })).toBeVisible();",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
               "line": 127
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-DISCARD 8.4-07 새로고침 경고·머무르기 전체 입력·폐기 서버 무효과",
               "assertion": "expect(dialog.type()).toBe(\"beforeunload\");",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
               "line": 127
             }
           ],
@@ -12205,6 +12300,22 @@
                 "selector": "SHIP-DISCARD 8.4-07 새로고침 경고·머무르기 전체 입력·폐기 서버 무효과",
                 "assertion": "expect(dialog.type()).toBe(\"beforeunload\");",
                 "sourceHash": "24eaa58576d2ddb0ba0725b4c8734968bb7ce38fd0f149778f7108088634d723",
+                "line": 127
+              }
+            ],
+            [
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-DISCARD 8.4-07 새로고침 경고·머무르기 전체 입력·폐기 서버 무효과",
+                "assertion": "await expect(page.getByText(\"이 화면에서 나갈까요?\", { exact: true })).toBeVisible();",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 127
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-DISCARD 8.4-07 새로고침 경고·머무르기 전체 입력·폐기 서버 무효과",
+                "assertion": "expect(dialog.type()).toBe(\"beforeunload\");",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
                 "line": 127
               }
             ]
@@ -12322,21 +12433,21 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-DISCARD 8.4-07 새로고침 경고·머무르기 전체 입력·폐기 서버 무효과",
               "assertion": "await expect.poll(() => final.innerText()).toBe(beforeSummary);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
               "line": 127
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-DISCARD 8.4-07 새로고침 경고·머무르기 전체 입력·폐기 서버 무효과",
               "assertion": "await expect(page.getByTestId(\"shipping-final-action-quantity\")).toContainText(\"3대\");",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
               "line": 127
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-DISCARD 8.4-07 새로고침 경고·머무르기 전체 입력·폐기 서버 무효과",
               "assertion": "expect(await page.evaluate(() => performance.timeOrigin)).toBe(documentStartedAt);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
               "line": 127
             }
           ],
@@ -12700,14 +12811,14 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-DISCARD 8.4-07 새로고침 경고·머무르기 전체 입력·폐기 서버 무효과",
               "assertion": "expect(await allRequests(request, actors.requester, parts)).toEqual(initial);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
               "line": 127
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-DISCARD 8.4-07 새로고침 경고·머무르기 전체 입력·폐기 서버 무효과",
               "assertion": "expect(stock(parts)).toEqual(before);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
               "line": 127
             }
           ],
@@ -12798,6 +12909,22 @@
                 "selector": "SHIP-DISCARD 8.4-07 새로고침 경고·머무르기 전체 입력·폐기 서버 무효과",
                 "assertion": "expect(stock(parts)).toEqual(before);",
                 "sourceHash": "24eaa58576d2ddb0ba0725b4c8734968bb7ce38fd0f149778f7108088634d723",
+                "line": 127
+              }
+            ],
+            [
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-DISCARD 8.4-07 새로고침 경고·머무르기 전체 입력·폐기 서버 무효과",
+                "assertion": "expect(await allRequests(request, actors.requester, parts)).toEqual(initial);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 127
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-DISCARD 8.4-07 새로고침 경고·머무르기 전체 입력·폐기 서버 무효과",
+                "assertion": "expect(stock(parts)).toEqual(before);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
                 "line": 127
               }
             ]
@@ -17757,78 +17884,78 @@
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(groups).toHaveCount(0);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(rows).toHaveCount(2);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(secondRow).toContainText(\"3개\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(rows).toHaveCount(1);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(groups).toHaveCount(1);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(groups).toContainText(\"5개\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(all).toContainText(`${expectedRemaining ? 2 : 1}건`);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(o).toContainText(`${expectedRemaining ? 2 : 1}건`);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(groups).toContainText(\"4개\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(firstRow).toContainText(\"1개\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(firstRow).toHaveCount(0);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             }
           ],
           "execution": {
@@ -18350,71 +18477,71 @@
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(firstRow).toContainText(actors.requester.name);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(secondRow).toContainText(actors.approver.name);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(firstRow).toContainText(\"2개\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(secondRow).toContainText(\"3개\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(firstRow).toContainText(\"독립 B급 원건 메모\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(secondRow).toContainText(\"독립 구형 원건 메모\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(firstRow.getByTestId(\"defect-reason-summary\")).toContainText(\"외관 불량\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(secondRow.getByTestId(\"defect-reason-summary\")).toContainText(\"외관 불량\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(row).toContainText(date);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(firstRow).toContainText(\"1개\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             }
           ],
           "execution": {
@@ -24982,71 +25109,71 @@
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(secondRow).toContainText(\"3개\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "expect((await records(request, item.item_id)).find((row: { record_id: string }) => row.record_id === obsolete.record_id)).toEqual(obsolete);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "expect((await restored).status()).toBe(200);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(page.getByLabel(\"B급·구형 검색\", { exact: true }).filter({ visible: true })).toHaveValue(item.item_name);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(all).toContainText(`${expectedRemaining ? 2 : 1}건`);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(o).toContainText(`${expectedRemaining ? 2 : 1}건`);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(groups).toContainText(\"4개\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(firstRow).toContainText(\"1개\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(firstRow).toHaveCount(0);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "expect(await records(request, other.item_id)).toEqual(unrelatedBefore);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-processing-expectations.spec.ts",
@@ -29539,78 +29666,78 @@
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(all).toContainText(\"2건\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(b).toContainText(\"1건\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(o).toContainText(\"1건\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(rows).toHaveCount(2);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(rows).toHaveCount(1);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(firstRow).toBeVisible();",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(secondRow).toHaveCount(0);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(b).toContainText(\"0건\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(o).toContainText(\"2건\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(all).toContainText(`${expectedRemaining ? 2 : 1}건`);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(o).toContainText(`${expectedRemaining ? 2 : 1}건`);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             }
           ],
           "execution": {
@@ -29974,78 +30101,78 @@
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(groups).toHaveCount(0);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(rows).toHaveCount(2);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(secondRow).toContainText(\"3개\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(rows).toHaveCount(1);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(groups).toHaveCount(1);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(groups).toContainText(\"5개\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(all).toContainText(`${expectedRemaining ? 2 : 1}건`);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(o).toContainText(`${expectedRemaining ? 2 : 1}건`);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(groups).toContainText(\"4개\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(firstRow).toContainText(\"1개\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(firstRow).toHaveCount(0);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             }
           ],
           "execution": {
@@ -33800,91 +33927,91 @@
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE-CREATE 8.10-03 ${selected.label} 실제 격리 등록은 선택 분류만 증가하고 다른 원건·위치·목록을 보존한다",
               "assertion": "expect(current.warehouse_qty).toBe(before.warehouse_qty - 2);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
               "line": 26
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE-CREATE 8.10-03 ${selected.label} 실제 격리 등록은 선택 분류만 증가하고 다른 원건·위치·목록을 보존한다",
               "assertion": "expect(current.production_total).toBe(before.production_total);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
               "line": 26
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE-CREATE 8.10-03 ${selected.label} 실제 격리 등록은 선택 분류만 증가하고 다른 원건·위치·목록을 보존한다",
               "assertion": "expect(current.defective_total).toBe(before.defective_total + 2);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
               "line": 26
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE-CREATE 8.10-03 ${selected.label} 실제 격리 등록은 선택 분류만 증가하고 다른 원건·위치·목록을 보존한다",
               "assertion": "expect(origins).toHaveLength(originsBefore.length + 1);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
               "line": 26
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE-CREATE 8.10-03 ${selected.label} 실제 격리 등록은 선택 분류만 증가하고 다른 원건·위치·목록을 보존한다",
               "assertion": "expect(created.management_category).toBe(selected.category);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
               "line": 26
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE-CREATE 8.10-03 ${selected.label} 실제 격리 등록은 선택 분류만 증가하고 다른 원건·위치·목록을 보존한다",
               "assertion": "expect(Number(created.available_quantity)).toBe(2);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
               "line": 26
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE-CREATE 8.10-03 ${selected.label} 실제 격리 등록은 선택 분류만 증가하고 다른 원건·위치·목록을 보존한다",
               "assertion": "await expect(filters.getByRole(\"button\", { name: /^전체 보관/ })).toContainText(\"2건\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
               "line": 26
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE-CREATE 8.10-03 ${selected.label} 실제 격리 등록은 선택 분류만 증가하고 다른 원건·위치·목록을 보존한다",
               "assertion": "await expect(filters.getByRole(\"button\", { name: /^B급/ })).toContainText(\"1건\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
               "line": 26
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE-CREATE 8.10-03 ${selected.label} 실제 격리 등록은 선택 분류만 증가하고 다른 원건·위치·목록을 보존한다",
               "assertion": "await expect(filters.getByRole(\"button\", { name: /^구형/ })).toContainText(\"1건\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
               "line": 26
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE-CREATE 8.10-03 ${selected.label} 실제 격리 등록은 선택 분류만 증가하고 다른 원건·위치·목록을 보존한다",
               "assertion": "await expect(rows).toHaveCount(1);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
               "line": 26
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE-CREATE 8.10-03 ${selected.label} 실제 격리 등록은 선택 분류만 증가하고 다른 원건·위치·목록을 보존한다",
               "assertion": "await expect(rows).toContainText(memo);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
               "line": 26
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE-CREATE 8.10-03 ${selected.label} 실제 격리 등록은 선택 분류만 증가하고 다른 원건·위치·목록을 보존한다",
               "assertion": "await expect(rows).toContainText(\"2개\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
               "line": 26
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE-CREATE 8.10-03 ${selected.label} 실제 격리 등록은 선택 분류만 증가하고 다른 원건·위치·목록을 보존한다",
               "assertion": "await expect(rows).not.toContainText(`기존 ${selected.other}`);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
               "line": 26
             }
           ],
@@ -39873,14 +40000,14 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-VARIANT 8.12-01/03 동일 BOM 국가·색상·판매처 이름 후보와 목록 실제 품목",
               "assertion": "await expect(card).toContainText(parts.variant.item_name);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
               "line": 156
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-VARIANT 8.12-01/03 동일 BOM 국가·색상·판매처 이름 후보와 목록 실제 품목",
               "assertion": "await expect(card.getByTestId(`shipping-request-code-${created.request_id}`)).toHaveText(parts.variant.mes_code);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
               "line": 156
             }
           ],
@@ -41449,21 +41576,21 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-VARIANT 8.12-01/03 동일 BOM 국가·색상·판매처 이름 후보와 목록 실제 품목",
               "assertion": "await expect(page.getByTestId(`shipping-bom-candidate-${parts.variantOther.item_id}`)).toContainText(\"한국 흰색 판매처A\");",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
               "line": 156
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-VARIANT 8.12-01/03 동일 BOM 국가·색상·판매처 이름 후보와 목록 실제 품목",
               "assertion": "await expect(candidate).toContainText(\"미국 파랑 판매처B\");",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
               "line": 156
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-VARIANT 8.12-01/03 동일 BOM 국가·색상·판매처 이름 후보와 목록 실제 품목",
               "assertion": "expect(created.final_pf_item_id).toBe(parts.variant.item_id);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
               "line": 156
             }
           ],
@@ -41863,21 +41990,21 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-VARIANT 8.12-01/03 동일 BOM 국가·색상·판매처 이름 후보와 목록 실제 품목",
               "assertion": "expect(created.final_pf_item_id).toBe(parts.variant.item_id);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
               "line": 156
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-VARIANT 8.12-01/03 동일 BOM 국가·색상·판매처 이름 후보와 목록 실제 품목",
               "assertion": "expect(created.final_pa_item_id).toBe(parts.variantPa.item_id);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
               "line": 156
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-VARIANT 8.12-01/03 동일 BOM 국가·색상·판매처 이름 후보와 목록 실제 품목",
               "assertion": "expect(created.bom_lines.find((line) => line.child_item_id === parts.af.item_id)?.quantity).toBe(2);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
               "line": 156
             },
             {
@@ -42550,71 +42677,71 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
               "assertion": "await expect(page.getByText(\"재사용할 기존 PF 후보를 다시 선택하세요.\", { exact: true }).filter({ visible: true }).first()).toBeVisible();",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 178
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 185
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
               "assertion": "expect(createCalls).toBe(0);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 178
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 185
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
               "assertion": "await expect(page.getByTestId(\"shipping-wizard-step-3\")).toBeVisible();",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 178
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 185
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
               "assertion": "await expect(page.getByTestId(\"shipping-wizard-next\")).toBeDisabled();",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 178
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 185
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
               "assertion": "await expect(page.getByRole(\"button\", { name: \"4. 요청 정보\", exact: true })).toBeDisabled();",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 178
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 185
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
               "assertion": "await expect(page.getByRole(\"button\", { name: \"5. 출하 요청 확인\", exact: true })).toBeDisabled();",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 178
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 185
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
               "assertion": "await expect(page.getByTestId(\"shipping-submit-request\")).toHaveCount(0);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 178
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 185
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
               "assertion": "await expect(page.locator(`[data-bom-line-child=\"${parts.af.item_id}\"]`).getByTestId(\"shipping-bom-line-controls\")).toHaveValue(\"2\");",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 178
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 185
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
               "assertion": "expect(await allRequests(request, actors.requester, parts)).toEqual([]);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 178
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 185
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
               "assertion": "expect(stock(parts)).toEqual(beforeStock);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 178
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 185
             },
             {
               "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
@@ -43721,15 +43848,15 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
               "assertion": "await expect(page.getByText(\"재사용할 기존 PF 후보를 다시 선택하세요.\", { exact: true }).filter({ visible: true }).first()).toBeVisible();",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 178
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 185
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
               "assertion": "await expect(page.getByTestId(\"shipping-bom-drift\")).toContainText(`PA · ${parts.af.item_name} (${parts.af.mes_code}): 초안 2EA → 현재 3EA`);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 178
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 185
             },
             {
               "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
@@ -43961,6 +44088,92 @@
                 "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
                 "line": 184
               }
+            ],
+            [
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
+                "assertion": "await expect(page.getByText(\"재사용할 기존 PF 후보를 다시 선택하세요.\", { exact: true }).filter({ visible: true }).first()).toBeVisible();",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 178
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
+                "assertion": "await expect(page.getByTestId(\"shipping-bom-drift\")).toContainText(`PA · ${parts.af.item_name} (${parts.af.mes_code}): 초안 2EA → 현재 3EA`);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 178
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-CANDIDATE PC 8.4-03/04 8.12-03/04/05 제외·추가 후보 PA/PF 일치와 원본 BOM 보존",
+                "assertion": "await expect(candidate).toContainText(`PF · ${shipping.candidatePa.item_name} (${shipping.candidatePa.mes_code}) · 1EA`);",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 184
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-CANDIDATE PC 8.4-03/04 8.12-03/04/05 제외·추가 후보 PA/PF 일치와 원본 BOM 보존",
+                "assertion": "await expect(candidate).toContainText(shipping.candidatePa.item_name);",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 184
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-CANDIDATE PC 8.4-03/04 8.12-03/04/05 제외·추가 후보 PA/PF 일치와 원본 BOM 보존",
+                "assertion": "await expect(page.getByTestId(\"shipping-bom-change-table\")).toContainText(shipping.cable.item_name);",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 184
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-CANDIDATE PC 8.4-03/04 8.12-03/04/05 제외·추가 후보 PA/PF 일치와 원본 BOM 보존",
+                "assertion": "await expect(page.getByTestId(\"shipping-bom-change-table\")).toContainText(shipping.extra.item_name);",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 184
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-CANDIDATE PC 8.4-03/04 8.12-03/04/05 제외·추가 후보 PA/PF 일치와 원본 BOM 보존",
+                "assertion": "await expect(page.getByTestId(\"shipping-final-summary\")).toContainText(shipping.candidatePa.item_name);",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 184
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-CANDIDATE PC 8.4-03/04 8.12-03/04/05 제외·추가 후보 PA/PF 일치와 원본 BOM 보존",
+                "assertion": "await expect(page.getByTestId(\"shipping-final-bom-changes\")).toContainText(shipping.cable.item_name);",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 184
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-CANDIDATE PC 8.4-03/04 8.12-03/04/05 제외·추가 후보 PA/PF 일치와 원본 BOM 보존",
+                "assertion": "await expect(page.getByTestId(\"shipping-final-bom-changes\")).toContainText(shipping.extra.item_name);",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 184
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-CANDIDATE PC 8.4-03/04 8.12-03/04/05 제외·추가 후보 PA/PF 일치와 원본 BOM 보존",
+                "assertion": "await expect(page.getByTestId(`shipping-final-quantity-linked-pa-${shipping.candidatePa.item_id}`)).toHaveText(\"총 1EA\");",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 184
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-CANDIDATE PC 8.4-03/04 8.12-03/04/05 제외·추가 후보 PA/PF 일치와 원본 BOM 보존",
+                "assertion": "expect(created.final_pa_item_id).toBe(shipping.candidatePa.item_id);",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 184
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-CANDIDATE PC 8.4-03/04 8.12-03/04/05 제외·추가 후보 PA/PF 일치와 원본 BOM 보존",
+                "assertion": "expect(candidatePaBom.map((line: { child_item_id: string; quantity: number; unit: string }) => [line.child_item_id, line.quantity, line.unit]).sort()).toEqual(componentTuples(created.bom_lines));",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 184
+              }
             ]
           ]
         },
@@ -43992,50 +44205,50 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
               "assertion": "expect(createCalls).toBe(0);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 178
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 185
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
               "assertion": "await expect(page.getByTestId(\"shipping-wizard-step-3\")).toBeVisible();",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 178
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 185
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
               "assertion": "await expect(page.getByTestId(\"shipping-wizard-next\")).toBeDisabled();",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 178
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 185
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
               "assertion": "await expect(page.getByRole(\"button\", { name: \"4. 요청 정보\", exact: true })).toBeDisabled();",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 178
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 185
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
               "assertion": "await expect(page.getByRole(\"button\", { name: \"5. 출하 요청 확인\", exact: true })).toBeDisabled();",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 178
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 185
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
               "assertion": "await expect(page.getByTestId(\"shipping-submit-request\")).toHaveCount(0);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 178
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 185
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-CANDIDATE-DRIFT 8.12-03/05 선택 이후 실제 후보 BOM 변경은 설명·제출 거부·초안 보존",
               "assertion": "expect(await allRequests(request, actors.requester, parts)).toEqual([]);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 178
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 185
             },
             {
               "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
@@ -48960,64 +49173,64 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-GENERATED-ROLES 8.12-12 기준 PF와 새 PA·PF 역할·실제 저장 식별값 구분",
               "assertion": "await expect(page.getByTestId(\"shipping-final-pa-summary\")).toContainText(\"새 PA 생성 예정\");",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 219
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 226
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-GENERATED-ROLES 8.12-12 기준 PF와 새 PA·PF 역할·실제 저장 식별값 구분",
               "assertion": "await expect(page.getByTestId(\"shipping-final-pf-summary\")).toContainText(\"새 PF 생성 예정\");",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 219
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 226
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-GENERATED-ROLES 8.12-12 기준 PF와 새 PA·PF 역할·실제 저장 식별값 구분",
               "assertion": "await expect(page.getByTestId(\"shipping-final-pa-summary\")).toContainText(paName);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 219
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 226
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-GENERATED-ROLES 8.12-12 기준 PF와 새 PA·PF 역할·실제 저장 식별값 구분",
               "assertion": "await expect(page.getByTestId(\"shipping-final-pf-summary\")).toContainText(pfName);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 219
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 226
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-GENERATED-ROLES 8.12-12 기준 PF와 새 PA·PF 역할·실제 저장 식별값 구분",
               "assertion": "await expect(page.getByTestId(\"shipping-final-summary\")).toContainText(pfName);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 219
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 226
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-GENERATED-ROLES 8.12-12 기준 PF와 새 PA·PF 역할·실제 저장 식별값 구분",
               "assertion": "expect(created.base_pf_item_id).toBe(parts.pf.item_id);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 219
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 226
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-GENERATED-ROLES 8.12-12 기준 PF와 새 PA·PF 역할·실제 저장 식별값 구분",
               "assertion": "expect(created.final_pa_item_id).not.toBe(parts.pa.item_id);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 219
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 226
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-GENERATED-ROLES 8.12-12 기준 PF와 새 PA·PF 역할·실제 저장 식별값 구분",
               "assertion": "expect(created.final_pf_item_id).not.toBe(parts.pf.item_id);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 219
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 226
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-GENERATED-ROLES 8.12-12 기준 PF와 새 PA·PF 역할·실제 저장 식별값 구분",
               "assertion": "expect((await detail(request, actors.requester, created.request_id)).base_pf_item_id).toBe(parts.pf.item_id);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 219
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 226
             },
             {
               "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
@@ -51333,15 +51546,15 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-HISTORY-COUNT 8.12-15 G09 실제 출하 원작업1+취소1 보존·필터·합계",
               "assertion": "expect(cancelled.transactions).toHaveLength(2);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 262
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 269
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-HISTORY-COUNT 8.12-15 G09 실제 출하 원작업1+취소1 보존·필터·합계",
               "assertion": "await expect(rows).toHaveCount(2);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 262
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 269
             }
           ],
           "execution": {
@@ -51506,6 +51719,67 @@
                 "sourceHash": "24eaa58576d2ddb0ba0725b4c8734968bb7ce38fd0f149778f7108088634d723",
                 "line": 262
               }
+            ],
+            [
+              {
+                "file": "backend/tests/services/test_shipping_actions.py",
+                "selector": "test_pickup_cancel_creates_reversal_operation_and_restores_prepared_request",
+                "assertion": "assert original_logs",
+                "sourceHash": "7e8786a545fd0afe26666edad18ab872d369f58230590e3cc9520c2dd83122ae"
+              },
+              {
+                "file": "backend/tests/services/test_shipping_actions.py",
+                "selector": "test_pickup_cancel_creates_reversal_operation_and_restores_prepared_request",
+                "assertion": "assert all(row.cancelled is False for row in original_logs)",
+                "sourceHash": "7e8786a545fd0afe26666edad18ab872d369f58230590e3cc9520c2dd83122ae"
+              },
+              {
+                "file": "backend/tests/services/test_shipping_actions.py",
+                "selector": "test_pickup_cancel_creates_reversal_operation_and_restores_prepared_request",
+                "assertion": "assert len(reversal_logs) == len(original_logs)",
+                "sourceHash": "7e8786a545fd0afe26666edad18ab872d369f58230590e3cc9520c2dd83122ae"
+              },
+              {
+                "file": "backend/tests/services/test_shipping_actions.py",
+                "selector": "test_pickup_cancel_creates_reversal_operation_and_restores_prepared_request",
+                "assertion": "assert {row.reverses_log_id for row in reversal_logs} == {row.log_id for row in original_logs}",
+                "sourceHash": "7e8786a545fd0afe26666edad18ab872d369f58230590e3cc9520c2dd83122ae"
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-CYCLE ${mobile ? \"mobile\" : \"PC\"} 8.4-01 8.12-07~16 준비·픽업·역순 취소의 같은 원건",
+                "assertion": "expect(prepared.transactions).toHaveLength(4);",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 385
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-CYCLE ${mobile ? \"mobile\" : \"PC\"} 8.4-01 8.12-07~16 준비·픽업·역순 취소의 같은 원건",
+                "assertion": "await expect(page.getByTestId(`shipping-transaction-code-${log.log_id}`)).toHaveText(shipping[log.item_id === shipping.pf.item_id ? \"pf\" : \"carton\"].mes_code);",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 385
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-CYCLE ${mobile ? \"mobile\" : \"PC\"} 8.4-01 8.12-07~16 준비·픽업·역순 취소의 같은 원건",
+                "assertion": "expect(cancelled.transactions).toHaveLength(4);",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 385
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-HISTORY-COUNT 8.12-15 G09 실제 출하 원작업1+취소1 보존·필터·합계",
+                "assertion": "expect(cancelled.transactions).toHaveLength(2);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 262
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-HISTORY-COUNT 8.12-15 G09 실제 출하 원작업1+취소1 보존·필터·합계",
+                "assertion": "await expect(rows).toHaveCount(2);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 262
+              }
             ]
           ]
         },
@@ -51523,29 +51797,29 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-HISTORY-LINK 8.12-15 원출하·취소 역거래 상세 양방향 이동",
               "assertion": "await expect(panel).toHaveAttribute(\"data-history-detail-log-id\", original.log_id);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 282
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 289
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-HISTORY-LINK 8.12-15 원출하·취소 역거래 상세 양방향 이동",
               "assertion": "await expect(reverseLink).toBeVisible();",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 282
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 289
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-HISTORY-LINK 8.12-15 원출하·취소 역거래 상세 양방향 이동",
               "assertion": "await expect(panel).toHaveAttribute(\"data-history-detail-log-id\", reverse.log_id);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 282
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 289
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-HISTORY-LINK 8.12-15 원출하·취소 역거래 상세 양방향 이동",
               "assertion": "await expect(originalLink).toBeVisible();",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 282
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 289
             }
           ],
           "execution": {
@@ -51651,6 +51925,36 @@
                 "sourceHash": "24eaa58576d2ddb0ba0725b4c8734968bb7ce38fd0f149778f7108088634d723",
                 "line": 282
               }
+            ],
+            [
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-HISTORY-LINK 8.12-15 원출하·취소 역거래 상세 양방향 이동",
+                "assertion": "await expect(panel).toHaveAttribute(\"data-history-detail-log-id\", original.log_id);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 282
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-HISTORY-LINK 8.12-15 원출하·취소 역거래 상세 양방향 이동",
+                "assertion": "await expect(reverseLink).toBeVisible();",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 282
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-HISTORY-LINK 8.12-15 원출하·취소 역거래 상세 양방향 이동",
+                "assertion": "await expect(panel).toHaveAttribute(\"data-history-detail-log-id\", reverse.log_id);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 282
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-HISTORY-LINK 8.12-15 원출하·취소 역거래 상세 양방향 이동",
+                "assertion": "await expect(originalLink).toBeVisible();",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 282
+              }
             ]
           ]
         },
@@ -51668,29 +51972,29 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-HISTORY-COUNT 8.12-15 G09 실제 출하 원작업1+취소1 보존·필터·합계",
               "assertion": "expect(cancelled.transactions).toHaveLength(2);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 262
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 269
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-HISTORY-COUNT 8.12-15 G09 실제 출하 원작업1+취소1 보존·필터·합계",
               "assertion": "await expect(rows).toHaveCount(2);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 262
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 269
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-HISTORY-COUNT 8.12-15 G09 실제 출하 원작업1+취소1 보존·필터·합계",
               "assertion": "await expect(page.getByTestId(\"history-scroll-surface\").locator(\"section\").first()).toContainText(\"2건\");",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 262
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 269
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-HISTORY-COUNT 8.12-15 G09 실제 출하 원작업1+취소1 보존·필터·합계",
               "assertion": "await expect(page.locator(`[data-log-id=\"${picked.transactions[0].log_id}\"]`).first()).toContainText(\"취소\");",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 262
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 269
             }
           ],
           "execution": {
@@ -51794,6 +52098,36 @@
                 "selector": "SHIP-HISTORY-COUNT 8.12-15 G09 실제 출하 원작업1+취소1 보존·필터·합계",
                 "assertion": "await expect(page.locator(`[data-log-id=\"${picked.transactions[0].log_id}\"]`).first()).toContainText(\"취소\");",
                 "sourceHash": "24eaa58576d2ddb0ba0725b4c8734968bb7ce38fd0f149778f7108088634d723",
+                "line": 262
+              }
+            ],
+            [
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-HISTORY-COUNT 8.12-15 G09 실제 출하 원작업1+취소1 보존·필터·합계",
+                "assertion": "expect(cancelled.transactions).toHaveLength(2);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 262
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-HISTORY-COUNT 8.12-15 G09 실제 출하 원작업1+취소1 보존·필터·합계",
+                "assertion": "await expect(rows).toHaveCount(2);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 262
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-HISTORY-COUNT 8.12-15 G09 실제 출하 원작업1+취소1 보존·필터·합계",
+                "assertion": "await expect(page.getByTestId(\"history-scroll-surface\").locator(\"section\").first()).toContainText(\"2건\");",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 262
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-HISTORY-COUNT 8.12-15 G09 실제 출하 원작업1+취소1 보존·필터·합계",
+                "assertion": "await expect(page.locator(`[data-log-id=\"${picked.transactions[0].log_id}\"]`).first()).toContainText(\"취소\");",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
                 "line": 262
               }
             ]
@@ -150718,29 +151052,29 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-INACTIVE PC-DELTA-SHIPPING-04 세션 중 비활성화 뒤 화면·직접 생성·준비·픽업 차단",
               "assertion": "await expect(page.getByRole(\"combobox\")).toBeVisible();",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 249
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 256
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-INACTIVE PC-DELTA-SHIPPING-04 세션 중 비활성화 뒤 화면·직접 생성·준비·픽업 차단",
               "assertion": "await expect(page.getByTestId(\"shipping-prepare-from-detail\")).toHaveCount(0);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 249
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 256
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-INACTIVE PC-DELTA-SHIPPING-04 세션 중 비활성화 뒤 화면·직접 생성·준비·픽업 차단",
               "assertion": "expect(response.status()).toBe(403);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 249
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 256
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-INACTIVE PC-DELTA-SHIPPING-04 세션 중 비활성화 뒤 화면·직접 생성·준비·픽업 차단",
               "assertion": "expect((await detail(request, actors.other, created.request_id)).status).toBe(\"PREPARING\");",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 249
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 256
             }
           ],
           "execution": {
@@ -150878,6 +151212,42 @@
                 "selector": "SHIP-INACTIVE PC-DELTA-SHIPPING-04 세션 중 비활성화 뒤 화면·직접 생성·준비·픽업 차단",
                 "assertion": "expect((await detail(request, actors.other, created.request_id)).status).toBe(\"PREPARING\");",
                 "sourceHash": "24eaa58576d2ddb0ba0725b4c8734968bb7ce38fd0f149778f7108088634d723",
+                "line": 249
+              }
+            ],
+            [
+              {
+                "file": "backend/tests/routers/test_shipping.py",
+                "selector": "test_shipping_prepare_complete_rejects_invalid_actor_without_state_changes",
+                "assertion": "assert request.status is ShippingRequestStatusEnum.PREPARING",
+                "sourceHash": "5cc9788badf259b9d5ea1e81b9498f98a3439e2a318860dd0d73a59d354c4464"
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-INACTIVE PC-DELTA-SHIPPING-04 세션 중 비활성화 뒤 화면·직접 생성·준비·픽업 차단",
+                "assertion": "await expect(page.getByRole(\"combobox\")).toBeVisible();",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 249
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-INACTIVE PC-DELTA-SHIPPING-04 세션 중 비활성화 뒤 화면·직접 생성·준비·픽업 차단",
+                "assertion": "await expect(page.getByTestId(\"shipping-prepare-from-detail\")).toHaveCount(0);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 249
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-INACTIVE PC-DELTA-SHIPPING-04 세션 중 비활성화 뒤 화면·직접 생성·준비·픽업 차단",
+                "assertion": "expect(response.status()).toBe(403);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 249
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-INACTIVE PC-DELTA-SHIPPING-04 세션 중 비활성화 뒤 화면·직접 생성·준비·픽업 차단",
+                "assertion": "expect((await detail(request, actors.other, created.request_id)).status).toBe(\"PREPARING\");",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
                 "line": 249
               }
             ]
@@ -152407,22 +152777,22 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
               "assertion": "await expect(modelRow.getByRole(\"cell\").nth(6)).toHaveText((baselinePf + 11).toLocaleString());",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 304
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 311
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
               "assertion": "expect(Number(after.production_matrix.find((row: { model_key: string }) => row.model_key === \"DX3000\").pf_qty) - baselinePf).toBe(11);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 304
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 311
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
               "assertion": "expect(closed.production_matrix).toEqual(after.production_matrix);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 304
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 311
             }
           ],
           "execution": {
@@ -152553,6 +152923,35 @@
                 "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
                 "assertion": "expect(closed.production_matrix).toEqual(after.production_matrix);",
                 "sourceHash": "24eaa58576d2ddb0ba0725b4c8734968bb7ce38fd0f149778f7108088634d723",
+                "line": 304
+              }
+            ],
+            [
+              {
+                "file": "backend/tests/routers/test_weekly_report.py",
+                "selector": "test_legacy_matrix_uses_kst_half_open_window_for_pf_pickups",
+                "assertion": "assert dx3000[\"pf_qty\"] == 10",
+                "sourceHash": "16d7f303814621fcb56f3286881c9655c3d1f9ae57775a21553453e8950fba46"
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
+                "assertion": "await expect(modelRow.getByRole(\"cell\").nth(6)).toHaveText((baselinePf + 11).toLocaleString());",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 304
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
+                "assertion": "expect(Number(after.production_matrix.find((row: { model_key: string }) => row.model_key === \"DX3000\").pf_qty) - baselinePf).toBe(11);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 304
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
+                "assertion": "expect(closed.production_matrix).toEqual(after.production_matrix);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
                 "line": 304
               }
             ]
@@ -152711,15 +153110,15 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
               "assertion": "expect(Number(after.production_matrix.find((row: { model_key: string }) => row.model_key === \"DX3000\").pf_qty) - baselinePf).toBe(11);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 304
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 311
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
               "assertion": "expect(closed.production_matrix).toEqual(after.production_matrix);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 304
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 311
             }
           ],
           "execution": {
@@ -152863,6 +153262,46 @@
                 "sourceHash": "24eaa58576d2ddb0ba0725b4c8734968bb7ce38fd0f149778f7108088634d723",
                 "line": 304
               }
+            ],
+            [
+              {
+                "file": "backend/tests/routers/test_weekly_report.py",
+                "selector": "test_legacy_matrix_counts_only_final_pf_pickup_completion",
+                "assertion": "assert dx3000[\"pf_qty\"] == 3",
+                "sourceHash": "16d7f303814621fcb56f3286881c9655c3d1f9ae57775a21553453e8950fba46"
+              },
+              {
+                "file": "backend/tests/routers/test_weekly_report.py",
+                "selector": "test_verified_matrix_counts_final_pf_pickup_not_pf_produce",
+                "assertion": "assert dx3000[\"pf_qty\"] == 5",
+                "sourceHash": "16d7f303814621fcb56f3286881c9655c3d1f9ae57775a21553453e8950fba46"
+              },
+              {
+                "file": "backend/tests/services/test_f705_02_production_log.py",
+                "selector": "test_collect_daily_quantities_uses_final_pf_pickups_instead_of_pf_produce",
+                "assertion": "assert quantities == {\n        date(2026, 1, 3): {(\"HF\", \"DX3000\"): 7, (\"PF\", \"SOLO\"): 3},\n        date(2026, 1, 5): {(\"PF\", \"SOLO\"): 2},\n    }",
+                "sourceHash": "c7c9b91d3237a55a472f6e2076e198d2701ba4d12aef9ba182b37ce29693267a"
+              },
+              {
+                "file": "backend/tests/routers/test_shipping_weekly_atoms.py",
+                "selector": "test_verified_pf_matrix_excludes_companion_unlinked_ship_and_pf_production",
+                "assertion": "assert row[\"pf_qty\"] == 5",
+                "sourceHash": "0da6aa1be3f1037a62594fb54ccaa9c50aa17120011958d37fb34da5ac3fcad7"
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
+                "assertion": "expect(Number(after.production_matrix.find((row: { model_key: string }) => row.model_key === \"DX3000\").pf_qty) - baselinePf).toBe(11);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 304
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
+                "assertion": "expect(closed.production_matrix).toEqual(after.production_matrix);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 304
+              }
             ]
           ]
         },
@@ -152935,15 +153374,15 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
               "assertion": "expect(Number(after.production_matrix.find((row: { model_key: string }) => row.model_key === \"DX3000\").pf_qty) - baselinePf).toBe(11);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 304
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 311
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
               "assertion": "expect(closed.production_matrix).toEqual(after.production_matrix);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 304
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 311
             }
           ],
           "execution": {
@@ -153118,6 +153557,77 @@
                 "sourceHash": "24eaa58576d2ddb0ba0725b4c8734968bb7ce38fd0f149778f7108088634d723",
                 "line": 304
               }
+            ],
+            [
+              {
+                "file": "backend/tests/services/test_f705_02_production_log.py",
+                "selector": "test_collect_daily_quantities_uses_final_pf_pickups_instead_of_pf_produce",
+                "assertion": "assert quantities == {\n        date(2026, 1, 3): {(\"HF\", \"DX3000\"): 7, (\"PF\", \"SOLO\"): 3},\n        date(2026, 1, 5): {(\"PF\", \"SOLO\"): 2},\n    }",
+                "sourceHash": "c7c9b91d3237a55a472f6e2076e198d2701ba4d12aef9ba182b37ce29693267a"
+              },
+              {
+                "file": "frontend/tests/e2e/report-expectations.spec.ts",
+                "selector": "PC-DELTA-WEEKLY-01 실제 PF 픽업·취소 뒤 같은탭 주간 수량 자동갱신",
+                "assertion": "expect(latestPf).toBe(beforePf + 1);",
+                "sourceHash": "0406686c7d1acd5fe734446079cae7ad08bbdbce78f65da4261e1da23d1e0202",
+                "line": 404
+              },
+              {
+                "file": "frontend/tests/e2e/report-expectations.spec.ts",
+                "selector": "PC-DELTA-WEEKLY-01 실제 PF 픽업·취소 뒤 같은탭 주간 수량 자동갱신",
+                "assertion": "expect(restored.production_matrix.reduce((sum: number, row: { pf_qty: number }) => sum + Number(row.pf_qty), 0)).toBe(beforePf);",
+                "sourceHash": "0406686c7d1acd5fe734446079cae7ad08bbdbce78f65da4261e1da23d1e0202",
+                "line": 404
+              },
+              {
+                "file": "frontend/tests/e2e/report-expectations.spec.ts",
+                "selector": "PC-DELTA-WEEKLY-01 실제 PF 픽업·취소 뒤 같은탭 주간 수량 자동갱신",
+                "assertion": "await expect(modelRow.getByRole(\"cell\").nth(6)).toHaveText(Number(restoredModel?.pf_qty ?? 0) === 0 ? \"—\" : Number(restoredModel.pf_qty).toLocaleString());",
+                "sourceHash": "0406686c7d1acd5fe734446079cae7ad08bbdbce78f65da4261e1da23d1e0202",
+                "line": 404
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-F705 PC-DELTA-PF-01/03 실제 픽업의 주간 PF·다운로드 일자/모델/월합계 증분",
+                "assertion": "expect(row, `Model ${model} must be in the real matrix`).toBeTruthy();",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 738
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-F705 PC-DELTA-PF-01/03 실제 픽업의 주간 PF·다운로드 일자/모델/월합계 증분",
+                "assertion": "await expect(matrix).toHaveCount(0);",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 738
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-F705 PC-DELTA-PF-01/03 실제 픽업의 주간 PF·다운로드 일자/모델/월합계 증분",
+                "assertion": "expect(restored.pf).toBe(before.pf);",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 738
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-expectations.spec.ts",
+                "selector": "SHIP-F705 PC-DELTA-PF-01/03 실제 픽업의 주간 PF·다운로드 일자/모델/월합계 증분",
+                "assertion": "expect(restored.workbook).toEqual(before.workbook);",
+                "sourceHash": "da61c423f7cf06e60a6cd1b107f52d5682deab4ade55668744e6741179d222d6",
+                "line": 738
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
+                "assertion": "expect(Number(after.production_matrix.find((row: { model_key: string }) => row.model_key === \"DX3000\").pf_qty) - baselinePf).toBe(11);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 304
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
+                "assertion": "expect(closed.production_matrix).toEqual(after.production_matrix);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 304
+              }
             ]
           ]
         },
@@ -153159,15 +153669,15 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
               "assertion": "expect(Number(after.production_matrix.find((row: { model_key: string }) => row.model_key === \"DX3000\").pf_qty) - baselinePf).toBe(11);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 304
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 311
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
               "assertion": "expect(closed.production_matrix).toEqual(after.production_matrix);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 304
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 311
             }
           ],
           "execution": {
@@ -153311,6 +153821,46 @@
                 "sourceHash": "24eaa58576d2ddb0ba0725b4c8734968bb7ce38fd0f149778f7108088634d723",
                 "line": 304
               }
+            ],
+            [
+              {
+                "file": "backend/tests/routers/test_weekly_report.py",
+                "selector": "test_legacy_matrix_keeps_pf_pickup_cancelled_after_sunday_cutoff",
+                "assertion": "assert dx3000[\"pf_qty\"] == 4",
+                "sourceHash": "16d7f303814621fcb56f3286881c9655c3d1f9ae57775a21553453e8950fba46"
+              },
+              {
+                "file": "backend/tests/routers/test_shipping_weekly_atoms.py",
+                "selector": "test_verified_closed_week_pf_and_f705_keep_pickup_cancelled_next_week",
+                "assertion": "assert row[\"pf_qty\"] == 5",
+                "sourceHash": "0da6aa1be3f1037a62594fb54ccaa9c50aa17120011958d37fb34da5ac3fcad7"
+              },
+              {
+                "file": "backend/tests/routers/test_shipping_weekly_atoms.py",
+                "selector": "test_verified_closed_week_pf_and_f705_keep_pickup_cancelled_next_week",
+                "assertion": "assert quantities[date(2026, 5, 8)][(\"PF\", \"DX3000\")] == row[\"pf_qty\"]",
+                "sourceHash": "0da6aa1be3f1037a62594fb54ccaa9c50aa17120011958d37fb34da5ac3fcad7"
+              },
+              {
+                "file": "backend/tests/routers/test_shipping_weekly_atoms.py",
+                "selector": "test_verified_closed_week_pf_and_f705_keep_pickup_cancelled_next_week",
+                "assertion": "assert workbook.worksheets[4].cell(27, 11).value == 5",
+                "sourceHash": "0da6aa1be3f1037a62594fb54ccaa9c50aa17120011958d37fb34da5ac3fcad7"
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
+                "assertion": "expect(Number(after.production_matrix.find((row: { model_key: string }) => row.model_key === \"DX3000\").pf_qty) - baselinePf).toBe(11);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 304
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
+                "assertion": "expect(closed.production_matrix).toEqual(after.production_matrix);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 304
+              }
             ]
           ]
         },
@@ -153356,22 +153906,22 @@
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
               "assertion": "await expect(modelRow.getByRole(\"cell\").nth(6)).toHaveText((baselinePf + 11).toLocaleString());",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 304
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 311
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
               "assertion": "expect(Number(after.production_matrix.find((row: { model_key: string }) => row.model_key === \"DX3000\").pf_qty) - baselinePf).toBe(11);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 304
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 311
             },
             {
               "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
               "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
               "assertion": "expect(closed.production_matrix).toEqual(after.production_matrix);",
-              "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
-              "line": 304
+              "sourceHash": "d3e1257ba60bbe124981b15441b736a33defc082aa01d8fbf8cc704c563323e1",
+              "line": 311
             }
           ],
           "execution": {
@@ -153496,6 +154046,57 @@
                 "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
                 "assertion": "expect(closed.production_matrix).toEqual(after.production_matrix);",
                 "sourceHash": "24eaa58576d2ddb0ba0725b4c8734968bb7ce38fd0f149778f7108088634d723",
+                "line": 304
+              }
+            ],
+            [
+              {
+                "file": "frontend/tests/e2e/report-expectations.spec.ts",
+                "selector": "PC-DELTA-WEEKLY-01 실제 PF 픽업·취소 뒤 같은탭 주간 수량 자동갱신",
+                "assertion": "await expect(modelRow.getByRole(\"cell\").nth(6)).toHaveText(Number(model.pf_qty).toLocaleString());",
+                "sourceHash": "0406686c7d1acd5fe734446079cae7ad08bbdbce78f65da4261e1da23d1e0202",
+                "line": 404
+              },
+              {
+                "file": "frontend/tests/e2e/report-expectations.spec.ts",
+                "selector": "PC-DELTA-WEEKLY-01 실제 PF 픽업·취소 뒤 같은탭 주간 수량 자동갱신",
+                "assertion": "expect(restored.production_matrix.reduce((sum: number, row: { pf_qty: number }) => sum + Number(row.pf_qty), 0)).toBe(beforePf);",
+                "sourceHash": "0406686c7d1acd5fe734446079cae7ad08bbdbce78f65da4261e1da23d1e0202",
+                "line": 404
+              },
+              {
+                "file": "frontend/tests/e2e/report-expectations.spec.ts",
+                "selector": "PC-DELTA-WEEKLY-01 실제 PF 픽업·취소 뒤 같은탭 주간 수량 자동갱신",
+                "assertion": "await expect(modelRow).toHaveCount(0);",
+                "sourceHash": "0406686c7d1acd5fe734446079cae7ad08bbdbce78f65da4261e1da23d1e0202",
+                "line": 404
+              },
+              {
+                "file": "frontend/tests/e2e/report-expectations.spec.ts",
+                "selector": "PC-DELTA-WEEKLY-01 실제 PF 픽업·취소 뒤 같은탭 주간 수량 자동갱신",
+                "assertion": "await expect(modelRow.getByRole(\"cell\").nth(6)).toHaveText(Number(restoredModel?.pf_qty ?? 0) === 0 ? \"—\" : Number(restoredModel.pf_qty).toLocaleString());",
+                "sourceHash": "0406686c7d1acd5fe734446079cae7ad08bbdbce78f65da4261e1da23d1e0202",
+                "line": 404
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
+                "assertion": "await expect(modelRow.getByRole(\"cell\").nth(6)).toHaveText((baselinePf + 11).toLocaleString());",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 304
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
+                "assertion": "expect(Number(after.production_matrix.find((row: { model_key: string }) => row.model_key === \"DX3000\").pf_qty) - baselinePf).toBe(11);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
+                "line": 304
+              },
+              {
+                "file": "frontend/tests/e2e/shipping-additional-expectations.spec.ts",
+                "selector": "SHIP-WEEK-BOUNDARY PC-DELTA-PF-02 실제 과거주 화면의 KST 경계·동반 제외·주내 취소·마감 보존",
+                "assertion": "expect(closed.production_matrix).toEqual(after.production_matrix);",
+                "sourceHash": "1bcf3d6e1f5989c9c8421700cf6760ee1fd0f74b9ec14457c9d35e79035f2b7c",
                 "line": 304
               }
             ]
@@ -159857,71 +160458,71 @@
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(secondRow).toContainText(\"3개\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "expect((await records(request, item.item_id)).find((row: { record_id: string }) => row.record_id === obsolete.record_id)).toEqual(obsolete);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "expect((await restored).status()).toBe(200);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(page.getByLabel(\"B급·구형 검색\", { exact: true }).filter({ visible: true })).toHaveValue(item.item_name);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(all).toContainText(`${expectedRemaining ? 2 : 1}건`);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(o).toContainText(`${expectedRemaining ? 2 : 1}건`);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(groups).toContainText(\"4개\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(firstRow).toContainText(\"1개\");",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "await expect(firstRow).toHaveCount(0);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-storage-expectations.spec.ts",
               "selector": "DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터·원건별 표시·부분/전량 복귀 후 다른 원건 보존",
               "assertion": "expect(await records(request, other.item_id)).toEqual(unrelatedBefore);",
-              "sourceHash": "2d8e3b4a7b1e546a4a7f45a2603afaf9e4fc72825eb77e2c7b123b7ebc3805d4",
-              "line": 91
+              "sourceHash": "bcf307eb0b2eb1f518f071cc88c20b3acee945fe2c459615e7af58647a3c4350",
+              "line": 92
             },
             {
               "file": "frontend/tests/e2e/defect-processing-expectations.spec.ts",

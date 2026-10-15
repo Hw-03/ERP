@@ -71,7 +71,8 @@ for (const selected of [{ category: "B_GRADE", label: "B급", other: "OBSOLETE" 
     expect(created.management_category).toBe(selected.category);
     expect(Number(created.available_quantity)).toBe(2);
     await page.getByRole("button").filter({ hasText: "B급·구형 자재", visible: true }).click();
-    if (await page.getByRole("button", { name: "필터 펼치기", exact: true }).isVisible()) await page.getByRole("button", { name: "필터 펼치기", exact: true }).click();
+    await page.getByRole("button", { name: "필터 펼치기", exact: true }).click();
+    await expect(page.getByRole("button", { name: "필터 접기", exact: true })).toHaveAttribute("aria-expanded", "true");
     await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "전체", exact: true }).click();
     await page.getByLabel("B급·구형 검색", { exact: true }).filter({ visible: true }).fill(item.item_name);
     const filters = page.getByRole("group", { name: "보관 분류 필터" });
@@ -113,7 +114,8 @@ test("DEFECT-STORAGE 8.6-01/02 8.7-07 8.9-01/02 PC-DELTA-DEFECT-02 보관 필터
   await loginUi(page, actors.requester);
   await page.goto("/mes?tab=defect");
   await page.getByRole("button").filter({ hasText: "B급·구형 자재", visible: true }).click();
-  if (await page.getByRole("button", { name: "필터 펼치기", exact: true }).isVisible()) await page.getByRole("button", { name: "필터 펼치기", exact: true }).click();
+  await page.getByRole("button", { name: "필터 펼치기", exact: true }).click();
+  await expect(page.getByRole("button", { name: "필터 접기", exact: true })).toHaveAttribute("aria-expanded", "true");
   await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "전체", exact: true }).click();
   await page.getByLabel("B급·구형 검색", { exact: true }).filter({ visible: true }).fill(item.item_name);
   await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "창고", exact: true }).click();
