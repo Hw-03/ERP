@@ -105,6 +105,19 @@ export interface StocktakeItemSummary {
   unconfirmed: number;
 }
 
+/** Limited closing snapshot readable by any authenticated operator. */
+export interface StocktakeLatestRoundSummary {
+  round_id: string;
+  title: string;
+  status: "CLOSED_FULL" | "CLOSED_PARTIAL";
+  closed_at: string | null;
+  item_summary: StocktakeItemSummary | null;
+}
+
+export interface StocktakeLatestSummaryResponse {
+  summary: StocktakeLatestRoundSummary | null;
+}
+
 export interface StocktakeProgressSummary {
   total: number;
   confirmed: number;

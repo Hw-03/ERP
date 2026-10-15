@@ -33,6 +33,9 @@ interface DisassembleTreeProps {
   parentItemName: string;
   parentMesCode: string;
   parentQty: number;
+  /** 단계 화면이 다시 마운트되어도 부모가 입력한 배분 기준을 유지한다. */
+  parentNormalQty?: number;
+  onParentNormalQtyChange?: (quantity: number) => void;
   parentDept: string;
   decisions: ChildDecision[];
   onChange: (decisions: ChildDecision[]) => void;
@@ -119,6 +122,8 @@ export function DisassembleTree({
   parentItemName,
   parentMesCode,
   parentQty,
+  parentNormalQty: controlledParentNormalQty,
+  onParentNormalQtyChange,
   parentDept: _parentDept,
   decisions,
   onChange,
@@ -126,7 +131,8 @@ export function DisassembleTree({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [requestVersion, setRequestVersion] = useState(0);
-  const [parentNormalQty, setParentNormalQty] = useState(parentQty);
+  const [localParentNormalQty, setParentNormalQty] = useState(parentQty);
+  const parentNormalQty = controlledParentNormalQty ?? localParentNormalQty;
 
   useEffect(() => {
     if (decisions.length > 0) {
@@ -158,6 +164,7 @@ export function DisassembleTree({
   function handleParentNormalChange(raw: number) {
     const next = clamp(raw, 0, parentQty);
     setParentNormalQty(next);
+    onParentNormalQtyChange?.(next);
     onChange(cascadeNormalQty(decisions, next, parentQty));
   }
 

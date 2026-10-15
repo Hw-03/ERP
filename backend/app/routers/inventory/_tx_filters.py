@@ -32,7 +32,7 @@ from app.models import (
 )
 from app.schemas import TransactionHistoryBatchResponse, TransactionLogResponse
 from app.services.transaction_item_identity import transaction_item_identity
-from app.utils.search import build_normalized_search_filter
+from app.services.item_search import build_item_search_filter
 
 
 # /transactions/summary 카테고리 — 프론트 historyShared.ts 의 scope 멤버와 일치.
@@ -526,18 +526,29 @@ def _apply_common_filters(
         query = query.filter(request_date_expr < date_to_end)
     if not include_archived:
         query = query.filter(TransactionLog.archived_at.is_(None))
-    search_filter = _history_search_filter(search)
+    search_filter = _history_search_filter(search, db)
     if search_filter is not None:
         query = query.filter(search_filter)
     return query
 
 
-def _history_search_filter(search: Optional[str]) -> Optional[ColumnElement[bool]]:
-    """목록·상세 작업명을 같은 모집단으로 검색하고 페이지 분할 전 적용한다."""
-    common_filter = build_normalized_search_filter(
-        search,
+def _history_search_filter(search: Optional[str], db: Session | None = None, *,
+                           groups: list[list[str]] | None = None) -> Optional[ColumnElement[bool]]:
+    """공통 품목 검색과 과거 작업·품목 증거를 페이지 분할 전에 함께 적용한다."""
+    operation_label = (
+        select(InventoryOperation.display_label)
+        .where(InventoryOperation.operation_id == TransactionLog.operation_id)
+        .correlate(TransactionLog)
+        .scalar_subquery()
+    )
+    return build_item_search_filter(db, search, name_columns=[Item.item_name], item_id_column=Item.item_id, groups=groups,
+        guarded_name_columns=[(TransactionLog.item_snapshot["item_name"].as_string(), TransactionLog.item_snapshot.is_not(None))],
+        guarded_literal_columns=[
+            (TransactionLog.item_snapshot["mes_code"].as_string(), TransactionLog.item_snapshot.is_not(None)),
+            (operation_label, TransactionLog.operation_id.is_not(None)),
+        ],
+        literal_columns=[
         _history_list_operation_label_expr(),
-        Item.item_name,
         Item.mes_code,
         TransactionLog.reference_no,
         TransactionLog.notes,
@@ -545,28 +556,7 @@ def _history_search_filter(search: Optional[str]) -> Optional[ColumnElement[bool
         TransactionLog.produced_by,
         TransactionLog.supplier_name_snapshot,
         IoBatch.requester_name,
-    )
-    if common_filter is None:
-        return None
-    operation_label = (
-        select(InventoryOperation.display_label)
-        .where(InventoryOperation.operation_id == TransactionLog.operation_id)
-        .correlate(TransactionLog)
-        .scalar_subquery()
-    )
-    snapshot_filter = build_normalized_search_filter(
-        search,
-        TransactionLog.item_snapshot["item_name"].as_string(),
-        TransactionLog.item_snapshot["mes_code"].as_string(),
-    )
-    # 과거 NULL 증거는 검색에 일치할 수 없으므로 문자열 정규화도 건너뛴다.
-    # CASE는 DB가 OR 조건 순서를 바꾸더라도 불필요한 식 평가를 막는다.
-    return or_(
-        common_filter,
-        case((TransactionLog.operation_id.is_not(None),
-              build_normalized_search_filter(search, operation_label)), else_=False),
-        case((TransactionLog.item_snapshot.is_not(None), snapshot_filter), else_=False),
-    )
+    ])
 
 
 def _history_list_operation_label_expr() -> ColumnElement[str]:

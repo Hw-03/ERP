@@ -24,7 +24,7 @@ type Progress = StocktakeProgress;
 type Preview = { preview_id: string; preview_hash: string; expires_at?: string; can_close?: boolean; summary?: Summary; target_count?: number; count?: number; manifest_id?: string; no_targets?: boolean; targets?: Array<{ item_id: string; scope_key: string; item_name: string; item_code: string; scope_name: string }> };
 type Event = StocktakeEvent;
 type PreparationIssue = { item_code?: string; item_name?: string; scope_name?: string; scope_id?: string; reason: string };
-type Props = { token: string; operator: Operator; round: Round | null; onChanged: () => void; section: "progress" | "rounds"; recovered?: RecoveredStocktakeCommand | null };
+type Props = { token: string; operator: Operator; round: Round | null; onChanged: () => void; section: "progress" | "rounds"; recovered?: RecoveredStocktakeCommand | null; focusStart?: boolean; onStarted?: () => void };
 
 const card = STOCKTAKE_CARD;
 const button = "min-h-11 rounded-xl border border-[var(--c-border)] bg-[var(--c-s2)] px-4 py-2 text-sm font-semibold text-[var(--c-text)] disabled:cursor-not-allowed disabled:opacity-50";
@@ -54,7 +54,7 @@ function completionMessage(kind: string, result?: unknown): string {
   return { round_close: "회차를 종료했습니다.", round_start: "회차를 시작했습니다.", target_append: "조사 대상을 추가했습니다.", round_close_preview: "종료 내용 확인을 마쳤습니다. 다시 내용을 확인해 주세요.", round_start_preview: "시작 대상 확인을 마쳤습니다. 다시 내용을 확인해 주세요.", target_append_preview: "추가 대상 확인을 마쳤습니다. 다시 내용을 확인해 주세요." }[kind] ?? "요청을 완료했습니다.";
 }
 
-export function StocktakeManagement({ token, operator, round, onChanged, section, recovered }: Props): ReactNode {
+export function StocktakeManagement({ token, operator, round, onChanged, section, recovered, focusStart = false, onStarted }: Props): ReactNode {
   const canManageRounds = canManageStocktakeRounds(operator);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [progressPending, setProgressPending] = useState(section === "progress" && !!round);
@@ -86,8 +86,9 @@ export function StocktakeManagement({ token, operator, round, onChanged, section
     if (recovered?.token === token && unknown?.key === recovered.entry.key && unknown.kind === recovered.entry.kind) {
       setUnknown(null); setPreview(null); setError("");
       setNotice(recovered.resolution === "COMPLETED" ? completionMessage(recovered.entry.kind, recovered.result) : "요청이 반영되지 않았습니다. 다시 내용을 확인해 주세요.");
+      if (recovered.resolution === "COMPLETED" && recovered.entry.kind === "round_start") onStarted?.();
     }
-  }, [recovered, token, unknown]);
+  }, [recovered, token, unknown, onStarted]);
   const roundRef = useRef(round?.round_id ?? null);
   const selectionRef = useRef("");
   const titleRef = useRef(title);
@@ -146,6 +147,9 @@ export function StocktakeManagement({ token, operator, round, onChanged, section
     setBusy(true); setError(""); setNotice(""); setPreparationIssues([]);
     try {
       const result = await stocktakeApi.command<Preview>(kind, path, token, payload, { key });
+      // A successful start can arrive after realtime already published its new round.
+      // Only the acknowledged command may leave the start/recovery screen.
+      if (kind === "round_start" && onStarted) { onChanged(); onStarted(); return null; }
       return roundRef.current === submittedRound && actionRef.current === submittedAction ? result : null;
     } catch (cause) {
       if (roundRef.current !== submittedRound || actionRef.current !== submittedAction) return null;
@@ -198,7 +202,7 @@ export function StocktakeManagement({ token, operator, round, onChanged, section
     const path = kind === "start" ? "/api/stocktakes/rounds" : kind === "append" ? `/api/stocktakes/rounds/${round?.round_id}/target-appends` : `/api/stocktakes/rounds/${round?.round_id}/close`;
     const command = kind === "start" ? "round_start" : kind === "append" ? "target_append" : "round_close";
     const result = await run(command, path, { preview_id: data.preview_id, preview_hash: data.preview_hash });
-    if (result) { setPreview(null); setNotice(completionMessage(command)); onChanged(); await refresh(); }
+    if (result) { setPreview(null); setNotice(completionMessage(command)); onChanged(); await refresh(); if (kind === "start") onStarted?.(); }
   };
   const lookup = async () => {
     if (!unknown) return;
@@ -206,6 +210,7 @@ export function StocktakeManagement({ token, operator, round, onChanged, section
     try {
       const result = await stocktakeApi.read<Record<string, unknown>>(`/api/stocktakes/commands/${encodeURIComponent(unknown.key)}?kind=${encodeURIComponent(unknown.kind)}`, token);
       setError(""); setNotice(completionMessage(unknown.kind, result)); setUnknown(null); setPreview(null); onChanged(); await refresh();
+      if (unknown.kind === "round_start") onStarted?.();
     } catch (cause) {
       if (isStocktakeNotApplied(cause)) { setUnknown(null); setPreview(null); setError("미반영으로 확정된 요청입니다."); onChanged(); }
       else setError(`영수증을 확인하지 못했습니다. 같은 키를 보관하고 부서 결재 담당자에게 확인하세요. ${message(cause)}`);
@@ -267,7 +272,7 @@ export function StocktakeManagement({ token, operator, round, onChanged, section
           <div>
           <ManagementFields open={!preview && action === "start"}>
             <h2 className="mb-3 font-semibold">새 회차 시작</h2>
-            <label className="block">회차 이름<input aria-label="회차 이름" className={`${field} mt-2`} value={title} onChange={event => { setTitle(event.target.value); setPreview(null); }} /></label>
+            <label className="block">회차 이름<input aria-label="회차 이름" autoFocus={focusStart} className={`${field} mt-2`} value={title} onChange={event => { setTitle(event.target.value); setPreview(null); }} /></label>
           </ManagementFields>
           <ManagementFields open={!preview && action === "append"}><p>현재 회차에 새 조사 대상을 추가합니다.</p></ManagementFields>
           <ManagementFields open={!preview && action === "close"}>

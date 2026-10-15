@@ -24,6 +24,22 @@ beforeEach(() => {
 });
 
 describe("StocktakeManagement", () => {
+  it("대기 화면의 시작 진입은 회차 이름에 초점을 두고 명령을 보내지 않는다", () => {
+    render(<StocktakeManagement token="t" operator={operator} round={null} onChanged={vi.fn()} section="rounds" focusStart />);
+    expect(screen.getByRole("textbox", { name: "회차 이름" })).toHaveFocus();
+    expect(stocktakeApi.command).not.toHaveBeenCalled();
+  });
+  it("시작 미리보기는 머무르고 확정 성공 후에만 조사 화면 이동을 알린다", async () => {
+    const started = vi.fn();
+    vi.mocked(stocktakeApi.command).mockResolvedValue({ preview_id: "start-preview", preview_hash: "hash", target_count: 1 });
+    render(<StocktakeManagement token="t" operator={operator} round={null} onChanged={vi.fn()} section="rounds" focusStart onStarted={started} />);
+    fireEvent.change(screen.getByRole("textbox", { name: "회차 이름" }), { target: { value: "새 조사" } });
+    fireEvent.click(screen.getByRole("button", { name: "시작 대상 확인", exact: true }));
+    const confirm = await screen.findByRole("button", { name: "회차 시작", exact: true });
+    expect(started).not.toHaveBeenCalled();
+    fireEvent.click(confirm);
+    await waitFor(() => expect(started).toHaveBeenCalledOnce());
+  });
   it("부분 종료에서 제외되는 예약 부족은 종료 오류로 오인하지 않게 안내한다", async () => {
     vi.mocked(stocktakeApi.command).mockResolvedValueOnce({ preview_id: "p", preview_hash: "h", can_close: true,
       summary: { total: 6, applied: 3, unconfirmed: 1, confirmed_excluded: 2, pending: 0 } });

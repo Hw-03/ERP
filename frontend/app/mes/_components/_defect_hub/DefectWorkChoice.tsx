@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type JSX } from "react";
-import { ArrowLeft, Building2, Check, ShieldAlert, Trash2, Warehouse, Wrench } from "lucide-react";
+import { Building2, Check, ShieldAlert, Trash2, Warehouse, Wrench } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import styles from "./DefectWorkChoice.module.css";
+import { DefectFlowStepper } from "./DefectFlowStepper";
 
 export type DefectWorkAction = "add" | "scrap" | "rework";
 export type DefectSourceKind = "production" | "warehouse";
@@ -14,7 +15,7 @@ interface Props {
   source: DefectSourceKind | null;
   onActionChange: (action: DefectWorkAction) => void;
   onProceed: (action: DefectWorkAction, source: DefectSourceKind) => void;
-  onCancel: () => void;
+  onMenuSelect: () => void;
 }
 
 const EXIT_FALLBACK_MS = 160;
@@ -25,7 +26,7 @@ const WORK_OPTIONS = [
 ] as const;
 
 /** 선택은 같은 화면에서 바꾸고, 출처가 확정된 뒤에만 품목 단계로 이동한다. */
-export function DefectWorkChoice({ action, source, onActionChange, onProceed, onCancel }: Props): JSX.Element {
+export function DefectWorkChoice({ action, source, onActionChange, onProceed, onMenuSelect }: Props): JSX.Element {
   const [leaving, setLeaving] = useState(false);
   const [pickedSource, setPickedSource] = useState<DefectSourceKind | null>(null);
   const pending = useRef<{ action: DefectWorkAction; source: DefectSourceKind } | null>(null);
@@ -77,19 +78,11 @@ export function DefectWorkChoice({ action, source, onActionChange, onProceed, on
     if (nextAction === "rework") beginExit(nextAction, "production");
   }
 
-  function cancel(): void {
-    if (timer.current !== null) clearTimeout(timer.current);
-    pending.current = null;
-    onCancel();
-  }
-
   return (
     <div data-testid="defect-work-choice" aria-busy={leaving} className={`${styles.root} ${leaving ? styles.leaving : ""}`}
       onAnimationEnd={(event) => { if (event.target === event.currentTarget) completeExit(); }}>
-      <header className={styles.header}>
-        <button type="button" onClick={cancel} className={`standard-hover ${styles.back}`}><ArrowLeft size={16} /> 이전</button>
-        <h2 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>불량 처리</h2>
-      </header>
+      <h2 className="sr-only">불량 처리</h2>
+      <DefectFlowStepper action={action} source={source} currentStep={1} busy={leaving} onMenuSelect={onMenuSelect} />
 
       <div className={`${styles.content} ${showSource ? styles.withSource : ""}`}>
         <section aria-label="작업 선택" className={styles.workSection}>

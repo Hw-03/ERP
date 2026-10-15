@@ -48,11 +48,15 @@ import { processTypeColor } from "@/lib/mes/process";
 import { useConfirmNavigation, useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { QuantityInput } from "./common/QuantityInput";
 import { StatusTargetNotice } from "./common/StatusTargetNotice";
+import { SearchInput } from "./common/SearchInput";
 import { DesktopWorkHubCard } from "./common/DesktopWorkHubCard";
 import type { Operator } from "./login/useCurrentOperator";
 import { QuantityStepper } from "./_warehouse_v2/QuantityStepper";
 import type { IoEntryIntent } from "./_warehouse_v2/types";
-import { matchesSearchText } from "@/lib/searchText";
+import { matchesItemSearchFields } from "@/lib/itemSearch";
+import type { ItemSearchConfig } from "@/lib/api/types/item-search";
+import { useItemSearch } from "@/lib/queries/useItemSearch";
+import { ApiError } from "@/lib/api-core";
 import {
   buildShippingPayload,
   isValidPositiveInt,
@@ -203,11 +207,10 @@ function itemLabel(item: Item | undefined) {
   if (!item) return "품목 선택";
   return `${item.mes_code ?? item.process_type_code ?? "-"} · ${item.item_name}`;
 }
-function filterItems(items: Item[], query: string) {
+function filterItems(items: Item[], query: string, config: ItemSearchConfig) {
   return items.filter((item) =>
-    [item.mes_code, item.process_type_code, item.item_name]
-      .filter(Boolean)
-      .some((value) => matchesSearchText(String(value), query)),
+    matchesItemSearchFields({ itemId: item.item_id, nameFields: [item.item_name],
+      literalFields: [item.mes_code, item.process_type_code] }, query, config),
   );
 }
 
@@ -259,6 +262,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   const [pfItems, setPfItems] = useState<Item[]>([]);
   const queryClient = useQueryClient();
   const realtimeRevision = useRealtimeRevision();
+  const { config: searchConfig } = useItemSearch();
   const shippingRequestsQuery = useShippingRequestsQuery();
   const requests = useMemo(() => shippingRequestsQuery.data ?? [], [shippingRequestsQuery.data]);
   const setRequests = useCallback(
@@ -327,6 +331,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   const pfItemsRefreshRevisionRef = useRef<number | null>(realtimeRevision);
   const pfItemsRefreshGenerationRef = useRef(0);
   const historyRefreshRevisionRef = useRef<number | null>(realtimeRevision);
+  const historyRefreshSearchVersionRef = useRef(searchConfig.version);
   const historyDetailRevisionRef = useRef<number | null>(realtimeRevision);
   const nameValidationNoticeIdRef = useRef(0);
 
@@ -650,14 +655,19 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       });
   }, [pfItems.length, pfItemsLoaded, realtimeRevision]);
 
+  /** 현재 조회 세대만 반영하며 검색 설정이 만료된 커서는 첫 페이지로 복구한다. */
   async function loadHistoryPage(
     params: ShippingHistoryParams,
     append = false,
     generation?: number,
-  ) {
+  ): Promise<void> {
     const requestGeneration = generation ?? ++historyRequestGenerationRef.current;
     setHistoryLoading(true);
     setHistoryError(null);
+    if (!append) {
+      setHistoryNextCursor(null);
+      setHistoryHasMore(false);
+    }
     try {
       const page = await api.getShippingHistory({ ...params, limit: 50 });
       if (requestGeneration !== historyRequestGenerationRef.current) return;
@@ -692,6 +702,12 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       }
     } catch (err) {
       if (requestGeneration !== historyRequestGenerationRef.current) return;
+      if (params.cursor && err instanceof ApiError && err.isConflict && err.code === "SEARCH_CONFIG_STALE") {
+        const firstPageParams = { ...params };
+        delete firstPageParams.cursor;
+        await loadHistoryPage(firstPageParams, false, requestGeneration);
+        return;
+      }
       const msg = err instanceof Error ? err.message : "출하 이력을 불러오지 못했습니다.";
       setHistoryError(msg);
       onStatusChange(msg);
@@ -893,16 +909,19 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     }
     if (historyLoadedStatusRef.current === historyStatus) return;
     historyLoadedStatusRef.current = historyStatus;
+    historyRefreshRevisionRef.current = realtimeRevision;
+    historyRefreshSearchVersionRef.current = searchConfig.version;
     void loadHistoryOverview(historyStatus);
     // Local search and folder actions load explicitly; this effect restores entry/status navigation only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, historyStatus, historyRows, requests, searchParams, selectedHistoryId, shippingRequestsQuery.isLoading]);
   useEffect(() => {
-    if (realtimeRevision === null) return;
-    if (historyRefreshRevisionRef.current === realtimeRevision) return;
-    historyRefreshRevisionRef.current = realtimeRevision;
     if (view !== "historyList" && view !== "historyWork") return;
-
+    const revisionChanged = realtimeRevision !== null && historyRefreshRevisionRef.current !== realtimeRevision;
+    const searchVersionChanged = historyRefreshSearchVersionRef.current !== searchConfig.version;
+    if (!revisionChanged && !searchVersionChanged) return;
+    historyRefreshRevisionRef.current = realtimeRevision;
+    historyRefreshSearchVersionRef.current = searchConfig.version;
     historyLoadedStatusRef.current = historyStatus;
     if (historyAppliedSearch) {
       void loadHistoryPage({ status: historyStatus, q: historyAppliedSearch });
@@ -910,7 +929,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     }
     if (historyYear !== null && historyMonth !== null) {
       const generation = ++historyRequestGenerationRef.current;
-      void api.getShippingHistoryMonths({ status: historyStatus })
+      if (revisionChanged) void api.getShippingHistoryMonths({ status: historyStatus })
         .then((months) => {
           if (generation === historyRequestGenerationRef.current) setHistoryMonths(months);
         })
@@ -921,9 +940,9 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       return;
     }
     void loadHistoryOverview(historyStatus);
-    // Revision is the sole trigger; current history filters and selection stay intact.
+    // 두 갱신 신호를 함께 처리하며 현재 검색·폴더·선택 상태를 보존한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [realtimeRevision]);
+  }, [realtimeRevision, searchConfig.version, view]);
   useEffect(() => {
     if (searchParams.get("tab") !== "shipping") {
       if (view === "requestWork") advanceRequestDraftGeneration();
@@ -2699,13 +2718,12 @@ function HistoryListEntry({
             onSearch();
           }}
         >
-          <input
-            type="search"
-            aria-label="출하 이력 검색"
+          <SearchInput
+            inputProps={{ type: "search" }}
+            ariaLabel="출하 이력 검색"
             value={search}
-            onChange={(event) => onSearchChange(event.target.value)}
-            className={`${SHIPPING_TEXT_INPUT_CLASS} min-w-0 flex-1`}
-            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+            onChange={onSearchChange}
+            className="min-w-0 flex-1 rounded-[12px]"
             placeholder="인보이스 번호 또는 PF 품명 검색"
           />
           <button type="submit" className="min-h-11 rounded-[12px] border px-5 text-sm font-black" style={{ background: tint(LEGACY_COLORS.blue, 14), borderColor: tint(LEGACY_COLORS.blue, 40), color: LEGACY_COLORS.blue }}>
@@ -2876,9 +2894,10 @@ function RequestSection(props: {
     PF: sortedDraftLines.filter((line) => line.parent_stage === "PF"),
   };
   const [pfQuery, setPfQuery] = useState("");
+  const { config: searchConfig } = useItemSearch();
   const requestQuantityRef = useRef<HTMLInputElement | null>(null);
   const [focusRequestQuantity, setFocusRequestQuantity] = useState(false);
-  const filteredPfItems = useMemo(() => filterItems(props.pfItems, pfQuery), [props.pfItems, pfQuery]);
+  const filteredPfItems = useMemo(() => filterItems(props.pfItems, pfQuery, searchConfig), [props.pfItems, pfQuery, searchConfig]);
   const locked = !props.canEditDraft;
   const usesCandidateSelection = props.matchResult?.base_pf_matches !== undefined;
   const basePfMatches = Boolean(props.matchResult?.base_pf_matches);
@@ -3075,14 +3094,14 @@ function RequestSection(props: {
                   />
                 </Field>
                 <Field label="PF 검색">
-                  <input
-                    data-testid="shipping-pf-search"
-                    aria-label="PF 검색"
+                  <SearchInput
+                    inputProps={{ "data-testid": "shipping-pf-search" }}
+                    ariaLabel="PF 검색"
                     value={pfQuery}
                     disabled={locked || props.pending !== null}
-                    onChange={(event) => setPfQuery(event.target.value)}
-                    className={SHIPPING_TEXT_INPUT_CLASS}
-                    style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                    onChange={setPfQuery}
+                    className="rounded-[12px]"
+                    style={{ background: LEGACY_COLORS.bg }}
                     placeholder="PF 코드/품명 검색"
                   />
                 </Field>
@@ -3797,17 +3816,18 @@ function ItemSearchAdd({
   tone: string;
   onAdd: (itemId: string) => void;
 }) {
-  const filtered = useMemo(() => filterItems(itemOptions, query).slice(0, 24), [itemOptions, query]);
+  const { config: searchConfig } = useItemSearch();
+  const filtered = useMemo(() => filterItems(itemOptions, query, searchConfig).slice(0, 24), [itemOptions, query, searchConfig]);
   return (
     <>
-      <input
-        data-testid={inputTestId}
-        aria-label={ariaLabel}
+      <SearchInput
+        inputProps={{ "data-testid": inputTestId }}
+        ariaLabel={ariaLabel}
         value={query}
         disabled={disabled}
-        onChange={(event) => setQuery(event.target.value)}
-        className="mb-2 h-11 w-full min-w-0 rounded-[12px] border px-3 text-sm font-bold outline-none focus-visible:ring-2"
-        style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+        onChange={setQuery}
+        className="mb-2 w-full min-w-0 rounded-[12px]"
+        style={{ background: LEGACY_COLORS.bg }}
         placeholder={placeholder}
       />
       {query.trim() && (

@@ -31,6 +31,25 @@ function makeItem(): Item {
 }
 
 describe("DesktopInventoryRightPanel", () => {
+  it("검색용 이름은 전용 탭에서 관리하며 탭 전환 후 입력을 유지한다", () => {
+    const item = makeItem();
+    render(<DesktopInventoryRightPanel selectedItem={item} displayItem={item} headerBadge={null} onClose={vi.fn()} onGoToWarehouse={vi.fn()} />);
+    expect(screen.queryByRole("textbox", { name: "검색용 이름 추가" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "검색용 이름" }));
+    expect(screen.getByRole("tabpanel", { name: "검색용 이름" })).toBeVisible();
+    const input = screen.getByRole("textbox", { name: "검색용 이름 추가" });
+    fireEvent.change(input, { target: { value: "현장 별명" } });
+    fireEvent.click(screen.getByRole("tab", { name: "최근 내역" }));
+    fireEvent.click(screen.getByRole("tab", { name: "검색용 이름" }));
+    expect(screen.getByRole("textbox", { name: "검색용 이름 추가" })).toHaveValue("현장 별명");
+  });
+
+  it("삭제된 품목의 검색용 이름은 편집할 수 없다", () => {
+    const item = { ...makeItem(), deleted_at: "2026-10-15T00:00:00Z" };
+    render(<DesktopInventoryRightPanel selectedItem={item} displayItem={item} headerBadge={null} onClose={vi.fn()} onGoToWarehouse={vi.fn()} />);
+    fireEvent.click(screen.getByRole("tab", { name: "검색용 이름" }));
+    expect(screen.getByRole("textbox", { name: "검색용 이름 추가" })).toBeDisabled();
+  });
   it("복원 중에는 품목 객체가 없어도 상세창과 로딩 안내를 유지한다", () => {
     render(<DesktopInventoryRightPanel open selectedItem={null} displayItem={null} headerBadge={null} onClose={vi.fn()} onGoToWarehouse={vi.fn()} detailLoading />);
     expect(screen.getByRole("dialog", { name: "품목 상세" })).toBeVisible();
@@ -150,11 +169,12 @@ describe("DesktopInventoryRightPanel", () => {
     expect(detailTab).toHaveAttribute("aria-selected", "true");
 
     fireEvent.keyDown(detailTab, { key: "End" });
-    expect(historyTab).toHaveFocus();
-    fireEvent.keyDown(historyTab, { key: "ArrowRight" });
+    const aliasesTab = screen.getByRole("tab", { name: "검색용 이름" });
+    expect(aliasesTab).toHaveFocus();
+    fireEvent.keyDown(aliasesTab, { key: "ArrowRight" });
     expect(detailTab).toHaveFocus();
     fireEvent.keyDown(detailTab, { key: "ArrowLeft" });
-    expect(historyTab).toHaveFocus();
+    expect(aliasesTab).toHaveFocus();
   });
 
   it("keeps modal dialog semantics while using one red card close button", () => {

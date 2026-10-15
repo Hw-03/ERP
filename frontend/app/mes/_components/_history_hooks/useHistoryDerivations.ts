@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import type { Item, ProductModel, TransactionLog, TransactionType } from "@/lib/api";
-import { matchesSearchText } from "@/lib/searchText";
+import { useItemSearch } from "@/lib/queries/useItemSearch";
 
 export interface HistoryFilters {
   date: string;
@@ -81,6 +81,7 @@ export function useHistoryDerivations(
   calendarMonth: number,
   productModels: ProductModel[] = [],
 ): UseHistoryDerivationsResult {
+  const { matchesFields } = useItemSearch();
   const itemModelMap = useMemo(() => {
     const slotToName = new Map(productModels.map((m) => [m.slot, m.model_name ?? "공용"]));
     return new Map(
@@ -114,10 +115,11 @@ export function useHistoryDerivations(
       if (filters.model !== "ALL" && (itemModelMap.get(log.item_id) ?? "공용") !== filters.model)
         return false;
       if (start && parseUtc(log.created_at) < start) return false;
-      if (!matchesSearchText(`${log.item_name} ${log.mes_code} ${log.reference_no ?? ""} ${log.notes ?? ""}`, filters.search)) return false;
+      if (!matchesFields({ itemId: log.item_id, nameFields: [log.item_name],
+        literalFields: [log.mes_code, log.reference_no, log.notes] }, filters.search)) return false;
       return true;
     });
-  }, [logs, filters, itemModelMap]);
+  }, [logs, filters, itemModelMap, matchesFields]);
 
   const summary = useMemo<HistorySummary>(() => {
     const total = filteredLogs.length;

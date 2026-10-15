@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, Depends, Query, Request, status
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Session, aliased
 
 from app._actor import get_actor_emp, set_actor
@@ -54,7 +54,7 @@ from app.schemas.shipping import (
 from app.services import shipping as shipping_svc
 from app.services import shipping_actions as shipping_actions_svc
 from app.services.shipping import ShippingConflictError, ShippingError
-from app.utils.search import build_normalized_search_filter
+from app.services.item_search import build_item_search_filter, get_search_config
 
 
 router = APIRouter()
@@ -639,15 +639,17 @@ def pickup_cancel(
     return _to_response(db, req)
 
 
-def _history_cursor(request: ShippingRequest, sort_at: datetime) -> str:
-    payload = {"sort_at": sort_at.isoformat(), "request_id": str(request.request_id)}
+def _history_cursor(request: ShippingRequest, sort_at: datetime, *, search_version: str | None = None) -> str:
+    payload = {"sort_at": sort_at.isoformat(), "request_id": str(request.request_id), "search_version": search_version}
     return base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode().rstrip("=")
 
 
-def _decode_history_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
+def _decode_history_cursor(cursor: str, *, search_version: str | None = None) -> tuple[datetime, uuid.UUID]:
     try:
         padded = cursor + "=" * (-len(cursor) % 4)
         value = json.loads(base64.urlsafe_b64decode(padded.encode()).decode())
+        if search_version is not None and value.get("search_version") != search_version:
+            raise http_error(409, "SEARCH_CONFIG_STALE", "검색 설정이 변경되었습니다. 처음부터 다시 조회해 주세요.")
         return datetime.fromisoformat(value["sort_at"]), uuid.UUID(value["request_id"])
     except (ValueError, KeyError, TypeError, UnicodeDecodeError, json.JSONDecodeError, binascii.Error):
         raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, "유효하지 않은 출하 이력 커서입니다.")
@@ -728,6 +730,8 @@ def history(
             raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.UNPROCESSABLE, "출하 이력은 완료 또는 취소 상태만 조회할 수 있습니다.")
         allowed = [status_filter]
     final_pf = aliased(Item)
+    search_config = get_search_config(db)
+    search_version = search_config["version"]
     base_pf = aliased(Item)
     sort_at = func.coalesce(ShippingRequest.picked_up_at, ShippingRequest.cancelled_at)
     effective_pf_name = func.coalesce(
@@ -744,15 +748,15 @@ def history(
     if year is not None:
         start, end = _kst_month_bounds_utc(year, month)
         query = query.filter(sort_at >= start, sort_at < end)
-    search_filter = build_normalized_search_filter(
-        q,
-        ShippingRequest.invoice_number,
-        effective_pf_name,
-    )
+    effective_pf_id = case((final_pf.item_id.is_not(None), final_pf.item_id),
+        (func.nullif(ShippingRequest.custom_pf_name, "").is_not(None), None), else_=base_pf.item_id)
+    search_filter = build_item_search_filter(db, q, name_columns=[effective_pf_name],
+        literal_columns=[ShippingRequest.invoice_number], item_id_column=effective_pf_id,
+        groups=[group["terms"] for group in search_config["synonym_groups"]])
     if search_filter is not None:
         query = query.filter(search_filter)
     if cursor:
-        cursor_at, cursor_id = _decode_history_cursor(cursor)
+        cursor_at, cursor_id = _decode_history_cursor(cursor, search_version=search_version)
         query = query.filter(or_(sort_at < cursor_at, and_(sort_at == cursor_at, ShippingRequest.request_id < cursor_id)))
     rows = query.order_by(sort_at.desc(), ShippingRequest.request_id.desc()).limit(limit + 1).all()
     page = rows[:limit]
@@ -760,7 +764,7 @@ def history(
     latest_revisions = _latest_preparation_revisions(db, [row.request_id for row in page])
     return ShippingHistoryPageResponse(
         requests=[_to_response(db, row, latest_revisions.get(row.request_id)) for row in page],
-        next_cursor=_history_cursor(page[-1], _history_sort_at(page[-1])) if has_more and page else None,
+        next_cursor=_history_cursor(page[-1], _history_sort_at(page[-1]), search_version=search_version) if has_more and page else None,
         has_more=has_more,
     )
 

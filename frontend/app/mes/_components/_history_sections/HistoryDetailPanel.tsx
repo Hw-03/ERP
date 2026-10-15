@@ -720,14 +720,25 @@ export function HistoryDetailMemo({
   notes,
   reasonMemo,
   transactionType,
+  variant = "card",
+  label = "메모",
+  excludeMemo,
 }: {
   notes: string | null | undefined;
   reasonMemo?: string | null;
   transactionType?: TransactionLog["transaction_type"];
+  variant?: "card" | "plain";
+  label?: string;
+  excludeMemo?: string | null;
 }) {
   const parsedMemo = parseTransactionNotes(notes, transactionType).userMemo;
   const userMemo = reasonMemo?.trim() || parsedMemo;
-  if (!userMemo) return null;
+  const normalize = (value: string): string => value.trim().replace(/\s+/g, " ");
+  if (!userMemo || (excludeMemo && normalize(userMemo) === normalize(excludeMemo))) return null;
+  if (variant === "plain") return <div className="mt-2 space-y-1">
+    <div className="text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div>
+    <p className="whitespace-pre-wrap break-words text-sm leading-relaxed" style={{ color: LEGACY_COLORS.text }}>{userMemo}</p>
+  </div>;
   return (
     <div
       className="rounded-[20px] border p-4"
@@ -741,7 +752,7 @@ export function HistoryDetailMemo({
         style={{ color: LEGACY_COLORS.blue }}
       >
         <StickyNote className="h-3.5 w-3.5" />
-        메모
+        {label}
       </div>
       <div
         className="whitespace-pre-wrap break-words text-sm leading-relaxed"

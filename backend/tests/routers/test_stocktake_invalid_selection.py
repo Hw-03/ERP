@@ -6,6 +6,7 @@ import uuid
 import pytest
 
 from app.services.stocktake_common import fingerprint
+from app.services.item_search import get_search_config
 from tests.routers.test_stocktakes import (
     BASE, QUANTITIES, _headers, _round, _setup, _start_count, _target, _token,
 )
@@ -43,7 +44,7 @@ def test_invalid_target_cursors_are_422(db_session, make_item, client, cursor):
     token = _token(client, admin)
     round_ = _round(client, token)
     if cursor == "bad-uuid":
-        context = fingerprint([round_["round_id"], round_["target_generation"], None, None, "", None, [], [], "AND", None, [], "dashboard-v2"])
+        context = fingerprint([round_["round_id"], round_["target_generation"], None, None, "", None, [], [], "AND", None, [], "dashboard-v2", get_search_config(db_session)["version"]])
         cursor = base64.urlsafe_b64encode(json.dumps({
             "v": 2, "context": context, "last": [0, 0, 0, "", "not-a-uuid", 1, "warehouse", "not-a-uuid"]}).encode()).decode()
     response = client.get(f"{BASE}/rounds/{round_['round_id']}/targets",

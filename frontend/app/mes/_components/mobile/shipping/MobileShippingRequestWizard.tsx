@@ -12,6 +12,7 @@ import {
 } from "@/lib/shipping/request-draft";
 import { BottomSheet } from "@/lib/ui/BottomSheet";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
+import { useItemSearch } from "@/lib/queries/useItemSearch";
 import type { Operator } from "../../login/useCurrentOperator";
 import { InlineSearch, PrimaryActionButton, StickyFooter } from "../primitives";
 import { ShippingAccordion, ShippingHeader, ShippingItemName } from "./ShippingPresentation";
@@ -325,8 +326,9 @@ export function MobileShippingRequestWizard({ operator, request, step, onStepCha
     }
   };
 
-  const pfOptions = catalog.filter((item) => item.process_type_code === "PF" && `${item.item_name} ${item.mes_code ?? ""}`.toLowerCase().includes(pfQuery.toLowerCase())).slice(0, 80);
-  const addOptions = catalog.filter((item) => `${item.item_name} ${item.mes_code ?? ""}`.toLowerCase().includes(addQuery.toLowerCase())).slice(0, 60);
+  const { matchesItem } = useItemSearch();
+  const pfOptions = catalog.filter((item) => item.process_type_code === "PF" && matchesItem(item, pfQuery)).slice(0, 80);
+  const addOptions = catalog.filter((item) => matchesItem(item, addQuery)).slice(0, 60);
   const sortedLines = sortShippingDraftLines(draft.lines, itemById);
   const changedLines = sortedLines.filter((line) => line.origin === "CUSTOM" || !line.included || (referenceQuantitiesRef.current.has(line.key) && line.quantity !== referenceQuantitiesRef.current.get(line.key)));
   /** 원래 BOM 수량을 기준으로 변경 종류를 표시한다. */

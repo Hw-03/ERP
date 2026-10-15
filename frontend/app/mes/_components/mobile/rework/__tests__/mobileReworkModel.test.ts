@@ -1,13 +1,22 @@
 import { describe, expect, it } from "vitest";
 import type { AdjLineTemplate } from "@/lib/api/types/dept-adjustment";
 import { toServerDecision, validateDecisionTree } from "../../../_defect_hub/DisassembleTree";
-import { allocateNormal, effectiveRows, fromTemplate, getNode, hasChanges, setPart, updateNode } from "../mobileReworkModel";
+import { activeRows, allocateNormal, effectiveRows, fromTemplate, getNode, hasChanges, setPart, updateNode, visibleRows } from "../mobileReworkModel";
 
 function node(id: string, qty = 10) {
   return fromTemplate({ item_id: id, item_name: id, mes_code: `CODE-${id}`, quantity: qty, unit: "EA", department: "고압", has_children: true, bom_auto_token: `token-${id}` } as AdjLineTemplate);
 }
 
 describe("mobile rework decisions", () => {
+  it("searches aliases and translated child names while keeping ancestors and edited quantities", () => {
+    const child = { ...setPart(node("child"), "scrap_qty", 3), item_name: "Battery B/D" };
+    const roots = [{ ...node("assembly"), nodeMode: "split" as const, children: [child] }, node("other")];
+    const config = { version: "test", synonym_groups: [{ group_id: "g", version: 1, terms: ["배터리", "battery"] }],
+      item_aliases: { child: [{ alias_id: "a", alias: "내장재" }] } };
+    const found = visibleRows(activeRows(roots), { "0": false }, "배터리 내장재", false, undefined, config);
+    expect(found.map(row => row.node.item_id)).toEqual(["assembly", "child"]);
+    expect(found[1].node.scrap_qty).toBe(3);
+  });
   it("starts all normal and keeps the template's unit, receiving department and token", () => {
     expect(node("part")).toMatchObject({ normal_qty: 10, defective_qty: 0, scrap_qty: 0, unit: "EA", department: "고압", bom_auto_token: "token-part" });
   });

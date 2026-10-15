@@ -111,6 +111,45 @@ describe("ManagementCategoryModal", () => {
 });
 
 describe("모바일 B급·구형 목록", () => {
+  it("PC 보관 검색을 지울 수 있고 조건에 가려진 재고를 없는 재고로 표시하지 않는다", () => {
+    window.localStorage.clear();
+    render(<DefectStorageView locations={[location]} currentEmployee={{ employee_id: "employee-1", name: "Kim", department: "조립" }} onBack={() => {}} onRestore={() => {}} onUpdated={() => {}} />);
+    const search = screen.getByRole("searchbox", { name: "B급·구형 검색" });
+    fireEvent.change(search, { target: { value: "검색 없음" } });
+    expect(screen.getByText("검색 결과가 없습니다")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "B급·구형 검색 지우기" }));
+    expect(search).toHaveValue("");
+    fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
+    fireEvent.click(within(screen.getByRole("group", { name: "공정 구분" })).getByRole("button", { name: "공정완료" }));
+    expect(screen.queryByText("보관 중인 B급·구형 자재가 없습니다.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "필터 초기화" })).toBeInTheDocument();
+  });
+  it("PC 빈결과 초기화는 격리자 조건도 풀고 고정과 정렬 설정은 유지한다", () => {
+    window.localStorage.clear();
+    render(<DefectStorageView locations={[{ ...location, quarantined_by_employee_id: "other" }]} currentEmployee={{ employee_id: "employee-1", name: "Kim", department: "조립" }} onBack={() => {}} onRestore={() => {}} onUpdated={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
+    fireEvent.click(screen.getByRole("button", { name: "내가 격리" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "필터 고정" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "정렬" }), { target: { value: "oldest" } });
+    fireEvent.click(screen.getByRole("button", { name: "필터 초기화" }));
+    expect(screen.getByText(location.item_name)).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "필터 고정" })).toBeChecked();
+    expect(screen.getByRole("combobox", { name: "정렬" })).toHaveValue("oldest");
+  });
+  it("조합 입력 도중에도 보관 목록을 필터링한다", () => {
+    window.localStorage.clear();
+    render(<DefectStorageView mobilePresentation locations={[location]}
+      currentEmployee={{ employee_id: "employee-1", name: "Kim", department: "조립" }}
+      onBack={vi.fn()} onRestore={vi.fn()} onUpdated={vi.fn()} />);
+    const input = screen.getByRole("textbox", { name: "B급·구형 검색" });
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: "없는 검색어" } });
+    expect(screen.queryByText(location.item_name)).not.toBeInTheDocument();
+    fireEvent.compositionEnd(input);
+    expect(screen.queryByText(location.item_name)).not.toBeInTheDocument();
+    expect(screen.getByText("검색 결과가 없습니다.")).toBeInTheDocument();
+  });
+
   it("필터를 접어 시작하고 조건·정렬·분류 선택을 접은 뒤에도 유지한다", () => {
     window.localStorage.clear();
     render(<DefectStorageView mobilePresentation locations={[

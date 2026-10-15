@@ -8,6 +8,7 @@
  */
 
 export const queryKeys = {
+  itemSearch: { all: ["itemSearch"] as const, config: () => ["itemSearch", "config"] as const },
   models: {
     all: ["models"] as const,
     list: () => ["models", "list"] as const,

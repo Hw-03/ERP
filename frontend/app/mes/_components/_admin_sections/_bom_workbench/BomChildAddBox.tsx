@@ -8,7 +8,7 @@ import { BomSearchInput } from "./BomSearchInput";
 import { DEPT_LETTERS, DEPT_LETTER_TO_NAME, deptColor, deptOf, stageOf, type DeptLetter, type StageLetter } from "./bomDept";
 import { BOM_EDIT_LIST_GRID_TEMPLATE, BomTableHeader, BomTableItemRow } from "./BomTablePrimitives";
 import { EmptyState } from "../../common";
-import { matchesSearchText } from "@/lib/searchText";
+import { useItemSearch } from "@/lib/queries/useItemSearch";
 import { QuantityInput } from "../../common/QuantityInput";
 
 /**
@@ -36,6 +36,7 @@ const STAGE_FILTERS: { id: "ALL" | StageLetter; label: string }[] = [
 ];
 
 export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false }: Props) {
+  const { matchesItem } = useItemSearch();
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState<DeptLetter | "">("");
   const [stageFilter, setStageFilter] = useState<"ALL" | StageLetter>("ALL");
@@ -77,9 +78,9 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
         return stageOf(i.process_type_code) === stageFilter;
       })
       .filter((i) => {
-        return matchesSearchText(`${i.item_name} ${i.mes_code ?? ""}`, search);
+        return matchesItem(i, search);
       });
-  }, [items, parent.item_id, search, deptFilter, stageFilter]);
+  }, [items, parent.item_id, search, deptFilter, stageFilter, matchesItem]);
 
   function openRow(id: string) {
     if (isLocked) return;

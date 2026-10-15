@@ -135,6 +135,24 @@ def rounds(db: Database, operator: Operator, limit: int = Query(50, ge=1, le=200
     return {"items": [stocktake_reads.round_response(r) for r in query.order_by(StocktakeRound.started_at.desc(), StocktakeRound.round_id).limit(limit).all()]}
 
 
+@router.get("/rounds/latest-summary")
+def latest_round_summary(db: Database, operator: Operator) -> dict:
+    """Expose only committed aggregate results; historic detail stays role-protected."""
+    row = db.query(StocktakeRound).filter(StocktakeRound.status != "ACTIVE").order_by(
+        StocktakeRound.closed_at.desc(), StocktakeRound.round_id.desc()).first()
+    if row is None:
+        return {"summary": None}
+    committed = db.get(StocktakeCloseCommit, row.round_id)
+    manifest = db.get(StocktakeCloseManifest, committed.manifest_id) if committed else None
+    counts = manifest.header.get("projected_item_summary") if manifest else None
+    return {"summary": {
+        "round_id": str(row.round_id), "title": row.title, "status": row.status,
+        "closed_at": row.closed_at.isoformat() + "Z" if row.closed_at else None,
+        "item_summary": {key: counts[key] for key in ("total", "confirmed", "applied", "unconfirmed")}
+        if counts is not None else None,
+    }}
+
+
 @router.get("/rounds/{round_id}")
 def get_round(round_id: uuid.UUID, db: Database, operator: Operator) -> dict:
     """Expose the active boundary and admitted target generation."""

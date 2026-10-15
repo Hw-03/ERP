@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import type { Operator } from "../login/useCurrentOperator";
 import type { ProductModel } from "@/lib/api";
+import type { ReactNode } from "react";
 
 const mocks = vi.hoisted(() => ({
   revision: null as number | null,
@@ -100,6 +101,29 @@ function deferred<T>() {
 }
 
 describe("DesktopDefectView realtime refresh", () => {
+  it("빈 결과 초기화는 격리자 조건을 풀고 고정과 정렬을 유지한다", async () => {
+    mocks.listDefects.mockResolvedValueOnce([{ ...location, quarantined_by_employee_id: "other-employee" }]);
+    render(<DesktopDefectView operator={operator} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open list" }));
+    expect(await screen.findByRole("button", { name: "Process D-001" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "필터 고정" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "정렬" }), { target: { value: "oldest" } });
+    fireEvent.click(screen.getByRole("button", { name: "내가 격리" }));
+    expect(screen.queryByRole("button", { name: "Process D-001" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "필터 초기화" }));
+    expect(screen.getByRole("button", { name: "Process D-001" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "내가 격리" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("checkbox", { name: "필터 고정" })).toBeChecked();
+    expect(screen.getByRole("combobox", { name: "정렬" })).toHaveValue("oldest");
+  });
+  it("B급만 있는 경우 격리 데이터가 없는 상태를 표시한다", async () => {
+    mocks.listDefects.mockResolvedValueOnce([{ ...location, management_category: "B_GRADE" }]);
+    render(<DesktopDefectView operator={operator} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open list" }));
+    expect(await screen.findByText("격리된 불량 재고가 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("필터로 모든 항목이 가려졌습니다")).not.toBeInTheDocument();
+  });
   beforeEach(() => {
     mocks.revision = null;
     mocks.productModels = [];
@@ -152,6 +176,7 @@ describe("DesktopDefectView realtime refresh", () => {
     mocks.productModels = [{ slot: 3, model_name: "DX3000" }, { slot: 7, model_name: "COCOON" }, { slot: 4, model_name: "ADX4000W" }].map((model) => ({ ...model, symbol: null, is_reserved: false }));
     render(<DesktopDefectView operator={operator} />);
     fireEvent.click(screen.getByRole("button", { name: "Open list" }));
+    fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
     const group = await screen.findByRole("group", { name: "모델 구분" });
     expect(within(group).getAllByRole("button").map((button) => button.textContent)).toEqual(["전체", "DX3000", "COCOON", "ADX4000W"]);
   });
@@ -185,6 +210,7 @@ describe("DesktopDefectView realtime refresh", () => {
     expect(screen.getByText("격리 중").parentElement).toHaveTextContent("3건");
     expect(screen.getByText("1년 이상 ⚠").parentElement).toHaveTextContent("2건");
 
+    fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "newest" } });
     expect(await screen.findByRole("button", { name: "Process TARGET-NEW" })).toBeInTheDocument();
     let processButtons = screen.getAllByRole("button", { name: /Process TARGET-/ });
@@ -328,6 +354,7 @@ describe("DesktopDefectView realtime refresh", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open list" }));
     expect(await screen.findByRole("button", { name: "Process UNKNOWN-ASSEMBLY" })).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
     const actorFilters = screen.getByText("격리자").parentElement!;
     fireEvent.click(within(actorFilters).getByRole("button", { name: "내가 격리" }));
 
@@ -387,6 +414,7 @@ describe("DesktopDefectView realtime refresh", () => {
     render(<DesktopDefectView operator={operator} />);
     fireEvent.click(screen.getByRole("button", { name: "Open list" }));
 
+    fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
     expect(await screen.findByRole("checkbox", { name: "필터 고정" })).toBeChecked();
     expect(screen.getByRole("combobox")).toHaveValue("oldest");
     const departmentFilters = screen.getByRole("group", { name: "부서 구분" });

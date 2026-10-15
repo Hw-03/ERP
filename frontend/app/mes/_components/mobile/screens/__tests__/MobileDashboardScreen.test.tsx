@@ -81,6 +81,12 @@ vi.mock("../../../_inventory_sections/InventoryDetailPanel", () => ({
 }));
 
 describe("MobileDashboardScreen", () => {
+  it("검색창 옆 검색어 연결에서 같은 뜻의 검색어 시트를 연다", () => {
+    render(<MobileDashboardScreen globalSearch="" onStatusChange={() => {}} onGoToWarehouse={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "검색어 연결" }));
+    expect(screen.getByRole("dialog", { name: "같은 뜻의 검색어" })).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "검색어", exact: true })).toBeVisible();
+  });
   it("필터 버튼은 현재 활성 필터 개수를 표시하고 0이면 배지를 숨긴다", () => {
     filterState.activeFilterCount = 3;
     const view = render(<MobileDashboardScreen globalSearch="" onStatusChange={() => {}} onGoToWarehouse={() => {}} />);

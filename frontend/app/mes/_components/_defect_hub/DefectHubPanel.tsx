@@ -33,6 +33,7 @@ import { tint } from "@/lib/mes/colorUtils";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { ReadEmpty, ReadFailure, ReadLoading } from "../common/ReadState";
 import { matchesDefectSearch } from "./defectSearch";
+import { useItemSearch } from "@/lib/queries/useItemSearch";
 import { ShieldAlert, Trash2 } from "lucide-react";
 import { DefectListSkeleton } from "./DefectListSkeleton";
 import { dataRevealClassName } from "../common/LoadingSkeleton";
@@ -129,6 +130,7 @@ export function DefectHubPanel({
   });
   const [kpiFilter, setKpiFilter] = useState<DefectKpiKind | null>(null);
   const [search, setSearch] = useState("");
+  const { config: searchConfig } = useItemSearch();
   const [processingLocations, setProcessingLocations] = useState<DefectLocation[]>([]);
   const [processingBatch, setProcessingBatch] = useState(false);
   const [restoreOnlyProcess, setRestoreOnlyProcess] = useState(false);
@@ -261,10 +263,10 @@ export function DefectHubPanel({
       return sort === "oldest" ? ta - tb : tb - ta;
     });
 
-    result = result.filter((loc) => matchesDefectSearch(loc, search));
+    result = result.filter((loc) => matchesDefectSearch(loc, search, searchConfig));
 
     return result;
-  }, [scopedLocations, sort, kpiFilter, search, poolMode]);
+  }, [scopedLocations, sort, kpiFilter, search, poolMode, searchConfig]);
 
   const departmentScopeLabel = selectedDepartments.length > 0
     ? selectedDepartments.join(" · ")

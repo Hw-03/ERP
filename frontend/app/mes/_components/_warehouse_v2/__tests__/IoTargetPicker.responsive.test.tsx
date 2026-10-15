@@ -54,6 +54,17 @@ const baseProps = {
 };
 
 describe("IoTargetPicker responsive layout", () => {
+  it("검색 입력은 IME 조합 중에도 부모 검색어를 변경한다", () => {
+    const onSearchChange = vi.fn();
+    render(<IoTargetPicker {...baseProps} onSearchChange={onSearchChange} />);
+    const input = screen.getByPlaceholderText("품목명 · 품목 코드");
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: "히" } });
+    expect(onSearchChange).toHaveBeenCalledWith("히");
+    fireEvent.compositionEnd(input, { data: "히" });
+    expect(onSearchChange).toHaveBeenCalledWith("히");
+  });
+
   it("keeps the mobile scroll rail outside the rounded item list", () => {
     const { container } = render(<IoTargetPicker {...baseProps} mobilePresentation />);
     const viewport = container.querySelector<HTMLElement>("[data-keep-scroll]")!;

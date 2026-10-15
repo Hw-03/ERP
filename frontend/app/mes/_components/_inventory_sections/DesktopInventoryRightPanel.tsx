@@ -8,13 +8,16 @@ import { InventoryDetailPanel } from "./InventoryDetailPanel";
 import { InventoryRecentHistoryPanel } from "./InventoryRecentHistoryPanel";
 import type { IoEntryIntent } from "../_warehouse_v2/types";
 import { ReadFailure, ReadLoading } from "../common/ReadState";
+import { ItemSearchAliases } from "../common/ItemSearchAliases";
 
 const INVENTORY_DETAIL_TITLE_ID = "desktop-inventory-detail-title";
 const INVENTORY_DETAIL_TAB_ID = "desktop-inventory-detail-tab";
 const INVENTORY_HISTORY_TAB_ID = "desktop-inventory-history-tab";
 const INVENTORY_DETAIL_PANEL_ID = "desktop-inventory-detail-panel";
 const INVENTORY_HISTORY_PANEL_ID = "desktop-inventory-history-panel";
-const INVENTORY_TABS = ["detail", "history"] as const;
+const INVENTORY_ALIASES_TAB_ID = "desktop-inventory-aliases-tab";
+const INVENTORY_ALIASES_PANEL_ID = "desktop-inventory-aliases-panel";
+const INVENTORY_TABS = ["detail", "history", "aliases"] as const;
 type InventoryTab = (typeof INVENTORY_TABS)[number];
 
 /**
@@ -57,10 +60,11 @@ export function DesktopInventoryRightPanel({
   const [activeTab, setActiveTab] = useState<InventoryTab>("detail");
   const detailTabRef = useRef<HTMLButtonElement>(null);
   const historyTabRef = useRef<HTMLButtonElement>(null);
+  const aliasesTabRef = useRef<HTMLButtonElement>(null);
 
   function selectTab(nextTab: InventoryTab, moveFocus = false) {
     setActiveTab(nextTab);
-    if (moveFocus) (nextTab === "detail" ? detailTabRef : historyTabRef).current?.focus();
+    if (moveFocus) (nextTab === "detail" ? detailTabRef : nextTab === "history" ? historyTabRef : aliasesTabRef).current?.focus();
   }
 
   function handleTabKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
@@ -115,7 +119,7 @@ export function DesktopInventoryRightPanel({
                   tabIndex={activeTab === "detail" ? 0 : -1}
                   onClick={() => selectTab("detail")}
                   onKeyDown={handleTabKeyDown}
-                  className="min-h-9 flex-1 rounded-[10px] px-3 text-sm font-bold transition-colors hover:brightness-110"
+                  className="min-h-11 min-w-0 flex-1 whitespace-nowrap rounded-[10px] px-1 text-sm font-bold transition-colors hover:brightness-110"
                   style={{
                     background: activeTab === "detail" ? "var(--c-s1)" : "transparent",
                     color: activeTab === "detail" ? "var(--c-text)" : "var(--c-muted2)",
@@ -133,13 +137,31 @@ export function DesktopInventoryRightPanel({
                   tabIndex={activeTab === "history" ? 0 : -1}
                   onClick={() => selectTab("history")}
                   onKeyDown={handleTabKeyDown}
-                  className="min-h-9 flex-1 rounded-[10px] px-3 text-sm font-bold transition-colors hover:brightness-110"
+                  className="min-h-11 min-w-0 flex-1 whitespace-nowrap rounded-[10px] px-1 text-sm font-bold transition-colors hover:brightness-110"
                   style={{
                     background: activeTab === "history" ? "var(--c-s1)" : "transparent",
                     color: activeTab === "history" ? "var(--c-text)" : "var(--c-muted2)",
                   }}
                 >
                   최근 내역
+                </button>
+                <button
+                  ref={aliasesTabRef}
+                  id={INVENTORY_ALIASES_TAB_ID}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "aliases"}
+                  aria-controls={INVENTORY_ALIASES_PANEL_ID}
+                  tabIndex={activeTab === "aliases" ? 0 : -1}
+                  onClick={() => selectTab("aliases")}
+                  onKeyDown={handleTabKeyDown}
+                  className="min-h-11 min-w-0 flex-1 whitespace-nowrap rounded-[10px] px-1 text-sm font-bold transition-colors hover:brightness-110"
+                  style={{
+                    background: activeTab === "aliases" ? "var(--c-s1)" : "transparent",
+                    color: activeTab === "aliases" ? "var(--c-text)" : "var(--c-muted2)",
+                  }}
+                >
+                  검색용 이름
                 </button>
               </div>
               <DesktopPanelCloseButton onClick={onClose} />
@@ -148,7 +170,7 @@ export function DesktopInventoryRightPanel({
         >
           {detailLoading && <ReadLoading label="품목 상세를 불러오는 중" variant="card" />}
           {detailError && <ReadFailure message={detailError} onRetry={onRetryDetail} refresh={!!displayItem} />}
-          {displayItem?.deleted_at && activeTab === "history" && <p role="status" className="mb-3 text-sm font-bold" style={{ color: "var(--c-red)" }}>
+          {displayItem?.deleted_at && activeTab !== "detail" && <p role="status" className="mb-3 text-sm font-bold" style={{ color: "var(--c-red)" }}>
             삭제된 품목입니다. 입출고 작업을 할 수 없습니다.
           </p>}
           {activeTab === "detail" ? (
@@ -161,11 +183,14 @@ export function DesktopInventoryRightPanel({
                 actionsDisabled={actionsDisabled}
               />}
             </div>
-          ) : selectedItem && displayItem && selectedItem.item_id === displayItem.item_id ? (
+          ) : activeTab === "history" && selectedItem && displayItem && selectedItem.item_id === displayItem.item_id ? (
             <div id={INVENTORY_HISTORY_PANEL_ID} role="tabpanel" aria-labelledby={INVENTORY_HISTORY_TAB_ID} className="flex h-full min-h-0 flex-col">
               <InventoryRecentHistoryPanel key={selectedItem.item_id} item={selectedItem} />
             </div>
           ) : null}
+          {displayItem && <div id={INVENTORY_ALIASES_PANEL_ID} role="tabpanel" aria-labelledby={INVENTORY_ALIASES_TAB_ID} hidden={activeTab !== "aliases"}>
+            <ItemSearchAliases key={displayItem.item_id} itemId={displayItem.item_id} disabled={actionsDisabled || !!displayItem.deleted_at} />
+          </div>}
         </DesktopRightPanel>
       )}
     </SlidePanel>

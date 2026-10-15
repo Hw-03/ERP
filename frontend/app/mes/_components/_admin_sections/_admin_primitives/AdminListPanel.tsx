@@ -1,9 +1,9 @@
 "use client";
 
-import { Search } from "lucide-react";
 import { useEffect, useRef, type AriaRole, type ReactNode } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState } from "../../common/EmptyState";
+import { SearchInput } from "../../common/SearchInput";
 
 export interface AdminListPanelProps<T> {
   title?: string;
@@ -83,23 +83,8 @@ export function AdminListPanel<T>({
         </div>
       )}
       {onSearchChange && (
-        <div
-          className="flex shrink-0 items-center gap-2 rounded-[12px] border px-3 py-2"
-          style={{
-            background: LEGACY_COLORS.s2,
-            borderColor: LEGACY_COLORS.border,
-          }}
-        >
-          <Search className="h-4 w-4" style={{ color: LEGACY_COLORS.muted2 }} />
-          <input
-            type="text"
-            value={searchValue ?? ""}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder={searchPlaceholder}
-            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:font-medium"
-            style={{ color: LEGACY_COLORS.text }}
-          />
-        </div>
+        <SearchInput value={searchValue ?? ""} onChange={onSearchChange} placeholder={searchPlaceholder}
+          className="shrink-0 rounded-[12px]" inputProps={{ className: "placeholder:font-medium" }} />
       )}
       {filters && <div className="flex shrink-0 flex-wrap gap-1.5">{filters}</div>}
       <div

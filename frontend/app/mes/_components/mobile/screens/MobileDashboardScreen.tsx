@@ -22,7 +22,6 @@ import {
   DEFAULT_DEPARTMENT_FILTER_BASIS,
   matchesInventoryCategoryFilters,
   matchesKpi,
-  matchesSearch,
   type InventoryFilterLogic,
   type DepartmentFilterBasis,
 } from "../../_inventory_sections/inventoryFilter";
@@ -30,6 +29,9 @@ import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import type { IoEntryIntent } from "../../_warehouse_v2/types";
 import { ReadFailure, ReadLoading } from "../../common/ReadState";
 import { SkeletonBlock } from "../../common/LoadingSkeleton";
+import { useItemSearch } from "@/lib/queries/useItemSearch";
+import { SearchConfigStatus } from "../../common/SearchConfigStatus";
+import { ItemSearchManagementPanel } from "../../common/ItemSearchManagementPanel";
 
 const PAGE_SIZE = 100;
 
@@ -74,6 +76,8 @@ export function MobileDashboardScreen({
   const { search: localSearch, setSearch: setLocalSearch, selectedItem, displayItem, detailOpen, detailStatus, detailError,
     actionsDisabled, selectItem, closeDetail, retryDetail } = useInventoryViewState(items);
   const imageManifest = useItemImageManifest();
+  const { matchesItem } = useItemSearch();
+  const [searchManagementOpen, setSearchManagementOpen] = useState(false);
   const productModels = useModelsQuery().data ?? EMPTY_MODELS;
   const [kpi, setKpi] = useState<KpiFilter>("ALL");
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
@@ -109,7 +113,7 @@ export function MobileDashboardScreen({
       items.filter((item) => {
         // 김건호 피드백 1 — 삭제(소프트삭제) 품목은 대시보드 재고 목록에 노출하지 않음.
         if (item.deleted_at) return false;
-        if (!matchesSearch(item, deferredLocalSearch)) return false;
+        if (!matchesItem(item, deferredLocalSearch)) return false;
         if (
           !matchesInventoryCategoryFilters(item, {
             selectedDepts,
@@ -123,7 +127,7 @@ export function MobileDashboardScreen({
         ) return false;
         return true;
       }),
-    [items, deferredLocalSearch, selectedDepts, departmentFilterBasis, selectedSlots, showUnclassified, showDisused, selectedProcessSteps, filterLogic],
+    [items, deferredLocalSearch, matchesItem, selectedDepts, departmentFilterBasis, selectedSlots, showUnclassified, showDisused, selectedProcessSteps, filterLogic],
   );
   const filteredItems = useMemo(() => scopedItems.filter((item) => matchesKpi(item, kpi)), [scopedItems, kpi]);
 
@@ -248,7 +252,7 @@ export function MobileDashboardScreen({
             <InventorySearchToolbar
               value={localSearch}
               onChange={setLocalSearch}
-              placeholder="품명 · 코드 · 위치 · 공급처"
+              placeholder="품명 · 코드 · 검색용 이름"
               filtersOpen={filtersOpen}
               filterLogic={filterLogic}
               onFilterLogicChange={setFilterLogic}
@@ -256,7 +260,9 @@ export function MobileDashboardScreen({
               isFiltered={isFiltered}
               activeFilterCount={activeFilterCount}
               controlsId="mobile-inventory-filter-panel"
+              onManageSearch={() => setSearchManagementOpen(true)}
             />
+            <SearchConfigStatus active={!!localSearch.trim()} />
             {(filtersOpen || canResetAll) && (
               <div
                 className="flex items-center"
@@ -352,6 +358,7 @@ export function MobileDashboardScreen({
           />
         )}
       </BottomSheet>
+      <ItemSearchManagementPanel open={searchManagementOpen} onClose={() => setSearchManagementOpen(false)} mobile />
     </div>
   );
 }

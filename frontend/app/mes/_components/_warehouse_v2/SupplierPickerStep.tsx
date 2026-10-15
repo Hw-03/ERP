@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Archive, Check, Pencil, Plus, RotateCcw, Search, X } from "lucide-react";
+import { Archive, Check, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { api, type Supplier } from "@/lib/api";
 import type { SupplierScope } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -9,6 +9,7 @@ import { tint } from "@/lib/mes/colorUtils";
 import { matchesSearchText } from "@/lib/searchText";
 import { Button } from "@/lib/ui/Button";
 import { EmptyState } from "../common/EmptyState";
+import { SearchInput } from "../common/SearchInput";
 import { SkeletonBlock, dataRevealClassName } from "../common/LoadingSkeleton";
 import scrollStyles from "../mobile/primitives/MobileScrollFrame.module.css";
 
@@ -203,19 +204,8 @@ export function SupplierPickerStep({
   return (
     <section className={compact ? "flex h-full min-h-[180px] flex-col gap-2" : "flex h-full min-h-0 flex-col gap-4"} aria-label="공급업체 검색·선택">
       <div className={compact ? "flex shrink-0 flex-wrap items-end gap-2" : "flex flex-wrap items-end gap-2"}>
-        <label className="min-w-[180px] flex-1">
-          <span className="sr-only">공급업체 검색</span>
-          <span className="relative block">
-            <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: LEGACY_COLORS.muted2 }} />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="업체명을 입력하세요"
-              className="h-11 w-full rounded-[12px] border bg-transparent py-2 pl-10 pr-3 text-sm font-medium outline-none transition focus-visible:ring-2"
-              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-            />
-          </span>
-        </label>
+        <SearchInput value={search} onChange={setSearch} ariaLabel="공급업체 검색"
+          placeholder="업체명을 입력하세요" className="min-w-[180px] flex-1 rounded-[12px]" />
         {canManage && candidateName && !matchingSupplier && !loading && !error && (
           <Button variant="primary" size="md" loading={saving} disabled={!employeeId} iconLeft={<Plus />} className="min-h-11 text-sm" style={{ background: outbound ? LEGACY_COLORS.red : LEGACY_COLORS.blueSolid }} onClick={() => void addSupplier()}>
             추가하고 선택

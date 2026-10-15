@@ -25,6 +25,7 @@ describe("InventoryOperationHistory", () => {
     mount();
     fireEvent.click(await screen.findByRole("button", { name: /업무 정정 상세/ }));
     expect(await screen.findByText("현재 재고 수량 변동 없음")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("처리 정보 보기"));
     expect(screen.getByText("완료 → 준비 중")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "원업무 1 보기" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "원업무 2 보기" }));
@@ -48,7 +49,8 @@ describe("InventoryOperationHistory", () => {
     mount();
     fireEvent.click(await screen.findByRole("button", { name: "B급 전환 상세" }));
     expect(await screen.findByText("상태 재고 변동")).toBeInTheDocument();
-    expect(screen.getByText("1 → 4 (변화 +3)")).toBeInTheDocument();
+    expect(screen.getByText("1 → 4")).toBeInTheDocument();
+    expect(screen.getByText("+3")).toBeVisible();
     expect(screen.getByText("등급 변경 확인")).toBeInTheDocument();
   });
 
@@ -58,8 +60,9 @@ describe("InventoryOperationHistory", () => {
     state.detail.mockResolvedValue(move);
     mount();
     fireEvent.click(await screen.findByRole("button", { name: "공동 재고 전환 상세" }));
-    expect(await screen.findByText(`고압 증빙 품목 · 8-VA-0018 · ${label} · 고압`)).toBeVisible();
-    expect(screen.getByText("1 → 4 (변화 +3)")).toBeVisible();
+    expect(await screen.findByRole("listitem", { name: `고압 증빙 품목 · 8-VA-0018 · ${label} · 고압` })).toBeVisible();
+    expect(screen.getByText("1 → 4")).toBeVisible();
+    expect(screen.getByText("+3")).toBeVisible();
   });
 
   it("POOL 메타데이터 없는 이전 응답도 거래 품목 또는 품목 ID·위치 키로 식별한다", async () => {
@@ -71,8 +74,8 @@ describe("InventoryOperationHistory", () => {
     state.detail.mockResolvedValue(move);
     mount();
     fireEvent.click(await screen.findByRole("button", { name: "이전 작업 상세" }));
-    expect(await screen.findByText("이전 품목 · OLD-1 · 불량 · 창고")).toBeVisible();
-    expect(screen.getByText("unknown-item · B급 · legacy-scope")).toBeVisible();
+    expect(await screen.findByRole("listitem", { name: "이전 품목 · OLD-1 · 불량 · 창고" })).toBeVisible();
+    expect(screen.getByRole("listitem", { name: "unknown-item · B급 · legacy-scope" })).toBeVisible();
   });
 
   it("차이 0 관측의 네 상태 및 실제 전후 수량을 표시한다", async () => {

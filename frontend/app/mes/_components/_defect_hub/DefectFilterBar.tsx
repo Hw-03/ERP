@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState, type JSX, type ReactNode } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { FilterChip } from "../common/FilterChip";
+import { PROD_DEPTS } from "../_warehouse_steps/_constants";
 import { DefectCategoryFilters } from "./DefectCategoryFilters";
+import { DefectFilterDisclosure } from "./DefectFilterDisclosure";
 
 export type DefectScope = "my" | "production" | "all";
 export type DefectActorScope = "all" | "mine";
@@ -13,6 +15,8 @@ export type DefectProcessStep = "R" | "A" | "F" | "UNCLASSIFIED" | "DISUSED";
 
 interface Props {
   mobilePresentation?: boolean;
+  /** PC 목록은 검색창 오른쪽에 필터 버튼을 배치한다. */
+  searchInput?: ReactNode;
   /** @deprecated 기존 호출부 호환용. 새 목록 필터는 selectedDepartments를 사용한다. */
   scope: DefectScope;
   actorScope: DefectActorScope;
@@ -60,6 +64,7 @@ function shortSelection(values: readonly string[]): string {
  */
 export function DefectFilterBar({
   mobilePresentation = false,
+  searchInput,
   scope,
   actorScope,
   poolMode = false,
@@ -79,9 +84,11 @@ export function DefectFilterBar({
   selectedProcessSteps = [],
   onProcessStepsChange,
   onResetCategoryFilters,
-}: Props) {
+}: Props): JSX.Element {
   const [expanded, setExpanded] = useState(false);
+  const controlsId = useId();
   const activeDepartments = [...(selectedDepartments ?? legacyDepartments(scope, currentDept))];
+  const availableDepartments = mobilePresentation ? departments : Array.from(new Set(["창고", ...PROD_DEPTS, ...departments, ...activeDepartments]));
   const activeConditions = [
     activeDepartments.length ? `부서 ${shortSelection(activeDepartments)}` : null,
     selectedModels?.length ? `모델 ${shortSelection(selectedModels)}` : null,
@@ -129,9 +136,14 @@ export function DefectFilterBar({
           {expanded ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
         </button>
       )}
-      {(!mobilePresentation || expanded) && <>
+      {!mobilePresentation && <div className="flex min-w-0 items-center gap-2">
+        {searchInput && <div className="min-w-0 flex-1">{searchInput}</div>}
+        <DefectFilterDisclosure expanded={expanded} onToggle={() => setExpanded((value) => !value)} controlsId={controlsId} summary={searchInput ? undefined : summary} />
+      </div>}
+      <div id={controlsId} hidden={!expanded} className={expanded ? "flex flex-col gap-3" : "hidden"}>
+      {expanded && <>
       <DefectCategoryFilters
-        departments={departments}
+        departments={availableDepartments}
         models={models}
         currentDept={currentDept}
         showMyDepartment={false}
@@ -161,6 +173,7 @@ export function DefectFilterBar({
         </label>
       </div>
       </>}
+      </div>
     </section>
   );
 }

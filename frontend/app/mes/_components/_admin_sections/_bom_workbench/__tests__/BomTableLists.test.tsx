@@ -592,7 +592,7 @@ describe("BOM 레이아웃 높이 계약", () => {
     expect(titleSection).toHaveClass("flex", "items-center", "gap-3", "px-4", "py-3");
     expect(titleSection).toContainElement(search);
     expect(titleSection.style.borderBottom).toBe("1px solid var(--c-border)");
-    expect(search).toHaveStyle({ background: "var(--c-s1)" });
+    expect(search.parentElement).toHaveStyle({ background: "var(--c-s1)" });
     expect(filterSection).toHaveClass("px-4", "py-3");
     expect(filterGroup).toHaveClass("flex", "shrink-0", "gap-1.5");
     expect(filterGroup.parentElement).toHaveClass("flex", "w-max", "min-w-full", "gap-1");

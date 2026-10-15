@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { InventoryOperation, InventoryOperationLine, TransactionLog } from "@/lib/api/types/production";
@@ -23,6 +23,68 @@ function mount(value: InventoryOperation): void {
 describe("직원용 작업 상세", () => {
   beforeEach(() => vi.resetAllMocks());
 
+  it.each(["available", "unavailable"] as const)("요청 순 계산 상태와 관계없이 실제 처리 전후 재고만 표시한다: %s", async (status) => {
+    const historyLog = { log_id: "out", item_id: "material", item_name: "처리 품목", item_unit: "EA", transaction_type: "BACKFLUSH",
+      quantity_change: -6, quantity_before: 40, quantity_after: 34, warehouse_qty_before: 0, warehouse_qty_after: 0,
+      department_qty_before: 40, department_qty_after: 34, department: "튜브", inventory_effect: [],
+      request_order_stock: { status, reason: status === "unavailable" ? "ambiguous_order" : null, warehouse_qty_before: 0, warehouse_qty_after: 0, department_qty_before: 60, department_qty_after: 54 },
+      created_at: "2026-10-13T02:44:00Z" } as TransactionLog;
+    mount(operation({ action: "adjust_out", lines: [line({ historyLog })] }));
+    expect(await screen.findByLabelText("튜브 40 −6→34")).toBeVisible();
+    expect(screen.queryByLabelText("튜브 60 −6→54")).not.toBeInTheDocument();
+    expect(screen.queryByText("요청 순 재고")).not.toBeInTheDocument();
+    expect(screen.queryByText(/계산 불가/)).not.toBeInTheDocument();
+  });
+
+  it("실제 전후 기록이 없으면 요청 순 계산 수량으로 대체하지 않는다", async () => {
+    const historyLog = { log_id: "out", item_id: "material", item_name: "처리 품목", item_unit: "EA", transaction_type: "BACKFLUSH",
+      quantity_change: -6, quantity_before: null, quantity_after: null, warehouse_qty_before: null, warehouse_qty_after: null,
+      department_qty_before: null, department_qty_after: null, inventory_effect: [],
+      request_order_stock: { status: "available", reason: null, warehouse_qty_before: 0, warehouse_qty_after: 0, department_qty_before: 60, department_qty_after: 54 },
+      created_at: "2026-10-13T02:44:00Z" } as TransactionLog;
+    mount(operation({ action: "adjust_out", lines: [line({ historyLog })] }));
+    expect(await screen.findByText("기록 없음")).toBeVisible();
+    expect(screen.queryByLabelText("부서 60 −6→54")).not.toBeInTheDocument();
+  });
+
+  it("결과를 먼저 표시하고 처리 상태·취소 제한은 접힌 영역에서 확인한다", async () => {
+    mount(operation({ cancelBlockers: ["취소 제한 확인"], effects: [{ effectId: "status", effectKind: "WORKFLOW", subjectType: "IoBatch", subjectId: "batch", role: "EXECUTION_STATUS", beforeState: { status: "submitted" }, afterState: { status: "completed" }, reversesEffectId: null }] }));
+    const result = await screen.findByRole("region", { name: "생산된 품목" });
+    const disclosure = screen.getByText("처리 정보 보기");
+    expect(result.compareDocumentPosition(disclosure) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(disclosure.closest("details")).not.toHaveAttribute("open");
+    expect(screen.getByText("제출 → 완료")).not.toBeVisible();
+    expect(screen.getByText("2026년 10월 13일 11시 44분")).not.toBeVisible();
+    fireEvent.click(disclosure);
+    expect(screen.getByText("제출 → 완료")).toBeVisible();
+    expect(screen.getByText("2026년 10월 13일 11시 44분")).toBeVisible();
+    expect(screen.getByText("취소 제한 확인")).toBeVisible();
+  });
+
+  it("공통 사유는 공백을 정규화해 한 번 표시하고 품목별 다른 메모는 보존한다", async () => {
+    mount(operation({ reason: "튜브  불량", lines: [line({ notes: "튜브\n불량" }), line({ logId: "input", itemName: "사용 자재", notes: "별도 자재 확인" })] }));
+    const result = await screen.findByRole("region", { name: "생산된 품목" });
+    expect(screen.getAllByText(/튜브\s+불량/)).toHaveLength(1);
+    const reason = screen.getByText(/튜브\s+불량/);
+    expect(result.compareDocumentPosition(reason) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText("사유")).toBeVisible();
+    expect(screen.getByText("별도 자재 확인")).toBeVisible();
+    expect(screen.queryByText("이 작업에 포함된 전체 품목입니다. 재고는 작업 당시의 기록입니다.")).not.toBeInTheDocument();
+  });
+
+  it("다른 작업 상세로 이동하면 펼친 처리 정보를 다시 접는다", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    state.detail.mockImplementation(async (id: string) => operation({ operationId: id, displayLabel: id === "op" ? "첫 작업" : "다음 작업", cancelBlockers: ["취소 제한 확인"] }));
+    const view = render(<QueryClientProvider client={client}><InventoryOperationDetail operationId="op" onBack={vi.fn()} onNavigate={vi.fn()} /></QueryClientProvider>);
+    await screen.findByText("첫 작업");
+    fireEvent.click(screen.getByText("처리 정보 보기"));
+    expect(screen.getByText("취소 제한 확인")).toBeVisible();
+    view.rerender(<QueryClientProvider client={client}><InventoryOperationDetail operationId="next" onBack={vi.fn()} onNavigate={vi.fn()} /></QueryClientProvider>);
+    await screen.findByText("다음 작업");
+    expect(screen.getByText("처리 정보 보기").closest("details")).not.toHaveAttribute("open");
+    expect(screen.getByText("취소 제한 확인")).not.toBeVisible();
+  });
+
   it("생산 결과와 사용 자재를 구분하고 입출고 내역의 요약 카드를 공유한다", async () => {
     mount(operation({ effects: [{ effectId: "status", effectKind: "WORKFLOW", subjectType: "IoBatch", subjectId: "batch", role: "EXECUTION_STATUS", beforeState: { status: "submitted" }, afterState: { status: "completed" }, reversesEffectId: null }] }));
     expect(await screen.findByTestId("history-operation-summary")).toHaveTextContent("생산");
@@ -32,6 +94,7 @@ describe("직원용 작업 상세", () => {
     expect(inputs.getByText("사용 자재")).toBeVisible();
     expect(inputs.getByText("9 사용")).toBeVisible();
     expect(inputs.getByText("186 → 177")).toBeVisible();
+    fireEvent.click(screen.getByText("처리 정보 보기"));
     expect(screen.getByText("입출고 작업")).toBeVisible();
     expect(screen.getByText("제출 → 완료")).toBeVisible();
     expect(screen.queryByText("produce")).not.toBeInTheDocument();
@@ -92,6 +155,7 @@ describe("직원용 작업 상세", () => {
   it("출하 픽업 상태를 한글로 표시한다", async () => {
     mount(operation({ action: "pickup", displayLabel: "출하 픽업", lines: [], effects: [{ effectId: "status", effectKind: "WORKFLOW", subjectType: "ShippingRequest", subjectId: "shipping", role: "PICKUP_STATUS", beforeState: { status: "PREPARED" }, afterState: { status: "PICKED_UP" }, reversesEffectId: null }] }));
     await screen.findByTestId("history-operation-summary");
+    fireEvent.click(screen.getByText("처리 정보 보기"));
     expect(screen.getByText("준비 완료 → 픽업 완료")).toBeVisible();
   });
 
@@ -111,6 +175,7 @@ describe("직원용 작업 상세", () => {
   it("알 수 없는 내부 작업명과 상태값은 영어 대신 확인 안내를 표시한다", async () => {
     mount(operation({ action: "future_work", displayLabel: "future_work", lines: [], effects: [{ effectId: "state", effectKind: "WORKFLOW", subjectType: "FutureDoc", subjectId: "doc", role: "STATUS", beforeState: { status: "future_state" }, afterState: { status: "COMPLETED" }, reversesEffectId: null }] }));
     expect(await screen.findByText("재고 작업")).toBeVisible();
+    fireEvent.click(screen.getByText("처리 정보 보기"));
     expect(screen.getByText("상태 확인 필요 → 완료")).toBeVisible();
     expect(screen.queryByText(/future_/)).not.toBeInTheDocument();
   });

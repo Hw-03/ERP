@@ -74,8 +74,9 @@ export function inventoryOperationLineMeaning(operation: InventoryOperation, lin
 export function inventoryOperationQuantityLabel(operation: InventoryOperation, line: InventoryOperationLine): string {
   const meaning = inventoryOperationLineMeaning(operation, line);
   const qty = line.transferQty == null ? Math.abs(line.quantityChange) : Math.abs(line.transferQty);
-  const unit = line.historyLog?.item_unit?.trim();
-  return `${formatQty(qty)}${unit ? ` ${unit}` : ""} ${meaning.verb}`;
+  const rawUnit = line.historyLog?.item_unit?.trim();
+  const unit = rawUnit?.toUpperCase() === "EA" ? "개" : rawUnit;
+  return `${formatQty(qty)}${unit === "개" ? unit : unit ? ` ${unit}` : ""} ${meaning.verb}`;
 }
 
 /** 입출고 내역의 요약 카드를 사용하되 재고는 각 품목의 실제 기록에서 별도로 표시한다. */

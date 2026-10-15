@@ -11,6 +11,13 @@ const location: DefectLocation = {
 };
 
 describe("matchesDefectSearch", () => {
+  it("matches item aliases and translated item names without expanding a reason", () => {
+    const config = { version: "test", synonym_groups: [{ group_id: "group", version: 1, terms: ["배터리", "battery"] }],
+      item_aliases: { i1: [{ alias_id: "alias", alias: "내장재" }] } };
+    expect(matchesDefectSearch(location, "내장재", config)).toBe(true);
+    expect(matchesDefectSearch({ ...location, item_name: "Battery", reason_memo: "Scratch" }, "배터리 김길호", config)).toBe(true);
+    expect(matchesDefectSearch({ ...location, reason_memo: "battery" }, "배터리", config)).toBe(false);
+  });
   it.each(["AX-100", " mes-001 ", " 조립", "치수", " bracket scratch ", "김길호"]) (
     "matches trimmed, case-insensitive values in %s",
     (query) => expect(matchesDefectSearch(location, query)).toBe(true),

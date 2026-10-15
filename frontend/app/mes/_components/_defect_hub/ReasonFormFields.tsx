@@ -14,6 +14,7 @@ import { Button } from "@/lib/ui/Button";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import styles from "./ReasonFormFields.module.css";
+import { SearchInput } from "../common/SearchInput";
 
 export interface ReasonFormFieldsProps {
   employeeId: string;
@@ -224,16 +225,12 @@ export function ReasonFormFields({
           <h2 id={`${dialogId}-title`} className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>사유 카테고리</h2>
           <Button variant="ghost" className="min-h-11 min-w-11 !px-2" aria-label="사유 선택 닫기" disabled={busy} onClick={() => setOpen(false)}><X size={18} /></Button>
         </div>
-        <div className="flex min-w-0 shrink-0 items-center gap-1 rounded-[12px] border pr-1 focus-within:ring-2"
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-          <div className="relative min-w-0 flex-1">
-            <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: LEGACY_COLORS.muted2 }} />
-            <input ref={searchRef} type="search" aria-label="사유 검색" placeholder="사유명을 입력하세요"
-              value={search} onChange={(event) => setSearch(event.target.value)}
-              className="min-h-11 w-full min-w-0 rounded-[12px] bg-transparent pl-10 pr-2 text-sm outline-none"
-              style={{ color: LEGACY_COLORS.text }} />
-          </div>
-          <div className="flex shrink-0 items-center py-1">
+        <SearchInput value={search} onChange={setSearch} inputRef={searchRef}
+          ariaLabel="사유 검색" placeholder="사유명을 입력하세요" clearable={false}
+          inputProps={{ type: "search", className: "!font-normal" }}
+          leading={<Search size={18} className="pointer-events-none shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />}
+          className="min-w-0 shrink-0 !gap-1 !rounded-[12px] !pr-1"
+          trailing={<div className="flex shrink-0 items-center py-1">
             <div aria-hidden={!canCreate} inert={!canCreate}
               className={`overflow-hidden transition-[max-width,opacity,transform] duration-200 ease-out motion-reduce:transition-none ${canCreate ? "max-w-[48px] translate-x-0 opacity-100 md:max-w-[132px]" : "max-w-0 -translate-x-1 opacity-0"}`}>
               <div className="pr-1">
@@ -247,8 +244,8 @@ export function ReasonFormFields({
               aria-label={showInactive ? "숨김 사유 닫기" : "숨김 사유 관리"} title={showInactive ? "숨김 사유 닫기" : "숨김 사유 관리"}
               aria-pressed={showInactive} disabled={busy}
               onClick={() => setShowInactive((value) => !value)}><span className="hidden md:inline">{showInactive ? "숨김 사유 닫기" : "숨김 사유 관리"}</span></Button>
-          </div>
-        </div>
+          </div>}
+        />
         {hiddenNameTaken && <p className="shrink-0 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>같은 이름의 사유가 숨김 상태입니다. 숨김 사유 관리에서 복원하세요.</p>}
         {error && !hideTarget && <p role="alert" className="shrink-0 text-sm" style={{ color: LEGACY_COLORS.red }}>{error}</p>}
         {query.isError && <div role="alert" className="shrink-0 text-sm" style={{ color: LEGACY_COLORS.red }}>

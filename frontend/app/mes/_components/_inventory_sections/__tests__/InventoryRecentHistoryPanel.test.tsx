@@ -85,6 +85,7 @@ describe("InventoryRecentHistoryPanel", () => {
     expect(screen.getByText("출하")).toBeInTheDocument();
     expect(screen.getByText("창고 입출고 취소")).toBeInTheDocument();
     expect(screen.getByText("분해 출고")).toBeInTheDocument();
+    expect(screen.queryByText("TRANSFER_TO_PROD")).not.toBeInTheDocument();
   });
 
   it.each([false, true])("다품목 묶음의 최근 목록은 현재 품목만 표시하고 상세는 전체 작업을 유지한다 mobile=%s", async (mobile) => {
@@ -198,11 +199,19 @@ describe("InventoryRecentHistoryPanel", () => {
     expect(screen.queryByText("조립 · 변경 전 기록")).not.toBeInTheDocument();
   });
 
-  it("승인 작업의 담당자는 기존처럼 실행자를 표시한다", async () => {
-    getPage.mockResolvedValue(makePage([makeLog({ executor_name: "실행 담당자", requester_name: "요청 담당자", produced_by: "기록 담당자" })]));
-    renderPanel();
+  it.each([false, true])("승인 작업도 실행자 대신 요청자를 표시한다 mobile=%s", async (mobile) => {
+    getPage.mockResolvedValue(makePage([makeLog({ executor_name: "실행 담당자", requester_name: "요청 담당자", approver_name: "승인 담당자", produced_by: "기록 담당자" })]));
+    renderPanel(makeItem(), mobile);
     await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(1));
-    expect(screen.getByText("조립 · 실행 담당자")).toBeVisible();
+    expect(screen.getByText("조립 · 요청 담당자")).toBeVisible();
+    expect(screen.queryByText(/실행 담당자|승인 담당자|기록 담당자/)).not.toBeInTheDocument();
+  });
+
+  it.each([false, true])("요청자 기록이 없는 승인 작업은 승인자로 대체하지 않는다 mobile=%s", async (mobile) => {
+    getPage.mockResolvedValue(makePage([makeLog({ executor_name: "승인 담당자", requester_name: "  ", approver_name: "승인 담당자", produced_by: "승인 담당자", operation_batch_id: "batch-1" })]));
+    renderPanel(makeItem(), mobile);
+    expect(await screen.findByText("조립 · 요청자 기록 없음")).toBeVisible();
+    expect(screen.queryByText(/승인 담당자/)).not.toBeInTheDocument();
   });
 
   it("실시간 변경과 최초 응답 완료가 같은 화면 갱신에 겹쳐도 변경 후 이력을 다시 조회한다", async () => {
@@ -360,6 +369,18 @@ describe("InventoryRecentHistoryPanel", () => {
     ["창고 입출고", "불량", "출하", "분해 출고", "기타 작업", "변동 없음"].forEach((label) => expect(screen.getByText(label)).toBeVisible());
     expect(screen.getByText("계산 불가 · 사유 보기")).toBeVisible();
     expect(screen.queryByText("UNMAPPED")).not.toBeInTheDocument();
+  });
+
+  it.each([false, true])("생산 작업의 자재 최근 내역도 생산 입고와 취소를 구분한다 mobile=%s", async (mobile) => {
+    getPage.mockResolvedValue(makePage([
+      makeLog({ log_id: "production-input", transaction_type: "BACKFLUSH", history_batch: { work_type: "process", sub_type: "produce" } }),
+      makeLog({ log_id: "production-cancel", transaction_type: "BACKFLUSH", operation_kind: "CANCELLATION", history_batch: { work_type: "process", sub_type: "produce" } }),
+      makeLog({ log_id: "quantity-adjustment", transaction_type: "BACKFLUSH", history_batch: { work_type: "process", sub_type: "produce", display_transaction_type: "ADJUST" } }),
+    ]));
+    renderPanel(makeItem(), mobile);
+    expect(await screen.findByText("생산 입고")).toBeVisible();
+    expect(screen.getByText("생산 입고 취소")).toBeVisible();
+    expect(screen.getByText("부서 입출고")).toBeVisible();
   });
 
   it("최초 조회 실패는 재시도하고 빈 목록은 별도 빈 상태를 표시한다", async () => {

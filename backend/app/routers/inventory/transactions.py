@@ -58,7 +58,7 @@ from app.services.stocktake_history import observation_groups, hydrate_observati
 from app.services import inventory_operation_history
 from app.services.export_helpers import csv_streaming_response
 from app.services.pin_auth import verify_pin
-from app.utils.search import build_normalized_search_filter
+from app.services.item_search import build_item_search_filter, get_search_config
 from app._actor import set_actor
 from app.routers.inventory._tx_filters import (
     KST,
@@ -155,7 +155,7 @@ class ReferenceSummaryResponse(BaseModel):
     unit: Optional[str] = None
 
 
-def _display_group_cursor(group: TransactionDisplayGroupResponse | DisplayGroup[DisplayGroupRecord]) -> str:
+def _display_group_cursor(group: TransactionDisplayGroupResponse | DisplayGroup[DisplayGroupRecord], *, search_version: str | None = None) -> str:
     """대표 행의 정렬 기준과 안정 키를 포함한 불투명 커서."""
     sort_at, created_at, log_id = _display_group_sort_tuple(group)
     payload = {
@@ -164,6 +164,7 @@ def _display_group_cursor(group: TransactionDisplayGroupResponse | DisplayGroup[
         "sort_at": sort_at,
         "created_at": created_at,
         "log_id": log_id,
+        "search_version": search_version,
     }
     encoded = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode()
     return encoded.rstrip("=")
@@ -660,6 +661,7 @@ def _load_display_work_groups(
     requester_employee_id: Optional[uuid.UUID] = None,
     page_limit: int | None = None,
     cursor_value: dict[str, str | None] | None = None,
+    search_config: dict | None = None,
 ) -> _DisplayWorkQuery:
     """Keep list/calendar membership identical; bound only list metadata reads."""
     sql_cursor = _canonical_display_group_cursor(cursor_value) if cursor_value else None
@@ -691,7 +693,8 @@ def _load_display_work_groups(
         include_archived=include_archived,
         requester_employee_id=requester_employee_id,
     )
-    search_filter = _history_search_filter(search)
+    search_filter = _history_search_filter(search, db,
+        groups=[group["terms"] for group in search_config["synonym_groups"]] if search_config else None)
     matched_log_ids = (
         {log_id for (log_id,) in query.with_entities(TransactionLog.log_id).filter(search_filter).all()}
         if search_filter is not None else None
@@ -776,7 +779,7 @@ def _load_display_work_groups(
         process_step=process_step, date_from=date_from, date_to=date_to, operation_keys=operation_keys,
         transaction_types=transaction_types or (transaction_type.value if transaction_type else None),
         include_archived=include_archived, item_id=item_id, reference_no=reference_no,
-        operation_batch_id=operation_batch_id, requester_employee_id=requester_employee_id)
+        operation_batch_id=operation_batch_id, requester_employee_id=requester_employee_id, search_config=search_config)
     # Remove log projections only for operations carrying typed observation evidence.
     typed_ids = {str(row[0]) for row in db.query(StocktakeApplication.operation_id).all()}
     groups = group_display_records([row for row in records if str(row.operation_id) not in typed_ids], include_submissions=True)
@@ -817,11 +820,15 @@ def list_transaction_display_groups(
         raise http_error(400, ErrorCode.BAD_REQUEST, "작업 전용 이력은 품목 ID만 지정하여 조회해 주세요.")
     started = perf_counter()
     cursor_value = _decode_display_group_cursor(cursor) if cursor else None
+    search_config = get_search_config(db)
+    search_version = search_config["version"]
+    if cursor_value is not None and cursor_value.get("search_version") != search_version:
+        raise http_error(409, "SEARCH_CONFIG_STALE", "검색 설정이 변경되었습니다. 처음부터 다시 조회해 주세요.")
     data = _load_display_work_groups(db, item_id=item_id, operation_batch_id=operation_batch_id,
         transaction_type=transaction_type, transaction_types=transaction_types, operation_keys=operation_keys,
         reference_no=reference_no, search=search, department=department, model=model, process_step=process_step,
         date_from=date_from, date_to=date_to, include_archived=include_archived,
-        requester_employee_id=requester_employee_id,
+        requester_employee_id=requester_employee_id, search_config=search_config,
         page_limit=None if include_operation_only else limit, cursor_value=cursor_value)
     groups, rows = data.groups, data.rows
     batch_map, stock_request_map, operation_map = data.batch_map, data.stock_request_map, data.operation_map
@@ -924,7 +931,7 @@ def list_transaction_display_groups(
     has_more = len(page_groups) < len(groups)
     return TransactionDisplayGroupPageResponse(
         groups=page_groups,
-        next_cursor=_display_group_cursor(page_groups[-1]) if has_more and page_groups else None,
+        next_cursor=_display_group_cursor(page_groups[-1], search_version=search_version) if has_more and page_groups else None,
         has_more=has_more,
     )
 
@@ -1240,18 +1247,17 @@ def export_transactions_csv(
 
     if transaction_type:
         query = query.filter(TransactionLog.transaction_type == transaction_type)
-    search_filter = build_normalized_search_filter(
-        search,
-        TransactionLog.item_snapshot["item_name"].as_string(),
-        TransactionLog.item_snapshot["mes_code"].as_string(),
-        Item.item_name,
+    search_filter = build_item_search_filter(db, search, name_columns=[Item.item_name], item_id_column=Item.item_id,
+        guarded_name_columns=[(TransactionLog.item_snapshot["item_name"].as_string(), TransactionLog.item_snapshot.is_not(None))],
+        guarded_literal_columns=[(TransactionLog.item_snapshot["mes_code"].as_string(), TransactionLog.item_snapshot.is_not(None))],
+        literal_columns=[
         Item.mes_code,
         TransactionLog.reference_no,
         TransactionLog.notes,
         TransactionLog.produced_by,
         TransactionLog.supplier_name_snapshot,
         IoBatch.requester_name,
-    )
+    ])
     if search_filter is not None:
         query = query.filter(search_filter)
 
@@ -1343,18 +1349,17 @@ def export_transactions_xlsx(
     )
     if transaction_type:
         query = query.filter(TransactionLog.transaction_type == transaction_type)
-    search_filter = build_normalized_search_filter(
-        search,
-        TransactionLog.item_snapshot["item_name"].as_string(),
-        TransactionLog.item_snapshot["mes_code"].as_string(),
-        Item.item_name,
+    search_filter = build_item_search_filter(db, search, name_columns=[Item.item_name], item_id_column=Item.item_id,
+        guarded_name_columns=[(TransactionLog.item_snapshot["item_name"].as_string(), TransactionLog.item_snapshot.is_not(None))],
+        guarded_literal_columns=[(TransactionLog.item_snapshot["mes_code"].as_string(), TransactionLog.item_snapshot.is_not(None))],
+        literal_columns=[
         Item.mes_code,
         TransactionLog.reference_no,
         TransactionLog.notes,
         TransactionLog.produced_by,
         TransactionLog.supplier_name_snapshot,
         IoBatch.requester_name,
-    )
+    ])
     if search_filter is not None:
         query = query.filter(search_filter)
 

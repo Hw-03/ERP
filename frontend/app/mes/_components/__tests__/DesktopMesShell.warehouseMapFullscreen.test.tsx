@@ -57,7 +57,11 @@ vi.mock("../login/useCurrentOperator", () => ({
 
 vi.mock("../DesktopSidebar", () => ({
   DESKTOP_TAB_ICON_COLORS: desktopTabIconColors,
-  DesktopSidebar: () => <nav data-testid="desktop-sidebar" />,
+  DesktopSidebar: ({ onTabChange }: { onTabChange: (tab: "dashboard" | "defect" | "warehouse") => void }) => <nav data-testid="desktop-sidebar">
+    <button type="button" onClick={() => onTabChange("dashboard")}>open dashboard</button>
+    <button type="button" onClick={() => onTabChange("defect")}>open defect</button>
+    <button type="button" onClick={() => onTabChange("warehouse")}>open warehouse</button>
+  </nav>,
 }));
 
 vi.mock("../DesktopTopbar", () => ({
@@ -85,7 +89,17 @@ vi.mock("../DesktopWarehouseView", () => ({
   ),
 }));
 vi.mock("../DesktopShippingView", () => ({ DesktopShippingView: () => <div /> }));
-vi.mock("../DesktopDefectView", () => ({ DesktopDefectView: () => <div /> }));
+vi.mock("../DesktopDefectView", () => ({
+  DesktopDefectView: ({ itemPickerFullscreen, onItemPickerFullscreenChange }: {
+    itemPickerFullscreen?: boolean;
+    onItemPickerFullscreenChange?: (fullscreen: boolean) => void;
+  }) => <section>
+    <input aria-label="defect draft" defaultValue="" />
+    <span data-testid="defect-item-picker-fullscreen-state">{String(Boolean(itemPickerFullscreen))}</span>
+    <button type="button" onClick={() => onItemPickerFullscreenChange?.(true)}>enter defect fullscreen</button>
+    <button type="button" onClick={() => onItemPickerFullscreenChange?.(false)}>exit defect fullscreen</button>
+  </section>,
+}));
 vi.mock("../DesktopHistoryView", () => ({ DesktopHistoryView: () => <div /> }));
 vi.mock("../DesktopWeeklyReportView", () => ({ DesktopWeeklyReportView: () => <div /> }));
 vi.mock("../DesktopAdminView", () => ({ DesktopAdminView: () => <div /> }));
@@ -150,6 +164,33 @@ describe("DesktopMesShell warehouse map fullscreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "exit item picker fullscreen" }));
     expect(screen.getByTestId("warehouse-item-picker-fullscreen-state")).toHaveTextContent("false");
+    expect(screen.getByTestId("desktop-topbar")).toBeInTheDocument();
+  });
+
+  it("keeps the defect draft and sidebar while hiding and restoring the topbar", () => {
+    window.history.replaceState({}, "", "/mes?tab=defect");
+    const { container } = render(<DesktopMesShell />);
+    fireEvent.change(screen.getByLabelText("defect draft"), { target: { value: "preserved input" } });
+    fireEvent.click(screen.getByRole("button", { name: "enter defect fullscreen" }));
+    expect(screen.getByTestId("defect-item-picker-fullscreen-state")).toHaveTextContent("true");
+    expect(screen.queryByTestId("desktop-topbar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("desktop-sidebar")).toBeInTheDocument();
+    expect(container.querySelector(".desktop-tab-content")).not.toHaveClass("mt-3");
+    expect(screen.getByLabelText("defect draft")).toHaveValue("preserved input");
+    fireEvent.click(screen.getByRole("button", { name: "exit defect fullscreen" }));
+    expect(screen.getByTestId("desktop-topbar")).toBeInTheDocument();
+    expect(screen.getByLabelText("defect draft")).toHaveValue("preserved input");
+  });
+
+  it("clears defect fullscreen on a menu change without expanding the warehouse picker", () => {
+    window.history.replaceState({}, "", "/mes?tab=defect");
+    render(<DesktopMesShell />);
+    fireEvent.click(screen.getByRole("button", { name: "enter defect fullscreen" }));
+    fireEvent.click(screen.getByRole("button", { name: "open warehouse" }));
+    expect(screen.getByTestId("desktop-topbar")).toBeInTheDocument();
+    expect(screen.getByTestId("warehouse-item-picker-fullscreen-state")).toHaveTextContent("false");
+    fireEvent.click(screen.getByRole("button", { name: "open defect" }));
+    expect(screen.getByTestId("defect-item-picker-fullscreen-state")).toHaveTextContent("false");
     expect(screen.getByTestId("desktop-topbar")).toBeInTheDocument();
   });
 });

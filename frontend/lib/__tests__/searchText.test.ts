@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchesSearchText, normalizeSearchText } from "../searchText";
+import { matchesSearchText, matchesSearchFields, normalizeSearchText } from "../searchText";
 
 describe("normalizeSearchText", () => {
   it("lowercases and removes spaces, hyphens, dots, and slashes", () => {
@@ -12,6 +12,15 @@ describe("normalizeSearchText", () => {
 });
 
 describe("matchesSearchText", () => {
+  it("matches multiple literal conditions independently of word order", () => {
+    expect(matchesSearchText("Alpha Gamma Beta", "beta alpha")).toBe(true);
+    expect(matchesSearchText("Alpha Gamma Beta", "beta delta")).toBe(false);
+  });
+
+  it("allows literal conditions to match explicit fields of the same result", () => {
+    expect(matchesSearchFields(["홍길동", "조립"], "조립 홍길동")).toBe(true);
+    expect(matchesSearchFields(["홍길동", "조립"], "홍길동 출하")).toBe(false);
+  });
   it("matches regardless of spacing on either side", () => {
     expect(matchesSearchText("Alpha Beta", "alphabeta")).toBe(true);
     expect(matchesSearchText("AlphaBeta", "alpha beta")).toBe(true);

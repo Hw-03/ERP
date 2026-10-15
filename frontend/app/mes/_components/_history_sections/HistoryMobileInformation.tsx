@@ -54,10 +54,11 @@ export function HistoryMobileStockDetails({ logs, batch = null, onSelectLog }: {
   </section>;
 }
 
-/** 요청 순 계산과 실제 효과가 다른 위치·수량을 별도로 보여준다. */
-export function HistoryMobileLogStock({ log }: { log: TransactionLog }) {
-  const snapshot = resolveStockSnapshot(log);
-  const actual = buildHistoryDetailSummary([log], null).actualStock;
+/** 작업 상세는 실제 기록을 사용하고 기존 이력 화면은 요청 순 비교를 유지한다. */
+export function HistoryMobileLogStock({ log, variant = "card", showRequestOrderStock = true }: { log: TransactionLog; variant?: "card" | "plain"; showRequestOrderStock?: boolean }) {
+  const stockLog = showRequestOrderStock ? log : { ...log, request_order_stock: undefined };
+  const snapshot = resolveStockSnapshot(stockLog);
+  const actual = showRequestOrderStock ? buildHistoryDetailSummary([log], null).actualStock : null;
   const actualDiffers = actual && (snapshot.status !== "available"
     || actual.warehouseBefore !== snapshot.warehouseBefore || actual.warehouseAfter !== snapshot.warehouseAfter
     || actual.departmentBefore !== snapshot.departmentBefore || actual.departmentAfter !== snapshot.departmentAfter);
@@ -98,10 +99,10 @@ export function HistoryMobileLogStock({ log }: { log: TransactionLog }) {
     && !["MARK_DEFECTIVE", "UNMARK_DEFECTIVE", "SUPPLIER_RETURN"].includes(log.transaction_type);
   // 요청순 합계는 실제 처리순 위치 스냅샷으로 대체할 수 없다.
   // 실제 위치 효과는 아래 실제 처리 재고 영역에서 원본 그대로 보여준다.
-  const requestOrderLog = showActual && log.request_order_stock?.status === "available"
-    ? { ...log, inventory_effect: log.inventory_effect?.filter((effect) => effect.scope !== "warehouse"
+  const requestOrderLog = showActual && stockLog.request_order_stock?.status === "available"
+    ? { ...stockLog, inventory_effect: stockLog.inventory_effect?.filter((effect) => effect.scope !== "warehouse"
       && !(effect.scope === "location" && effect.status === "PRODUCTION")) }
-    : log;
+    : stockLog;
   const actualLog = { ...log, request_order_stock: undefined };
   const actualSnapshot = resolveStockSnapshot(actualLog);
   const displayedActual = actualDiffers && actualSnapshot.status === "available" && !isDepartmentCorrectionLog(log)
@@ -112,13 +113,13 @@ export function HistoryMobileLogStock({ log }: { log: TransactionLog }) {
       && shown.before === effect.quantityBefore && shown.after === effect.quantityAfter
       && shown.after - shown.before === effect.delta);
   });
-  return <div className="space-y-2">
-    {!onlyActualChanges && <div className={styles.stockInformation}>
-      {showActual && <span className="text-xs" style={{color:LEGACY_COLORS.muted2}}>요청 순 재고</span>}
+  return <div className={`space-y-2${variant === "plain" ? ` ${styles.plainStockDetails}` : ""}`}>
+    {!onlyActualChanges && <div className={variant === "plain" ? "space-y-1" : styles.stockInformation}>
+      {showActual && showRequestOrderStock && <span className="text-xs" style={{color:LEGACY_COLORS.muted2}}>요청 순 재고</span>}
       <StockSnapshotContent log={requestOrderLog} variant="panel" expandableUnavailableReason showUnit />
     </div>}
     {showActual && <div className={onlyActualChanges ? "space-y-1" : "space-y-1 border-t pt-2"} style={{borderColor:LEGACY_COLORS.border}}>
-      {!onlyActualChanges && <div className="text-xs" style={{color:LEGACY_COLORS.muted2}}>실제 처리 재고</div>}
+      {!onlyActualChanges && <div className="text-xs" style={{color:LEGACY_COLORS.muted2}}>{showRequestOrderStock ? "실제 처리 재고" : "상태별 재고 변화"}</div>}
       {actualDiffers && <StockSnapshotContent log={actualLog} variant="panel" showUnit />}
       {additionalEffects.map((effect) => <div key={effect.key} className={styles.effectRow}
         aria-label={`${effect.label} ${effect.quantityBefore != null ? `${formatQty(effect.quantityBefore)} ` : ""}${effect.deltaLabel}${effect.quantityAfter != null ? `→${formatQty(effect.quantityAfter)}` : ""}${effect.unit ? ` ${effect.unit}` : ""}`}>

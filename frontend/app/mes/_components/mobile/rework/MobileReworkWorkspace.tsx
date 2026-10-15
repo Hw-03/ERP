@@ -1,7 +1,9 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState, type MutableRefObject } from "react";
-import { ChevronDown, ChevronUp, Layers, Search } from "lucide-react";
+import { ChevronDown, ChevronUp, Layers } from "lucide-react";
+import { useItemSearch } from "@/lib/queries/useItemSearch";
+import { SearchInput } from "../../common/SearchInput";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { formatQty } from "@/lib/mes/format";
 import { QuantityInput } from "../../common/QuantityInput";
@@ -39,6 +41,7 @@ const qty = (value: number): string => formatQty(value, { maximumFractionDigits:
 
 /** 두 모바일 진입점의 실제 제출 결정을 같은 목록에서 직접 편집한다. */
 export function MobileReworkWorkspace(props: Props) {
+  const { config: searchConfig } = useItemSearch();
   const { parentItemName, parentMesCode, parentQty, parentUnit = "EA", reason, decisions, busy = false, canSubmit, onConfirm, error, context = "재작업", steps, current } = props;
   const work = useMobileReworkWorkspace({ ...props, busy });
   const { nav, view } = work;
@@ -48,7 +51,7 @@ export function MobileReworkWorkspace(props: Props) {
   const [focused, setFocused] = useState<{ view: string; path: string } | null>(null);
   const result = effectiveRows(decisions);
   const rows = nav.review ? result : activeRows(decisions);
-  const shown = visibleRows(rows, nav.review ? {} : work.expanded, view.search, view.changedOnly, focused?.view === work.viewKey ? focused.path : undefined);
+  const shown = visibleRows(rows, nav.review ? {} : work.expanded, view.search, view.changedOnly, focused?.view === work.viewKey ? focused.path : undefined, searchConfig);
   const shownParents = new Set(shown.map(({ path }) => path.slice(0, -1).join("/")));
   const pending = busy || work.loading || work.loadingPath !== null;
   const changedCount = rows.filter(({ node }) => hasChanges(node)).length;
@@ -90,7 +93,7 @@ export function MobileReworkWorkspace(props: Props) {
               <label><span>기본 정상 수량</span><QuantityInput aria-label="기본 정상 수량" inputMode="decimal" min={0} max={parentQty} step="any" value={work.normalQty} disabled={pending || !decisions.length} onChange={(event) => work.allocate(Number(event.target.value))} /><span>/ {qty(parentQty)} {parentUnit}</span></label>
               <p>나머지는 격리 · 개별 수정한 품목은 유지</p>
             </div>}
-            <label className={styles.search}><Search size={18} /><input type="search" aria-label="조회된 구성품 검색" placeholder="품목명 · 코드 · 입고 부서" value={view.search} onChange={(event) => work.updateView({ search: event.target.value })} /></label>
+            <SearchInput inputProps={{ type: "search" }} ariaLabel="조회된 구성품 검색" placeholder="품목명 · 코드 · 입고 부서" value={view.search} onChange={(search) => work.updateView({ search })} />
             <div className={styles.filters} aria-label="구성품 필터">
               <button type="button" aria-pressed={!view.changedOnly} onClick={() => work.updateView({ changedOnly: false })}>전체 <span>{rows.length}</span></button>
               <button type="button" aria-pressed={view.changedOnly} onClick={() => work.updateView({ changedOnly: true })}>처리 변경 <span>{changedCount}</span></button>

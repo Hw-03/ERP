@@ -10,7 +10,10 @@ import {
   type ItemConversionResult,
 } from "@/lib/api";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
-import { matchesSearchText } from "@/lib/searchText";
+import { matchesItemSearchFields } from "@/lib/itemSearch";
+import type { ItemSearchConfig } from "@/lib/api/types/item-search";
+import { useItemSearch } from "@/lib/queries/useItemSearch";
+import { SearchInput } from "../common/SearchInput";
 import { QuantityInput } from "../common/QuantityInput";
 import { EmptyState } from "../common/EmptyState";
 
@@ -78,9 +81,10 @@ function conversionModeLabel(mode: ItemConversionMode | null): string {
   return "자동 판정";
 }
 
-function filterCandidates(candidates: Item[], query: string): Item[] {
+function filterCandidates(candidates: Item[], query: string, config: ItemSearchConfig): Item[] {
   return candidates.filter((item) => {
-    return matchesSearchText(item.item_name, query) || matchesSearchText(item.mes_code, query) || matchesSearchText(item.process_type_code, query);
+    return matchesItemSearchFields({ itemId: item.item_id, nameFields: [item.item_name],
+      literalFields: [item.mes_code, item.process_type_code] }, query, config);
   });
 }
 
@@ -126,6 +130,7 @@ export function ItemConversionWorkView({
   onBack,
   onComplete,
 }: WorkProps) {
+  const { config: searchConfig } = useItemSearch();
   const [sourceId, setSourceId] = useState("");
   const [targetId, setTargetId] = useState("");
   const [quantity, setQuantity] = useState(1);
@@ -153,8 +158,8 @@ export function ItemConversionWorkView({
           item.process_type_code === sourceItem.process_type_code,
       )
     : [];
-  const filteredSources = filterCandidates(candidates, sourceQuery);
-  const filteredTargets = filterCandidates(targetCandidates, targetQuery);
+  const filteredSources = filterCandidates(candidates, sourceQuery, searchConfig);
+  const filteredTargets = filterCandidates(targetCandidates, targetQuery, searchConfig);
   const currentStep = historyStep
     ? historyStep === 1 || preview
       ? historyStep
@@ -584,16 +589,15 @@ function CandidatePanel({
           <div className="ict text-base font-black">{title}</div>
         </div>
       </div>
-      <label className="icf flex min-h-12 items-center gap-2 rounded-[14px] border px-3">
-        <input
-          data-testid={`item-conversion-${kind}-search`}
+      <SearchInput
+          inputProps={{ "data-testid": `item-conversion-${kind}-search` }}
+          ariaLabel={placeholder}
           value={query}
           disabled={disabled}
-          onChange={(event) => onQuery(event.target.value)}
+          onChange={onQuery}
           placeholder={placeholder}
-          className="ict h-full min-w-0 flex-1 bg-transparent text-sm font-bold outline-none disabled:cursor-not-allowed"
+          className="min-h-12"
         />
-      </label>
       <div data-testid={`item-conversion-${kind}-candidate-shell`} className="relative min-h-0 flex-1">
         <div
           ref={candidateListRef}

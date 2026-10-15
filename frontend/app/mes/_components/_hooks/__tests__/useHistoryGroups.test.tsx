@@ -3,6 +3,8 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { useHistoryGroups } from "../useHistoryGroups";
+const searchState = vi.hoisted(() => ({ version: 0, retry: vi.fn() }));
+vi.mock("@/lib/queries/useItemSearch", () => ({ useItemSearch: () => ({ config: { version: searchState.version }, retry: searchState.retry }) }));
 
 function makeResponse(body: unknown, ok = true): Response {
   return {
@@ -45,11 +47,68 @@ const baseArgs = {
 
 const originalFetch = globalThis.fetch;
 afterEach(() => {
+  searchState.version = 0;
+  searchState.retry.mockReset();
   globalThis.fetch = originalFetch;
   vi.restoreAllMocks();
 });
 
 describe("useHistoryGroups", () => {
+  it("restores the current search-version cache immediately on remount", async () => {
+    searchState.version = 4;
+    const page = { groups: [makeGroup(4)], next_cursor: null, has_more: false };
+    const fetchSpy = vi.fn().mockResolvedValue(makeResponse(page));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 60_000 } } });
+    const wrapper = makeWrapper(client);
+    const first = renderHook(() => useHistoryGroups(baseArgs), { wrapper });
+    await waitFor(() => expect(first.result.current.loading).toBe(false));
+    first.unmount();
+    const second = renderHook(() => useHistoryGroups(baseArgs), { wrapper });
+    expect(second.result.current.loading).toBe(false);
+    expect(second.result.current.groups).toEqual(page.groups);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    await act(async () => {});
+  });
+
+  it("restarts a stale background-refresh cursor from page one with the same filters", async () => {
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse({ groups: [makeGroup(0)], next_cursor: "old-tail", has_more: true }))
+      .mockResolvedValueOnce(makeResponse({ groups: [makeGroup(1)], next_cursor: null, has_more: false }))
+      .mockResolvedValueOnce(makeResponse({ groups: [makeGroup(10)], next_cursor: "stale-tail", has_more: true }))
+      .mockResolvedValueOnce({ ...makeResponse({ detail: { code: "SEARCH_CONFIG_STALE", message: "설정 변경" } }, false), status: 409 })
+      .mockResolvedValueOnce(makeResponse({ groups: [makeGroup(20)], next_cursor: null, has_more: false }));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 60_000 } } });
+    const { result } = renderHook(() => useHistoryGroups({ ...baseArgs, debouncedSearch: "전극", department: "조립" }), { wrapper: makeWrapper(client) });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => result.current.loadMore());
+    act(() => result.current.refreshLoaded());
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(5));
+    expect(String(fetchSpy.mock.calls[4][0])).not.toContain("cursor=");
+    expect(String(fetchSpy.mock.calls[4][0])).toContain("department=%EC%A1%B0%EB%A6%BD");
+    expect(searchState.retry).toHaveBeenCalledOnce();
+    await waitFor(() => expect(result.current.groups).toEqual([makeGroup(20)]));
+    expect(result.current.refreshError).toBeNull();
+  });
+
+  it("invalidates the cached first page before restarting a rejected load-more cursor", async () => {
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse({ groups: [makeGroup(0)], next_cursor: "stale-tail", has_more: true }))
+      .mockResolvedValueOnce({ ...makeResponse({ detail: { code: "SEARCH_CONFIG_STALE", message: "설정 변경" } }, false), status: 409 })
+      .mockResolvedValueOnce(makeResponse({ groups: [makeGroup(20)], next_cursor: null, has_more: false }));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 60_000 } } });
+    const { result } = renderHook(() => useHistoryGroups({ ...baseArgs, debouncedSearch: "전극" }), { wrapper: makeWrapper(client) });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => result.current.loadMore());
+    await waitFor(() => expect(result.current.groups).toEqual([makeGroup(20)]));
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    expect(String(fetchSpy.mock.calls[2][0])).not.toContain("cursor=");
+    expect(searchState.retry).toHaveBeenCalledOnce();
+    expect(result.current.loadMoreError).toBeNull();
+  });
+
   it("isolates employee pages and ignores late load-more results after the mine filter changes", async () => {
     const oldMore = deferred<Response>();
     const mine = deferred<Response>();
@@ -153,6 +212,7 @@ describe("useHistoryGroups", () => {
     expect(secondMount.result.current.loading).toBe(false);
     expect(secondMount.result.current.groups).toEqual(page.groups);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+    await act(async () => {});
   });
 
   it("cancels an in-flight same-key group request before a realtime revision refresh", async () => {

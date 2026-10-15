@@ -688,7 +688,7 @@ export function getHistoryListOperationLabel(
     }
     if (batch.work_type === "internal_use") return getInternalUseListLabel(log, batch);
     const displayType = getHistoryDisplayTransactionType(log, batch);
-    if (displayType === "PRODUCE") return "생산 입고";
+    if (displayType === "PRODUCE" || (batch.sub_type === "produce" && displayType === "BACKFLUSH")) return "생산 입고";
     if (displayType === "DISASSEMBLE") return "분해 출고";
     return batch.work_type === "warehouse_adjust"
       ? "창고 수량 조정"

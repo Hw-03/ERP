@@ -235,6 +235,7 @@ describe("DefectHubPanel", () => {
     const productModels = [{ slot: 3, model_name: "DX3000" }, { slot: 7, model_name: "COCOON" }, { slot: 4, model_name: "ADX4000W" }].map((model) => ({ ...model, symbol: null, is_reserved: false }));
     render(<DefectHubPanel currentEmployee={mockEmployee} productModels={productModels} />);
     fireEvent.click(screen.getByText("격리 목록"));
+    fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
     const group = await screen.findByRole("group", { name: "모델 구분" });
     expect(within(group).getAllByRole("button").map((button) => button.textContent)).toEqual(["전체", "DX3000", "COCOON", "ADX4000W"]);
   });
@@ -570,6 +571,7 @@ describe("DefectHubPanel", () => {
     openList();
     expect(await screen.findByText("UNKNOWN-ASSEMBLY")).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
     const actorFilters = screen.getByText("격리자").parentElement!;
     fireEvent.click(within(actorFilters).getByRole("button", { name: "내가 격리" }));
 
@@ -598,6 +600,7 @@ describe("DefectHubPanel", () => {
     render(<DefectHubPanel currentEmployee={mockEmployee} />);
     openList();
 
+    fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
     expect(await screen.findByRole("checkbox", { name: "필터 고정" })).toBeChecked();
     expect(screen.getByRole("combobox")).toHaveValue("newest");
     expect(screen.getByRole("button", { name: "내가 격리" })).toHaveAttribute("aria-pressed", "true");
@@ -618,6 +621,7 @@ describe("DefectHubPanel", () => {
     expect(screen.getByText("격리 중").parentElement).toHaveTextContent("2건");
     expect(screen.getByText("1년 이상 ⚠").parentElement).toHaveTextContent("1건");
 
+    fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
     fireEvent.click(screen.getByRole("button", { name: "내가 격리" }));
     expect(screen.queryByText("게터")).not.toBeInTheDocument();
     expect(screen.getByText("격리 중").parentElement).toHaveTextContent("1건");
@@ -643,6 +647,7 @@ describe("DefectHubPanel", () => {
     openList();
     expect(await screen.findByText("전극(70kV)")).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "newest" } });
     const summaries = screen.getAllByTestId("defect-item-summary");
     expect(summaries[0]).toHaveTextContent("전극(70kV)");
@@ -665,6 +670,7 @@ describe("DefectHubPanel", () => {
     expect(screen.getByText("1년 이상 ⚠").parentElement).toHaveTextContent("2건");
     expect(screen.queryByText("다른 품목")).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "newest" } });
     let summaries = screen.getAllByTestId("defect-item-summary");
     expect(summaries[0]).toHaveTextContent("검색 최신");

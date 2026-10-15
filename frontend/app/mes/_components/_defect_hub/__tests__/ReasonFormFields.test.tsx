@@ -55,6 +55,23 @@ function mount() {
 describe("managed defect reasons", () => {
   beforeEach(() => { vi.clearAllMocks(); api.updateReasonCategory.mockReset(); api.createReasonCategory.mockReset(); api.listReasonCategories.mockResolvedValue(reasons); });
 
+  it("filters during IME composition without creating a reason on composing Enter", async () => {
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "사유 카테고리 선택" }));
+    await screen.findByRole("button", { name: "표면 균열", exact: true });
+    const input = screen.getByRole("searchbox", { name: "사유 검색" });
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: "용접 균열" } });
+    expect(input).toHaveValue("용접 균열");
+    expect(screen.queryByRole("button", { name: "표면 균열", exact: true })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "추가하고 선택" })).toBeEnabled();
+    fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+    expect(api.createReasonCategory).not.toHaveBeenCalled();
+    fireEvent.compositionEnd(input);
+    expect(screen.queryByRole("button", { name: "표면 균열", exact: true })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "추가하고 선택" })).toBeEnabled();
+  });
+
   it("selects a server reason by stable ID and excludes inactive reasons", async () => {
     mount();
     expect(screen.queryByRole("searchbox", { name: "사유 검색" })).not.toBeInTheDocument();

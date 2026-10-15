@@ -171,6 +171,14 @@ describe("formatDefectReason", () => {
   });
 });
 describe("historyPresentation", () => {
+  it.each([false, true])("생산 작업의 자재 차감 행도 생산 입고로 표시한다: cancellation=%s", (cancellation) => {
+    const input = makeLog({ transaction_type: "BACKFLUSH", operation_kind: cancellation ? "CANCELLATION" : "BUSINESS" });
+    expect(getHistoryListOperationLabel(input, makeBatch({ work_type: "process", sub_type: "produce" })))
+      .toBe(cancellation ? "생산 입고 취소" : "생산 입고");
+    expect(getHistoryListOperationLabel(input, makeBatch({ work_type: "process", sub_type: "produce", display_transaction_type: "ADJUST" })))
+      .toBe(cancellation ? "부서 입출고 취소" : "부서 입출고");
+  });
+
   it("uses menu-level labels in the list while retaining the detailed movement elsewhere", () => {
     expect(getHistoryListOperationLabel(makeLog({ transaction_type: "PRODUCE" }))).toBe("생산 입고");
     expect(getHistoryListOperationLabel(

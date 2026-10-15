@@ -41,7 +41,7 @@ from app.utils.mes_code import (
     next_serial_no,
     parse_model_symbol,
 )
-from app.utils.search import build_normalized_search_filter
+from app.services.item_search import build_item_search_filter
 from app.models import ProductSymbol
 from app.services import audit
 from app.services import inventory as inventory_svc
@@ -431,12 +431,8 @@ def list_items(
     if legacy_item_type:
         query = query.filter(Item.legacy_item_type == legacy_item_type)
 
-    search_filter = build_normalized_search_filter(
-        search,
-        Item.item_name,
-        Item.mes_code,
-        Inventory.location,
-    )
+    search_filter = build_item_search_filter(db, search, name_columns=[Item.item_name],
+        literal_columns=[Item.mes_code, Inventory.location], item_id_column=Item.item_id)
     if search_filter is not None:
         query = query.filter(search_filter)
 
@@ -582,12 +578,8 @@ def export_items_xlsx(
     query = _build_item_query(db)
     if process_type_code:
         query = query.filter(Item.process_type_code == process_type_code)
-    search_filter = build_normalized_search_filter(
-        search,
-        Item.item_name,
-        Item.mes_code,
-        Inventory.location,
-    )
+    search_filter = build_item_search_filter(db, search, name_columns=[Item.item_name],
+        literal_columns=[Item.mes_code, Inventory.location], item_id_column=Item.item_id)
     if search_filter is not None:
         query = query.filter(search_filter)
     rows = query.order_by(Item.process_type_code, Item.mes_code).all()

@@ -8,7 +8,7 @@ import { BOM_STATUS_META, bomStatusOf, stageOf, type BomDeptFilter, type StageLe
 import type { StatusFilter } from "./BomStatsRow";
 import { BOM_EDIT_LIST_GRID_TEMPLATE, BomTableHeader, BomTableItemRow } from "./BomTablePrimitives";
 import { EmptyState } from "../../common";
-import { matchesSearchText } from "@/lib/searchText";
+import { useItemSearch } from "@/lib/queries/useItemSearch";
 
 /**
  * 좌측 부모 품목 리스트 — 선택된 부서의 품목을 검색/단계/상태 필터링.
@@ -56,6 +56,7 @@ export function BomParentList({
   onSelect,
   mode,
 }: Props) {
+  const { matchesItem } = useItemSearch();
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState<"ALL" | StageLetter>("ALL");
 
@@ -85,9 +86,9 @@ export function BomParentList({
         return bomStatusOf(i.item_id, completedSet, childCountMap) === statusFilter;
       })
       .filter((i) => {
-        return matchesSearchText(`${i.item_name} ${i.mes_code ?? ""}`, search);
+        return matchesItem(i, search);
       });
-  }, [items, dept, search, stageFilter, mode, statusFilter, completedSet, childCountMap]);
+  }, [items, dept, search, stageFilter, mode, statusFilter, completedSet, childCountMap, matchesItem]);
 
   const filters = mode === "whereused" ? STAGE_FILTERS_WHEREUSED : STAGE_FILTERS;
 

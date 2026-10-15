@@ -27,6 +27,7 @@ import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { ReadEmpty, ReadFailure, ReadLoading } from "./common/ReadState";
 import { matchesDefectSearch } from "./_defect_hub/defectSearch";
 import { makeClientRequestId } from "@/lib/uuid";
+import { useItemSearch } from "@/lib/queries/useItemSearch";
 
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -53,7 +54,7 @@ function workViewFromHistory(state: WorkHistoryState): Extract<ViewMode, { kind:
   }
   if (state?.defect !== "cart" || (state.mode !== "add" && state.mode !== "scrap")) return null;
   const action = state.mode === "add" ? "add" : state.directAction === "rework" ? "rework" : state.directAction === "scrap" ? "scrap" : null;
-  const valid = (state.step === 2 || (state.step === 3 && action === "rework"))
+  const valid = (state.step === 2 || state.step === 3 || (state.step === 4 && action === "rework"))
     && action !== null && !(state.mode === "add" && state.directAction === "rework");
   if (valid && action) return { kind: "cart", mode: state.mode, action, source: action === "rework" ? "production" : state.source === "warehouse" ? "warehouse" : "production" };
   return { kind: "work-choice", action: action === "rework" ? null : action, source: null };
@@ -63,6 +64,8 @@ interface Props {
   operator: Operator | null;
   defectDeptFilter?: string | null;
   onStatusChange?: (status: string) => void;
+  itemPickerFullscreen?: boolean;
+  onItemPickerFullscreenChange?: (fullscreen: boolean) => void;
 }
 
 /**
@@ -70,7 +73,7 @@ interface Props {
  * list 모드는 KPI·퀵액션·필터·부서별 목록(다중선택). 액션 시 좌측을 덮는 전폭 흐름으로
  * 전환(새 불량 추가 / R 바로 폐기·반품 / 일괄 처리 / PA·PF 분해).
  */
-export function DesktopDefectView({ operator, defectDeptFilter, onStatusChange }: Props) {
+export function DesktopDefectView({ operator, defectDeptFilter, onStatusChange, itemPickerFullscreen, onItemPickerFullscreenChange }: Props) {
   if (!operator) {
     return (
       <div className="flex h-full min-h-0 flex-1 items-center justify-center px-6">
@@ -86,6 +89,8 @@ export function DesktopDefectView({ operator, defectDeptFilter, onStatusChange }
       operator={operator}
       defectDeptFilter={defectDeptFilter}
       onStatusChange={onStatusChange}
+      itemPickerFullscreen={itemPickerFullscreen}
+      onItemPickerFullscreenChange={onItemPickerFullscreenChange}
     />
   );
 }
@@ -94,12 +99,17 @@ function DefectViewInner({
   operator,
   defectDeptFilter,
   onStatusChange,
+  itemPickerFullscreen,
+  onItemPickerFullscreenChange,
 }: {
   operator: Operator;
   defectDeptFilter?: string | null;
   onStatusChange?: (status: string) => void;
+  itemPickerFullscreen?: boolean;
+  onItemPickerFullscreenChange?: (fullscreen: boolean) => void;
 }) {
   const realtimeRevision = useRealtimeRevision();
+  const { config: searchConfig } = useItemSearch();
   const noop = useMemo(() => () => {}, []);
   // 피커용 품목/모델 — 입출고와 동일하게 자체 로드(shell 은 넘겨주지 않음).
   const { items, productModels } = useWarehouseData({
@@ -261,14 +271,14 @@ function DefectViewInner({
           Date.now() - new Date(loc.defective_at).getTime() > ONE_YEAR_MS,
       );
     }
-    result = result.filter((loc) => matchesDefectSearch(loc, search));
+    result = result.filter((loc) => matchesDefectSearch(loc, search, searchConfig));
 
     return [...result].sort((a, b) => {
       const ta = a.defective_at ? new Date(a.defective_at).getTime() : 0;
       const tb = b.defective_at ? new Date(b.defective_at).getTime() : 0;
       return sort === "oldest" ? ta - tb : tb - ta;
     });
-  }, [scopedLocations, sort, kpiFilter, search, poolMode]);
+  }, [scopedLocations, sort, kpiFilter, search, poolMode, searchConfig]);
 
   // KPI 집계 범위 라벨 — 숫자가 어느 범위인지 카드 부제로 노출
   const departmentScopeLabel = selectedDepartments.length > 0
@@ -376,7 +386,7 @@ function DefectViewInner({
   function openCart(action: DefectWorkAction, source: DefectSourceKind): void {
     const mode = action === "add" ? "add" : "scrap";
     window.history.replaceState({ ...window.history.state, defect: "work-choice", action, source }, "");
-    window.history.pushState({ ...window.history.state, defect: "cart", mode, directAction: action === "rework" ? "rework" : "scrap", source, step: 2 }, "");
+    window.history.pushState({ ...window.history.state, defect: "cart", mode, directAction: action === "rework" ? "rework" : "scrap", source, step: 2, workChoiceDepth: 1 }, "");
     setView({ kind: "cart", mode, action, source });
   }
 
@@ -503,7 +513,9 @@ function DefectViewInner({
                 items={items}
                 productModels={productModels}
                 currentEmployee={employee}
-                onCancel={() => window.history.back()}
+                itemPickerFullscreen={itemPickerFullscreen}
+                onItemPickerFullscreenChange={onItemPickerFullscreenChange}
+                onCancel={(historyDepth) => window.history.go(-historyDepth)}
                 onDone={(directAction) =>
                   handleProcessed(
                     view.mode === "add"
@@ -516,7 +528,7 @@ function DefectViewInner({
               />
             )}
             {view.kind === "work-choice" && (
-              <DefectWorkChoice action={view.action} source={view.source} onActionChange={selectWork} onProceed={openCart} onCancel={() => window.history.back()} />
+              <DefectWorkChoice action={view.action} source={view.source} onActionChange={selectWork} onProceed={openCart} onMenuSelect={() => window.history.back()} />
             )}
             {view.kind === "process" && (
               <DefectProcessPanel
@@ -544,7 +556,7 @@ function DefectViewInner({
               <button
                 type="button"
                 onClick={() => window.history.back()}
-                className="standard-hover flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-sm font-bold transition-colors"
+                className="standard-hover flex min-h-11 items-center gap-1 rounded-[10px] border px-3 text-sm font-bold transition-colors"
                 style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -563,6 +575,7 @@ function DefectViewInner({
             />
 
             <DefectFilterBar
+              searchInput={<DefectSearchInput value={search} onChange={setSearch} />}
               scope={scope}
               actorScope={actorScope}
               poolMode={poolMode}
@@ -604,8 +617,6 @@ function DefectViewInner({
               }}
             />
 
-            <DefectSearchInput value={search} onChange={setSearch} />
-
             {refreshError && (
               <ReadFailure
                 refresh
@@ -621,12 +632,12 @@ function DefectViewInner({
             ) : (
               <>
                 <DefectDepartmentList
-                  emptyContent={<ReadEmpty hasSearch={!!search.trim()} hasFilters={locations.length > 0}
+                  emptyContent={<ReadEmpty hasSearch={!!search.trim()} hasFilters={locations.some((location) => (location.management_category ?? "DEFECT") === "DEFECT")}
                     illustrated
                     aboveFold
                     className="min-h-[260px] flex-1"
-                    title={!search.trim() && locations.length === 0 ? "격리된 불량 재고가 없습니다." : undefined}
-                    onReset={() => { setSearch(""); setScope("all"); resetCategoryFilters(); setKpiFilter(null); }} />}
+                    title={!search.trim() && !locations.some((location) => (location.management_category ?? "DEFECT") === "DEFECT") ? "격리된 불량 재고가 없습니다." : undefined}
+                    onReset={() => { setSearch(""); setScope("all"); setActorScope("all"); resetCategoryFilters(); setKpiFilter(null); }} />}
                   locations={filteredLocations}
                   currentEmployee={employee}
                   onMemoUpdated={handleMemoUpdated}
