@@ -19,7 +19,8 @@ import { DefectManagementCategoryControl } from "./DefectManagementCategoryContr
 import type { DefectManagementCategory } from "@/lib/api/types/defects";
 import { makeClientRequestId } from "@/lib/uuid";
 import { queryKeys } from "@/lib/queries/keys";
-import { defectCartLineErrors } from "./defectCartValidation";
+import { defectCartLineErrors, defectSourceStock } from "./defectCartValidation";
+import { formatQty } from "@/lib/mes/format";
 import { MAX_QUARANTINE_LINES, groupDefectCartLines, insertDefectCartLine, defectCartGroupErrors } from "./defectCartGroups";
 import quarantineConfirmStyles from "./DefectQuarantineConfirm.module.css";
 import { DefectFlowStepper } from "./DefectFlowStepper";
@@ -459,12 +460,25 @@ export function DefectCartFlow({
                   {mode === "add" ? groups.map((group) => (
                     <div key={group.item.item_id} data-testid="defect-quarantine-item-group" data-item-id={group.item.item_id}
                       className="flex flex-col overflow-hidden rounded-[12px] border" style={{ background: LEGACY_COLORS.s1, borderColor: groupErrors.has(group.item.item_id) ? tint(LEGACY_COLORS.red, 30) : LEGACY_COLORS.border }}>
-                      <div className="flex items-start justify-between gap-3 px-3 py-3">
-                        <div className="min-w-0">
-                          <div className="break-words text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{group.item.item_name}</div>
-                          <div className="mt-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{group.item.mes_code ?? "(코드 없음)"} · {source === "warehouse" ? "창고" : itemDepartment(group.item) ?? "부서 미지정"}</div>
+                      <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-3">
+                        <div className="min-w-0 flex-1 basis-[240px]">
+                          <div className="break-words text-2xl font-black leading-snug" style={{ color: LEGACY_COLORS.text }}>{group.item.item_name}</div>
+                          <div className="mt-1 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{group.item.mes_code ?? "(코드 없음)"} · {source === "warehouse" ? "창고" : itemDepartment(group.item) ?? "부서 미지정"}</div>
                         </div>
-                        <span className="shrink-0 text-sm font-bold" style={{ color: LEGACY_COLORS.blue }}>총 {group.totalQuantity ?? "—"} {group.item.unit || "EA"} · {group.lines.length}건</span>
+                        <dl aria-label="품목 수량 요약" className="flex max-w-full shrink-0 flex-wrap items-center gap-x-4 gap-y-2 rounded-[10px] px-3 py-2" style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}>
+                          <div className="flex flex-col gap-0.5">
+                            <dt className="text-xs font-bold">{source === "warehouse" ? "창고 가용" : "부서 가용"}</dt>
+                            <dd className="m-0 flex items-baseline gap-1 whitespace-nowrap"><span className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>{formatQty(defectSourceStock(group.item, source).available)}</span><span className="text-xs font-bold">{group.item.unit || "EA"}</span></dd>
+                          </div>
+                          <div className="flex flex-col gap-0.5 border-l pl-4" style={{ borderColor: LEGACY_COLORS.border }}>
+                            <dt className="text-xs font-bold">총 처리 수량</dt>
+                            <dd className="m-0 flex items-baseline gap-1 whitespace-nowrap"><span className="text-lg font-black" style={{ color: LEGACY_COLORS.red }}>{group.totalQuantity === null ? "—" : formatQty(group.totalQuantity)}</span><span className="text-xs font-bold">{group.item.unit || "EA"}</span></dd>
+                          </div>
+                          <div className="flex flex-col gap-0.5 border-l pl-4" style={{ borderColor: LEGACY_COLORS.border }}>
+                            <dt className="text-xs font-bold">사유</dt>
+                            <dd className="m-0 flex items-baseline gap-1 whitespace-nowrap"><span className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>{formatQty(group.lines.length)}</span><span className="text-xs font-bold">건</span></dd>
+                          </div>
+                        </dl>
                       </div>
                       {groupErrors.has(group.item.item_id) && <p className="px-3 pb-2 text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>{groupErrors.get(group.item.item_id)}</p>}
                       {group.lines.map((line, index) => {

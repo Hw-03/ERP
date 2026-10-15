@@ -1,4 +1,4 @@
-.root { --section-label-height: 44px; --source-label-height: 52px; display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 12px; }
+.root { --section-label-height: 0px; --source-label-height: 52px; display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 12px; }
 .content { display: grid; min-height: 480px; flex: 1; grid-template-rows: minmax(0, 1fr) 0px; padding: 0 2px; transition: grid-template-rows 200ms ease; }
 .withSource { grid-template-rows: minmax(0, 1fr) calc((100% + var(--source-label-height) - var(--section-label-height)) / 2); }
 .sectionLabel { display: flex; height: var(--section-label-height); flex-shrink: 0; align-items: center; color: var(--c-muted2); font-size: 16px; font-weight: 700; line-height: 20px; }

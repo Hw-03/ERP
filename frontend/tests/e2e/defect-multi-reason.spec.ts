@@ -214,7 +214,8 @@ for (const scenario of [
     await assertHideConfirmation(page, lines.nth(0), hiddenCategory.category_id, hiddenName, testInfo.outputPath("hide-confirmation.png"));
     await group.getByRole("button", { name: /다른 사유 추가/ }).click();
     await chooseReason(page, lines.nth(2), categories[2], 3, "C 입력 보존");
-    await expect(group).toContainText("총 10 EA · 3건");
+    if (scenario.mobile) await expect(group).toContainText("총 10 EA · 3건");
+    else await expect(group.getByLabel("품목 수량 요약").getByRole("definition")).toHaveText(["20EA", "10EA", "3건"]);
 
     if (scenario.width === 1915) {
       await group.getByRole("button", { name: /다른 사유 추가/ }).click();
@@ -254,7 +255,8 @@ for (const scenario of [
     await expect(lines).toHaveCount(2);
     await expect(lines.nth(0).getByRole("textbox")).toHaveValue("A 입력 보존");
     await expect(lines.nth(1).getByRole("textbox")).toHaveValue("C 입력 보존");
-    await expect(group).toContainText("총 6 EA · 2건");
+    if (scenario.mobile) await expect(group).toContainText("총 6 EA · 2건");
+    else await expect(group.getByLabel("품목 수량 요약").getByRole("definition")).toHaveText(["20EA", "6EA", "2건"]);
     await group.getByRole("button", { name: /다른 사유 추가/ }).click();
     await expect(lines.nth(2).getByRole("button", { name: "사유 카테고리 선택", exact: true })).toHaveText(scenario.mobile ? "카테고리 선택" : "사유 카테고리를 선택하세요.");
     await chooseReason(page, lines.nth(2), categories[1], 4, "B 재입력");
