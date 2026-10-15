@@ -278,7 +278,7 @@ export function DailyWorkReportScreen({
   const reportLoadFailed = tab === "mine" ? reportQuery.isError : selectedReportQuery.isError;
   const reportLoading = tab === "mine" ? reportQuery.isLoading : selectedReportQuery.isLoading;
   const initialContentLoading = Boolean(reportLoading || activityQuery.isLoading);
-  const authorsLoading = reportsQuery.isLoading || (mobile && reportsQuery.isFetching && reportsQuery.isPlaceholderData);
+  const authorsLoading = reportsQuery.isLoading || (reportsQuery.isFetching && reportsQuery.isPlaceholderData);
   const keepAuthors = mobile && reportsQuery.data !== undefined && !reportsQuery.isPlaceholderData;
   const keepActivity = mobile && activityQuery.data !== undefined;
   const mobileCompact = mobile && tab === "mine" && !isActivityDetailOpen && !reportLoadFailed && !activityQuery.isError && !saveError;
@@ -323,9 +323,9 @@ export function DailyWorkReportScreen({
                 <h2 className="text-base font-black">작성한 직원</h2>
                 {!mobile && <p className="mt-1 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2 }}>직원을 선택하면 해당 날짜의 일보와 MES 거래를 읽을 수 있습니다.</p>}
               </div>
-              <span className="rounded-full px-2.5 py-1 text-xs font-black" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>{authorsLoading ? <span className={`inline-block h-3 w-6 rounded ${mobile ? "" : "motion-safe:animate-pulse"}`} style={{ background: LEGACY_COLORS.s3 }} /> : mobile && reportsQuery.isError && !keepAuthors ? "—" : reports.length}명</span>
+              <span className="rounded-full px-2.5 py-1 text-xs font-black" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>{authorsLoading ? <span className={`inline-block h-3 w-6 rounded ${mobile ? "" : "motion-safe:animate-pulse"}`} style={{ background: LEGACY_COLORS.s3 }} /> : reportsQuery.isError && !keepAuthors ? "—" : reports.length}명</span>
             </div>
-            {reportsQuery.isError && <div className="mt-4"><Failure message="작성자 목록을 불러오지 못했습니다." onRetry={mobile ? () => void reportsQuery.refetch() : undefined} /></div>}
+            {reportsQuery.isError && <div className="mt-4"><Failure message="작성자 목록을 불러오지 못했습니다." onRetry={() => void reportsQuery.refetch()} /></div>}
             {(!reportsQuery.isError || keepAuthors) && (
               <div ref={authorChipsRef} data-testid="daily-work-report-author-chips" className={`mt-4 gap-2 ${mobile ? "grid grid-cols-4" : "flex flex-wrap lg:max-h-36 lg:overflow-y-auto lg:pr-1"}`} style={{ minHeight: mobile && authorsLoading ? authorSkeletonLayout?.height : undefined }}>
                 {authorsLoading && (mobile ? <div role="status" aria-busy="true" aria-label="작성자 목록 불러오는 중" className="contents">
@@ -355,8 +355,8 @@ export function DailyWorkReportScreen({
 
         {targetEmployeeId ? (
           <div key={mobile ? editorResetKey : tab === "all" ? targetEmployeeId : "mine"} data-testid="daily-work-report-result" role={initialContentLoading ? "status" : undefined} aria-busy={initialContentLoading || undefined} aria-label={initialContentLoading ? "일일 작업 일보 불러오는 중" : undefined} className={`min-w-0 ${mobile ? `flex flex-1 flex-col gap-3 ${mobileCompact ? "min-h-0" : ""}` : "space-y-3"} lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-3 lg:space-y-0 ${!mobile && tab === "all" && selectedEmployeeId ? "animate-view-fade" : ""}`}>
-              {reportLoadFailed && <Failure message="일보를 불러오지 못했습니다." onRetry={mobile ? () => void (tab === "mine" ? reportQuery.refetch() : selectedReportQuery.refetch()) : undefined} />}
-              {activityQuery.isError && <Failure message="MES 거래를 불러오지 못했습니다." onRetry={mobile ? () => void activityQuery.refetch() : undefined} />}
+              {reportLoadFailed && <Failure message="일보를 불러오지 못했습니다." onRetry={() => void (tab === "mine" ? reportQuery.refetch() : selectedReportQuery.refetch())} />}
+              {activityQuery.isError && <Failure message="MES 거래를 불러오지 못했습니다." onRetry={() => void activityQuery.refetch()} />}
               {(!activityQuery.isError || keepActivity) && <DailyWorkActivity activity={activityQuery.data} loading={activityQuery.isLoading} onDetailOpenChange={setIsActivityDetailOpen} mobile={mobile} />}
               <DailyWorkReportEditor
               loading={reportLoading}

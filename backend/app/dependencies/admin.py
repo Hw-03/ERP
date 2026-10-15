@@ -27,6 +27,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.routers._errors import ErrorCode, http_error
 from app.routers.settings import require_admin, require_admin_readonly
+from app.dependencies.employee_actor import require_current_employee_actor
+from app._actor import set_actor
 
 
 async def extract_admin_pin(
@@ -61,7 +63,10 @@ def require_admin_pin(
     """모든 admin 엔드포인트 시그니처에 추가:
         _admin: Annotated[None, Depends(require_admin_pin)]
     """
+    actor = require_current_employee_actor(request, db, required=False)
     if request.method in {"GET", "HEAD"}:
         require_admin_readonly(db, pin_value)
     else:
         require_admin(db, pin_value)
+    if actor is not None:
+        set_actor(request, actor)

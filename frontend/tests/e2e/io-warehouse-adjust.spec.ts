@@ -45,12 +45,28 @@ test.describe.serial("입출고 V2 — 창고 수량보정", () => {
     const warehouseIoCard = await visible(
       page.getByRole("button", { name: /창고 입출고/ }),
     );
-    const adjustBox = await adjustCard.boundingBox();
-    const warehouseIoBox = await warehouseIoCard.boundingBox();
-    expect(adjustBox).not.toBeNull();
-    expect(warehouseIoBox).not.toBeNull();
-    expect(adjustBox?.width).toBeCloseTo(warehouseIoBox?.width ?? 0, 0);
-    expect(adjustBox?.height).toBeCloseTo(warehouseIoBox?.height ?? 0, 0);
+    await expect(adjustCard).toBeVisible();
+    const cards = adjustCard.or(warehouseIoCard);
+    // 사이드바 전환 중 서로 다른 시점의 크기를 비교하지 않는다.
+    // 두 카드를 같은 프레임에 읽고 다음 프레임에서도 크기가 같은지 확인한다.
+    await expect.poll(async () => cards.evaluateAll(async (elements) => {
+      const measure = () => elements.map((element) => {
+        const box = element.getBoundingClientRect();
+        return { width: box.width, height: box.height };
+      });
+      const first = measure();
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      const second = measure();
+      return first.length === 2 && second.every((box, index) =>
+        box.width === first[index].width && box.height === first[index].height);
+    })).toBe(true);
+    const boxes = await cards.evaluateAll((elements) => elements.map((element) => {
+      const box = element.getBoundingClientRect();
+      return { width: box.width, height: box.height };
+    }));
+    expect(boxes).toHaveLength(2);
+    expect(boxes[0].width).toBeCloseTo(boxes[1].width, 0);
+    expect(boxes[0].height).toBeCloseTo(boxes[1].height, 0);
 
     await adjustCard.click();
     const inbound = await visible(page.getByRole("button", { name: "입고", exact: true }));

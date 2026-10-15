@@ -2665,13 +2665,30 @@ def test_live_database_backup_consumers_use_explicit_database_mode(relative_path
 
 
 def test_employee_sync_deploys_runtime_restore_verifier_and_uses_structural_backup() -> None:
+    """구조 백업을 마이그레이션 전 고정하고 DB·코드 공동복구로만 안내한다."""
     source = (ROOT / "scripts" / "dev" / "sync-to-employee.ps1").read_text(
         encoding="utf-8"
     )
 
     assert '"verify-runtime-tasks.ps1"' in source
     assert '@($backupTool, "--sqlite", $EmpDb, "--integrity-only")' in source
-    assert "--structural-rollback" in source
+    assert "--structural-rollback" not in source
+    assert "employee_release_recovery.py" in source
+    admission = source.index("$migrationBoundary = Invoke-CheckedExternalCommand")
+    migration = source.index("$migrateResult = Invoke-CheckedExternalCommand")
+    assert source.index('@($backupTool, "--sqlite", $EmpDb, "--integrity-only")') < admission < migration
+    boundary = source[admission:migration]
+    assert "'begin', '--record', $script:FrontendRollbackRecord, '--employee-root', $EmpRoot, '--backup', $backupPath" in boundary
+    assert "if (-not $migrationBoundary.Success -or -not $admissionHashMatch.Success -or -not $recoveryToolMatch.Success)" in boundary
+    assert "Restore-EmployeePreMigration" in boundary
+    assert "exit 5" in boundary
+    assert "$script:EmployeeRecoveryAdmissionSha256 = $admissionHashMatch.Groups['hash'].Value" in boundary
+    assert "$script:EmployeeRecoveryTool = $recoveryToolMatch.Groups['path'].Value.Trim()" in boundary
+    instructions = source[source.index("function Write-RecoveryInstructions"):source.index("function Get-SyncFileSha256")]
+    assert '$($script:EmployeeRecoveryTool)' in instructions
+    assert 'recover --record' in instructions
+    assert '--employee-root' in instructions
+    assert '--admission-sha256 $($script:EmployeeRecoveryAdmissionSha256)' in instructions
 
 
 def test_employee_data_sync_publishes_migrated_candidate_before_install() -> None:

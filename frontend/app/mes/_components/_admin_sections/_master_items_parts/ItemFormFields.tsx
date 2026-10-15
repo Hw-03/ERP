@@ -8,6 +8,7 @@ import { PROCESS_TYPE_OPTIONS, UNIT_OPTIONS } from "../adminShared";
 import { useDepartments } from "../../DepartmentsContext";
 import type { ProductModel } from "@/lib/api";
 import { modelSlotsToSymbolPrefix, sortModelsBySymbol } from "@/lib/mes/item-code";
+import type { ItemCodePreview } from "../../_admin_hooks/useItemCodePreview";
 
 export type ItemFormData = {
   item_name: string;
@@ -39,6 +40,7 @@ interface Props {
   showMesCode?: boolean;
   enableAfSalesReviewDefault?: boolean;
   productModels?: ProductModel[];
+  codePreview?: ItemCodePreview;
 }
 
 function FieldLabel({ label, badge }: { label: string; badge?: "필수" | "선택" }) {
@@ -106,9 +108,11 @@ function previewFullCode(form: ItemFormData, models: ProductModel[]): string {
 function MesCodeSection({
   form,
   models,
+  preview,
 }: {
   form: ItemFormData;
   models: ProductModel[];
+  preview?: ItemCodePreview;
 }) {
   return (
     <div>
@@ -122,16 +126,23 @@ function MesCodeSection({
         }}
         aria-readonly
       >
-        {previewFullCode(form, models)}
+        {preview ? (preview.code ?? (preview.status === "loading" ? "품목 코드 확인 중…" : "사용 제품과 카테고리를 선택하세요.")) : previewFullCode(form, models)}
       </div>
+      {preview?.status === "error" && (
+        <p role="alert" className="mt-1.5 text-xs" style={{ color: LEGACY_COLORS.red }}>
+          품목 코드를 확인하지 못했습니다.{" "}
+          <button type="button" onClick={preview.retry} className="underline">코드 다시 확인</button>
+        </p>
+      )}
       <p className="mt-1.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-        품목 코드는 사용제품·카테고리·옵션에서 자동 계산됩니다. 사용제품만 바꾸면 번호 유지(즉시 미리 보임), 카테고리를 바꾸면 새 카테고리의 다음 번호가 저장 시 부여됩니다.
+        {preview ? "표시된 품목 코드로 저장합니다. 다른 등록으로 번호가 바뀌면 새 미리보기를 확인하고 다시 저장하세요."
+          : "품목 코드는 사용제품·카테고리·옵션에서 자동 계산됩니다. 사용제품만 바꾸면 번호 유지(즉시 미리 보임), 카테고리를 바꾸면 새 카테고리의 다음 번호가 저장 시 부여됩니다."}
       </p>
     </div>
   );
 }
 
-export function ItemFormFields({ form, setForm, showInitialQuantity, showInitialLocations, showMesCode, enableAfSalesReviewDefault, productModels = [] }: Props) {
+export function ItemFormFields({ form, setForm, showInitialQuantity, showInitialLocations, showMesCode, enableAfSalesReviewDefault, productModels = [], codePreview }: Props) {
   const departments = useDepartments();
   const bomStockExempt = Boolean(form.bom_stock_exempt);
   const deptOptions = departments.map((d) => ({ value: d.name, label: d.name }));
@@ -330,7 +341,7 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
       </div>
 
       {showMesCode && (
-        <MesCodeSection form={form} models={productModels} />
+        <MesCodeSection form={form} models={productModels} preview={codePreview} />
       )}
 
       <label

@@ -460,6 +460,7 @@ def cancel_request(
                 linked.cancelled_at = now
                 for line in linked.lines:
                     line.status = StockRequestStatusEnum.CANCELLED
+                notification_svc.remove_cancelled_request_approval_notifications(db, linked.request_id)
             batch.status = "cancelled"
             batch.completed_at = None
             batch.updated_at = now
@@ -472,6 +473,7 @@ def cancel_request(
             pin=pin,
             http_request=http_request,
         )
+        notification_svc.remove_cancelled_request_approval_notifications(db, request.request_id)
     return request
 
 

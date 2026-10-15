@@ -154,7 +154,7 @@ export function useNotificationController({ operator, onNavigate, loginDialogEna
   return {
     visibilityRef, open: open && !!employeeId, openDialog, unread,
     dialogProps: {
-      items: selectedQuery.data?.items ?? [], unread, filter, onFilterChange: setFilter,
+      items: selectedQuery.data?.items ?? [], unread, unreadKnown: countData !== undefined, filter, onFilterChange: setFilter,
       onClose: () => setOpen(false), onMarkAll: handleMarkAll, onItemClick: handleItemClick,
       onDeleteItem: handleDeleteItem, onDeleteRead: handleDeleteRead,
       loginPopupEnabled: operator?.loginPopupEnabled ?? false, loginPopupUpdating,

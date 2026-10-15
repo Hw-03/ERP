@@ -88,23 +88,7 @@ function normalizeSplit(
   part: "normal_qty" | "defective_qty" | "scrap_qty",
   raw: number,
 ): ChildDecision {
-  const next = { ...node };
-  const value = clamp(raw, 0, node.qty);
-
-  if (part === "normal_qty") {
-    const scrapQty = clamp(next.scrap_qty, 0, node.qty - value);
-    next.normal_qty = value;
-    next.scrap_qty = scrapQty;
-    next.defective_qty = node.qty - value - scrapQty;
-  } else {
-    next[part] = value;
-    const defectiveQty = clamp(next.defective_qty, 0, node.qty);
-    const scrapQty = clamp(next.scrap_qty, 0, Math.max(0, node.qty - defectiveQty));
-    next.defective_qty = defectiveQty;
-    next.scrap_qty = scrapQty;
-    next.normal_qty = node.qty - defectiveQty - scrapQty;
-  }
-
+  const next = { ...node, [part]: raw };
   next.keep_qty = next.normal_qty;
   return { ...next, manuallySet: true };
 }
@@ -268,8 +252,7 @@ function TreeNode({
   const hasChildren = expanded && (node.children?.length ?? 0) > 0;
   const nodeMode = node.nodeMode ?? "whole";
   const isDecomposed = hasChildren && nodeMode === "split";
-  const total = node.normal_qty + node.defective_qty + node.scrap_qty;
-  const invalid = !isDecomposed && total !== node.qty;
+  const invalid = !isDecomposed && !isValidNode(node);
   const nodeDept = deptFromCode(node.mes_code);
 
   async function handleExpand() {

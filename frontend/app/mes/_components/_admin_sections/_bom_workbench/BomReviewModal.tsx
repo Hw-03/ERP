@@ -25,11 +25,12 @@ interface Props {
   items: Item[];
   isCompleted: boolean;
   onClose: () => void;
-  onConfirm: (completed: boolean) => Promise<void>;
+  onConfirm: (completed: boolean) => Promise<string | null>;
 }
 
 export function BomReviewModal({ parent, rows, items, isCompleted, onClose, onConfirm }: Props) {
   const [busy, setBusy] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const itemMap = useMemo(() => new Map(items.map((i) => [i.item_id, i])), [items]);
 
   const badQty = rows.filter((r) => !(Number(r.quantity) > 0));
@@ -46,9 +47,11 @@ export function BomReviewModal({ parent, rows, items, isCompleted, onClose, onCo
     // 완료로 표시하는 방향은 검증 통과 + row≥1 일 때만. 완료 해제는 항상 허용.
     if (!isCompleted && !canComplete) return;
     setBusy(true);
+    setErrorMessage(null);
     try {
-      await onConfirm(!isCompleted);
-      onClose();
+      const error = await onConfirm(!isCompleted);
+      if (error) setErrorMessage(error);
+      else onClose();
     } finally {
       setBusy(false);
     }
@@ -64,6 +67,7 @@ export function BomReviewModal({ parent, rows, items, isCompleted, onClose, onCo
       busy={busy}
       confirmLabel={isCompleted ? "완료 해제" : "완료로 표시"}
       busyLabel="처리 중…"
+      confirmDisabled={!isCompleted && !canComplete}
       confirmAccent={
         isCompleted
           ? LEGACY_COLORS.muted2
@@ -73,6 +77,7 @@ export function BomReviewModal({ parent, rows, items, isCompleted, onClose, onCo
       }
     >
       <div className="flex flex-col gap-3">
+        {errorMessage && <p role="alert" className="whitespace-pre-line text-sm" style={{ color: LEGACY_COLORS.red }}>{errorMessage}</p>}
         {/* 부모 헤더 */}
         <div
           className="flex items-center gap-3 rounded-[12px] border px-3 py-2"

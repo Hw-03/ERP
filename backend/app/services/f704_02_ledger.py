@@ -18,6 +18,7 @@ from typing import Iterable
 from xml.etree import ElementTree as ET
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -268,13 +269,17 @@ def _line_map(db: Session, batch_ids: set[object]) -> dict[tuple[object, object]
 def collect_entries(db: Session, year: int) -> list[F704LedgerEntry]:
     """선택한 KST 연도에 실제 창고가 변한 거래만 F704 행으로 변환한다."""
     start, end = _year_range_utc_naive(year)
+    # 명시적인 역거래가 있으면 두 실제 창고 증감을 각 발생 기간에 보존한다.
+    reversed_log_ids = db.query(TransactionLog.reverses_log_id).filter(
+        TransactionLog.reverses_log_id.is_not(None), TransactionLog.archived_at.is_(None)
+    )
     logs_and_items = (
         db.query(TransactionLog, Item)
         .join(Item, Item.item_id == TransactionLog.item_id)
         .filter(
             TransactionLog.created_at >= start,
             TransactionLog.created_at < end,
-            TransactionLog.cancelled.is_(False),
+            or_(TransactionLog.cancelled.is_(False), TransactionLog.log_id.in_(reversed_log_ids)),
             TransactionLog.archived_at.is_(None),
         )
         .order_by(TransactionLog.created_at.asc(), TransactionLog.log_id.asc())

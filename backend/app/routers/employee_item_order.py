@@ -8,10 +8,11 @@ DELETE /api/items/my-order?employee_id=<str> → {"ok": true}
 import uuid
 from typing import List
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.employee_actor import require_current_employee_actor
 from app.models import Employee, EmployeeItemOrder, Item
 from app.routers._errors import ErrorCode, http_error
 from app.schemas.item import MyItemOrderEntry, MyItemOrderPut
@@ -43,22 +44,23 @@ def get_my_order(
 
 
 @router.put("/my-order")
-def put_my_order(payload: MyItemOrderPut, db: Session = Depends(get_db)):
+def put_my_order(payload: MyItemOrderPut, request: Request, db: Session = Depends(get_db)):
     """직원의 품목 표시 순서 전체 교체.
 
     기존 행 전부 삭제 후 bulk insert (upsert 효과).
-    존재하지 않는 item_id는 조용히 skip.
+    존재하지 않거나 삭제된 item_id는 조용히 skip.
     """
     employee_id = payload.employee_id
     _get_employee_or_404(db, employee_id)
+    _require_order_owner(request, db, employee_id)
 
-    # 존재하는 item_id만 허용 (FK 위반 방지 + silent skip)
+    # 활성 item_id만 허용 (FK 위반 방지 + silent skip)
     requested_ids = [str(e.item_id).replace("-", "") for e in payload.items]
     valid_ids = set()
     if requested_ids:
         existing = (
             db.query(Item.item_id)
-            .filter(Item.item_id.in_(requested_ids))
+            .filter(Item.item_id.in_(requested_ids), Item.deleted_at.is_(None))
             .all()
         )
         # UUIDString TypeDecorator는 UUID 객체를 반환 — hex로 정규화
@@ -86,13 +88,22 @@ def put_my_order(payload: MyItemOrderPut, db: Session = Depends(get_db)):
 
 @router.delete("/my-order")
 def delete_my_order(
+    request: Request,
     employee_id: uuid.UUID = Query(..., description="직원 ID"),
     db: Session = Depends(get_db),
 ):
     """직원의 품목 표시 순서 전체 삭제."""
     _get_employee_or_404(db, employee_id)
+    _require_order_owner(request, db, employee_id)
     db.query(EmployeeItemOrder).filter(
         EmployeeItemOrder.employee_id == employee_id
     ).delete(synchronize_session=False)
     db.commit()
     return {"ok": True}
+
+
+def _require_order_owner(request: Request, db: Session, employee_id: uuid.UUID) -> None:
+    """Personal order writes must match the active actor claimed by this tab."""
+    actor = require_current_employee_actor(request, db)
+    if actor.employee_id != employee_id:
+        raise http_error(403, ErrorCode.FORBIDDEN, "본인의 품목 순서만 변경할 수 있습니다.")

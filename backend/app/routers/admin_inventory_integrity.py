@@ -25,4 +25,4 @@ def get_inventory_integrity(
     db: Annotated[Session, Depends(get_db)],
 ) -> InventoryIntegrityResponse:
     """재고·불량·취소·주간 분류 불변식을 변경 없이 검사한다."""
-    return diagnose_inventory_integrity(db)
+    return diagnose_inventory_integrity(db, sample_limit=None)

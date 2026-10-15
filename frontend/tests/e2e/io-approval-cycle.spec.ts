@@ -15,7 +15,7 @@ test.describe("결재 풀사이클 — 창고 승인", () => {
     // ── context A: 일반직원 E01 이 창고→부서 결재 요청 제출(큐 적재) ──
     const ctxA = await browser.newContext();
     const a = await ctxA.newPage();
-    await loginAsOperator(a, { code: "E01" });
+    const submitter = await loginAsOperator(a, { code: "E01" });
     await gotoWarehouseCompose(a);
     await pickWorkType(a, /창고 입출고/);
     await a.getByRole("button", { name: /창고 → 부서/ }).first().click();
@@ -38,9 +38,9 @@ test.describe("결재 풀사이클 — 창고 승인", () => {
     await b.goto("/mes?tab=warehouse");
     await b.getByRole("tab", { name: /창고 승인함/ }).click();
 
-    // 대기 요청(창고 → 부서 · 김민재) 등장
+    // 대기 요청에 실제 API에서 읽은 제출자 표시 이름이 나타난다.
     await expect(b.getByText("창고 → 부서")).toBeVisible();
-    await expect(b.getByText(/김민재/)).toBeVisible();
+    await expect(b.getByText(submitter.name)).toBeVisible();
 
     // 승인 → PIN 0000 → 승인 확정
     await b.getByRole("button", { name: "승인", exact: true }).click();

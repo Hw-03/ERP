@@ -39,6 +39,24 @@ const defaults: Args = {
 };
 
 describe("useIoPreselect", () => {
+  it("출하 부족수량은 최초 진입 때만 적용하고 재렌더로 사용자의 변경을 덮지 않는다", () => {
+    const addItem = vi.fn();
+    const item = makeItem();
+    const { rerender } = renderHook(({ quantity }) => useIoPreselect({
+      ...defaults, preselectedItem: item, forceManual: true, quantity, addItem,
+    }), { initialProps: { quantity: 7 } });
+    expect(addItem).toHaveBeenCalledWith(item, "manual", 7);
+    rerender({ quantity: 9 });
+    expect(addItem).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([undefined, 0, -2, Number.NaN, Number.POSITIVE_INFINITY, 1.5])("유효하지 않은 진입 수량 %s는 기본 수량 계약을 유지한다", (quantity) => {
+    const addItem = vi.fn();
+    const item = makeItem();
+    renderHook(() => useIoPreselect({ ...defaults, preselectedItem: item, forceManual: true, quantity, addItem }));
+    expect(addItem).toHaveBeenCalledWith(item, "manual");
+  });
+
   it("낱개 강제 진입이면 BOM 부모도 manual로 담는다", () => {
     const addItem = vi.fn();
     const setHighlightItemId = vi.fn();

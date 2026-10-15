@@ -23,6 +23,23 @@ const employee = (over: Partial<any> = {}): any => ({
 });
 
 describe("useAdminEmployeesForm", () => {
+  it("PIN 메타데이터만 갱신할 때 선택 상세는 갱신하고 미저장 이름·권한은 보존한다", () => {
+    const original = employee({ pin_is_default: false });
+    const refreshed = employee({ pin_is_default: true, pin_last_changed: "2026-10-07T01:00:00Z" });
+    const { result, rerender } = renderHook(
+      ({ employees }) => useAdminEmployeesForm(employees),
+      { initialProps: { employees: [original] } },
+    );
+    act(() => result.current.setSelectedEmployee(original));
+    act(() => result.current.setEditForm((form) => ({ ...form, name: "미저장 이름", warehouse_role: "primary" })));
+    rerender({ employees: [refreshed] });
+    expect(result.current.selectedEmployee).toBe(refreshed);
+    expect(result.current.selectedEmployee?.pin_is_default).toBe(true);
+    expect(result.current.editForm.name).toBe("미저장 이름");
+    expect(result.current.editForm.warehouse_role).toBe("primary");
+    expect(result.current.dirty).toBe(true);
+  });
+
   it("직원 재조회 결과에서 삭제 모델을 제거하고 남은 담당 모델 순서로 선택 폼을 갱신한다", async () => {
     const original = employee({ assigned_model_slots: [3, 7, 1] });
     const refreshed = employee({ assigned_model_slots: [3, 1] });

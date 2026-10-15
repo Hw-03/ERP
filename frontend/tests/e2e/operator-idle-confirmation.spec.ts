@@ -6,7 +6,7 @@ async function login(page: Page): Promise<string> {
   const employees = await (await page.request.get("/api/employees?active_only=true")).json();
   const employee = employees.find((candidate: { employee_code: string }) => candidate.employee_code === "E01") ?? employees[0];
   await page.goto("/mes?tab=dashboard");
-  await page.getByRole("combobox", { name: "직원 선택" }).fill(employee.name);
+  await page.getByRole("combobox", { name: "직원 선택" }).fill(employee.employee_code);
   await page.getByRole("option").filter({ hasText: employee.name }).first().click();
   await page.getByPlaceholder("숫자 4자리").fill("0000");
   await page.getByRole("button", { name: "로그인", exact: true }).click();

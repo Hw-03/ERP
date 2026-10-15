@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "kind": "mes-reviewed-reuse-completion",
+  "status": "STRICT_COMPLETE_WITH_REVIEWED_REUSE",
+  "completedAt": "2026-10-14T01:06:38.537Z",
+  "head": "8754c1cf2073560156bf1f7a42770234a69729e2",
+  "branch": "codex/mes-expectation-closure",
+  "review": {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/review.json",
+    "sha256": "072b01dc77907ae53c722ad93708c73f34a0603c0680ffac54a9f1d2920055b7"
+  },
+  "strict": {
+    "argv": [
+      "C:\\ERP\\_attic\\runtime\\tools\\node-v20.20.2-win-x64\\node.exe",
+      "scripts/dev/normalize-mes-expectations.mjs",
+      "--check",
+      "--require-complete"
+    ],
+    "nativeExit": 0,
+    "result": {
+      "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/strict-completion.txt",
+      "sha256": "783293f25ef06115ef33e9ccabae77270f2f246387862c1752a40439a81c7bc1"
+    }
+  },
+  "toolCompatibility": {
+    "nativeExit": 0,
+    "testCount": 71,
+    "result": {
+      "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/tool-compatibility.xml",
+      "sha256": "704951f6f9445e96c281eca5359e6b48865ba3171fe537f5a116c71afe067e14"
+    }
+  },
+  "preservationAudit": {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/preservation-audit.json",
+    "sha256": "024d9c962202da7b2f1c3cfd04b8de2453a50e48aa912cc05e13fcc862c16566"
+  },
+  "counts": {
+    "restored": 615,
+    "preserved": 443,
+    "eligibleConditions": 1058,
+    "verifiedReuse": 1058,
+    "reusedLocalChecks": 7,
+    "newBusinessRuns": 0
+  },
+  "workspaceChanges": [
+    ".github/workflows/ci.yml",
+    "_attic/handoff/active/2026-10-10-mes-deferred-verification-todo.md",
+    "docs/superpowers/specs/2026-10-07-mes-expectations.assertions.json",
+    "docs/superpowers/specs/2026-10-07-mes-expectations.json",
+    "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/before/appearance-sync.spec.ts.txt",
+    "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/before/io-request-order-stock.spec.ts.txt",
+    "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/before/normalize-mes-expectations.mjs.txt",
+    "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/local-seven-last-run.json",
+    "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/local-seven.log",
+    "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/node-6cec52101c-reuse.json",
+    "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/node-a86a95cbd0-reuse.json",
+    "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/node-ff9f8c06ce-reuse.json",
+    "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/playwright-411a1b28c5-reuse.json",
+    "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/playwright-8338f033f9-reuse.json",
+    "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/playwright-a39d40068b-reuse.json",
+    "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/preservation-audit.json",
+    "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/pytest-0929f3cdc2-reuse.json",
+    "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/pytest-6eb3066497-reuse.json",
+    "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/review.json",
+    "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/strict-completion.txt",
+    "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/tool-compatibility.xml",
+    "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/vitest-d4c81f0c18-reuse.json",
+    "docs/superpowers/specs/2026-10-14-mes-reviewed-reuse-results.md",
+    "scripts/dev/mes-expectation-reviewed-reuse.mjs",
+    "scripts/dev/mes-expectation-reviewed-reuse.test.mjs",
+    "scripts/dev/normalize-mes-expectations.mjs"
+  ],
+  "notPerformed": [
+    "commit",
+    "push",
+    "main integration",
+    "employee deployment",
+    "full business tests",
+    "build",
+    "performance",
+    "recovery"
+  ]
+}

@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from app.models import (
     DepartmentEnum,
+    DefectQuarantineRecord,
     Employee,
     Inventory,
     InventoryLocation,
@@ -58,15 +59,6 @@ def _stock_request(client, *, requester: Employee, request_type: str, lines: lis
 def _approve_warehouse(client, request_id: str, approver: Employee, pin: str = "0000"):
     res = client.post(
         f"/api/stock-requests/{request_id}/approve",
-        json={"actor_employee_id": str(approver.employee_id), "pin": pin},
-    )
-    assert res.status_code == 200, res.text
-    return res.json()
-
-
-def _approve_department(client, request_id: str, approver: Employee, pin: str = "0000"):
-    res = client.post(
-        f"/api/stock-requests/{request_id}/department-approve",
         json={"actor_employee_id": str(approver.employee_id), "pin": pin},
     )
     assert res.status_code == 200, res.text
@@ -134,7 +126,7 @@ def test_inventory_day_flow_preserves_quantities_and_audit_trail(db_session, cli
         warehouse_role="primary",
     )
     worker = _make_employee(db_session, code="OPWK1", name="assembly worker")
-    dept_approver = _make_employee(
+    _make_employee(
         db_session,
         code="OPDP1",
         name="department approver",
@@ -240,24 +232,48 @@ def test_inventory_day_flow_preserves_quantities_and_audit_trail(db_session, cli
     _assert_auditable(mark_log, worker, require_reference=False)
     assert mark_log.reason_category == "기능 불량"
 
+    warehouse_quarantine = client.post("/api/defects/quarantine", json={
+        "item_id": str(item.item_id),
+        "qty": "2",
+        "source": "warehouse",
+        "target_dept": DepartmentEnum.WAREHOUSE.value,
+        "reason_category": "기능 불량",
+        "reason_memo": "day flow warehouse return origin",
+        "actor_employee_id": str(worker.employee_id),
+    })
+    assert warehouse_quarantine.status_code == 200, warehouse_quarantine.text
+    db_session.expire_all()
+    warehouse_origin_log = _latest_log(db_session, item.item_id, TransactionTypeEnum.MARK_DEFECTIVE)
+    _assert_auditable(warehouse_origin_log, worker, require_reference=False)
+    warehouse_record = db_session.get(DefectQuarantineRecord, warehouse_origin_log.defect_quarantine_record_id)
+    assert warehouse_record.department == DepartmentEnum.WAREHOUSE.value
+    assert warehouse_record.original_quantity == D("2")
+    assert warehouse_record.remaining_quantity == D("2")
+    assert _inv(db_session, item.item_id).warehouse_qty == D("68")
+    assert _inv(db_session, item.item_id).quantity == D("100")
+    assert _loc_qty(db_session, item.item_id, department=DepartmentEnum.WAREHOUSE,
+                    status=LocationStatusEnum.DEFECTIVE) == D("2")
+    assert _loc_qty(db_session, item.item_id, department=DepartmentEnum.HIGH_VOLTAGE,
+                    status=LocationStatusEnum.DEFECTIVE) == D("5")
+    assert _loc_qty(db_session, item.item_id, department=DepartmentEnum.HIGH_VOLTAGE) == D("13")
+    assert _loc_qty(db_session, item.item_id, department=DepartmentEnum.ASSEMBLY) == D("12")
+
     defect_return = _stock_request(
         client,
         requester=worker,
         request_type="defect_return",
         reason_category="기능 불량",
         supplier_id=str(supplier.supplier_id),
-        requires_department_approval=True,
         lines=[{
             "item_id": str(item.item_id),
             "quantity": "2",
             "from_bucket": "defective",
-            "from_department": DepartmentEnum.HIGH_VOLTAGE.value,
+            "from_department": DepartmentEnum.WAREHOUSE.value,
+            "record_id": str(warehouse_record.record_id),
             "to_bucket": "none",
         }],
         notes="return defective sample",
     )
-    if defect_return["status"] != "completed":
-        defect_return = _approve_department(client, defect_return["request_id"], dept_approver)
     assert defect_return["status"] == "completed"
     db_session.expire_all()
     assert _loc_qty(
@@ -265,10 +281,17 @@ def test_inventory_day_flow_preserves_quantities_and_audit_trail(db_session, cli
         item.item_id,
         department=DepartmentEnum.HIGH_VOLTAGE,
         status=LocationStatusEnum.DEFECTIVE,
-    ) == D("3")
+    ) == D("5")
+    assert _loc_qty(db_session, item.item_id, department=DepartmentEnum.WAREHOUSE,
+                    status=LocationStatusEnum.DEFECTIVE) == D("0")
+    assert warehouse_record.remaining_quantity == D("0")
+    assert _inv(db_session, item.item_id).warehouse_qty == D("68")
     assert _inv(db_session, item.item_id).quantity == D("98")
     return_log = _latest_log(db_session, item.item_id, TransactionTypeEnum.SUPPLIER_RETURN)
     _assert_auditable(return_log)
+    assert return_log.department == DepartmentEnum.WAREHOUSE
+    assert return_log.defect_quarantine_record_id == warehouse_record.record_id
+    assert return_log.supplier_id == supplier.supplier_id
 
     cancel = client.post(
         f"/api/inventory/transactions/{return_log.log_id}/cancel",
@@ -282,6 +305,10 @@ def test_inventory_day_flow_preserves_quantities_and_audit_trail(db_session, cli
         department=DepartmentEnum.HIGH_VOLTAGE,
         status=LocationStatusEnum.DEFECTIVE,
     ) == D("5")
+    assert _loc_qty(db_session, item.item_id, department=DepartmentEnum.WAREHOUSE,
+                    status=LocationStatusEnum.DEFECTIVE) == D("2")
+    assert warehouse_record.remaining_quantity == D("2")
+    assert _inv(db_session, item.item_id).warehouse_qty == D("68")
     assert _inv(db_session, item.item_id).quantity == D("100")
     cancelled_return = db_session.query(TransactionLog).filter(TransactionLog.log_id == return_log.log_id).one()
     assert cancelled_return.cancelled is True

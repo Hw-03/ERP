@@ -19,7 +19,7 @@ import {
  *
  * 인라인 수량 편집:
  *   - 수량 칸 클릭 → input 노출 + 자동 select
- *   - Enter / blur 저장 (parseFloat > 0 검증)
+ *   - Enter / blur로 전체 구성 초안에 반영 (수량 오류는 부모에서 한 번에 표시)
  *   - Esc 취소
  *
  * 삭제는 부모에서 ConfirmModal 띄우도록 onRequestDelete 콜백.
@@ -28,11 +28,12 @@ interface Props {
   row: BOMEntry;
   childItem: Item | undefined;
   onSaveQty: (bomId: string, qty: number) => void | Promise<void>;
+  onBeginEdit?: () => void;
   onRequestDelete: (row: BOMEntry, childName: string) => void;
   isLocked?: boolean;
 }
 
-export function BomRow({ row, childItem, onSaveQty, onRequestDelete, isLocked = false }: Props) {
+export function BomRow({ row, childItem, onSaveQty, onBeginEdit, onRequestDelete, isLocked = false }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(row.quantity));
   const inputRef = useRef<HTMLInputElement>(null);
@@ -58,7 +59,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete, isLocked = 
     }
     setEditing(false);
     const next = parseFloat(draft);
-    if (!Number.isFinite(next) || next <= 0) {
+    if (!Number.isFinite(next)) {
       setDraft(String(row.quantity));
       return;
     }
@@ -143,7 +144,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete, isLocked = 
             type="button"
             disabled={isLocked}
             onClick={() => {
-              if (!isLocked) setEditing(true);
+              if (!isLocked) { onBeginEdit?.(); setEditing(true); }
             }}
             {...actionTooltipProps}
             className="standard-hover h-[30px] rounded-md border px-3 py-1 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"

@@ -45,6 +45,48 @@ beforeEach(() => { realtimeState.revision = null; getPage.mockReset().mockResolv
 afterEach(() => { clients.splice(0).forEach((client) => client.clear()); });
 
 describe("InventoryRecentHistoryPanel", () => {
+  it.each([false, true])("통합 조회에서도 실제 위치 전후와 취소된 원거래 수량을 보존한다 mobile=%s", async (mobile) => {
+    getPage.mockResolvedValue(makePage([
+      makeLog({ cancelled: true }),
+      makeLog({ log_id: "location", transaction_type: "TRANSFER_DEPT", warehouse_qty_before: 27, warehouse_qty_after: 27,
+        department_qty_before: 14, department_qty_after: 19,
+        inventory_effect: [{ scope: "location", department: "조립", status: "PRODUCTION", delta: 5, quantity_before: 4, quantity_after: 9 }],
+      }),
+    ]));
+    renderPanel(makeItem(), mobile);
+    expect(await screen.findByText("취소된 작업")).toBeVisible();
+    expect(screen.getByLabelText("창고 15 +12→27")).toBeInTheDocument();
+    expect(screen.getByLabelText("조립 4 +5→9")).toBeInTheDocument();
+    expect(screen.queryByLabelText("조립 14 +5→19")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("통합 페이지의 원장 미연결 기록도 중복 없이 실제 합계 표시로 남긴다", async () => {
+    const legacy = makeLog({ log_id: "legacy", operation_id: null, transaction_type: "BACKFLUSH", quantity_change: -60,
+      warehouse_qty_before: 40, warehouse_qty_after: 40, department_qty_before: 60, department_qty_after: 0 });
+    getPage.mockResolvedValue(makePage([makeLog(), legacy, legacy]));
+    renderPanel();
+    expect(await screen.findByLabelText("부서 합계 60 −60→0")).toBeInTheDocument();
+    expect(screen.queryByLabelText("조립 60 −60→0")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("이력 표와 같은 메뉴명으로 이동·불량·출하·취소·분해를 표시한다", async () => {
+    getPage.mockResolvedValue(makePage([
+      makeLog({ log_id: "transfer", transaction_type: "TRANSFER_TO_PROD" }),
+      makeLog({ log_id: "defect", transaction_type: "MARK_DEFECTIVE" }),
+      makeLog({ log_id: "ship", transaction_type: "SHIP" }),
+      makeLog({ log_id: "cancel", transaction_type: "TRANSFER_TO_WH", operation_kind: "CANCELLATION" }),
+      makeLog({ log_id: "disassemble", transaction_type: "PRODUCE", history_batch: { work_type: "process", sub_type: "disassemble", to_department: "조립" } }),
+    ]));
+    renderPanel();
+    expect(await screen.findByText("창고 입출고")).toBeInTheDocument();
+    expect(screen.getByText("불량")).toBeInTheDocument();
+    expect(screen.getByText("출하")).toBeInTheDocument();
+    expect(screen.getByText("창고 입출고 취소")).toBeInTheDocument();
+    expect(screen.getByText("분해 출고")).toBeInTheDocument();
+  });
+
   it.each([false, true])("다품목 묶음의 최근 목록은 현재 품목만 표시하고 상세는 전체 작업을 유지한다 mobile=%s", async (mobile) => {
     const quantities = { normal: 7, defect: 0, b_grade: 0, obsolete: 0 };
     const observations = ["item-1", "item-2"].map((itemId, index) => ({

@@ -330,6 +330,251 @@ def _compiled_default(column: sa.Column, connection: Connection) -> str | None:
     return _compiled_sql(column.server_default.arg, connection)
 
 
+_PG_LITERAL_DEFAULT = re.compile(
+    r"'(?P<value>(?:''|[^'])*)'::(?P<cast>[a-z_][a-z_ ]*)",
+    flags=re.IGNORECASE,
+)
+_PG_NEXTVAL_DEFAULT = re.compile(
+    r"nextval\('(?P<sequence>[a-z_][a-z_0-9]*(?:\.[a-z_][a-z_0-9]*)?)'::regclass\)",
+    flags=re.IGNORECASE,
+)
+_PG_SQL_TOKEN = re.compile(
+    r"\s+|'(?:''|[^'])*'|\"(?:\"\"|[^\"])*\"|::|>=|<=|<>|!=|\|\||"
+    r"[a-z_][a-z_0-9]*|\d+(?:\.\d+)?|[()\[\],=<>+*/-]",
+    flags=re.IGNORECASE,
+)
+_PG_MES_CODE_EXPECTED = (
+    "model_symbol||'-'||process_type_code||'-'||case "
+    "when serial_no<10 then '000'||cast(serial_no as varchar)"
+    "when serial_no<100 then '00'||cast(serial_no as varchar)"
+    "when serial_no<1000 then '0'||cast(serial_no as varchar)"
+    "else cast(serial_no as varchar)end"
+)
+_PG_MES_CODE_REFLECTED = (
+    "((((model_symbol)::text||'-'::text)||(process_type_code)::text)||'-'::text)||"
+    "(case when(serial_no<10)then(('000'::text||((serial_no)::character varying)::text))"
+    "::character varying when(serial_no<100)then(('00'::text||((serial_no)::character varying)"
+    "::text))::character varying when(serial_no<1000)then(('0'::text||((serial_no)"
+    "::character varying)::text))::character varying else(serial_no)::character varying end)::text"
+)
+
+
+def _postgres_serial_default_matches(
+    connection: Connection,
+    table_name: str,
+    column: sa.Column,
+    actual_default: str,
+) -> bool:
+    """Accept only the owned implicit sequence for a sole integer primary key."""
+    if (
+        not column.primary_key
+        or len(column.table.primary_key.columns) != 1
+        or not isinstance(column.type, sa.Integer)
+        or column.autoincrement not in (True, "auto")
+    ):
+        return False
+    match = _PG_NEXTVAL_DEFAULT.fullmatch(actual_default.strip())
+    if match is None:
+        return False
+    return bool(
+        connection.scalar(
+            sa.text(
+                "SELECT to_regclass(:actual_sequence) IS NOT NULL "
+                "AND to_regclass(:actual_sequence) = "
+                "to_regclass(format('%I.%I', current_schema(), :expected_sequence)) "
+                "AND to_regclass(pg_get_serial_sequence("
+                "format('%I.%I', current_schema(), :table_name), :column_name)) = "
+                "to_regclass(format('%I.%I', current_schema(), :expected_sequence))"
+            ),
+            {
+                "actual_sequence": match.group("sequence"),
+                "expected_sequence": f"{table_name}_{column.name}_seq",
+                "table_name": table_name,
+                "column_name": column.name,
+            },
+        )
+    )
+
+
+def _postgres_default_matches(
+    connection: Connection,
+    table_name: str,
+    column: sa.Column,
+    actual_column: dict[str, object],
+) -> bool:
+    """Compare PostgreSQL defaults using the column type and literal value."""
+    expected = column.server_default
+    if isinstance(expected, sa.Computed):
+        expected = None
+    raw_actual = actual_column.get("default")
+    if expected is None:
+        return raw_actual is None or (
+            isinstance(raw_actual, str)
+            and _postgres_serial_default_matches(connection, table_name, column, raw_actual)
+        )
+    if not isinstance(raw_actual, str):
+        return False
+    raw_expected = str(expected.arg)
+    actual = raw_actual.strip()
+    if isinstance(column.type, sa.Boolean):
+        boolean_value = {"0": "false", "1": "true", "false": "false", "true": "true"}.get(
+            raw_expected.lower()
+        )
+        return boolean_value is not None and actual.lower() == boolean_value
+    literal = _PG_LITERAL_DEFAULT.fullmatch(actual)
+    if isinstance(column.type, sa.Enum):
+        reflected_type = actual_column.get("type")
+        return bool(
+            literal
+            and isinstance(reflected_type, sa.Enum)
+            and literal.group("cast").lower() == column.type.name
+            and reflected_type.name == column.type.name
+            and literal.group("value").replace("''", "'") == raw_expected
+        )
+    if isinstance(column.type, (sa.String, sa.Text)):
+        reflected_type = actual_column.get("type")
+        expected_cast = "text" if isinstance(column.type, sa.Text) else "character varying"
+        return bool(
+            literal
+            and isinstance(reflected_type, type(column.type))
+            and literal.group("cast").lower() == expected_cast
+            and literal.group("value").replace("''", "'") == raw_expected
+        )
+    if "'" in raw_expected or "'" in actual or "::" in raw_expected or "::" in actual:
+        return False
+    if "[" in raw_expected or "]" in raw_expected or "[" in actual or "]" in actual:
+        return False
+    return _normalize_sql(raw_expected) == _normalize_sql(actual)
+
+
+def _postgres_sql_tokens(value: object) -> tuple[str, ...] | None:
+    """Tokenize SQL without changing quoted values or removing array brackets."""
+    source = str(value)
+    tokens: list[str] = []
+    offset = 0
+    while offset < len(source):
+        match = _PG_SQL_TOKEN.match(source, offset)
+        if match is None:
+            return None
+        token = match.group()
+        if not token.isspace():
+            tokens.append(token if token.startswith(("'", '"')) else token.lower())
+        offset = match.end()
+    return tuple(tokens)
+
+
+def _postgres_outer_parens(tokens: tuple[str, ...]) -> tuple[str, ...]:
+    """Drop only parentheses enclosing the entire expression."""
+    while len(tokens) >= 2 and tokens[0] == "(" and tokens[-1] == ")":
+        depth = 0
+        for index, token in enumerate(tokens):
+            depth += (token == "(") - (token == ")")
+            if depth == 0 and index < len(tokens) - 1:
+                return tokens
+        if depth != 0:
+            return tokens
+        tokens = tokens[1:-1]
+    return tokens
+
+
+def _postgres_text_column(table: sa.Table, name: str) -> bool:
+    column = table.columns.get(name)
+    if column is None:
+        return False
+    column_type = column.type
+    return isinstance(column_type, sa.String) or (
+        isinstance(column_type, sa.TypeDecorator)
+        and isinstance(column_type.impl, sa.String)
+    )
+
+
+def _postgres_check_matches(table: sa.Table, expected: object, actual: object) -> bool:
+    """Recognize only the PostgreSQL rewrites seen for this metadata's CHECKs."""
+    expected_tokens = _postgres_sql_tokens(expected)
+    actual_tokens = _postgres_sql_tokens(actual)
+    if expected_tokens is None or actual_tokens is None:
+        return False
+    expected_tokens = _postgres_outer_parens(expected_tokens)
+    actual_tokens = _postgres_outer_parens(actual_tokens)
+    if expected_tokens == actual_tokens:
+        return True
+    if len(expected_tokens) >= 5 and expected_tokens[1:3] == ("in", "("):
+        column_name = expected_tokens[0]
+        if not _postgres_text_column(table, column_name) or expected_tokens[-1] != ")":
+            return False
+        values = expected_tokens[3:-1]
+        if not values or any(
+            token != "," if index % 2 else not token.startswith("'")
+            for index, token in enumerate(values)
+        ):
+            return False
+        flattened = tuple(token for token in actual_tokens if token not in ("(", ")"))
+        canonical = [column_name, "::", "text", "=", "any", "array", "["]
+        restored = canonical.copy()
+        for index, value in enumerate(values[::2]):
+            if index:
+                canonical.append(",")
+                restored.append(",")
+            canonical.extend((value, "::", "character", "varying"))
+            restored.extend((value, "::", "character", "varying", "::", "text"))
+        canonical.extend(("]", "::", "text", "[", "]"))
+        restored.append("]")
+        return flattened in (tuple(canonical), tuple(restored))
+    if len(expected_tokens) == 3 and expected_tokens[1] == "<>":
+        left, _, right = expected_tokens
+        return (
+            _postgres_text_column(table, left)
+            and _postgres_text_column(table, right)
+            and tuple(token for token in actual_tokens if token not in ("(", ")"))
+            == (left, "::", "text", "<>", right, "::", "text")
+        )
+    if table.name == "items" and expected_tokens == (
+        "standard_purchase_price", ">=", "0", "or",
+        "standard_purchase_price", "is", "null",
+    ):
+        return actual_tokens == (
+            "standard_purchase_price", ">=", "0", "::", "numeric", "or",
+            "standard_purchase_price", "is", "null",
+        ) and isinstance(table.c.standard_purchase_price.type.impl, sa.Numeric)
+    return False
+
+
+def _postgres_checks_match(table: sa.Table, constraints: list[dict[str, object]]) -> bool:
+    expected = {
+        str(constraint.name): constraint.sqltext
+        for constraint in table.constraints
+        if isinstance(constraint, sa.CheckConstraint)
+    }
+    actual = {str(constraint.get("name")): constraint.get("sqltext") for constraint in constraints}
+    return expected.keys() == actual.keys() and all(
+        _postgres_check_matches(table, expression, actual[name])
+        for name, expression in expected.items()
+    )
+
+
+def _postgres_computed_matches(
+    table_name: str,
+    column_name: str,
+    expected_sql: object,
+    actual_sql: object,
+) -> bool:
+    """Allow this stored item-code formula's exact PostgreSQL deparse only."""
+    expected_tokens = _postgres_sql_tokens(expected_sql)
+    actual_tokens = _postgres_sql_tokens(actual_sql)
+    if expected_tokens is None or actual_tokens is None:
+        return False
+    expected_tokens = _postgres_outer_parens(expected_tokens)
+    actual_tokens = _postgres_outer_parens(actual_tokens)
+    if expected_tokens == actual_tokens:
+        return True
+    return (
+        table_name == "items"
+        and column_name == "mes_code"
+        and expected_tokens == _postgres_sql_tokens(_PG_MES_CODE_EXPECTED)
+        and actual_tokens == _postgres_sql_tokens(_PG_MES_CODE_REFLECTED)
+    )
+
+
 def _sqlite_computed_sql(
     connection: Connection,
     table_name: str,
@@ -511,7 +756,12 @@ def schema_differences(connection: Connection) -> tuple[str, ...]:
                 continue
             expected_default = _compiled_default(column, connection)
             actual_default = _normalize_sql(actual.get("default"))
-            if expected_default != actual_default:
+            defaults_match = (
+                _postgres_default_matches(connection, table_name, column, actual)
+                if connection.dialect.name == "postgresql"
+                else expected_default == actual_default
+            )
+            if not defaults_match:
                 differences.append(
                     f"server default mismatch: {table_name}.{column.name} "
                     f"expected={expected_default!r} actual={actual_default!r}"
@@ -524,8 +774,15 @@ def schema_differences(connection: Connection) -> tuple[str, ...]:
             if expected_computed is None or actual_computed is None:
                 differences.append(f"computed column mismatch: {table_name}.{column.name}")
                 continue
-            expected_sql = _compiled_sql(expected_computed.sqltext, connection)
-            actual_sql = _normalize_sql(actual_computed.get("sqltext"))
+            raw_expected_sql = str(
+                expected_computed.sqltext.compile(
+                    dialect=connection.dialect,
+                    compile_kwargs={"literal_binds": True},
+                )
+            )
+            raw_actual_sql = actual_computed.get("sqltext")
+            expected_sql = _normalize_sql(raw_expected_sql)
+            actual_sql = _normalize_sql(raw_actual_sql)
             if not actual_sql:
                 actual_sql = _sqlite_computed_sql(
                     connection,
@@ -534,16 +791,35 @@ def schema_differences(connection: Connection) -> tuple[str, ...]:
                 )
             expected_persisted = expected_computed.persisted
             actual_persisted = actual_computed.get("persisted")
-            if expected_sql != actual_sql or expected_persisted != actual_persisted:
+            computed_match = (
+                _postgres_computed_matches(
+                    table_name, column.name, raw_expected_sql, raw_actual_sql,
+                )
+                if connection.dialect.name == "postgresql"
+                else expected_sql == actual_sql
+            )
+            if not computed_match or expected_persisted != actual_persisted:
+                display_expected = (
+                    raw_expected_sql if connection.dialect.name == "postgresql" else expected_sql
+                )
+                display_actual = (
+                    raw_actual_sql if connection.dialect.name == "postgresql" else actual_sql
+                )
                 differences.append(
                     f"computed column mismatch: {table_name}.{column.name} "
-                    f"expected={expected_sql!r}/{expected_persisted!r} "
-                    f"actual={actual_sql!r}/{actual_persisted!r}"
+                    f"expected={display_expected!r}/{expected_persisted!r} "
+                    f"actual={display_actual!r}/{actual_persisted!r}"
                 )
 
         expected_checks = _metadata_check_signature(table)
-        actual_checks = _constraint_signature(inspector.get_check_constraints(table_name))
-        if expected_checks != actual_checks:
+        reflected_checks = inspector.get_check_constraints(table_name)
+        actual_checks = _constraint_signature(reflected_checks)
+        checks_match = (
+            _postgres_checks_match(table, reflected_checks)
+            if connection.dialect.name == "postgresql"
+            else expected_checks == actual_checks
+        )
+        if not checks_match:
             differences.append(
                 f"check constraint mismatch: {table_name} "
                 f"expected={sorted(expected_checks)!r} actual={sorted(actual_checks)!r}"

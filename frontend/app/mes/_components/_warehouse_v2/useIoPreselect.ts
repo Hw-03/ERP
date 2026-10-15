@@ -31,7 +31,8 @@ export type UseIoPreselectArgs = {
   toDepartment: string | null;
   deptIoDirection: "in" | "out" | null;
   forceManual?: boolean;
-  addItem: (item: Item, sourceKind?: "manual") => Promise<void> | void;
+  quantity?: number;
+  addItem: (item: Item, sourceKind?: "manual", quantity?: number) => Promise<void> | void;
   setHighlightItemId: (id: string | null) => void;
 };
 
@@ -46,6 +47,7 @@ export function useIoPreselect(args: UseIoPreselectArgs): void {
     toDepartment,
     deptIoDirection,
     forceManual = false,
+    quantity,
     addItem,
     setHighlightItemId,
   } = args;
@@ -69,7 +71,9 @@ export function useIoPreselect(args: UseIoPreselectArgs): void {
       void addItem(preselectedItem);
     } else if (forceManual) {
       setHighlightItemId(null);
-      void addItem(preselectedItem, "manual");
+      if (quantity !== undefined && Number.isSafeInteger(quantity) && quantity > 0) {
+        void addItem(preselectedItem, "manual", quantity);
+      } else void addItem(preselectedItem, "manual");
     } else if (bomParents.has(preselectedItem.item_id)) {
       // BOM 부모: 자동 카트 추가하지 않고 Step 3 picker 에서 해당 row 만 강조.
       // 낱개/BOM 선택은 사용자가 직접.
@@ -77,7 +81,9 @@ export function useIoPreselect(args: UseIoPreselectArgs): void {
     } else {
       // 일반 품목: 기존 흐름대로 자동 카트 추가.
       setHighlightItemId(null);
-      void addItem(preselectedItem);
+      if (quantity !== undefined && Number.isSafeInteger(quantity) && quantity > 0) {
+        void addItem(preselectedItem, undefined, quantity);
+      } else void addItem(preselectedItem);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preselectedItem?.item_id, workType, subType, fromDepartment, toDepartment, deptIoDirection, forceManual, bomParents, bomParentsLoaded]);

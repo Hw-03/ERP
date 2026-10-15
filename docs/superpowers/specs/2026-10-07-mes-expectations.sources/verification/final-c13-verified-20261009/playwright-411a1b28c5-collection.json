@@ -1,0 +1,239 @@
+{
+  "config": {
+    "configFile": "C:\\Users\\user\\.codex\\worktrees\\mes-expectation-closure\\ERP\\frontend\\playwright.config.ts",
+    "rootDir": "C:/Users/user/.codex/worktrees/mes-expectation-closure/ERP/frontend/tests/e2e",
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": "C:\\Users\\user\\.codex\\worktrees\\mes-expectation-closure\\ERP\\frontend\\tests\\e2e\\global-setup.ts",
+    "globalTeardown": "C:\\Users\\user\\.codex\\worktrees\\mes-expectation-closure\\ERP\\frontend\\tests\\e2e\\global-teardown.ts",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {},
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/user/.codex/worktrees/mes-expectation-closure/ERP/frontend/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "C:/Users/user/.codex/worktrees/mes-expectation-closure/ERP/frontend/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": {
+      "current": 1,
+      "total": 1
+    },
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.60.0",
+    "workers": 1,
+    "webServer": {
+      "command": "npx next dev -p 3100",
+      "url": "http://localhost:3100",
+      "reuseExistingServer": false,
+      "timeout": 120000,
+      "env": {
+        "BACKEND_INTERNAL_URL": "http://127.0.0.1:8021"
+      }
+    }
+  },
+  "suites": [
+    {
+      "title": "as-research-ui-expectations.spec.ts",
+      "file": "as-research-ui-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "ASR04 최초 로딩·오류·재시도 빈 성공과 기존 비어있지 않은 승인 목록의 재조회 실패를 구분한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2b9487a85786ac3ac35a-f21da05368967878080e",
+          "file": "as-research-ui-expectations.spec.ts",
+          "line": 65,
+          "column": 5
+        },
+        {
+          "title": "ASR04 실제 중복 승인409는 안내·재시도 후 재고 불변이며 사라진 딥링크 강조를 해제한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2b9487a85786ac3ac35a-b9c7bf5a3a6061f14b3f",
+          "file": "as-research-ui-expectations.spec.ts",
+          "line": 116,
+          "column": 5
+        },
+        {
+          "title": "ASR01 ASR06 PC 실제 세 승인 단계는 즉시 큐에서 사라지고 마지막 승인에서만 재고를 반영한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2b9487a85786ac3ac35a-bae5b53054eab64635a9",
+          "file": "as-research-ui-expectations.spec.ts",
+          "line": 156,
+          "column": 7
+        },
+        {
+          "title": "ASR05 PC 혼합 최종 확인은 실제 서버 AS·연구 2건·일반 부서1건 승인 경로를 구분한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2b9487a85786ac3ac35a-fb8691ada390ce6a1b1c",
+          "file": "as-research-ui-expectations.spec.ts",
+          "line": 215,
+          "column": 7
+        },
+        {
+          "title": "ASR02 PC 전용 승인자0 최종 확인·실제 제출은 부서 결재와 유효 수신자만 사용한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2b9487a85786ac3ac35a-7f56034ca469b7c77af6",
+          "file": "as-research-ui-expectations.spec.ts",
+          "line": 227,
+          "column": 7
+        },
+        {
+          "title": "ASR01 ASR06 모바일 실제 세 승인 단계는 즉시 큐에서 사라지고 마지막 승인에서만 재고를 반영한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2b9487a85786ac3ac35a-3263a1360125959933d3",
+          "file": "as-research-ui-expectations.spec.ts",
+          "line": 156,
+          "column": 7
+        },
+        {
+          "title": "ASR05 모바일 혼합 최종 확인은 실제 서버 AS·연구 2건·일반 부서1건 승인 경로를 구분한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2b9487a85786ac3ac35a-a59dbea3f74ba764abe9",
+          "file": "as-research-ui-expectations.spec.ts",
+          "line": 215,
+          "column": 7
+        },
+        {
+          "title": "ASR02 모바일 전용 승인자0 최종 확인·실제 제출은 부서 결재와 유효 수신자만 사용한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2b9487a85786ac3ac35a-e2f692ea3f441d964c3a",
+          "file": "as-research-ui-expectations.spec.ts",
+          "line": 227,
+          "column": 7
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-09T10:22:56.504Z",
+    "duration": 48.36800000000005,
+    "expected": 0,
+    "skipped": 8,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

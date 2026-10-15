@@ -80,13 +80,17 @@ const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
 
 export function DesktopMesShell({
   onBeforeViewportSwitchChange,
+  recoveryContent,
+  onRecoveryNavigate,
 }: {
   onBeforeViewportSwitchChange?: (handler: (() => Promise<void | boolean>) | null) => void;
+  recoveryContent?: ReactNode;
+  onRecoveryNavigate?: (query: string) => void;
 }) {
   return (
     <DirtyGuardProvider>
       <DesktopTabHomeProvider>
-      <DesktopMesShellInner onBeforeViewportSwitchChange={onBeforeViewportSwitchChange} />
+      <DesktopMesShellInner onBeforeViewportSwitchChange={onBeforeViewportSwitchChange} recoveryContent={recoveryContent} onRecoveryNavigate={onRecoveryNavigate} />
       </DesktopTabHomeProvider>
     </DirtyGuardProvider>
   );
@@ -94,8 +98,12 @@ export function DesktopMesShell({
 
 function DesktopMesShellInner({
   onBeforeViewportSwitchChange,
+  recoveryContent,
+  onRecoveryNavigate,
 }: {
   onBeforeViewportSwitchChange?: (handler: (() => Promise<void | boolean>) | null) => void;
+  recoveryContent?: ReactNode;
+  onRecoveryNavigate?: (query: string) => void;
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -137,8 +145,12 @@ function DesktopMesShellInner({
   })();
 
   const [activeTab, setActiveTab] = useState<DesktopTabId>(initialTab);
+  const historyMountedRef = useRef(initialTab === "history");
   const deferredTab = useDeferredValue(activeTab);
-  const contentTab = activeTab === "dashboard" || activeTab === "history" ? deferredTab : activeTab;
+  const contentTab = activeTab === "dashboard" || (activeTab === "history" && !historyMountedRef.current) ? deferredTab : activeTab;
+  useEffect(() => {
+    if (contentTab === "history") historyMountedRef.current = true;
+  }, [contentTab]);
   const admittedStocktakeEmployee = useRef<string | null>(null);
   const canOpenStocktake = canOpenTab("stocktake");
   // The operator hook restores after mount, including a mobile-to-desktop switch.
@@ -157,6 +169,8 @@ function DesktopMesShellInner({
   const [dailyReportTopbarControls, setDailyReportTopbarControls] = useState<ReactNode>(null);
   const autoRevertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUrlTabRef = useRef<DesktopTabId | null>(null);
+  const acceptedTabUrlRef = useRef(typeof window === "undefined" ? `/mes?${searchParams}` : `${window.location.pathname}${window.location.search}${window.location.hash}`);
+  const pendingBrowserExitRef = useRef<string | null>(null);
 
   useEffect(() => {
     const meta = TAB_META[activeTab];
@@ -192,6 +206,7 @@ function DesktopMesShellInner({
   ) => {
     const navigation = options?.navigation ?? "push";
     const url = options?.url ?? `?tab=${tab}`;
+    if (recoveryContent) { onRecoveryNavigate?.(url); return; }
     const closeWarehouseMapFullscreen = options?.closeWarehouseMapFullscreen ?? true;
     const updateTabState = () => {
       if (closeWarehouseMapFullscreen) setWarehouseMapFullscreen(false);
@@ -214,7 +229,7 @@ function DesktopMesShellInner({
 
     if (navigation === "push") window.history.pushState(null, "", url);
     if (navigation === "replace") window.history.replaceState(null, "", url);
-  }, [activeTab]);
+  }, [activeTab, recoveryContent, onRecoveryNavigate]);
 
   function handleTabChange(tab: DesktopTabId) {
     if (!canOpenTab(tab)) {
@@ -223,6 +238,7 @@ function DesktopMesShellInner({
       }
       return;
     }
+    if (recoveryContent) { commitDesktopTab(tab); return; }
     if (tab === activeTab) {
       if (activeTab !== contentTab) return;
       requestHome(() => {
@@ -307,15 +323,31 @@ function DesktopMesShellInner({
     if (targetFromUrl) {
       const target = canOpenTab(targetFromUrl) ? targetFromUrl : fallbackTab;
       if (target !== activeTab) {
-        commitDesktopTab(target, { navigation: "none", closeWarehouseMapFullscreen: false });
+        const destination = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        if (pendingBrowserExitRef.current === destination) return;
+        pendingBrowserExitRef.current = destination;
+        const proceed = () => {
+          pendingBrowserExitRef.current = null;
+          commitDesktopTab(target, { navigation: "none", closeWarehouseMapFullscreen: false });
+          if (target !== targetFromUrl) router.replace(`?tab=${target}`, { scroll: false });
+        };
+        if (canOpenTab(activeTab)) {
+          confirmAdminNavigation(proceed, () => {
+            pendingBrowserExitRef.current = null;
+            pendingUrlTabRef.current = activeTab;
+            router.push(acceptedTabUrlRef.current, { scroll: false });
+          });
+        } else proceed();
+        return;
       }
+      acceptedTabUrlRef.current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
       if (target !== targetFromUrl) router.replace(`?tab=${target}`, { scroll: false });
     } else if (!canOpenTab(activeTab)) {
       commitDesktopTab(fallbackTab, { navigation: "replace" });
     }
 
     setDefectDeptFilter(canOpenTab("defect") ? dept : null);
-  }, [searchParams, activeTab, canOpenTab, fallbackTab, router, commitDesktopTab, retainStocktake, canOpenStocktake, stocktakeAccessPending]);
+  }, [searchParams, activeTab, canOpenTab, fallbackTab, router, commitDesktopTab, confirmAdminNavigation, retainStocktake, canOpenStocktake, stocktakeAccessPending]);
 
   useEffect(() => {
     if (activeTab !== "stocktake" || !retainStocktake || canOpenStocktake || stocktakeAccessPending) return;
@@ -430,6 +462,7 @@ function DesktopMesShellInner({
   }, [canOpenTab, commitDesktopTab]);
 
   const content = useMemo(() => {
+    if (recoveryContent) return recoveryContent;
     const key = contentTab === "admin" ? `admin-${adminPinEntryNonce}` : `${contentTab}-${refreshNonce}`;
     if (contentTab === "stocktake" && stocktakeAccessPending && !retainStocktake) return <StocktakeLoadingSkeleton variant="desktop" />;
     if (contentTab === "stocktake") return canOpenTab("stocktake") || retainStocktake ? <StocktakeView key={key} operator={operator} variant="desktop" /> : null;
@@ -521,7 +554,7 @@ function DesktopMesShellInner({
     // setStockWarnings/setCapacityModal(setter), handleTabChange 는 안정적이거나 결과에
     // 영향이 없어 의도적으로 제외 — 누락이 아니라 최소 deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, capacityLoading, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen, isItemPickerFullscreen, preferences, savePreferences, canOpenTab, handleOpenAdminPinEntry, handleDailyReportTopbarControlsChange, retainStocktake, stocktakeAccessPending]);
+  }, [recoveryContent, contentTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, capacityLoading, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen, isItemPickerFullscreen, preferences, savePreferences, canOpenTab, handleOpenAdminPinEntry, handleDailyReportTopbarControlsChange, retainStocktake, stocktakeAccessPending]);
 
   return (
     <>
@@ -555,9 +588,10 @@ function DesktopMesShellInner({
               icon={activeMeta.icon}
               iconColor={DESKTOP_TAB_ICON_COLORS[activeTab]}
               onRefresh={() => {
-                const refresh = () => { setRefreshNonce((current) => current + 1); void refetchCapacity(); };
-                if (activeTab === "stocktake") confirmAdminNavigation(refresh);
-                else refresh();
+                confirmAdminNavigation(() => {
+                  setRefreshNonce((current) => current + 1);
+                  void refetchCapacity();
+                });
               }}
               onBeforeLogout={activeTab === "stocktake" ? flushDirtyEntries : undefined}
               status={status}

@@ -101,6 +101,29 @@ describe("데스크톱 불량 작업·출처 통합 선택", async () => {
     expect(window.history.state.defect).toBe("work-choice");
   });
 
+  it("다른 탭 Back의 이탈 확인 전에는 선택 품목·수량·메모를 해제하지 않는다", async () => {
+    const previousUrl = `${window.location.pathname}${window.location.search}`;
+    try {
+      window.history.replaceState({ defect: "hub" }, "", "/mes?tab=defect");
+      await openWork();
+      fireEvent.click(screen.getByRole("button", { name: /즉시 폐기/ }));
+      fireEvent.click(screen.getByRole("button", { name: /창고 재고/ }));
+      finishExit();
+      fireEvent.click(screen.getByRole("button", { name: "조립 시험 품목 장바구니에 추가", exact: true }));
+      const cart = screen.getByTestId("defect-cart-panel");
+      fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "2" } });
+      fireEvent.change(screen.getByPlaceholderText("예: 스크래치 다수 / 우측 끝단"), { target: { value: "Back 이전 초안" } });
+      window.history.replaceState({ defect: "hub" }, "", "/mes?tab=dashboard");
+      act(() => window.dispatchEvent(new PopStateEvent("popstate", { state: { defect: "hub" } })));
+      expect(cart).toBeInTheDocument();
+      expect(cart).toHaveTextContent("조립 시험 품목");
+      expect(screen.getByRole("spinbutton")).toHaveValue(2);
+      expect(screen.getByPlaceholderText("예: 스크래치 다수 / 우측 끝단")).toHaveValue("Back 이전 초안");
+    } finally {
+      window.history.replaceState({ defect: "hub" }, "", previousUrl);
+    }
+  });
+
   it("전환 중 나가면 예약된 품목 이동을 취소한다", async () => {
     vi.useFakeTimers();
     try {

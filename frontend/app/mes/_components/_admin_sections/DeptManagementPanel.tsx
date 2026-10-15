@@ -71,7 +71,7 @@ export function DeptManagementPanel({
       .then((updated) => {
         setDepartments((prev) => prev.map((d) => (d.id === dept.id ? updated : d)));
         setSelectedDept(updated);
-        onStatusChange(`'${dept.name}' 부서를 ${next ? "활성화" : "비활성화"}했습니다.`);
+        onStatusChange(`'${dept.display_name ?? dept.name}' 부서를 ${next ? "활성화" : "비활성화"}했습니다.`);
         void refreshDepartments();
       })
       .catch((err: unknown) => onError(err instanceof Error ? err.message : "상태 변경 실패"));
@@ -87,7 +87,7 @@ export function DeptManagementPanel({
       .then(() => {
         setDepartments((prev) => prev.filter((d) => d.id !== dept.id));
         setSelectedDept(null);
-        onStatusChange(`'${dept.name}' 부서를 삭제했습니다.`);
+        onStatusChange(`'${dept.display_name ?? dept.name}' 부서를 삭제했습니다.`);
         void refreshDepartments();
       })
       .catch((err: unknown) => onError(err instanceof Error ? err.message : "삭제 실패"));
@@ -104,10 +104,10 @@ export function DeptManagementPanel({
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base font-black text-white"
           style={{ background: localColor }}
         >
-          {dept.name.slice(0, 1)}
+          {(dept.display_name ?? dept.name).slice(0, 1)}
         </div>
         <div className="min-w-0">
-          <div className="text-base font-black truncate">{dept.name}</div>
+          <div className="text-base font-black truncate">{dept.display_name ?? dept.name}</div>
           <span
             className="inline-block rounded-full px-2 py-0.5 text-[11px] font-bold"
             style={{
@@ -208,7 +208,7 @@ export function DeptManagementPanel({
 
       <ConfirmModal
         open={deactivateOpen}
-        title={`'${dept.name}' 부서를 비활성화하시겠습니까?`}
+        title={`'${dept.display_name ?? dept.name}' 부서를 비활성화하시겠습니까?`}
         tone="caution"
         confirmLabel="비활성화"
         onClose={() => setDeactivateOpen(false)}
@@ -216,7 +216,7 @@ export function DeptManagementPanel({
       />
       <ConfirmModal
         open={deleteOpen}
-        title={`'${dept.name}' 부서를 영구 삭제하시겠습니까?`}
+        title={`'${dept.display_name ?? dept.name}' 부서를 영구 삭제하시겠습니까?`}
         cautionMessage="이 작업은 되돌릴 수 없습니다."
         tone="danger"
         confirmLabel="삭제"

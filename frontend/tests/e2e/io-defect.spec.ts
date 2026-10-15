@@ -6,7 +6,8 @@
  * PR #17에서 삭제됐던 spec 을 전용 DB 인프라 위에서 재작성.
  */
 import { expect, test } from "@playwright/test";
-import { loginAsOperator } from "./_helpers";
+import { randomUUID } from "node:crypto";
+import { loginAsOperator, readSeed } from "./_helpers";
 
 test.describe("불량 — 격리 / 해제", () => {
   test.beforeEach(async ({ page }) => {
@@ -15,7 +16,29 @@ test.describe("불량 — 격리 / 해제", () => {
   });
 
   test("새 불량 격리 → 정상 복귀", async ({ page }) => {
-    const quarantineMemo = `격리 복귀 E2E ${Date.now().toString(36)}`;
+    const activeRecords = async (): Promise<Array<{ record_id: string; item_id: string; reason_memo: string | null }>> => {
+      const response = await page.request.get("/api/defects/locations");
+      expect(response.ok()).toBeTruthy();
+      return response.json();
+    };
+    const existingMarker = `기존 격리 ${randomUUID()}`;
+    const existing = await page.request.post("/api/defects/quarantine", { data: {
+      actor_employee_id: readSeed().warehouseEmployee.employee_id,
+      item_id: readSeed().rawItem.item_id,
+      qty: 1,
+      source: "warehouse",
+      target_dept: "창고",
+      reason_category: "외관 불량",
+      reason_memo: existingMarker,
+    } });
+    expect(existing.status(), await existing.text()).toBe(200);
+    const before = await activeRecords();
+    const existingRecords = before.filter((record) => record.reason_memo === existingMarker);
+    expect(existingRecords).toHaveLength(1);
+    const priorIds = new Set(before.map((record) => record.record_id));
+    const marker = `새 격리 ${randomUUID()}`;
+
+    try {
     await page.goto("/mes?tab=defect");
     // 4장 허브의 통합 등록·처리 카드 확인 — 첫 컴파일만 넉넉히 기다린다.
     const workCard = page.getByRole("button").filter({ hasText: "불량 처리", visible: true });
@@ -39,7 +62,7 @@ test.describe("불량 — 격리 / 해제", () => {
     // 사유 마스터 선택 다이얼로그에서 활성 카테고리를 선택한다.
     await page.getByRole("button", { name: "사유 카테고리 선택", exact: true }).filter({ visible: true }).click();
     await page.getByRole("dialog", { name: "사유 카테고리", exact: true }).getByRole("button", { name: "외관 불량", exact: true }).click();
-    await page.getByRole("textbox", { name: "메모", exact: true }).filter({ visible: true }).fill(quarantineMemo);
+    await page.getByRole("textbox", { name: "메모", exact: true }).filter({ visible: true }).fill(marker);
     // 제출 → ConfirmModal → 확인
     await page.getByRole("button", { name: /격리하기 \(1건\)/ }).click();
     await page
@@ -55,12 +78,17 @@ test.describe("불량 — 격리 / 해제", () => {
     // mes 는 모바일·데스크톱 셸을 CSS(lg:hidden)로 둘 다 DOM 에 렌더. 모바일 불량 허브가
     // 첫 화면에서 격리 목록을 함께 보여주므로 같은 품목명/버튼/빈 메시지가 (숨은) 모바일 셸에도
     // 존재 → 보이는(데스크톱) 요소만 골라야 strict 위반을 피한다. [[project_e2e_dual_shell_visible_filter]]
-    await page.getByRole("searchbox", { name: "불량 검색", exact: true }).filter({ visible: true }).fill(quarantineMemo);
-    const record = page.getByRole("article", { name: "E2E원자재튜브 격리 기록", exact: true }).filter({ hasText: quarantineMemo, visible: true });
-    await expect(record).toBeVisible();
+    await expect(page.getByText("E2E원자재튜브").filter({ visible: true }).first()).toBeVisible();
+    const created = (await activeRecords()).filter((record) => !priorIds.has(record.record_id));
+    expect(created).toHaveLength(1);
+    expect(created[0].item_id).toBe(readSeed().rawItem.item_id);
+    expect(created[0].reason_memo).toBe(marker);
 
     // ── 해제(정상 복귀) ───────────────────────────────────
-    await record.getByRole("button", { name: "처리", exact: true }).click();
+    await page.getByRole("searchbox", { name: "불량 검색" }).filter({ visible: true }).fill(marker);
+    const createdRow = page.getByRole("article", { name: "E2E원자재튜브 격리 기록" }).filter({ hasText: marker, visible: true });
+    await expect(createdRow).toHaveCount(1);
+    await createdRow.getByRole("button", { name: "처리", exact: true }).click();
     await expect(page.getByRole("heading", { name: /불량 처리/ })).toBeVisible();
     await expect(page.getByRole("button", { name: "정상 복귀 →" })).toBeEnabled();
     await expect(page.getByRole("button", { name: "사유 카테고리 선택", exact: true })).toHaveCount(0);
@@ -88,11 +116,26 @@ test.describe("불량 — 격리 / 해제", () => {
       page.getByRole("button").filter({ hasText: "불량 처리", visible: true }),
     ).toBeVisible();
     await page.getByRole("button").filter({ hasText: "격리 목록" }).filter({ hasText: "격리 항목" }).click();
-    await expect(page.getByRole("heading", { name: "격리 목록", exact: true }).filter({ visible: true })).toBeVisible();
-    // 다른 시나리오의 격리 기록은 보존하고 이번에 만든 기록의 복귀만 검증한다.
-    await expect(record).toHaveCount(0);
-    const locations = await page.request.get("/api/defects/locations");
-    expect(locations.ok(), await locations.text()).toBeTruthy();
-    expect((await locations.json()).filter((entry: { reason_memo: string | null }) => entry.reason_memo === quarantineMemo)).toHaveLength(0);
+    await expect.poll(async () => {
+      const ids = (await activeRecords()).map((record) => record.record_id);
+      return {
+        createdStillPresent: ids.includes(created[0].record_id),
+        priorIds: ids.filter((id) => priorIds.has(id)).sort(),
+        allIds: ids.sort(),
+      };
+    }).toEqual({ createdStillPresent: false, priorIds: [...priorIds].sort(), allIds: [...priorIds].sort() });
+    } finally {
+      if ((await activeRecords()).some((record) => record.record_id === existingRecords[0].record_id)) {
+        const restored = await page.request.post("/api/defects/unquarantine", { data: {
+          actor_employee_id: readSeed().warehouseEmployee.employee_id,
+          record_id: existingRecords[0].record_id,
+          item_id: readSeed().rawItem.item_id,
+          qty: 1,
+          dept: "창고",
+          reason_category: "검사 통과",
+        } });
+        expect(restored.status(), await restored.text()).toBe(200);
+      }
+    }
   });
 });

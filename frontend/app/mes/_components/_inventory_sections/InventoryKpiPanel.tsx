@@ -28,6 +28,7 @@ export function InventoryKpiPanel({ cards, activeKey, onChange, loading = false,
 
   if (mobile) {
     return (
+      <div>
       <div className="grid grid-cols-4 overflow-hidden rounded-[20px] border" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
         {displayCards.map((card) => (
           <button
@@ -45,6 +46,8 @@ export function InventoryKpiPanel({ cards, activeKey, onChange, loading = false,
             <span className="sr-only">{card.hint}</span>
           </button>
         ))}
+      </div>
+      <p className="mt-2 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>집계와 자재 목록은 PA·PF 품목을 제외합니다.</p>
       </div>
     );
   }

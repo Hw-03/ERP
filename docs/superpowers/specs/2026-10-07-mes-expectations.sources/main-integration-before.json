@@ -1,0 +1,499 @@
+{
+  "priorHead": "a8eda817576123d830a730dddbeaff1d29fb31ec",
+  "integratedMain": "353ee530f05337c7dfaa5c5ae18a04d4fc20efa9",
+  "reason": "원격 main의 튜브 입출고·공급업체 범위 계약과 기존 기대를 통합하기 전 원문 보존",
+  "cases": [
+    {
+      "id": "8.6-10",
+      "decisionIds": [],
+      "atomicReview": "reviewed",
+      "finalExpected": "화면 설명의 복귀·폐기·반품과 실제 버튼 일치",
+      "finalStaffExpected": "창고에서 격리한 기록을 처리할 때는 정상 복귀, 전체 폐기, 반품 세 가지 선택지가 보여야 한다. 부서에서 격리한 기록에는 반품을 보여 주면 안 된다.",
+      "verificationTags": [
+        "P0"
+      ],
+      "conditions": [
+        {
+          "id": "warehouse-return-only-process-options",
+          "origin": "technical+staff",
+          "expected": "창고 DEFECT에는 복귀·폐기·반품, 부서에는 반품 없음. B급·구형은 복귀 정책을 구분한다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "8.9-08",
+      "decisionIds": [],
+      "atomicReview": "reviewed",
+      "finalExpected": "부서 격리품 반품은 어떤 경로로도 실행 불가",
+      "finalStaffExpected": "부서 격리품 반품은 화면·직접 호출 모두 차단해야 합니다.",
+      "verificationTags": [
+        "P0"
+      ],
+      "conditions": [
+        {
+          "id": "department-return-direct-request-rejected",
+          "origin": "technical+staff",
+          "expected": "어떤 직접 API 경로로도 부서 격리품을 공급업체 반품할 수 없다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "warehouse-return-only-process-options",
+          "origin": "technical+staff",
+          "expected": "창고 DEFECT에는 복귀·폐기·반품, 부서에는 반품 없음. B급·구형은 복귀 정책을 구분한다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "8.18-05",
+      "decisionIds": [],
+      "atomicReview": "reviewed",
+      "finalExpected": "부서는 반품 불가, 창고만 반품 가능",
+      "finalStaffExpected": "부서는 반품 불가, 창고만 반품 가능해야 합니다.",
+      "verificationTags": [
+        "P0"
+      ],
+      "conditions": [
+        {
+          "id": "department-return-direct-request-rejected",
+          "origin": "technical+staff",
+          "expected": "어떤 직접 API 경로로도 부서 격리품을 공급업체 반품할 수 없다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "warehouse-return-only-process-options",
+          "origin": "technical+staff",
+          "expected": "창고 DEFECT에는 복귀·폐기·반품, 부서에는 반품 없음. B급·구형은 복귀 정책을 구분한다.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "PC-DELTA-DEFECT-05",
+      "decisionIds": [],
+      "atomicReview": "reviewed",
+      "finalExpected": "창고 격리품 반품에는 활성 공급업체 선택이 필수여야 한다. 업체를 선택하지 않았거나 처리 전에 업체가 숨겨지면 반품과 재고 변경을 막고 이유를 알려야 한다. 부서 격리품은 반품할 수 없어야 한다.",
+      "finalStaffExpected": "창고 격리품 반품에는 활성 공급업체 선택이 필수여야 한다. 업체를 선택하지 않았거나 처리 전에 업체가 숨겨지면 반품과 재고 변경을 막고 이유를 알려야 한다. 부서 격리품은 반품할 수 없어야 한다.",
+      "verificationTags": [
+        "P0"
+      ],
+      "conditions": [
+        {
+          "id": "department-return-direct-request-rejected",
+          "origin": "technical+staff",
+          "expected": "어떤 직접 API 경로로도 부서 격리품을 공급업체 반품할 수 없다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "return-active-supplier-required-at-create-and-submit",
+          "origin": "technical+staff",
+          "expected": "반품 실행은 활성 업체가 필수이고 draft이후 업체숨김도 제출 전에 차단한다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "employee-only-active-supplier-list",
+          "origin": "technical+staff",
+          "expected": "일반직원 공급업체 조회는 활성 업체만 반환하고 숨김포함 조회를 거부한다.",
+          "requiredEvidence": [
+            "test"
+          ]
+        },
+        {
+          "id": "active-supplier-required-hidden-stale-blocked",
+          "origin": "technical+staff",
+          "expected": "개별/일괄 창고 격리 반품은 활성 업체 필수이며 선택 후 숨긴 업체는 실행 전에 오류로 막는다. 부서 반품 없음.",
+          "requiredEvidence": [
+            "browser"
+          ]
+        }
+      ]
+    }
+  ],
+  "assertions": [
+    {
+      "caseId": "8.6-10",
+      "conditionId": "warehouse-return-only-process-options",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/defect-action-boundaries.spec.ts",
+          "selector": "8.18-05 ${mobile ? \"모바일\" : \"PC\"} 창고 불량은 복귀·폐기·반품이고 부서 반품과 B급·구형 추가처리는 없다",
+          "assertion": "await expect(page.getByRole(\"button\", { name: /^정상 복귀(?: 불량 해제|$)/ }).filter({ visible: true })).toBeVisible();",
+          "sourceHash": "f9d770e3d20639836b86bb1f76e9e0fe4c9930bd8f6c515fbd324c61643f250a",
+          "line": 8
+        },
+        {
+          "file": "frontend/tests/e2e/defect-action-boundaries.spec.ts",
+          "selector": "8.18-05 ${mobile ? \"모바일\" : \"PC\"} 창고 불량은 복귀·폐기·반품이고 부서 반품과 B급·구형 추가처리는 없다",
+          "assertion": "await expect(page.getByRole(\"button\", { name: /^전체 폐기|^재작업/ }).filter({ visible: true })).toHaveCount(0);",
+          "sourceHash": "f9d770e3d20639836b86bb1f76e9e0fe4c9930bd8f6c515fbd324c61643f250a",
+          "line": 8
+        },
+        {
+          "file": "frontend/tests/e2e/defect-action-boundaries.spec.ts",
+          "selector": "8.18-05 ${mobile ? \"모바일\" : \"PC\"} 창고 불량은 복귀·폐기·반품이고 부서 반품과 B급·구형 추가처리는 없다",
+          "assertion": "await expect(page.getByRole(\"button\", { name: /^전체 폐기/ }).filter({ visible: true })).toBeVisible();",
+          "sourceHash": "f9d770e3d20639836b86bb1f76e9e0fe4c9930bd8f6c515fbd324c61643f250a",
+          "line": 8
+        },
+        {
+          "file": "frontend/tests/e2e/defect-action-boundaries.spec.ts",
+          "selector": "8.18-05 ${mobile ? \"모바일\" : \"PC\"} 창고 불량은 복귀·폐기·반품이고 부서 반품과 B급·구형 추가처리는 없다",
+          "assertion": "expect((await afterReply.json() as DefectLocation[]).filter((row) => row.item_id === item.item_id)).toEqual(before);",
+          "sourceHash": "f9d770e3d20639836b86bb1f76e9e0fe4c9930bd8f6c515fbd324c61643f250a",
+          "line": 8
+        }
+      ],
+      "execution": {
+        "status": "NOT_RUN"
+      }
+    },
+    {
+      "caseId": "8.9-08",
+      "conditionId": "department-return-direct-request-rejected",
+      "bindings": [
+        {
+          "file": "backend/tests/test_defect_closure_contracts.py",
+          "selector": "test_invalid_return_has_no_stock_origin_request_or_ledger_changes",
+          "assertion": "assert response.status_code == 422, response.text",
+          "sourceHash": "2492a13adbc9c29e7216e1c00aebf706d96d6e4cc2d1ad6dc21a4d7451083e22"
+        }
+      ],
+      "execution": {
+        "status": "NOT_RUN"
+      }
+    },
+    {
+      "caseId": "8.9-08",
+      "conditionId": "warehouse-return-only-process-options",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/defect-action-boundaries.spec.ts",
+          "selector": "8.18-05 ${mobile ? \"모바일\" : \"PC\"} 창고 불량은 복귀·폐기·반품이고 부서 반품과 B급·구형 추가처리는 없다",
+          "assertion": "await expect(page.getByRole(\"button\", { name: /^정상 복귀(?: 불량 해제|$)/ }).filter({ visible: true })).toBeVisible();",
+          "sourceHash": "f9d770e3d20639836b86bb1f76e9e0fe4c9930bd8f6c515fbd324c61643f250a",
+          "line": 8
+        },
+        {
+          "file": "frontend/tests/e2e/defect-action-boundaries.spec.ts",
+          "selector": "8.18-05 ${mobile ? \"모바일\" : \"PC\"} 창고 불량은 복귀·폐기·반품이고 부서 반품과 B급·구형 추가처리는 없다",
+          "assertion": "await expect(page.getByRole(\"button\", { name: /^전체 폐기|^재작업/ }).filter({ visible: true })).toHaveCount(0);",
+          "sourceHash": "f9d770e3d20639836b86bb1f76e9e0fe4c9930bd8f6c515fbd324c61643f250a",
+          "line": 8
+        },
+        {
+          "file": "frontend/tests/e2e/defect-action-boundaries.spec.ts",
+          "selector": "8.18-05 ${mobile ? \"모바일\" : \"PC\"} 창고 불량은 복귀·폐기·반품이고 부서 반품과 B급·구형 추가처리는 없다",
+          "assertion": "await expect(page.getByRole(\"button\", { name: /^전체 폐기/ }).filter({ visible: true })).toBeVisible();",
+          "sourceHash": "f9d770e3d20639836b86bb1f76e9e0fe4c9930bd8f6c515fbd324c61643f250a",
+          "line": 8
+        },
+        {
+          "file": "frontend/tests/e2e/defect-action-boundaries.spec.ts",
+          "selector": "8.18-05 ${mobile ? \"모바일\" : \"PC\"} 창고 불량은 복귀·폐기·반품이고 부서 반품과 B급·구형 추가처리는 없다",
+          "assertion": "expect((await afterReply.json() as DefectLocation[]).filter((row) => row.item_id === item.item_id)).toEqual(before);",
+          "sourceHash": "f9d770e3d20639836b86bb1f76e9e0fe4c9930bd8f6c515fbd324c61643f250a",
+          "line": 8
+        }
+      ],
+      "execution": {
+        "status": "NOT_RUN"
+      }
+    },
+    {
+      "caseId": "8.18-05",
+      "conditionId": "department-return-direct-request-rejected",
+      "bindings": [
+        {
+          "file": "backend/tests/test_defect_closure_contracts.py",
+          "selector": "test_invalid_return_has_no_stock_origin_request_or_ledger_changes",
+          "assertion": "assert response.status_code == 422, response.text",
+          "sourceHash": "2492a13adbc9c29e7216e1c00aebf706d96d6e4cc2d1ad6dc21a4d7451083e22"
+        }
+      ],
+      "execution": {
+        "status": "NOT_RUN"
+      }
+    },
+    {
+      "caseId": "8.18-05",
+      "conditionId": "warehouse-return-only-process-options",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
+          "selector": "B급 등록·분류 변경·일부 정상 복귀는 보관 목록에 남는다",
+          "assertion": "await expect(record).toContainText(\"B급\");",
+          "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
+          "line": 274
+        },
+        {
+          "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
+          "selector": "B급 등록·분류 변경·일부 정상 복귀는 보관 목록에 남는다",
+          "assertion": "await expect(page.getByRole(\"button\", { name: \"전체 폐기\", exact: true }).filter({ visible: true })).toHaveCount(0);",
+          "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
+          "line": 274
+        },
+        {
+          "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
+          "selector": "B급 등록·분류 변경·일부 정상 복귀는 보관 목록에 남는다",
+          "assertion": "await expect(page.getByRole(\"button\", { name: \"반품\", exact: true }).filter({ visible: true })).toHaveCount(0);",
+          "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
+          "line": 274
+        },
+        {
+          "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
+          "selector": "B급 등록·분류 변경·일부 정상 복귀는 보관 목록에 남는다",
+          "assertion": "await expect(record.getByText(\"3개\", { exact: true })).toBeVisible();",
+          "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
+          "line": 274
+        },
+        {
+          "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
+          "selector": "B급 등록·분류 변경·일부 정상 복귀는 보관 목록에 남는다",
+          "assertion": "await expect(record).toContainText(\"구형\");",
+          "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
+          "line": 274
+        },
+        {
+          "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
+          "selector": "B급 등록·분류 변경·일부 정상 복귀는 보관 목록에 남는다",
+          "assertion": "expect(history).toEqual(expect.arrayContaining([\n      expect.objectContaining({ is_initial: true, next_category: \"B_GRADE\" }),\n      expect.objectContaining({ previous_category: \"B_GRADE\", next_category: \"OBSOLETE\" }),\n    ]));",
+          "sourceHash": "07a30176345c22b01c596e11d27ffe26e031ec5d4de47e44d1a98f2b017813c4",
+          "line": 274
+        },
+        {
+          "file": "frontend/tests/e2e/defect-bulk-boundaries.spec.ts",
+          "selector": "DEFECT-BULK-RETURN 창고 일괄반품 업체필수·숨김경합 전체불변과 부서 반품 없음",
+          "assertion": "await expect(page.getByRole(\"button\", { name: /^반품(?: |$)/ }).filter({ visible: true })).toHaveCount(0);",
+          "sourceHash": "d76dd0f3810d08308b3a4d97d069f6db3422220ec0c6357f2cccc000d639d889",
+          "line": 215
+        },
+        {
+          "file": "frontend/tests/e2e/defect-bulk-boundaries.spec.ts",
+          "selector": "DEFECT-BULK-BLOCK ${mobile ? \"모바일\" : \"PC\"} 서버 응답형 대기·출처불명 원건 투영은 선택 불가이며 보관 관리분류는 분리한다",
+          "assertion": "await expect(page.getByRole(\"button\", { name: \"정상 복귀 →\", exact: true }).filter({ visible: true })).toBeVisible();",
+          "sourceHash": "d76dd0f3810d08308b3a4d97d069f6db3422220ec0c6357f2cccc000d639d889",
+          "line": 125
+        },
+        {
+          "file": "frontend/tests/e2e/defect-bulk-boundaries.spec.ts",
+          "selector": "DEFECT-BULK-BLOCK ${mobile ? \"모바일\" : \"PC\"} 서버 응답형 대기·출처불명 원건 투영은 선택 불가이며 보관 관리분류는 분리한다",
+          "assertion": "await expect(page.getByRole(\"button\", { name: /^반품(?: |$)|^전체 폐기/ }).filter({ visible: true })).toHaveCount(0);",
+          "sourceHash": "d76dd0f3810d08308b3a4d97d069f6db3422220ec0c6357f2cccc000d639d889",
+          "line": 125
+        },
+        {
+          "file": "frontend/tests/e2e/defect-action-boundaries.spec.ts",
+          "selector": "8.18-05 ${mobile ? \"모바일\" : \"PC\"} 창고 불량은 복귀·폐기·반품이고 부서 반품과 B급·구형 추가처리는 없다",
+          "assertion": "await expect(page.getByRole(\"button\", { name: /^정상 복귀(?: 불량 해제|$)/ }).filter({ visible: true })).toBeVisible();",
+          "sourceHash": "f9d770e3d20639836b86bb1f76e9e0fe4c9930bd8f6c515fbd324c61643f250a",
+          "line": 8
+        },
+        {
+          "file": "frontend/tests/e2e/defect-action-boundaries.spec.ts",
+          "selector": "8.18-05 ${mobile ? \"모바일\" : \"PC\"} 창고 불량은 복귀·폐기·반품이고 부서 반품과 B급·구형 추가처리는 없다",
+          "assertion": "if (entry.returnAllowed) await expect(page.getByRole(\"button\", { name: /^반품(?: |$)/ }).filter({ visible: true })).toBeVisible();",
+          "sourceHash": "f9d770e3d20639836b86bb1f76e9e0fe4c9930bd8f6c515fbd324c61643f250a",
+          "line": 8
+        },
+        {
+          "file": "frontend/tests/e2e/defect-action-boundaries.spec.ts",
+          "selector": "8.18-05 ${mobile ? \"모바일\" : \"PC\"} 창고 불량은 복귀·폐기·반품이고 부서 반품과 B급·구형 추가처리는 없다",
+          "assertion": "else await expect(page.getByRole(\"button\", { name: /^반품(?: |$)/ }).filter({ visible: true })).toHaveCount(0);",
+          "sourceHash": "f9d770e3d20639836b86bb1f76e9e0fe4c9930bd8f6c515fbd324c61643f250a",
+          "line": 8
+        },
+        {
+          "file": "frontend/tests/e2e/defect-action-boundaries.spec.ts",
+          "selector": "8.18-05 ${mobile ? \"모바일\" : \"PC\"} 창고 불량은 복귀·폐기·반품이고 부서 반품과 B급·구형 추가처리는 없다",
+          "assertion": "await expect(page.getByRole(\"button\", { name: /^전체 폐기|^재작업/ }).filter({ visible: true })).toHaveCount(0);",
+          "sourceHash": "f9d770e3d20639836b86bb1f76e9e0fe4c9930bd8f6c515fbd324c61643f250a",
+          "line": 8
+        },
+        {
+          "file": "frontend/tests/e2e/defect-action-boundaries.spec.ts",
+          "selector": "8.18-05 ${mobile ? \"모바일\" : \"PC\"} 창고 불량은 복귀·폐기·반품이고 부서 반품과 B급·구형 추가처리는 없다",
+          "assertion": "await expect(page.getByRole(\"button\", { name: /^전체 폐기/ }).filter({ visible: true })).toBeVisible();",
+          "sourceHash": "f9d770e3d20639836b86bb1f76e9e0fe4c9930bd8f6c515fbd324c61643f250a",
+          "line": 8
+        },
+        {
+          "file": "frontend/tests/e2e/defect-action-boundaries.spec.ts",
+          "selector": "8.18-05 ${mobile ? \"모바일\" : \"PC\"} 창고 불량은 복귀·폐기·반품이고 부서 반품과 B급·구형 추가처리는 없다",
+          "assertion": "expect((await afterReply.json() as DefectLocation[]).filter((row) => row.item_id === item.item_id)).toEqual(before);",
+          "sourceHash": "f9d770e3d20639836b86bb1f76e9e0fe4c9930bd8f6c515fbd324c61643f250a",
+          "line": 8
+        }
+      ],
+      "execution": {
+        "status": "NOT_RUN"
+      }
+    },
+    {
+      "caseId": "PC-DELTA-DEFECT-05",
+      "conditionId": "department-return-direct-request-rejected",
+      "bindings": [
+        {
+          "file": "backend/tests/test_defect_closure_contracts.py",
+          "selector": "test_invalid_return_has_no_stock_origin_request_or_ledger_changes",
+          "assertion": "assert response.status_code == 422, response.text",
+          "sourceHash": "2492a13adbc9c29e7216e1c00aebf706d96d6e4cc2d1ad6dc21a4d7451083e22"
+        }
+      ],
+      "execution": {
+        "status": "NOT_RUN"
+      }
+    },
+    {
+      "caseId": "PC-DELTA-DEFECT-05",
+      "conditionId": "return-active-supplier-required-at-create-and-submit",
+      "bindings": [
+        {
+          "file": "backend/tests/test_defect_return_supplier.py",
+          "selector": "test_defect_return_requires_active_supplier_and_preserves_snapshot",
+          "assertion": "assert missing.status_code == 422",
+          "sourceHash": "624db0f4243563051d53d7ea853a0c340cbcce840aab492adc2315828f394ede"
+        },
+        {
+          "file": "backend/tests/test_defect_return_supplier.py",
+          "selector": "test_hidden_supplier_and_non_return_supplier_id_are_rejected",
+          "assertion": "assert hidden.status_code == 422",
+          "sourceHash": "624db0f4243563051d53d7ea853a0c340cbcce840aab492adc2315828f394ede"
+        },
+        {
+          "file": "backend/tests/test_defect_return_supplier.py",
+          "selector": "test_hidden_supplier_blocks_defect_return_draft_submit_without_inventory_change",
+          "assertion": "assert draft.status_code == 200, draft.json()",
+          "sourceHash": "624db0f4243563051d53d7ea853a0c340cbcce840aab492adc2315828f394ede"
+        },
+        {
+          "file": "backend/tests/test_defect_return_supplier.py",
+          "selector": "test_hidden_supplier_blocks_defect_return_draft_submit_without_inventory_change",
+          "assertion": "assert submitted.status_code == 422",
+          "sourceHash": "624db0f4243563051d53d7ea853a0c340cbcce840aab492adc2315828f394ede"
+        },
+        {
+          "file": "backend/tests/test_defect_return_supplier.py",
+          "selector": "test_hidden_supplier_blocks_defect_return_draft_submit_without_inventory_change",
+          "assertion": "assert db_session.query(TransactionLog).filter(\n        TransactionLog.item_id == item.item_id,\n        TransactionLog.transaction_type == TransactionTypeEnum.SUPPLIER_RETURN,\n    ).count() == 0",
+          "sourceHash": "624db0f4243563051d53d7ea853a0c340cbcce840aab492adc2315828f394ede"
+        },
+        {
+          "file": "backend/tests/test_defect_return_supplier.py",
+          "selector": "test_hidden_supplier_blocks_defect_return_draft_submit_without_inventory_change",
+          "assertion": "assert record.remaining_quantity == Decimal(\"3\")",
+          "sourceHash": "624db0f4243563051d53d7ea853a0c340cbcce840aab492adc2315828f394ede"
+        }
+      ],
+      "execution": {
+        "status": "NOT_RUN"
+      }
+    },
+    {
+      "caseId": "PC-DELTA-DEFECT-05",
+      "conditionId": "employee-only-active-supplier-list",
+      "bindings": [
+        {
+          "file": "backend/tests/test_defect_return_supplier.py",
+          "selector": "test_active_employee_can_list_active_suppliers_but_not_hidden_suppliers",
+          "assertion": "assert response.status_code == 200",
+          "sourceHash": "624db0f4243563051d53d7ea853a0c340cbcce840aab492adc2315828f394ede"
+        },
+        {
+          "file": "backend/tests/test_defect_return_supplier.py",
+          "selector": "test_active_employee_can_list_active_suppliers_but_not_hidden_suppliers",
+          "assertion": "assert [row[\"supplier_id\"] for row in response.json()] == [str(active.supplier_id)]",
+          "sourceHash": "624db0f4243563051d53d7ea853a0c340cbcce840aab492adc2315828f394ede"
+        },
+        {
+          "file": "backend/tests/test_defect_return_supplier.py",
+          "selector": "test_active_employee_can_list_active_suppliers_but_not_hidden_suppliers",
+          "assertion": "assert client.get(\n        f\"/api/suppliers?requester_employee_id={employee.employee_id}&include_inactive=true\"\n    ).status_code == 403",
+          "sourceHash": "624db0f4243563051d53d7ea853a0c340cbcce840aab492adc2315828f394ede"
+        }
+      ],
+      "execution": {
+        "status": "NOT_RUN"
+      }
+    },
+    {
+      "caseId": "PC-DELTA-DEFECT-05",
+      "conditionId": "active-supplier-required-hidden-stale-blocked",
+      "bindings": [
+        {
+          "file": "frontend/tests/e2e/defect-processing-expectations.spec.ts",
+          "selector": "DEFECT-RETURN PC-DELTA-DEFECT-05/06 8.13-03/04/05 활성업체·숨김경합·당시이름·PIN취소·실제격리수량",
+          "assertion": "await expect(picker.getByRole(\"button\", { name: `${supplierName}숨김`, exact: true })).toHaveCount(0);",
+          "sourceHash": "94c6178adca193663b9db9ad3fb2fb80c9b617a024c7a9c5d534f1194954fc5a",
+          "line": 53
+        },
+        {
+          "file": "frontend/tests/e2e/defect-processing-expectations.spec.ts",
+          "selector": "DEFECT-RETURN PC-DELTA-DEFECT-05/06 8.13-03/04/05 활성업체·숨김경합·당시이름·PIN취소·실제격리수량",
+          "assertion": "await expect(page.getByRole(\"button\", { name: \"반품 확인\", exact: true })).toBeDisabled();",
+          "sourceHash": "94c6178adca193663b9db9ad3fb2fb80c9b617a024c7a9c5d534f1194954fc5a",
+          "line": 53
+        },
+        {
+          "file": "frontend/tests/e2e/defect-processing-expectations.spec.ts",
+          "selector": "DEFECT-RETURN PC-DELTA-DEFECT-05/06 8.13-03/04/05 활성업체·숨김경합·당시이름·PIN취소·실제격리수량",
+          "assertion": "expect((await rejected).status()).toBe(422);",
+          "sourceHash": "94c6178adca193663b9db9ad3fb2fb80c9b617a024c7a9c5d534f1194954fc5a",
+          "line": 53
+        },
+        {
+          "file": "frontend/tests/e2e/defect-processing-expectations.spec.ts",
+          "selector": "DEFECT-RETURN PC-DELTA-DEFECT-05/06 8.13-03/04/05 활성업체·숨김경합·당시이름·PIN취소·실제격리수량",
+          "assertion": "expect(await snapshot(request, item.item_id)).toEqual(before);",
+          "sourceHash": "94c6178adca193663b9db9ad3fb2fb80c9b617a024c7a9c5d534f1194954fc5a",
+          "line": 53
+        },
+        {
+          "file": "frontend/tests/e2e/defect-bulk-boundaries.spec.ts",
+          "selector": "DEFECT-BULK-RETURN 창고 일괄반품 업체필수·숨김경합 전체불변과 부서 반품 없음",
+          "assertion": "await expect(page.getByRole(\"button\", { name: /^반품(?: |$)/ }).filter({ visible: true })).toHaveCount(0);",
+          "sourceHash": "d76dd0f3810d08308b3a4d97d069f6db3422220ec0c6357f2cccc000d639d889",
+          "line": 215
+        },
+        {
+          "file": "frontend/tests/e2e/defect-bulk-boundaries.spec.ts",
+          "selector": "DEFECT-BULK-RETURN 창고 일괄반품 업체필수·숨김경합 전체불변과 부서 반품 없음",
+          "assertion": "expect((await rejected).status()).toBe(422);",
+          "sourceHash": "d76dd0f3810d08308b3a4d97d069f6db3422220ec0c6357f2cccc000d639d889",
+          "line": 215
+        },
+        {
+          "file": "frontend/tests/e2e/defect-bulk-boundaries.spec.ts",
+          "selector": "DEFECT-BULK-RETURN 창고 일괄반품 업체필수·숨김경합 전체불변과 부서 반품 없음",
+          "assertion": "await expect(page.getByText(/숨김.*공급업체|활성.*공급업체/).filter({ visible: true })).toBeVisible();",
+          "sourceHash": "d76dd0f3810d08308b3a4d97d069f6db3422220ec0c6357f2cccc000d639d889",
+          "line": 215
+        },
+        {
+          "file": "frontend/tests/e2e/defect-bulk-boundaries.spec.ts",
+          "selector": "DEFECT-BULK-RETURN 창고 일괄반품 업체필수·숨김경합 전체불변과 부서 반품 없음",
+          "assertion": "expect(await snapshot(request, item.item_id)).toEqual(before);",
+          "sourceHash": "d76dd0f3810d08308b3a4d97d069f6db3422220ec0c6357f2cccc000d639d889",
+          "line": 215
+        }
+      ],
+      "execution": {
+        "status": "NOT_RUN"
+      }
+    }
+  ]
+}

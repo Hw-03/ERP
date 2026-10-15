@@ -1,0 +1,1585 @@
+﻿import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { StrictMode, useEffect, useLayoutEffect, useState } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ioApi } from "@/lib/api/io";
+import type { IoBatch } from "@/lib/api/types/io";
+import type { TransactionLog } from "@/lib/api/types/production";
+import { tint } from "@/lib/mes/colorUtils";
+import { transactionColor } from "@/lib/mes-status";
+import { HistoryTable } from "../HistoryTable";
+import type { HistoryRowPresentation } from "../historyPresentation";
+import {
+  HISTORY_CHILD_ROW_CLASS,
+  HISTORY_MAIN_CELL_CLASS,
+  HISTORY_MAIN_ROW_CLASS,
+  FlowBadge,
+  ItemCodeCell,
+  MovementSummaryCell,
+  PeopleStatusCell,
+  ReferenceBatchDetail,
+  StockSnapshotCell,
+  StockSnapshotContent,
+  TargetSummaryBlock,
+  buildGroups,
+  getAdditionalDistinctItemCount,
+  getHistoryGroupSummary,
+  getStockSnapshotQuantityWidth,
+  toHistoryLogGroups,
+} from "../historyTableHelpers";
+
+vi.mock("@/lib/api/io", () => ({
+  ioApi: {
+    getBatch: vi.fn(),
+  },
+}));
+
+beforeEach(() => {
+  vi.mocked(ioApi.getBatch).mockReset();
+});
+
+function makeLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
+  return {
+    log_id: "log-1",
+    item_id: "ITEM-1",
+    mes_code: "AX-001",
+    item_name: "AX-100",
+    item_process_type_code: "AF",
+    item_unit: "EA",
+    transaction_type: "SHIP",
+    quantity_change: -1,
+    quantity_before: 2,
+    quantity_after: 1,
+    warehouse_qty_before: null,
+    warehouse_qty_after: null,
+    transfer_qty: 1,
+    reference_no: "SHIP-REQ-1",
+    produced_by: null,
+    requester_name: null,
+    approver_name: null,
+    requested_at: "2026-07-02T01:00:00Z",
+    approved_at: null,
+    department: "조립",
+    notes: null,
+    operation_batch_id: null,
+    created_at: "2026-07-02T01:00:00Z",
+    edit_count: 0,
+    cancelled: false,
+    cancel_reason: null,
+    cancelled_by: null,
+    cancelled_at: null,
+    inventory_effect: null,
+    shipping_phase: null,
+    ...overrides,
+  };
+}
+
+describe("getHistoryGroupSummary cancellation labels", () => {
+  it.each([
+    [false, false], [false, true], [true, false], [true, true],
+  ])("전환 회수품보다 대상품을 대표로 유지한다: cancellation=%s, reversed=%s", (cancellation, reversed) => {
+    const multiplier = cancellation ? -1 : 1;
+    const base: Partial<TransactionLog> = {
+      shipping_phase: "COMPONENT_CHANGE",
+      operation_kind: cancellation ? "CANCELLATION" : "BUSINESS",
+      operation_role: "PRODUCT_OUTPUT",
+      operation_display_label: "품목 전환",
+    };
+    // The API orders the later recovery RECEIVE before the target PRODUCE; both retain PRODUCT_OUTPUT on cancellation.
+    const recovered = makeLog({ ...base, log_id: "recovered", item_id: "RECOVERED", item_name: "회수품", transaction_type: "RECEIVE", quantity_change: 2 * multiplier, created_at: "2026-07-02T01:00:05Z" });
+    const target = makeLog({ ...base, log_id: "target", item_id: "TARGET", item_name: "전환 대상", transaction_type: "PRODUCE", quantity_change: multiplier, created_at: "2026-07-02T01:00:04Z" });
+    const inputs = ["added-b", "added-a", "source"].map((id) => makeLog({ ...base, log_id: id, item_id: id, transaction_type: "BACKFLUSH", quantity_change: -multiplier, operation_role: "COMPONENT_INPUT" }));
+    const logs = [recovered, target, ...inputs].map((log) => ({ ...log, reverses_log_id: cancellation ? `original-${log.log_id}` : null }));
+    const summary = getHistoryGroupSummary({ type: "operation", operationId: "conversion", logs: reversed ? logs.toReversed() : logs });
+
+    expect(summary.primaryLog.log_id).toBe("target");
+    expect(summary.title).toBe("전환 대상");
+    expect(summary.additionalItemCount).toBe(4);
+    expect(summary.primaryLog.quantity_change).toBe(multiplier);
+    expect(summary.label).toBe(cancellation ? "품목 전환 취소" : "품목 전환");
+  });
+
+  it.each([false, true])("비전환 작업의 기존 역할 우선 대표를 유지한다: cancellation=%s", (cancellation) => {
+    const base: Partial<TransactionLog> = { operation_role: "PRODUCT_OUTPUT", operation_kind: cancellation ? "CANCELLATION" : "BUSINESS" };
+    const first = makeLog({ ...base, log_id: "first-output", transaction_type: "RECEIVE" });
+    const produced = makeLog({ ...base, log_id: "produced", transaction_type: "PRODUCE" });
+
+    expect(getHistoryGroupSummary({ type: "operation", operationId: "non-conversion", logs: [first, produced] }).primaryLog).toBe(first);
+  });
+
+  it.each([false, true])("keeps research use as representative before returned components, reversed=%s", (reversed) => {
+    const used = makeLog({ log_id: "used", transaction_type: "INTERNAL_USE", department: "연구", operation_role: "PRIMARY" });
+    const returned = makeLog({ log_id: "returned", transaction_type: "PRODUCE", department: "조립", quantity_change: 2, operation_role: "PRIMARY" });
+    const summary = getHistoryGroupSummary({ type: "operation", operationId: "internal-use", logs: reversed ? [used, returned] : [returned, used] });
+    expect(summary.primaryLog.log_id).toBe("used");
+    expect(summary.label).toBe("연구소 사용");
+    expect(summary.displayType).toBe("INTERNAL_USE");
+  });
+
+  it.each([
+    ["disassemble", ["BACKFLUSH", "PRODUCE"], "분해 출고"],
+    ["disassemble", ["BACKFLUSH"], "부서 입출고"],
+    ["disassemble", ["PRODUCE"], "부서 입출고"],
+    ["produce", ["PRODUCE"], "부서 입출고"],
+    ["produce", ["BACKFLUSH"], "부서 입출고"],
+    ["produce", ["PRODUCE", "BACKFLUSH"], "생산 입고"],
+  ] as const)("%s %s preserves cancellation after grouping", (operationLabel, types, label) => {
+    for (const cancellation of [false, true]) {
+      const logs = types.map((transactionType, index) => makeLog({
+        log_id: `log-${index}`,
+        transaction_type: transactionType,
+        operation_display_label: operationLabel,
+        operation_kind: cancellation ? "CANCELLATION" : "BUSINESS",
+      }));
+      const summary = getHistoryGroupSummary({ type: "operation", operationId: "operation-1", logs });
+      expect(summary.label).toBe(`${label}${cancellation ? " 취소" : ""}`);
+      if (cancellation) expect(summary.color).toBe(transactionColor("MARK_DEFECTIVE"));
+    }
+  });
+
+  it("already labelled solo and reference groups do not duplicate the suffix", () => {
+    const log = makeLog({ transaction_type: "TRANSFER_TO_WH", operation_kind: "CANCELLATION" });
+    expect(getHistoryGroupSummary({ type: "solo", log }).label).toBe("창고 입출고 취소");
+    expect(getHistoryGroupSummary({ type: "batch", refKey: "ref", refNo: "ref", logs: [log] }).label).toBe("창고 입출고 취소");
+  });
+});
+
+describe("getAdditionalDistinctItemCount", () => {
+  it("대표 품목을 제외한 고유 품목만 세고 미변동 구성품도 포함한다", () => {
+    const representative = makeLog({ item_id: "PARENT", quantity_change: 5 });
+    const duplicateParent = makeLog({ log_id: "parent-copy", item_id: "PARENT", quantity_change: -5 });
+    const firstComponent = makeLog({ log_id: "component-a", item_id: "COMPONENT-A", quantity_change: 0 });
+    const duplicatedComponent = makeLog({ log_id: "component-a-copy", item_id: "COMPONENT-A", quantity_change: -1 });
+    const secondComponent = makeLog({ log_id: "component-b", item_id: "COMPONENT-B", quantity_change: 3 });
+
+    expect(getAdditionalDistinctItemCount(
+      [representative, duplicateParent, firstComponent, duplicatedComponent, secondComponent],
+      representative,
+    )).toBe(2);
+  });
+
+  it("추가 품목이 없으면 0을 반환한다", () => {
+    const representative = makeLog({ item_id: "PARENT" });
+
+    expect(getAdditionalDistinctItemCount([representative, makeLog({ log_id: "copy", item_id: "PARENT" })], representative)).toBe(0);
+  });
+});
+
+describe("getStockSnapshotQuantityWidth", () => {
+  it("실제 위치의 수량 폭에는 표시하지 않는 다른 부서 합계를 넣지 않는다", () => {
+    expect(getStockSnapshotQuantityWidth([makeLog({
+      warehouse_qty_before: 5, warehouse_qty_after: 4,
+      department_qty_before: 9_999_999, department_qty_after: 10_000_000,
+      inventory_effect: [{ scope: "location", department: "튜브", status: "PRODUCTION", delta: 1, quantity_before: 7, quantity_after: 8 }],
+    })])).toBe(24);
+  });
+  it("숨긴 미변동 재고의 큰 수량은 묶음 수량 폭에 포함하지 않는다", () => {
+    expect(getStockSnapshotQuantityWidth([
+      makeLog({
+        warehouse_qty_before: 9_999_999,
+        warehouse_qty_after: 9_999_999,
+        department_qty_before: 76,
+        department_qty_after: 75,
+      }),
+    ])).toBe(24);
+  });
+
+  it("요청 순 재고를 기준으로 묶음 수량 폭을 계산한다", () => {
+    const log = Object.assign(makeLog({
+      warehouse_qty_before: 9_999_999,
+      warehouse_qty_after: 9_999_955,
+      department_qty_before: 1_000_000,
+      department_qty_after: 999_956,
+    }), {
+      request_order_stock: {
+        status: "available",
+        reason: null,
+        warehouse_qty_before: 44,
+        warehouse_qty_after: 0,
+        department_qty_before: 12,
+        department_qty_after: 12,
+      },
+    });
+
+    expect(getStockSnapshotQuantityWidth([log])).toBe(24);
+  });
+});
+
+describe("StockSnapshotContent panel", () => {
+  it.each(["table", "panel"] as const)("%s에서 다른 부서 재고를 더하지 않고 실제 튜브 7→8을 표시한다", (variant) => {
+    render(<StockSnapshotContent variant={variant} log={makeLog({
+      transaction_type: "TRANSFER_TO_PROD", department: "튜브",
+      warehouse_qty_before: 20, warehouse_qty_after: 19,
+      department_qty_before: 14, department_qty_after: 15,
+      inventory_effect: [
+        { scope: "warehouse", delta: -1, quantity_before: 20, quantity_after: 19 },
+        { scope: "location", department: "튜브", status: "PRODUCTION", delta: 1, quantity_before: 7, quantity_after: 8 },
+      ],
+    })} />);
+    expect(screen.getByLabelText("튜브 7 +1→8")).toBeInTheDocument();
+    expect(screen.getByLabelText("창고 20 −1→19")).toBeInTheDocument();
+    expect(screen.queryByLabelText("튜브 14 +1→15")).not.toBeInTheDocument();
+  });
+
+  it.each(["PRODUCE", "TRANSFER_TO_WH", "UNMARK_DEFECTIVE"] as const)("%s와 취소도 실제 위치 전후 수량을 유지한다", (transactionType) => {
+    render(<StockSnapshotContent log={makeLog({
+      transaction_type: transactionType, cancelled: true, operation_kind: "CANCELLATION", department: "튜브",
+      warehouse_qty_before: 0, warehouse_qty_after: 0,
+      department_qty_before: 15, department_qty_after: 14,
+      inventory_effect: [{ scope: "location", department: "튜브", status: "PRODUCTION", delta: -1, quantity_before: 8, quantity_after: 7 }],
+    })} />);
+    expect(screen.getByLabelText("튜브 8 −1→7")).toBeInTheDocument();
+    expect(screen.queryByLabelText("튜브 15 −1→14")).not.toBeInTheDocument();
+  });
+
+  it("요청순 합계와 실제 위치가 다르면 확정된 위치별 전후 수량을 표시한다", () => {
+    render(<StockSnapshotContent log={makeLog({
+      warehouse_qty_before: 0, warehouse_qty_after: 0, department_qty_before: 14, department_qty_after: 15,
+      request_order_stock: { status: "available", reason: null, warehouse_qty_before: 0, warehouse_qty_after: 0, department_qty_before: 20, department_qty_after: 21 },
+      inventory_effect: [{ scope: "location", department: "튜브", status: "PRODUCTION", delta: 1, quantity_before: 7, quantity_after: 8 }],
+    })} />);
+    expect(screen.getByLabelText("튜브 7 +1→8")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/20.*21/)).not.toBeInTheDocument();
+  });
+
+  it("부서 총합이 같아도 실제로 움직인 두 위치는 각각 표시한다", () => {
+    render(<StockSnapshotContent log={makeLog({
+      warehouse_qty_before: 0, warehouse_qty_after: 0, department_qty_before: 10, department_qty_after: 10,
+      inventory_effect: [
+        { scope: "location", department: "튜브", status: "PRODUCTION", delta: 1, quantity_before: 7, quantity_after: 8 },
+        { scope: "location", department: "조립", status: "PRODUCTION", delta: -1, quantity_before: 3, quantity_after: 2 },
+      ],
+    })} />);
+    expect(screen.getByLabelText("튜브 7 +1→8")).toBeInTheDocument();
+    expect(screen.getByLabelText("조립 3 −1→2")).toBeInTheDocument();
+    expect(screen.queryByLabelText("재고 변동 없음")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { scope: "location", department: "튜브", status: "PRODUCTION", delta: 1 },
+    { scope: "location", department: "튜브", status: "PRODUCTION", delta: 1, quantity_before: 7 },
+    { scope: "location", department: "튜브", status: "PRODUCTION", delta: 1, quantity_before: Number.NaN, quantity_after: 8 },
+  ])("위치별 전후가 없는 delta %o는 부서 합계라고 명시하고 위치값을 추정하지 않는다", (effect) => {
+    render(<StockSnapshotContent log={makeLog({
+      department: "튜브", warehouse_qty_before: 0, warehouse_qty_after: 0,
+      department_qty_before: 14, department_qty_after: 15, inventory_effect: [effect],
+    })} />);
+    expect(screen.getByLabelText("부서 합계 14 +1→15")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/튜브.*14.*15/)).not.toBeInTheDocument();
+  });
+
+  it("패널과 표 모두 변경 전 수량·증감·화살표·변경 후 수량 순서를 유지한다", () => {
+    const log = makeLog({ warehouse_qty_before: 1_234_567, warehouse_qty_after: 1_234_559, department_qty_before: 0, department_qty_after: 0 });
+    const { rerender } = render(<StockSnapshotContent log={log} variant="panel" />);
+    expect(screen.getByLabelText("창고 1,234,567 −8→1,234,559").textContent).toBe("창고1,234,567−8→1,234,559");
+
+    rerender(<StockSnapshotContent log={log} />);
+    expect(screen.getByLabelText("창고 1,234,567 −8→1,234,559").textContent).toBe("창고1,234,567−8→1,234,559");
+  });
+
+  it("복수 위치의 증가와 감소를 각각 표시하고 취소된 수량도 읽을 수 있게 남긴다", () => {
+    const log = makeLog({ warehouse_qty_before: 100, warehouse_qty_after: 92, department_qty_before: 10, department_qty_after: 18, cancelled: true });
+    const { container } = render(<StockSnapshotContent log={log} variant="panel" />);
+    expect(screen.getByLabelText("창고 100 −8→92").textContent).toBe("창고100−8→92");
+    expect(screen.getByLabelText("부서 합계 10 +8→18").textContent).toBe("부서 합계10+8→18");
+    expect(container.querySelector("[data-history-after-stock]")).toBeNull();
+  });
+
+  it("정상 재고의 불량 전환은 정상 감소와 불량 증가를 각각 보존한다", () => {
+    render(<StockSnapshotContent variant="panel" log={makeLog({
+      transaction_type: "MARK_DEFECTIVE", quantity_before: 25, quantity_after: 25,
+      warehouse_qty_before: 0, warehouse_qty_after: 0, department_qty_before: 10, department_qty_after: 2,
+      inventory_effect: [{ scope: "location", department: "조립", status: "DEFECTIVE", delta: 8 }],
+    })} />);
+    expect(screen.getByLabelText("부서 합계 10 −8→2")).toBeInTheDocument();
+    expect(screen.getByLabelText("불량 15 +8→23")).toBeInTheDocument();
+  });
+
+  it("부서 정정 이동의 출발 수량·감소·도착 부서와 실제 도착 재고를 유지한다", () => {
+    const log = makeLog({ transaction_type: "TRANSFER_DEPT", reference_no: "DEPT-CORRECTION-1", inventory_effect: [
+      { scope: "location", department: "긴 출발 부서 이름", status: "PRODUCTION", delta: -8, quantity_before: 1_234_567, quantity_after: 1_234_559 },
+      { scope: "location", department: "긴 도착 부서 이름", status: "PRODUCTION", delta: 8, quantity_before: 72, quantity_after: 80 },
+    ] });
+    const { rerender } = render(<StockSnapshotContent log={log} variant="panel" />);
+    const label = "부서 위치 이동: 긴 출발 부서 이름 1,234,567 −8 → 긴 도착 부서 이름 80";
+    expect(screen.getByLabelText(label)).toBeInTheDocument();
+    rerender(<StockSnapshotContent log={log} />);
+    expect(screen.getByLabelText(label)).toBeInTheDocument();
+  });
+});
+
+describe("StockSnapshotCell request-order stock", () => {
+  it("승인 시점 원본 대신 요청 순 재계산 재고를 표시한다", () => {
+    const log = Object.assign(makeLog({
+      quantity_change: -44,
+      warehouse_qty_before: 94,
+      warehouse_qty_after: 50,
+      department_qty_before: 30,
+      department_qty_after: 30,
+    }), {
+      request_order_stock: {
+        status: "available",
+        reason: null,
+        warehouse_qty_before: 44,
+        warehouse_qty_after: 0,
+        department_qty_before: 30,
+        department_qty_after: 30,
+      },
+    });
+
+    render(<table><tbody><tr><StockSnapshotCell log={log} /></tr></tbody></table>);
+
+    expect(screen.getByLabelText(/재고 변동: 창고 44.*0/)).toBeInTheDocument();
+    expect(screen.queryByText("94")).not.toBeInTheDocument();
+    expect(screen.queryByText("50")).not.toBeInTheDocument();
+  });
+
+  it("재계산 불가 응답은 원본 재고로 대체하지 않고 사유를 설명한다", async () => {
+    const log = Object.assign(makeLog({
+      warehouse_qty_before: 94,
+      warehouse_qty_after: 50,
+      department_qty_before: 30,
+      department_qty_after: 30,
+    }), {
+      request_order_stock: {
+        status: "unavailable",
+        reason: "ambiguous_order",
+        warehouse_qty_before: null,
+        warehouse_qty_after: null,
+        department_qty_before: null,
+        department_qty_after: null,
+      },
+    });
+
+    render(<table><tbody><tr><StockSnapshotCell log={log} /></tr></tbody></table>);
+
+    const unavailable = screen.getByLabelText("요청 순 재고 계산 불가: 같은 처리 시각의 거래 순서를 확정할 수 없습니다.");
+    expect(unavailable).toHaveTextContent("계산 불가");
+    expect(screen.queryByText("94")).not.toBeInTheDocument();
+    fireEvent.mouseEnter(unavailable);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("같은 처리 시각의 거래 순서를 확정할 수 없습니다.");
+  });
+});
+
+describe("buildGroups shipping phase grouping", () => {
+  it("keeps multiple inventory operations from one I/O batch in one display group", () => {
+    const groups = buildGroups([
+      makeLog({ log_id: "line-a", operation_id: "operation-a", operation_batch_id: "batch-1", operation_kind: "BUSINESS", operation_effective_status: "active" }),
+      makeLog({ log_id: "line-b", operation_id: "operation-b", operation_batch_id: "batch-1", operation_kind: "BUSINESS", operation_effective_status: "active" }),
+    ]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ type: "op_batch", batchId: "batch-1" });
+  });
+
+  it("separates prepare and pickup logs that share a shipping request reference", () => {
+    const groups = buildGroups([
+      makeLog({ log_id: "prep-pa", transaction_type: "BACKFLUSH", shipping_phase: "PREPARE", item_id: "PA" }),
+      makeLog({ log_id: "prep-pf", transaction_type: "PRODUCE", shipping_phase: "PREPARE", item_id: "PF" }),
+      makeLog({ log_id: "pickup-pf", transaction_type: "SHIP", shipping_phase: "PICKUP", item_id: "PF" }),
+    ]);
+
+    expect(groups).toHaveLength(2);
+    expect(groups[0]).toMatchObject({ type: "batch", refNo: "SHIP-REQ-1", refKey: "SHIP-REQ-1::PREPARE" });
+    expect(groups[1]).toMatchObject({ type: "solo" });
+    if (groups[0].type === "batch") {
+      expect(groups[0].logs.map((log) => log.shipping_phase)).toEqual(["PREPARE", "PREPARE"]);
+    }
+    if (groups[1].type === "solo") {
+      expect(groups[1].log.shipping_phase).toBe("PICKUP");
+    }
+  });
+});
+
+describe("toHistoryLogGroups", () => {
+  it("서버 대표 묶음의 경계와 안정 키를 다시 묶지 않고 표 행 모델로 변환한다", () => {
+    const parent = makeLog({ log_id: "defect-parent", transaction_type: "MARK_DEFECTIVE" });
+    const child = makeLog({ log_id: "defect-child", transaction_type: "DISASSEMBLE" });
+    const groups = toHistoryLogGroups([
+      { type: "operation", key: "operation-1", logs: [makeLog({ operation_id: "operation-1" })], matchedLogIds: ["log-1"] },
+      { type: "op_batch", key: "batch-1", logs: [makeLog({ operation_batch_id: "batch-1" })] },
+      { type: "batch", key: "REF-1::PICKUP", logs: [makeLog({ reference_no: "REF-1", shipping_phase: "PICKUP" })] },
+      { type: "defect_lifecycle", key: "defect-lifecycle:defect-parent:defect-child", logs: [parent, child] },
+    ]);
+
+    expect(groups).toEqual([
+      expect.objectContaining({ type: "operation", operationId: "operation-1", matchedLogIds: ["log-1"] }),
+      expect.objectContaining({ type: "op_batch", batchId: "batch-1" }),
+      expect.objectContaining({ type: "batch", refKey: "REF-1::PICKUP", refNo: "REF-1" }),
+      expect.objectContaining({ type: "defect_lifecycle", parent, child }),
+    ]);
+  });
+});
+
+describe("HistoryTable server groups", () => {
+  it("재고 변동 열에서 요청 순 계산과 승인 후 변경 가능성을 설명한다", async () => {
+    render(
+      <HistoryTable
+        loading={false}
+        filteredLogs={[makeLog()]}
+        selection={null}
+        onSelectLog={() => {}}
+        onSelectBatch={() => {}}
+        batchCache={new Map()}
+        setBatchCache={() => {}}
+        canLoadMore={false}
+        loadingMore={false}
+        onLoadMore={() => {}}
+      />,
+    );
+
+    const help = screen.getByLabelText("수량 변동 계산 기준");
+    fireEvent.focus(help);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("요청 시각 순서로 계산");
+    expect(screen.getByRole("tooltip")).toHaveTextContent("승인되면 과거 표시도 변경");
+  });
+
+  it("invalidates the prior request during a revision render before passive cache reset", async () => {
+    const batchId = "batch-revision-race";
+    const staleBatch = {
+      batch_id: batchId,
+      work_type: "process",
+      sub_type: "produce",
+      status: "completed",
+      bundles: [],
+      from_department: "Stale Revision",
+      to_department: "Stale Revision",
+    } as IoBatch;
+    const freshBatch = {
+      ...staleBatch,
+      from_department: "Fresh Revision",
+      to_department: "Fresh Revision",
+    };
+    let resolveStale: (batch: IoBatch) => void = () => {};
+    let resolveFresh: (batch: IoBatch) => void = () => {};
+    vi.mocked(ioApi.getBatch)
+      .mockImplementationOnce(() => new Promise<IoBatch>((resolve) => {
+        resolveStale = resolve;
+      }))
+      .mockImplementationOnce(() => new Promise<IoBatch>((resolve) => {
+        resolveFresh = resolve;
+      }));
+    const groups = [{
+      type: "op_batch" as const,
+      key: batchId,
+      batchId,
+      logs: [makeLog({ operation_batch_id: batchId })],
+    }];
+
+    function RevisionHarness({ cacheEpoch }: { cacheEpoch: number }) {
+      const [cache, setCache] = useState<Map<string, IoBatch>>(new Map());
+      useLayoutEffect(() => {
+        if (cacheEpoch === 2) resolveStale(staleBatch);
+      }, [cacheEpoch]);
+      return (
+        <>
+          <span data-testid="revision-race-cache">{cache.get(batchId)?.from_department ?? "empty"}</span>
+          <HistoryTable
+            loading={false}
+            displayGroups={groups}
+            selection={null}
+            onSelectLog={() => {}}
+            onSelectBatch={() => {}}
+            batchCache={cache}
+            setBatchCache={setCache}
+            cacheEpoch={cacheEpoch}
+            canLoadMore={false}
+            loadingMore={false}
+            onLoadMore={() => {}}
+          />
+        </>
+      );
+    }
+
+    const { rerender } = render(<RevisionHarness cacheEpoch={1} />);
+    await waitFor(() => expect(ioApi.getBatch).toHaveBeenCalledTimes(1));
+
+    rerender(<RevisionHarness cacheEpoch={2} />);
+
+    await waitFor(() => expect(ioApi.getBatch).toHaveBeenCalledTimes(2));
+    expect(screen.getByTestId("revision-race-cache")).toHaveTextContent("empty");
+    expect(screen.getAllByLabelText("작업 정보 확인 중").length).toBeGreaterThan(0);
+
+    await act(async () => resolveFresh(freshBatch));
+    await waitFor(() => expect(screen.getByTestId("revision-race-cache")).toHaveTextContent("Fresh Revision"));
+  });
+
+  it("requeues an aborted StrictMode setup request and applies only the fresh batch", async () => {
+    const batchId = "batch-strict-mode";
+    const staleBatch = {
+      batch_id: batchId,
+      work_type: "process",
+      sub_type: "produce",
+      status: "completed",
+      bundles: [],
+      from_department: "Stale Setup",
+      to_department: "Stale Setup",
+    } as IoBatch;
+    const freshBatch = {
+      ...staleBatch,
+      from_department: "Fresh Setup",
+      to_department: "Fresh Setup",
+    };
+    let firstSignal: AbortSignal | undefined;
+    let resolveStale: (batch: IoBatch) => void = () => {};
+    let resolveFresh: (batch: IoBatch) => void = () => {};
+    vi.mocked(ioApi.getBatch)
+      .mockImplementationOnce((_batchId, options) => {
+        firstSignal = options?.signal;
+        return new Promise<IoBatch>((resolve) => {
+          resolveStale = resolve;
+        });
+      })
+      .mockImplementationOnce(() => new Promise<IoBatch>((resolve) => {
+        resolveFresh = resolve;
+      }));
+    const groups = [{
+      type: "op_batch" as const,
+      key: batchId,
+      batchId,
+      logs: [makeLog({ operation_batch_id: batchId })],
+    }];
+
+    function StrictModeHarness() {
+      const [cache, setCache] = useState<Map<string, IoBatch>>(new Map());
+      return (
+        <>
+          <span data-testid="strict-mode-cache">{cache.get(batchId)?.from_department ?? "empty"}</span>
+          <HistoryTable
+            loading={false}
+            displayGroups={groups}
+            selection={null}
+            onSelectLog={() => {}}
+            onSelectBatch={() => {}}
+            batchCache={cache}
+            setBatchCache={setCache}
+            cacheEpoch={1}
+            canLoadMore={false}
+            loadingMore={false}
+            onLoadMore={() => {}}
+          />
+        </>
+      );
+    }
+
+    render(
+      <StrictMode>
+        <StrictModeHarness />
+      </StrictMode>,
+    );
+
+    await waitFor(() => expect(firstSignal?.aborted).toBe(true));
+    await waitFor(() => expect(ioApi.getBatch).toHaveBeenCalledTimes(2));
+
+    await act(async () => resolveStale(staleBatch));
+    expect(screen.getByTestId("strict-mode-cache")).toHaveTextContent("empty");
+
+    await act(async () => resolveFresh(freshBatch));
+    await waitFor(() => expect(screen.getByTestId("strict-mode-cache")).toHaveTextContent("Fresh Setup"));
+  });
+
+  it("discards an in-flight batch from the prior cache epoch and starts a fresh request after clear", async () => {
+    const batchId = "batch-in-flight";
+    const staleBatch = {
+      batch_id: batchId,
+      work_type: "process",
+      sub_type: "produce",
+      status: "completed",
+      bundles: [],
+      from_department: "Stale Epoch",
+      to_department: "Stale Epoch",
+    } as IoBatch;
+    const freshBatch = {
+      ...staleBatch,
+      from_department: "Fresh Epoch",
+      to_department: "Fresh Epoch",
+    };
+    let resolveStale: (batch: IoBatch) => void = () => {};
+    let resolveFresh: (batch: IoBatch) => void = () => {};
+    vi.mocked(ioApi.getBatch)
+      .mockImplementationOnce(() => new Promise<IoBatch>((resolve) => {
+        resolveStale = resolve;
+      }))
+      .mockImplementationOnce(() => new Promise<IoBatch>((resolve) => {
+        resolveFresh = resolve;
+      }));
+    const groups = [{
+      type: "op_batch" as const,
+      key: batchId,
+      batchId,
+      logs: [makeLog({ operation_batch_id: batchId })],
+    }];
+
+    function InFlightCacheHarness({ clearNonce }: { clearNonce: number }) {
+      const [cache, setCache] = useState<Map<string, IoBatch>>(new Map());
+      useEffect(() => {
+        if (clearNonce > 0) setCache(new Map());
+      }, [clearNonce]);
+      return (
+        <>
+          <span data-testid="in-flight-batch-cache">{cache.get(batchId)?.from_department ?? "empty"}</span>
+          <HistoryTable
+            loading={false}
+            displayGroups={groups}
+            selection={null}
+            onSelectLog={() => {}}
+            onSelectBatch={() => {}}
+            batchCache={cache}
+            setBatchCache={setCache}
+            canLoadMore={false}
+            loadingMore={false}
+            onLoadMore={() => {}}
+          />
+        </>
+      );
+    }
+
+    const { rerender } = render(<InFlightCacheHarness clearNonce={0} />);
+    await waitFor(() => expect(ioApi.getBatch).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("in-flight-batch-cache")).toHaveTextContent("empty");
+
+    rerender(<InFlightCacheHarness clearNonce={1} />);
+
+    await waitFor(() => expect(ioApi.getBatch).toHaveBeenCalledTimes(2));
+    await act(async () => resolveStale(staleBatch));
+    expect(screen.getByTestId("in-flight-batch-cache")).toHaveTextContent("empty");
+    expect(screen.getAllByLabelText("작업 정보 확인 중").length).toBeGreaterThan(0);
+
+    await act(async () => resolveFresh(freshBatch));
+    await waitFor(() => expect(screen.getByTestId("in-flight-batch-cache")).toHaveTextContent("Fresh Epoch"));
+    expect(screen.queryByLabelText("작업 정보 확인 중")).not.toBeInTheDocument();
+  });
+
+  it("requeues a visible batch after its shared cache is cleared and repopulates the cache", async () => {
+    const batchId = "batch-realtime";
+    const staleBatch = {
+      batch_id: batchId,
+      work_type: "process",
+      sub_type: "produce",
+      status: "completed",
+      bundles: [],
+      from_department: "Stale Cache",
+      to_department: "Stale Cache",
+    } as IoBatch;
+    const freshBatch = {
+      ...staleBatch,
+      from_department: "Fresh Cache",
+      to_department: "Fresh Cache",
+    };
+    const groups = [{
+      type: "op_batch" as const,
+      key: batchId,
+      batchId,
+      logs: [makeLog({ operation_batch_id: batchId })],
+    }];
+    vi.mocked(ioApi.getBatch).mockResolvedValue(freshBatch);
+
+    function CacheHarness({ clearNonce }: { clearNonce: number }) {
+      const [cache, setCache] = useState<Map<string, IoBatch>>(
+        () => new Map([[batchId, staleBatch]]),
+      );
+      useEffect(() => {
+        if (clearNonce > 0) setCache(new Map());
+      }, [clearNonce]);
+      return (
+        <>
+          <span data-testid="table-batch-cache">{cache.get(batchId)?.from_department ?? "empty"}</span>
+          <HistoryTable
+            loading={false}
+            displayGroups={groups}
+            selection={null}
+            onSelectLog={() => {}}
+            onSelectBatch={() => {}}
+            batchCache={cache}
+            setBatchCache={setCache}
+            canLoadMore={false}
+            loadingMore={false}
+            onLoadMore={() => {}}
+          />
+        </>
+      );
+    }
+
+    const { rerender } = render(<CacheHarness clearNonce={0} />);
+    expect(screen.getByTestId("table-batch-cache")).toHaveTextContent("Stale Cache");
+    expect(ioApi.getBatch).not.toHaveBeenCalled();
+
+    rerender(<CacheHarness clearNonce={1} />);
+
+    await waitFor(() => expect(ioApi.getBatch).toHaveBeenCalledWith(
+      batchId,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    ));
+    await waitFor(() => expect(screen.getByTestId("table-batch-cache")).toHaveTextContent("Fresh Cache"));
+  });
+
+  it("클라이언트 원본 로그를 다시 묶지 않고 서버가 준 대표 묶음을 렌더링한다", () => {
+    const first = makeLog({ log_id: "server-group-first", reference_no: "SERVER-REF" });
+    const second = makeLog({ log_id: "server-group-second", reference_no: "SERVER-REF" });
+    render(
+      <HistoryTable
+        loading={false}
+        filteredLogs={[]}
+        displayGroups={[{ type: "batch", refKey: "SERVER-REF::", refNo: "SERVER-REF", logs: [first, second] }]}
+        selection={null}
+        onSelectLog={() => {}}
+        onSelectBatch={() => {}}
+        batchCache={new Map()}
+        setBatchCache={() => {}}
+        canLoadMore={false}
+        loadingMore={false}
+        onLoadMore={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "묶음 펼치기" })).toBeInTheDocument();
+  });
+
+  it("selects the DISASSEMBLE parent when a legacy rework group is headed by a newer child log", () => {
+    const onSelectLog = vi.fn();
+    const child = makeLog({
+      log_id: "rework-child",
+      item_id: "RECOVERED",
+      item_name: "회수 구성품",
+      transaction_type: "RECEIVE",
+      reference_no: "defect-disassemble:rework-1",
+    });
+    const parent = makeLog({
+      log_id: "rework-parent",
+      item_id: "PARENT",
+      item_name: "재작업 대상",
+      transaction_type: "DISASSEMBLE",
+      reference_no: child.reference_no,
+    });
+
+    render(
+      <HistoryTable
+        loading={false}
+        filteredLogs={[]}
+        displayGroups={[{
+          type: "batch",
+          refKey: "defect-disassemble:rework-1::",
+          refNo: "defect-disassemble:rework-1",
+          logs: [child, parent],
+        }]}
+        selection={null}
+        onSelectLog={onSelectLog}
+        onSelectBatch={() => {}}
+        batchCache={new Map()}
+        setBatchCache={() => {}}
+        canLoadMore={false}
+        loadingMore={false}
+        onLoadMore={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("재작업 대상").closest("tr")!);
+    expect(onSelectLog).toHaveBeenCalledWith(expect.objectContaining({ log_id: "rework-parent" }));
+  });
+});
+
+describe("history table helper rendering policies", () => {
+  it("keeps non-target table cells unchanged when the right detail panel is open", () => {
+    const log = makeLog();
+    const { container } = render(
+      <HistoryTable
+        loading={false}
+        filteredLogs={[log]}
+        totalCount={1}
+        selection={{ kind: "log", log }}
+        onSelectLog={() => {}}
+        onSelectBatch={() => {}}
+        batchCache={new Map()}
+        setBatchCache={() => {}}
+        canLoadMore={false}
+        loadingMore={false}
+        onLoadMore={() => {}}
+      />,
+    );
+
+    const tableCard = container.querySelector("section.card");
+    const tableScroller = container.querySelector("div.overflow-clip");
+    const table = tableScroller?.querySelector("table");
+
+    expect(tableCard).not.toBeInTheDocument();
+    expect(tableScroller).toHaveClass("min-w-0");
+    expect(tableScroller).toHaveClass("overflow-clip");
+    expect(tableScroller).not.toHaveClass("overflow-x-hidden");
+    expect(tableScroller).not.toHaveClass("-mr-5");
+    expect(table).toHaveClass("w-full");
+    expect(table).toHaveClass("table-fixed");
+    expect(table).not.toHaveClass("[&_tbody_td:nth-child(3)]:px-2");
+    expect(table).not.toHaveClass("[&_tbody_td:nth-child(4)]:px-1");
+    expect(table).not.toHaveClass("[&_tbody_td:nth-child(6)]:px-2");
+    expect(table).not.toHaveClass("[&_tbody_td:nth-child(7)]:px-2");
+    expect(table).not.toHaveClass("[&_tbody_td:nth-child(8)]:px-1");
+    expect(screen.queryByText(/표시 .*건/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "현재 묶음 접기" })).not.toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "일시" })).toHaveClass("sticky", "top-0", "z-10");
+    expect(screen.getByRole("columnheader", { name: "작업" })).toHaveStyle({ width: "184px" });
+    expect(screen.getByRole("columnheader", { name: "담당자" })).toHaveStyle({ width: "132px" });
+  });
+
+  it("defines a single fixed rhythm for main history rows", () => {
+    expect(HISTORY_MAIN_ROW_CLASS).toBe("h-[64px]");
+    expect(HISTORY_CHILD_ROW_CLASS).toBe("h-[40px]");
+    expect(HISTORY_MAIN_CELL_CLASS).toContain("py-2");
+    expect(HISTORY_MAIN_CELL_CLASS).toContain("align-middle");
+  });
+
+  it("keeps every loaded selectable row in the exact 64px slot after appending more logs", () => {
+    const first = makeLog({ log_id: "first" });
+    const second = makeLog({ log_id: "second", reference_no: "SHIP-REQ-2" });
+    const props = {
+      loading: false,
+      totalCount: 2,
+      selection: null,
+      onSelectLog: () => {},
+      onSelectBatch: () => {},
+      batchCache: new Map(),
+      setBatchCache: () => {},
+      canLoadMore: false,
+      loadingMore: false,
+      onLoadMore: () => {},
+    };
+    const { container, rerender } = render(<HistoryTable {...props} filteredLogs={[first]} />);
+
+    expect(container.querySelectorAll("tbody tr[role='button']")).toHaveLength(1);
+    expect(container.querySelector("tbody tr[role='button']")).toHaveClass("h-[64px]");
+
+    rerender(<HistoryTable {...props} filteredLogs={[first, second]} />);
+    const rows = Array.from(container.querySelectorAll("tbody tr[role='button']"));
+    expect(rows).toHaveLength(2);
+    rows.forEach((row) => expect(row).toHaveClass("h-[64px]"));
+  });
+
+  it("keeps the selected row in its transaction color while only the target column stays flexible", () => {
+    const log = makeLog();
+    render(
+      <HistoryTable
+        loading={false}
+        filteredLogs={[log]}
+        selection={{ kind: "log", log }}
+        onSelectLog={() => {}}
+        onSelectBatch={() => {}}
+        batchCache={new Map()}
+        setBatchCache={() => {}}
+        canLoadMore={false}
+        loadingMore={false}
+        onLoadMore={() => {}}
+      />,
+    );
+
+    const target = screen.getByRole("columnheader", { name: "대상" });
+    expect(target.style.width).toBe("");
+    expect(target.style.minWidth).toBe("");
+    expect(screen.getByRole("columnheader", { name: "일시" }).style.width).toBe("116px");
+    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("184px");
+    const itemCodeHeader = screen.getByRole("columnheader", { name: "품목코드" });
+    expect(itemCodeHeader.style.width).toBe("144px");
+    expect(itemCodeHeader).not.toHaveAttribute("colspan");
+    expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "수량 변동" }).style.width).toBe("220px");
+    const statusHeader = screen.getByRole("columnheader", { name: "담당자" });
+    expect(statusHeader.style.width).toBe("132px");
+    expect(statusHeader).toHaveClass("text-center");
+
+    const row = screen.getByRole("button");
+    const color = transactionColor(log.transaction_type);
+    expect(row).toHaveStyle({
+      background: tint(color, 10),
+      outline: `1.5px solid ${color}`,
+    });
+    fireEvent.mouseEnter(row);
+    expect(row).toHaveStyle({ background: tint(color, 18) });
+  });
+
+  it("keeps a reference batch summary fixed while more logs join the loaded page", () => {
+    const first = makeLog({ log_id: "ref-1", reference_no: "REF-ALL", item_id: "ITEM-1", transfer_qty: 1 });
+    const second = makeLog({ log_id: "ref-2", reference_no: "REF-ALL", item_id: "ITEM-2", transfer_qty: 2 });
+    const props = {
+      loading: false,
+      selection: null,
+      onSelectLog: () => {},
+      onSelectBatch: () => {},
+      batchCache: new Map(),
+      setBatchCache: () => {},
+      canLoadMore: false,
+      loadingMore: false,
+      onLoadMore: () => {},
+      referenceSummaries: new Map([["REF-ALL::", {
+        referenceNo: "REF-ALL",
+        shippingPhase: null,
+        logCount: 62,
+        itemCount: 20,
+        totalQuantity: 108,
+        unit: "EA",
+      }]]),
+    };
+    const { rerender } = render(<HistoryTable {...props} filteredLogs={[first, second]} />);
+
+    expect(screen.getByText("출고 구성 62건")).toBeInTheDocument();
+    expect(screen.getByText("외 1품목")).toBeInTheDocument();
+    expect(screen.queryByText("출고 20품목 · 108 EA")).not.toBeInTheDocument();
+
+    rerender(<HistoryTable {...props} filteredLogs={[first, second, makeLog({
+      log_id: "ref-3", reference_no: "REF-ALL", item_id: "ITEM-3", transfer_qty: 50,
+    })]} />);
+    expect(screen.getByText("출고 구성 62건")).toBeInTheDocument();
+    expect(screen.getByText("외 2품목")).toBeInTheDocument();
+    expect(screen.queryByText("출고 20품목 · 108 EA")).not.toBeInTheDocument();
+  });
+
+  it("hides stock totals and internal separation hints from the list", () => {
+    const first = makeLog({
+      log_id: "separation-first",
+      reference_no: null,
+      requester_name: "Requester A",
+      quantity_after: 2198,
+    });
+    const second = makeLog({
+      log_id: "separation-second",
+      reference_no: null,
+      requester_name: "Requester B",
+      created_at: "2026-07-02T01:01:00Z",
+      quantity_after: 2199,
+    });
+    render(
+      <HistoryTable
+        loading={false}
+        filteredLogs={[first, second]}
+        selection={null}
+        onSelectLog={() => {}}
+        onSelectBatch={() => {}}
+        batchCache={new Map()}
+        setBatchCache={() => {}}
+        canLoadMore={false}
+        loadingMore={false}
+        onLoadMore={() => {}}
+      />,
+    );
+
+    expect(screen.queryByText(/재고 2,198 EA/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/재고 2,199 EA/)).not.toBeInTheDocument();
+    expect(screen.queryByText("다른 요청")).not.toBeInTheDocument();
+    expect(screen.queryByText("별도 시각")).not.toBeInTheDocument();
+  });
+
+  it("uses the rebalanced status width for the work column while leaving the target flexible", () => {
+    const log = makeLog();
+    render(
+      <HistoryTable
+        loading={false}
+        filteredLogs={[log]}
+        selection={null}
+        onSelectLog={() => {}}
+        onSelectBatch={() => {}}
+        batchCache={new Map()}
+        setBatchCache={() => {}}
+        canLoadMore={false}
+        loadingMore={false}
+        onLoadMore={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("184px");
+    expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "품목코드" }).style.width).toBe("144px");
+    expect(screen.getByRole("columnheader", { name: "수량 변동" }).style.width).toBe("220px");
+    const statusHeader = screen.getByRole("columnheader", { name: "담당자" });
+    expect(statusHeader.style.width).toBe("132px");
+    expect(statusHeader).toHaveClass("text-center");
+  });
+
+  it("uses the same thin pill height for single and paired movement summaries", () => {
+    render(
+      <div>
+        <MovementSummaryCell summary={{ parts: [{ label: "이동 2품목 · 22 EA", tone: "info" }] }} />
+        <MovementSummaryCell
+          summary={{
+            parts: [
+              { label: "완제품 +5 EA", tone: "primary" },
+              { label: "부품 -10 EA", tone: "danger" },
+            ],
+          }}
+        />
+      </div>,
+    );
+
+    expect(screen.getByText("이동 2품목 · 22 EA")).toHaveClass("h-6");
+    expect(screen.getByText("이동 2품목 · 22 EA")).toHaveClass("min-w-[12.75rem]");
+    expect(screen.getByText("완제품 +5 EA")).toHaveClass("h-6");
+    expect(screen.getByText("완제품 +5 EA")).toHaveClass("min-w-[6.25rem]");
+    expect(screen.getByText("부품 -10 EA")).toHaveClass("h-6");
+    expect(screen.getByText("부품 -10 EA")).toHaveClass("min-w-[6.25rem]");
+  });
+
+  it("lets compact movement pills shrink and truncate in detail cards", () => {
+    render(
+      <MovementSummaryCell
+        compact
+        summary={{ parts: [{ label: "아주 긴 수량 변화 요약 100 EA", tone: "info" }] }}
+      />,
+    );
+
+    const pill = screen.getByText("아주 긴 수량 변화 요약 100 EA");
+    expect(pill).toHaveClass("max-w-full");
+    expect(pill).toHaveClass("min-w-0");
+    expect(pill).toHaveClass("truncate");
+    expect(pill).not.toHaveClass("min-w-[10.25rem]");
+  });
+
+  it("renders an excluded-line supplement once before the shortage warning", () => {
+    render(
+      <MovementSummaryCell
+        compact
+        summary={{
+          parts: [{ label: "생산 +1 EA", tone: "primary" }],
+          warning: "부족 1",
+          supplement: { label: "제외 1", tone: "muted" },
+        }}
+      />,
+    );
+
+    const movement = screen.getByText("생산 +1 EA");
+    const warning = screen.getByText("부족 1");
+    const supplement = screen.getByText("제외 1");
+
+    expect(movement).toHaveClass("max-w-full", "min-w-0", "truncate");
+    expect(movement.parentElement).toHaveClass("w-full", "max-w-full", "min-w-0");
+    expect(supplement).toHaveClass("h-5", "shrink-0");
+    expect(screen.getAllByText("제외 1")).toHaveLength(1);
+    expect(supplement.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("uses the real conversion item as each collapsible parent instead of an empty section row", () => {
+    const source = makeLog({
+      log_id: "conversion-source",
+      item_name: "기존품",
+      mes_code: "3-AA-0001",
+      transaction_type: "BACKFLUSH",
+      quantity_change: -1,
+      shipping_phase: "COMPONENT_CHANGE",
+      notes: "품목 전환 소스 PA 사용",
+    });
+    const additional = makeLog({
+      log_id: "conversion-additional",
+      item_name: "추가 차감품",
+      mes_code: "3-AR-0006",
+      transaction_type: "BACKFLUSH",
+      quantity_change: -1,
+      shipping_phase: "COMPONENT_CHANGE",
+      notes: "품목 전환 추가 차감",
+    });
+    const target = makeLog({
+      log_id: "conversion-target",
+      item_name: "변경품",
+      mes_code: "3-AR-0027",
+      transaction_type: "PRODUCE",
+      quantity_change: 1,
+      shipping_phase: "COMPONENT_CHANGE",
+      notes: "품목 전환 대상 PA 입고",
+    });
+    const targetAdditional = makeLog({
+      log_id: "conversion-target-additional",
+      item_name: "변경품 구성품",
+      mes_code: "3-AR-0030",
+      transaction_type: "PRODUCE",
+      quantity_change: 1,
+      shipping_phase: "COMPONENT_CHANGE",
+      notes: "품목 전환 추가 입고",
+    });
+
+    render(
+      <table>
+        <tbody>
+          <ReferenceBatchDetail logs={[source, additional, target, targetAdditional]} />
+        </tbody>
+      </table>,
+    );
+
+    const sourceRow = screen.getByText("기존품").closest("tr");
+    expect(sourceRow).toHaveTextContent("기존품 차감");
+    expect(sourceRow).not.toHaveTextContent("-1 EA");
+    expect(sourceRow).not.toHaveTextContent("자동 차감 1 EA");
+    expect(sourceRow).toHaveTextContent("3-AA-0001");
+    expect(sourceRow).toHaveClass("h-[40px]");
+    expect(screen.queryByText("추가 차감품")).not.toBeInTheDocument();
+    expect(screen.queryByText("변경품 구성품")).not.toBeInTheDocument();
+
+    fireEvent.click(within(sourceRow!).getByRole("button", { name: "묶음 펼치기" }));
+    expect(screen.getByText("추가 차감품")).toBeInTheDocument();
+    expect(screen.getByText("기존품")).toBeInTheDocument();
+
+    const targetRow = screen.getByText("변경품").closest("tr");
+    fireEvent.click(within(targetRow!).getByRole("button", { name: "묶음 펼치기" }));
+    expect(screen.getByText("변경품 구성품")).toBeInTheDocument();
+  });
+
+  it("keeps expanded component-change child rows informational", () => {
+    const onSelectLog = vi.fn();
+    const source = makeLog({
+      log_id: "conversion-source",
+      item_name: "기존품",
+      transaction_type: "BACKFLUSH",
+      quantity_change: -1,
+      shipping_phase: "COMPONENT_CHANGE",
+      notes: "품목 전환 소스 PA 사용",
+    });
+    const additional = makeLog({
+      log_id: "conversion-additional",
+      item_name: "추가 차감품",
+      transaction_type: "BACKFLUSH",
+      quantity_change: -1,
+      shipping_phase: "COMPONENT_CHANGE",
+      notes: "품목 전환 추가 차감",
+    });
+    const target = makeLog({
+      log_id: "conversion-target",
+      item_name: "변경품",
+      transaction_type: "PRODUCE",
+      quantity_change: 1,
+      shipping_phase: "COMPONENT_CHANGE",
+      notes: "품목 전환 대상 PA 입고",
+    });
+    const targetAdditional = makeLog({
+      log_id: "conversion-target-additional",
+      item_name: "변경품 구성품",
+      transaction_type: "PRODUCE",
+      quantity_change: 1,
+      shipping_phase: "COMPONENT_CHANGE",
+      notes: "품목 전환 추가 입고",
+    });
+
+    render(
+      <table>
+        <tbody>
+          <ReferenceBatchDetail logs={[source, additional, target, targetAdditional]} onSelectLog={onSelectLog} />
+        </tbody>
+      </table>,
+    );
+
+    fireEvent.click(within(screen.getByText("기존품").closest("tr")!).getByRole("button", { name: "묶음 펼치기" }));
+    fireEvent.click(within(screen.getByText("변경품").closest("tr")!).getByRole("button", { name: "묶음 펼치기" }));
+
+    for (const childName of ["추가 차감품", "변경품 구성품"]) {
+      const childRow = screen.getByText(childName).closest("tr");
+      expect(childRow).not.toHaveAttribute("role");
+      expect(childRow).not.toHaveAttribute("tabindex");
+      fireEvent.click(childRow!);
+    }
+
+    expect(onSelectLog).not.toHaveBeenCalled();
+  });
+
+  it("keeps the flow column absent when the detail panel opens", () => {
+    render(
+      <HistoryTable
+        loading={false}
+        filteredLogs={[makeLog()]}
+        selection={{ kind: "log", log: makeLog() }}
+        onSelectLog={() => {}}
+        onSelectBatch={() => {}}
+        batchCache={new Map()}
+        setBatchCache={() => {}}
+        canLoadMore={false}
+        loadingMore={false}
+        onLoadMore={() => {}}
+      />,
+    );
+
+    expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
+  });
+
+  it("keeps operation badges at the shared fixed width when the detail panel opens", () => {
+    const { rerender } = render(
+      <FlowBadge type="REWORK" label="재작업" color="#3b82f6" />,
+    );
+    expect(screen.getByText("재작업").parentElement).toHaveClass("w-32", "max-w-full", "px-3");
+
+    rerender(<FlowBadge type="REWORK" label="재작업" color="#3b82f6" compact />);
+    expect(screen.getByText("재작업").parentElement).toHaveClass("w-32", "max-w-full", "px-3");
+  });
+
+  it("aligns conversion process codes on the shared center line", () => {
+    render(
+      <table>
+        <tbody>
+          <tr>
+            <ItemCodeCell code="46-AR-0093" sourceCode="4-AA-0077" />
+          </tr>
+        </tbody>
+      </table>,
+    );
+
+    const cell = screen.getByText("AR").closest("td");
+    expect(cell).not.toHaveAttribute("colspan");
+    expect(cell).not.toHaveAttribute("data-history-collapsible-group");
+    expect(cell).toHaveTextContent("4-AA-0077↓46-AR-0093");
+    expect(within(cell!).getByText("↓")).toBeInTheDocument();
+    expect(within(cell!).getByText("AA").parentElement?.parentElement).toHaveClass("justify-center");
+    expect(within(cell!).getByText("AR").parentElement?.parentElement).toHaveClass("justify-center");
+  });
+
+  it("centers one-digit code frames while longer model symbols extend left", () => {
+    render(
+      <table>
+        <tbody>
+          <tr>
+            <ItemCodeCell code="8-AR-0285" />
+          </tr>
+          <tr>
+            <ItemCodeCell code="346789-VR-0040" />
+          </tr>
+        </tbody>
+      </table>,
+    );
+
+    expect(screen.getByText("AR").parentElement?.parentElement).toHaveClass("w-full", "justify-center");
+    expect(screen.getByText("8-")).toHaveClass("absolute", "right-0");
+    expect(screen.getByText("346789-")).toHaveClass("absolute", "right-0");
+    expect(screen.getByText("-0040")).toHaveClass("text-left");
+  });
+
+  it("shows an unapproved requester name without a requester prefix in compact cells", () => {
+    const presentation = {
+      people: { requester: "권동환", approver: "" },
+      statusChips: [{ label: "메모", tone: "primary" }],
+    } as HistoryRowPresentation;
+
+    render(<PeopleStatusCell presentation={presentation} compact />);
+
+    expect(screen.getByText("권동환")).toBeInTheDocument();
+    expect(screen.queryByText("요청 권동환")).not.toBeInTheDocument();
+    expect(screen.getByText("권동환")).toHaveAttribute("title", "권동환");
+    expect(screen.getByText("메모").parentElement).toHaveClass("flex-nowrap");
+    expect(screen.getByText("메모").parentElement).toHaveClass("justify-center");
+  });
+
+  it("shows an unapproved requester name without a requester prefix in default cells", () => {
+    const presentation = {
+      people: { requester: "권동환", approver: "" },
+      statusChips: [{ label: "메모", tone: "primary" }],
+    } as HistoryRowPresentation;
+
+    render(<PeopleStatusCell presentation={presentation} />);
+
+    expect(screen.getByText("권동환")).toHaveAttribute("title", "권동환");
+    expect(screen.getByText("권동환").parentElement).toHaveClass("items-center");
+    expect(screen.getByText("메모").parentElement).toHaveClass("justify-center");
+  });
+
+  it("uses the full fixed main-row height for requester, approver, and memo", () => {
+    const presentation = {
+      people: { requester: "김재헌", approver: "권동환" },
+      statusChips: [{ label: "메모", tone: "primary" }],
+    } as HistoryRowPresentation;
+
+    render(<PeopleStatusCell presentation={presentation} />);
+
+    const cell = screen.getByText("요청 김재헌").parentElement!;
+    expect(cell).toHaveTextContent("승인 권동환");
+    expect(cell).toHaveTextContent("메모");
+    expect(cell).toHaveClass("h-16");
+    expect(cell).toHaveClass("overflow-hidden");
+    expect(cell).toHaveClass("gap-1");
+    expect(screen.getByText("메모")).toHaveClass("h-5");
+  });
+
+  it("keeps requester and approver roles in the visible text and tooltip when approved", () => {
+    const presentation = {
+      people: { requester: "김재헌", approver: "권동환" },
+      statusChips: [],
+    } as HistoryRowPresentation;
+
+    render(<PeopleStatusCell presentation={presentation} compact />);
+
+    expect(screen.getByText("요청 김재헌")).toHaveAttribute("title", "요청 김재헌");
+    expect(screen.getByText("승인 권동환")).toBeInTheDocument();
+  });
+
+  it("keeps system requester wording unprefixed while preserving the approver role", () => {
+    const presentation = {
+      people: { requester: "시스템 처리", approver: "권동환" },
+      statusChips: [],
+    } as HistoryRowPresentation;
+
+    render(<PeopleStatusCell presentation={presentation} />);
+
+    expect(screen.getByText("시스템 처리")).toHaveAttribute("title", "시스템 처리");
+    expect(screen.queryByText("요청 시스템 처리")).not.toBeInTheDocument();
+    expect(screen.getByText("승인 권동환")).toBeInTheDocument();
+  });
+
+  it("keeps ordinary long target titles on two lines", () => {
+    const presentation = {
+      target: {
+        title: "발생부 고압B/D+튜브 최종 작업판 [COCOON] 매우 긴 품목명",
+        code: "7-HF-0007",
+        meta: ["긴 보조 설명"],
+      },
+    } as HistoryRowPresentation;
+
+    render(
+      <TargetSummaryBlock
+        presentation={presentation}
+        icon={<span aria-hidden />}
+      />,
+    );
+
+    expect(screen.getByText(presentation.target.title)).toHaveClass("line-clamp-2");
+    expect(screen.getByText("긴 보조 설명")).toHaveClass("truncate");
+  });
+
+  it("places additional item counts beside the target title", () => {
+    const presentation = {
+      target: {
+        title: "COCOON OP BD ASS'Y",
+        code: "7-AA-0047",
+        meta: ["긴 보조 설명"],
+      },
+    } as HistoryRowPresentation;
+
+    render(<TargetSummaryBlock presentation={presentation} icon={<span aria-hidden />} additionalItemCount={4} />);
+
+    const itemCount = screen.getByText("외 4품목");
+    expect(itemCount.parentElement).toHaveTextContent(presentation.target.title);
+    expect(itemCount).toHaveClass("shrink-0");
+    expect(screen.getByText("긴 보조 설명").parentElement).not.toHaveTextContent("외 4품목");
+  });
+
+  it("strikes through cancelled target titles and quantity pills only", () => {
+    const presentation = {
+      target: { title: "취소된 품목", code: "CANCEL-001", meta: [] },
+    } as HistoryRowPresentation;
+
+    render(
+      <div>
+        <TargetSummaryBlock cancelled presentation={presentation} icon={<span aria-hidden />} />
+        <MovementSummaryCell cancelled summary={{ parts: [{ label: "-3 EA", tone: "danger" }] }} />
+      </div>,
+    );
+
+    expect(screen.getByText("취소된 품목")).toHaveClass("line-through");
+    expect(screen.getByText("-3 EA")).toHaveClass("line-through");
+  });
+
+  it("lets expanded reference child rows select their own log", () => {
+    const onSelectLog = vi.fn();
+    const Detail = ReferenceBatchDetail as React.ComponentType<{
+      logs: TransactionLog[];
+      onSelectLog: (log: TransactionLog) => void;
+    }>;
+    const child = makeLog({
+      log_id: "child-log",
+      item_name: "구성품 라인",
+      transaction_type: "BACKFLUSH",
+      shipping_phase: "PREPARE",
+    });
+
+    render(
+      <table>
+        <tbody>
+          <Detail logs={[child]} onSelectLog={onSelectLog} />
+        </tbody>
+      </table>,
+    );
+
+    fireEvent.click(screen.getByText("구성품 라인"));
+    expect(onSelectLog).toHaveBeenCalledWith(expect.objectContaining({ log_id: "child-log" }));
+    expect(screen.getByText("구성품 라인").closest("tr")).toHaveClass("h-[40px]");
+  });
+
+  it("uses the adjustment icon for flat single-item outbound rows", () => {
+    const child = makeLog({
+      log_id: "single-outbound",
+      item_name: "단품 출고 품목",
+      transaction_type: "BACKFLUSH",
+      quantity_change: -1,
+    });
+
+    render(
+      <table><tbody><ReferenceBatchDetail logs={[child]} flat singleAdjustment /></tbody></table>,
+    );
+
+    const badge = screen.getByText("단품 출고").parentElement!;
+    expect(badge.querySelector("svg")).toHaveClass("lucide-sliders-vertical");
+  });
+
+  it("keeps multiple reference items behind a collapsed section", () => {
+    const first = makeLog({ log_id: "shipment-a", item_name: "출고 품목 A", transaction_type: "SHIP", shipping_phase: "PICKUP" });
+    const second = makeLog({ log_id: "shipment-b", item_id: "ITEM-2", item_name: "출고 품목 B", transaction_type: "SHIP", shipping_phase: "PICKUP" });
+
+    render(
+      <table><tbody><ReferenceBatchDetail logs={[first, second]} /></tbody></table>,
+    );
+
+    expect(screen.getByText("출고 품목 A")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "출하 구성 펼치기" }));
+    expect(screen.getByText("출고 품목 A")).toBeInTheDocument();
+    expect(screen.getByText("출고 품목 B")).toBeInTheDocument();
+  });
+
+  it("uses the actual shipped item as the shipment title when its companion arrives first", () => {
+    const companion = makeLog({
+      log_id: "companion-carton",
+      item_id: "CARTON",
+      item_name: "DX3000, ADX4000W 카톤 박스 [490x460x370 mm]",
+      mes_code: "34-PR-0117",
+      shipping_phase: "PICKUP",
+      notes: "동반 출하: DX3000, ADX4000W 카톤 박스 [490x460x370 mm]",
+    });
+    const shipped = makeLog({
+      log_id: "actual-shipment",
+      item_id: "PF-0047",
+      item_name: "DX3000_65kV, 1.7mA_USA_Vector [Black]",
+      mes_code: "3-PF-0047",
+      shipping_phase: "PICKUP",
+      notes: "출하 픽업: DX3000_65kV, 1.7mA_USA_Vector [Black] x 10",
+    });
+
+    render(<table><tbody><ReferenceBatchDetail logs={[companion, shipped]} /></tbody></table>);
+
+    expect(screen.getByText("DX3000_65kV, 1.7mA_USA_Vector [Black]")).toBeInTheDocument();
+    expect(screen.queryByText("DX3000, ADX4000W 카톤 박스 [490x460x370 mm]")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "출하 구성 펼치기" }));
+
+    expect(screen.getByText("DX3000, ADX4000W 카톤 박스 [490x460x370 mm]")).toBeInTheDocument();
+    expect(screen.getByText("동반 출하")).toBeInTheDocument();
+  });
+
+  it.each(["click", "Enter", " "])("toggles an expandable reference row with %s without selecting its log", (interaction) => {
+    const onSelectLog = vi.fn();
+    const first = makeLog({ log_id: "shipment-a", item_name: "출고 품목 A", transaction_type: "SHIP", shipping_phase: "PICKUP" });
+    const second = makeLog({ log_id: "shipment-b", item_id: "ITEM-2", item_name: "출고 품목 B", transaction_type: "SHIP", shipping_phase: "PICKUP" });
+
+    render(
+      <table><tbody><ReferenceBatchDetail logs={[first, second]} onSelectLog={onSelectLog} controlsId="shipment-items" /></tbody></table>,
+    );
+
+    const row = screen.getByText("출고 품목 A").closest("tr")!;
+    const toggle = screen.getByRole("button", { name: "출하 구성 펼치기" });
+    const controlsId = toggle.getAttribute("aria-controls")!;
+
+    expect(row).not.toHaveAttribute("role");
+    expect(row).toHaveAttribute("aria-expanded", "false");
+    expect(row).toHaveAttribute("aria-controls", controlsId);
+
+    if (interaction === "click") fireEvent.click(row);
+    else fireEvent.keyDown(row, { key: interaction });
+
+    expect(onSelectLog).not.toHaveBeenCalled();
+    expect(row).toHaveAttribute("aria-expanded", "true");
+    expect(document.getElementById(controlsId)).toHaveTextContent("출고 품목 B");
+  });
+
+  it("shortens the compact additional component badge but preserves its full title and accessible name", () => {
+    const child = makeLog({
+      log_id: "additional-component",
+      item_name: "추가 구성품",
+      transaction_type: "BACKFLUSH",
+      shipping_phase: "COMPONENT_CHANGE",
+      notes: "품목 전환 추가 차감",
+    });
+
+    render(
+      <table>
+        <tbody>
+          <ReferenceBatchDetail logs={[child]} compact />
+        </tbody>
+      </table>,
+    );
+
+    const badge = screen.getByLabelText("추가 구성품 차감");
+    expect(badge).toHaveTextContent("추가 차감");
+    expect(badge).toHaveAttribute("title", "추가 구성품 차감");
+    expect(badge).toHaveClass("max-w-full");
+    expect(badge).toHaveClass("min-w-0");
+  });
+
+  it.each(["Enter", " "])("uses %s on a batch chevron without selecting the parent row", (key) => {
+    const onSelectLog = vi.fn();
+    const logs = [
+      makeLog({ log_id: "component", transaction_type: "BACKFLUSH", shipping_phase: "PREPARE" }),
+      makeLog({ log_id: "product", item_id: "ITEM-2", transaction_type: "PRODUCE", shipping_phase: "PREPARE" }),
+    ];
+    render(
+      <HistoryTable
+        loading={false}
+        filteredLogs={logs}
+        selection={null}
+        onSelectLog={onSelectLog}
+        onSelectBatch={() => {}}
+        batchCache={new Map()}
+        setBatchCache={() => {}}
+        canLoadMore={false}
+        loadingMore={false}
+        onLoadMore={() => {}}
+      />,
+    );
+
+    const toggle = screen.getByRole("button", { name: "묶음 펼치기" });
+    const parentRow = toggle.closest("tr");
+    expect(toggle.closest("td")?.cellIndex).toBe(0);
+    const controlsId = toggle.getAttribute("aria-controls");
+    expect(controlsId).toBeTruthy();
+    expect(parentRow).not.toHaveAttribute("role", "button");
+    expect(parentRow).toHaveAttribute("aria-selected", "false");
+
+    fireEvent.keyDown(toggle, { key });
+
+    expect(onSelectLog).not.toHaveBeenCalled();
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(document.getElementById(controlsId!)).toBeInTheDocument();
+  });
+
+  it("renders an initial failure instead of the normal empty state and retries", () => {
+    const onRetry = vi.fn();
+    render(
+      <HistoryTable
+        loading={false}
+        filteredLogs={[]}
+        error="서버 연결 실패"
+        onRetry={onRetry}
+        selection={null}
+        onSelectLog={() => {}}
+        onSelectBatch={() => {}}
+        batchCache={new Map()}
+        setBatchCache={() => {}}
+        canLoadMore={false}
+        loadingMore={false}
+        onLoadMore={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent("서버 연결 실패");
+    expect(screen.queryByText("거래 이력이 없습니다.")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it("keeps loaded rows visible when load-more fails and offers inline retry", () => {
+    const onLoadMore = vi.fn();
+    const log = makeLog();
+    render(
+      <HistoryTable
+        loading={false}
+        filteredLogs={[log]}
+        loadMoreError="추가 내역 조회 실패"
+        selection={null}
+        onSelectLog={() => {}}
+        onSelectBatch={() => {}}
+        batchCache={new Map()}
+        setBatchCache={() => {}}
+        canLoadMore
+        loadingMore={false}
+        onLoadMore={onLoadMore}
+      />,
+    );
+
+    expect(screen.getByText("AX-100")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("추가 내역 조회 실패");
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(onLoadMore).toHaveBeenCalledOnce();
+  });
+});

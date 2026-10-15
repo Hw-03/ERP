@@ -31,6 +31,27 @@ const defectViewStates = vi.hoisted(() => vi.fn());
 const slowDashboard = vi.hoisted(() => ({ pending: false, promise: new Promise<void>(() => {}) }));
 const slowHistory = vi.hoisted(() => ({ pending: false, promise: new Promise<void>(() => {}) }));
 
+it("guards native tab exit before unmount, keeps draft on stay and discards it before Forward", async () => {
+  const workUrl = "/mes?tab=warehouse&section=compose&step=quantity";
+  window.history.replaceState({ __NA: true, wic: { step: "quantity" } }, "", workUrl);
+  const { rerender } = render(<DesktopMesShell />);
+  const paint = () => rerender(<DesktopMesShell />);
+  fireEvent.change(screen.getByLabelText("테스트 작업 입력"), { target: { value: "13" } });
+  window.history.replaceState({ __NA: true }, "", "/mes?tab=dashboard");
+  paint();
+  expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  expect(screen.getByLabelText("테스트 작업 입력")).toHaveValue("13");
+  fireEvent.click(screen.getByRole("button", { name: "계속 머무르기" }));
+  expect(routerPush).toHaveBeenLastCalledWith(workUrl, { scroll: false });
+  window.history.replaceState({ __NA: true, wic: { step: "quantity" } }, "", workUrl); paint();
+  expect(screen.getByLabelText("테스트 작업 입력")).toHaveValue("13");
+  window.history.replaceState({ __NA: true }, "", "/mes?tab=dashboard"); paint();
+  fireEvent.click(await screen.findByRole("button", { name: "나가기" }));
+  expect(await screen.findByText("dashboard content")).toBeInTheDocument();
+  window.history.replaceState({ __NA: true }, "", workUrl); paint();
+  expect(await screen.findByLabelText("테스트 작업 입력")).toHaveValue("");
+});
+
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => queryClientMock,
 }));
@@ -107,9 +128,10 @@ vi.mock("../DesktopSidebar", () => ({
 }));
 
 vi.mock("../DesktopTopbar", () => ({
-  DesktopTopbar: ({ title, titleAddon, actionSlot }: { title: string; titleAddon?: ReactNode; actionSlot?: ReactNode }) => (
+  DesktopTopbar: ({ title, titleAddon, actionSlot, onRefresh }: { title: string; titleAddon?: ReactNode; actionSlot?: ReactNode; onRefresh: () => void }) => (
     <header>
       {title}
+      <button onClick={onRefresh}>동기화</button>
       <div data-testid="desktop-topbar-title-addon">{titleAddon}</div>
       <div data-testid="desktop-topbar-actions">{actionSlot}</div>
     </header>
@@ -212,9 +234,8 @@ vi.mock("../DesktopHistoryView", () => ({ DesktopHistoryView: () => {
 } }));
 
 it("keeps summary card details while the history screen is preparing", () => {
-  window.history.replaceState(null, "", "/mes?tab=history");
+  window.history.replaceState(null, "", "/mes?tab=dashboard");
   render(<Suspense fallback={<div>root loading</div>}><DesktopMesShell /></Suspense>);
-  fireEvent.click(screen.getByRole("button", { name: "dashboard", exact: true }));
   slowHistory.pending = true;
   try {
     fireEvent.click(screen.getByRole("button", { name: "history", exact: true }));
@@ -401,6 +422,40 @@ describe("DesktopMesShell tab transition", () => {
     defectViewStates.mockClear();
     vi.mocked(sendClientEvent).mockClear();
     setAuditScreen.mockClear();
+  });
+
+  it("동기화는 미저장 입력을 확인 전과 계속 작성 선택 후 유지하고 폐기 후에만 갱신한다", () => {
+    render(<DesktopMesShell />);
+    fireEvent.click(screen.getByRole("button", { name: "warehouse", exact: true }));
+    const input = screen.getByLabelText("테스트 작업 입력");
+    fireEvent.change(input, { target: { value: "수량 초안" } });
+    fireEvent.click(screen.getByRole("button", { name: "동기화" }));
+    expect(screen.getByLabelText("테스트 작업 입력")).toBe(input);
+    expect(input).toHaveValue("수량 초안");
+    fireEvent.click(screen.getByRole("button", { name: "계속 머무르기" }));
+    expect(input).toHaveValue("수량 초안");
+    fireEvent.click(screen.getByRole("button", { name: "동기화" }));
+    fireEvent.click(screen.getByRole("button", { name: "나가기", exact: true }));
+    expect(screen.getByLabelText("테스트 작업 입력")).toHaveValue("");
+    expect(screen.getByLabelText("테스트 작업 입력")).not.toBe(input);
+  });
+
+  it("깨끗한 화면 동기화는 확인 없이 즉시 갱신한다", () => {
+    render(<DesktopMesShell />);
+    fireEvent.click(screen.getByRole("button", { name: "warehouse", exact: true }));
+    const input = screen.getByLabelText("테스트 작업 입력");
+    fireEvent.click(screen.getByRole("button", { name: "동기화" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("테스트 작업 입력")).not.toBe(input);
+  });
+
+  it("없는 주소 본문에서도 메뉴를 유지하고 정상 MES 주소로 복귀한다", () => {
+    const onRecoveryNavigate = vi.fn();
+    render(<DesktopMesShell recoveryContent={<h2>페이지를 찾을 수 없습니다</h2>} onRecoveryNavigate={onRecoveryNavigate} />);
+    expect(screen.getByRole("heading", { name: "페이지를 찾을 수 없습니다" })).toBeInTheDocument();
+    expect(screen.queryByText("history content")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "dashboard", exact: true }));
+    expect(onRecoveryNavigate).toHaveBeenCalledWith("?tab=dashboard");
   });
 
   afterEach(() => {
@@ -639,6 +694,16 @@ describe("DesktopMesShell tab transition", () => {
       slow.pending = false;
       resolve();
     }
+  });
+
+  it("받은 내역으로 돌아오면 전체 로딩 덮개를 다시 표시하지 않는다", async () => {
+    render(<DesktopMesShell />);
+    fireEvent.click(screen.getByRole("button", { name: "history", exact: true }));
+    await waitFor(() => expect(screen.queryByTestId("desktop-loading-cover")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "dailyReport", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "history", exact: true }));
+    expect(screen.getByText("history content")).toBeInTheDocument();
+    expect(screen.queryByTestId("desktop-loading-cover")).not.toBeInTheDocument();
   });
 
   it("does not restart the shared transition when the active tab is refreshed", () => {

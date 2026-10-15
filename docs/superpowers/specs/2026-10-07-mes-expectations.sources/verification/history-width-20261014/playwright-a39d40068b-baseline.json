@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 4,
+  "kind": "baseline-verification",
+  "original": {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/playwright-a39d40068b-reuse.json",
+    "sha256": "de5b9c3d859e785ed80b6324033f67878d73d2aee524d0314fd604021a1ea35b"
+  },
+  "review": {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/history-width-20261014/review.json",
+    "sha256": "f216fc081188005b611766eff00c80aa7f15558d7a421c447d5009096c07bd0b"
+  }
+}

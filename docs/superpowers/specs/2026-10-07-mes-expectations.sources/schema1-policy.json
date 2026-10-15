@@ -1,0 +1,757 @@
+{
+  "schemaVersion": 1,
+  "decisionSource": "_attic/handoff/active/2026-10-07-mes-expectation-decisions-todo.md",
+  "cases": [
+    {
+      "id": "8.2-07",
+      "decisionIds": [
+        "G01"
+      ],
+      "finalExpected": "직원 등급을 제거하고 독립 결재 역할로 승인함·서버 승인 권한을 판단한다. 과거 등급을 역할로 자동 변환하지 않고 지정된 역할과 관리자 PIN 접근 정책은 유지한다.",
+      "conditions": [
+        {
+          "id": "no-grade-schema",
+          "expected": "DB·API·직원 편집·로그인 상태·내보내기에 직원 등급을 사용하지 않는다."
+        },
+        {
+          "id": "no-grade-approval",
+          "expected": "과거 ADMIN 등급만으로 부서·창고 결재 및 자가승인이 허용되지 않는다."
+        },
+        {
+          "id": "roles-preserved",
+          "expected": "기존 독립 결재 역할을 유지하고 등급을 역할로 자동 변환하지 않는다."
+        },
+        {
+          "id": "pin-separate",
+          "expected": "관리자 PIN 접근 정책은 직원 등급 제거와 별개로 유지한다."
+        }
+      ],
+      "verificationTags": [
+        "P0",
+        "smoke"
+      ]
+    },
+    {
+      "id": "8.19-09",
+      "decisionIds": [
+        "G01",
+        "WORDING-ROLE"
+      ],
+      "finalExpected": "결재 역할 부여·회수 후 승인함과 서버 권한이 바뀐다. 대기 요청·예약은 유지하고 역할 재부여 후 정상 승인으로 재고를 정확히 한 번 이동한다.",
+      "conditions": [
+        {
+          "id": "grant-access",
+          "expected": "역할 부여 후 해당 승인함과 서버 승인이 허용된다."
+        },
+        {
+          "id": "revoke-access",
+          "expected": "역할 회수 후 승인함과 직접 승인 API 접근이 거부된다."
+        },
+        {
+          "id": "pending-preserved",
+          "expected": "권한 변경으로 대기 요청과 예약을 없애거나 실행하지 않는다."
+        },
+        {
+          "id": "regrant-once",
+          "expected": "재부여 후 유효 결재자가 승인하면 재고가 정확히 한 번 이동한다."
+        }
+      ],
+      "verificationTags": [
+        "P0"
+      ]
+    },
+    {
+      "id": "8.23-06",
+      "decisionIds": [
+        "G01"
+      ],
+      "finalExpected": "부서 승인 대기 요청은 실제 결재 역할 보유자의 승인함·알림에 정확히 한 번 표시하고, 결재 역할이 없는 직원에게 보내지 않는다.",
+      "conditions": [
+        {
+          "id": "role-recipient",
+          "expected": "알림과 승인함 수신자는 실제 결재 역할로 결정한다."
+        },
+        {
+          "id": "recipient-once",
+          "expected": "해당 대기 요청이 유효 결재자에게 정확히 한 번 표시된다."
+        }
+      ],
+      "verificationTags": [
+        "P0"
+      ]
+    },
+    {
+      "id": "8.11-01",
+      "decisionIds": [
+        "G02",
+        "G03",
+        "G04",
+        "G05"
+      ],
+      "finalExpected": "기간별 비양품 통계는 발생 시각의 원래 수량을 최초 불량·B급·구형 분류별로 집계한다. 후속 처리·현재 분류 변경은 과거 발생량을 바꾸거나 새 발생을 추가하지 않는다.",
+      "conditions": [
+        {
+          "id": "occurrence-period",
+          "expected": "발생 시각 quarantined_at의 해당 기간으로 집계한다."
+        },
+        {
+          "id": "original-quantity",
+          "expected": "정상 복귀·폐기·반품 뒤에도 original_quantity 발생량을 유지한다."
+        },
+        {
+          "id": "initial-category",
+          "expected": "최초 불량 발생을 현재 B급·구형 분류로 바꿔도 과거 불량 통계를 유지한다."
+        },
+        {
+          "id": "categories-distinct",
+          "expected": "최초 B급·구형 발생도 포함하고 불량·B급·구형을 구분한다."
+        },
+        {
+          "id": "no-double-count",
+          "expected": "분류 변경을 새 발생 건수로 중복 집계하지 않는다."
+        },
+        {
+          "id": "ui-categories",
+          "expected": "기간별 화면에서 최초 발생 분류별 수량·건수를 구분해 표시한다."
+        }
+      ],
+      "verificationTags": [
+        "P0"
+      ]
+    },
+    {
+      "id": "8.11-07",
+      "decisionIds": [
+        "G02",
+        "G03",
+        "G04",
+        "G05"
+      ],
+      "finalExpected": "보관 분류는 변경할 수 있다. 기간별 발생 통계의 최초 분류·수량·건수는 분류 변경 뒤에도 유지하고, 처음부터 B급·구형인 원건은 최초 분류로 별도 집계한다.",
+      "conditions": [
+        {
+          "id": "classification-allowed",
+          "expected": "보관·분류 변경·정상 복귀는 기존 승인 계약을 유지한다."
+        },
+        {
+          "id": "initial-category",
+          "expected": "분류 변경으로 발생 통계의 최초 분류·수량·건수가 이동하거나 중복되지 않는다."
+        },
+        {
+          "id": "initial-storage-categories",
+          "expected": "처음부터 B급·구형으로 발생한 원건도 최초 분류별로 집계한다."
+        }
+      ],
+      "verificationTags": [
+        "P0"
+      ]
+    },
+    {
+      "id": "8.17-03",
+      "decisionIds": [
+        "G06"
+      ],
+      "finalExpected": "외부 원자재 입고는 현재 원자재로 분류된 유효한 품목만 허용한다. 일반·공정·조립품과 삭제 품목은 화면 선택 및 서버 작성·미리보기·최종 실행에서 거부한다.",
+      "conditions": [
+        {
+          "id": "ui-raw-only",
+          "expected": "화면 선택에는 원자재로 분류된 품목만 나타난다."
+        },
+        {
+          "id": "ui-deleted-excluded",
+          "expected": "삭제 품목은 화면 선택에서 제외한다."
+        },
+        {
+          "id": "server-raw-only",
+          "expected": "서버 요청에서 비원자재 품목을 거부한다."
+        },
+        {
+          "id": "server-deleted-final",
+          "expected": "삭제된 품목은 서버 작성·미리보기·최종 실행 시 다시 검증해 거부한다."
+        }
+      ],
+      "verificationTags": [
+        "P0",
+        "smoke"
+      ]
+    },
+    {
+      "id": "PC-DELTA-ITEM-01",
+      "decisionIds": [
+        "G07"
+      ],
+      "action": "품목 검색 후 상세를 열어 새로고침하고, 닫은 뒤 다시 새로고침한다.",
+      "finalExpected": "같은 직원·현재 서버 부팅의 탭 상태에서 새로고침 뒤 검색어·선택 품목·상세 열림을 복원한다. 닫힌 상세는 닫힌 상태로 유지하고 로그인·접근 권한을 계속 확인한다.",
+      "conditions": [
+        {
+          "id": "search-restored",
+          "expected": "새로고침 후 검색어가 복원된다."
+        },
+        {
+          "id": "selection-restored",
+          "expected": "목록에 선택 품목이 없어도 단건 조회로 선택을 복원한다."
+        },
+        {
+          "id": "open-restored",
+          "expected": "열려 있던 상세는 다시 열린다."
+        },
+        {
+          "id": "closed-preserved",
+          "expected": "닫힌 상세는 새로고침으로 열리지 않고 선택을 유지한다."
+        },
+        {
+          "id": "employee-boot-scope",
+          "expected": "다른 직원 또는 이전 서버 boot의 상세·검색을 잘못 복원하지 않는다."
+        },
+        {
+          "id": "desktop-mobile",
+          "expected": "PC 상세 패널과 모바일 상세 BottomSheet 모두 복원 계약을 지킨다."
+        },
+        {
+          "id": "login-access",
+          "expected": "복원 시 로그인·접근 권한 확인을 우회하지 않는다."
+        }
+      ],
+      "verificationTags": [
+        "P0",
+        "smoke"
+      ]
+    },
+    {
+      "id": "PC-DELTA-ITEM-02",
+      "decisionIds": [
+        "G08",
+        "WORDING-ITEM-LABEL"
+      ],
+      "finalExpected": "품목 최근 내역의 작업명을 한국어로 표시한다. 열린 품목의 삭제가 200 deleted_at 응답으로 확인되면 상세·이력을 유지하고 삭제 안내와 작업 차단을 표시한다. 404·권한·조회 실패는 삭제와 구분하여 안내·재시도하고 오래된 응답을 새 선택에 적용하지 않는다.",
+      "conditions": [
+        {
+          "id": "korean-operation-label",
+          "expected": "최근 내역 작업명은 한국어이며 내부 저장 코드를 노출하지 않는다."
+        },
+        {
+          "id": "deleted-keeps-detail",
+          "expected": "삭제 확인으로 열린 상세를 닫지 않는다."
+        },
+        {
+          "id": "deleted-notice",
+          "expected": "삭제된 품목이라는 명확한 안내를 표시한다."
+        },
+        {
+          "id": "ui-write-block",
+          "expected": "PC·모바일에서 삭제·초기 조회·조회 실패 중 입출고 버튼과 콜백을 차단한다."
+        },
+        {
+          "id": "read-history-preserved",
+          "expected": "삭제 확인 뒤 상세 정보·BOM·최근 이력의 읽기는 유지한다."
+        },
+        {
+          "id": "server-write-block",
+          "expected": "서버의 live 쓰기와 최종 실행은 삭제 품목을 거부한다."
+        },
+        {
+          "id": "not-found-distinct",
+          "expected": "404를 삭제 확인으로 단정하지 않는다."
+        },
+        {
+          "id": "access-distinct",
+          "expected": "401·403은 권한 확인 안내로 구분한다."
+        },
+        {
+          "id": "retry-distinct",
+          "expected": "5xx 조회 실패는 오류·재시도로 복구하고 기존 상세를 유지한다."
+        },
+        {
+          "id": "stale-response",
+          "expected": "이전 선택의 늦은 응답을 새 품목 상세에 적용하지 않는다."
+        }
+      ],
+      "verificationTags": [
+        "P0",
+        "smoke"
+      ]
+    },
+    {
+      "id": "8.23-13",
+      "decisionIds": [
+        "G09"
+      ],
+      "finalExpected": "부서 원작업과 취소는 각각 처리 이력 1건으로 총 2건을 센다. 업무 유형별 카드·목록·필터·원장은 같은 기준을 쓰고 순재고 0과 처리 2건을 구분한다. 기간을 넘긴 취소는 각 기록의 실제 기간에 센다.",
+      "conditions": [
+        {
+          "id": "two-works",
+          "expected": "부서 원작업과 취소를 각각 1건으로 센다."
+        },
+        {
+          "id": "category-consistency",
+          "expected": "부서 업무 유형·요약 카드·목록·필터·원장 기준이 일치한다."
+        },
+        {
+          "id": "inventory-net-zero",
+          "expected": "원작업과 취소의 순재고 효과는 0이다."
+        },
+        {
+          "id": "own-period",
+          "expected": "기간을 넘긴 취소는 취소 발생 기간에만 센다."
+        }
+      ],
+      "verificationTags": [
+        "P0"
+      ]
+    },
+    {
+      "id": "8.24-16",
+      "decisionIds": [
+        "G09"
+      ],
+      "finalExpected": "창고 원작업·취소를 각각 1건으로 전체·창고 총 2건에 포함한다. 부서·수량조정 유형을 잘못 늘리지 않고 물리 재고·예약을 원래 상태로 복구한다. 기간별 집계는 각 기록의 해당 기간을 따른다.",
+      "conditions": [
+        {
+          "id": "two-warehouse-works",
+          "expected": "전체·창고 집계에서 원작업과 취소를 각각 1건으로 센다."
+        },
+        {
+          "id": "other-categories-preserved",
+          "expected": "부서·수량조정 집계를 잘못 증가시키지 않는다."
+        },
+        {
+          "id": "inventory-reservations-restored",
+          "expected": "물리 재고·예약이 작업 전 상태로 정확히 복구된다."
+        },
+        {
+          "id": "own-period",
+          "expected": "각 기록은 실제 발생 기간에만 집계한다."
+        }
+      ],
+      "verificationTags": [
+        "P0"
+      ]
+    },
+    {
+      "id": "8.25-12",
+      "decisionIds": [
+        "G09"
+      ],
+      "finalExpected": "창고 정거래와 취소를 각각 처리 1건으로 세며 물리 순효과는 0이다. 창고·목적 부서 재고와 예약이 작업 전 상태로 돌아가고 부서·수량조정 집계를 잘못 늘리지 않는다. 기간별 기록은 각 발생 기간을 따른다.",
+      "conditions": [
+        {
+          "id": "two-warehouse-works",
+          "expected": "창고 정거래·취소를 각각 1건으로 센다."
+        },
+        {
+          "id": "inventory-reservations-restored",
+          "expected": "창고·목적 부서 재고·예약은 작업 전 상태로 복구된다."
+        },
+        {
+          "id": "other-categories-preserved",
+          "expected": "부서·수량조정 집계를 잘못 증가시키지 않는다."
+        },
+        {
+          "id": "own-period",
+          "expected": "원작업·취소는 각 발생 기간에 센다."
+        }
+      ],
+      "verificationTags": [
+        "P0"
+      ]
+    },
+    {
+      "id": "PC-DELTA-SETTINGS-03",
+      "decisionIds": [
+        "G10"
+      ],
+      "finalExpected": "같은 브라우저의 같은 직원 탭은 테마·사이드바 쌍을 저장 성공 후 자동 반영한다. 다른 직원 탭을 오염시키지 않고 실패 저장·오래된 요청으로 설정을 덮어쓰지 않는다. 역할·권한 및 열려 있는 편집 초안은 보존한다.",
+      "conditions": [
+        {
+          "id": "atomic-pair",
+          "expected": "테마·사이드바는 한 요청으로 원자적으로 저장한다."
+        },
+        {
+          "id": "same-employee-auto",
+          "expected": "저장 성공 event로 같은 직원의 다른 탭이 자동 갱신한다."
+        },
+        {
+          "id": "other-employee-isolated",
+          "expected": "다른 직원 event·이전 직원 응답으로 현재 설정을 덮어쓰지 않는다."
+        },
+        {
+          "id": "failed-save-no-event",
+          "expected": "저장이 실패하면 설정·다른 탭을 바꾸지 않는다."
+        },
+        {
+          "id": "old-fetch-save",
+          "expected": "오래된 조회·저장 응답을 현재 직원·최신 설정에 적용하지 않는다."
+        },
+        {
+          "id": "session-auth-preserved",
+          "expected": "appearance 갱신으로 직원 역할·권한·로그인 audit를 바꾸지 않는다."
+        },
+        {
+          "id": "dirty-draft-preserved",
+          "expected": "편집 중인 theme·sidebar 초안과 PIN 상태를 원격 갱신으로 잃지 않는다."
+        }
+      ],
+      "verificationTags": [
+        "P0",
+        "smoke"
+      ]
+    },
+    {
+      "id": "PC-DELTA-ASR-05",
+      "decisionIds": [
+        "WORDING-ROLE-SCOPE"
+      ],
+      "finalExpected": "승인자의 소속 부서로 결재 범위를 제한하지 않는다. 부서 정·부는 비창고 요청, 창고 정·부는 창고 포함 요청을 처리한다. AR·AA와 일반 공정 승인함 경로 구분은 유지한다.",
+      "conditions": [
+        {
+          "id": "department-role-scope",
+          "expected": "부서 정·부는 소속 부서와 무관하게 비창고 요청을 처리한다."
+        },
+        {
+          "id": "warehouse-role-scope",
+          "expected": "창고 정·부는 창고 포함 요청을 처리한다."
+        },
+        {
+          "id": "as-research-route",
+          "expected": "AR·AA와 일반 공정의 승인함 경로는 구분한다."
+        }
+      ],
+      "verificationTags": [
+        "P0"
+      ]
+    },
+    {
+      "id": "8.15-05",
+      "decisionIds": [
+        "WORDING-ROLE-SCOPE"
+      ],
+      "finalExpected": "승인자의 소속 부서로 결재 범위를 제한하지 않는다. 부서 정·부는 비창고 요청, 창고 정·부는 창고 포함 요청을 처리한다. AR·AA와 일반 공정의 승인함 경로는 유지한다.",
+      "conditions": [
+        {
+          "id": "department-role-scope",
+          "expected": "부서 정·부의 비창고 결재 범위는 소속 부서로 제한하지 않는다."
+        },
+        {
+          "id": "warehouse-role-scope",
+          "expected": "창고 정·부의 결재 범위에는 창고 요청도 포함한다."
+        },
+        {
+          "id": "as-research-route",
+          "expected": "AR·AA와 일반 공정은 승인함 경로를 구분한다."
+        }
+      ],
+      "verificationTags": [
+        "P0"
+      ]
+    },
+    {
+      "id": "PC-DELTA-ASR-01",
+      "decisionIds": [
+        "WORDING-STAGED-APPROVAL"
+      ],
+      "finalExpected": "한 승인 단계의 성공과 묶음 전체 완료를 구분한다. 다른 승인이 남으면 대기·예약을 유지하고 물리 재고를 바꾸지 않는다. 마지막 승인 후 함께 반영하고 성공한 단계의 버튼·대기 목록은 새로고침 없이 갱신한다.",
+      "conditions": [
+        {
+          "id": "pending-reservation",
+          "expected": "다른 승인이 남으면 대기·예약을 유지한다."
+        },
+        {
+          "id": "no-early-stock",
+          "expected": "마지막 승인 전에는 물리 재고를 바꾸지 않는다."
+        },
+        {
+          "id": "final-together",
+          "expected": "마지막 승인 후 묶음 작업을 함께 반영한다."
+        },
+        {
+          "id": "immediate-ui-update",
+          "expected": "성공한 단계의 버튼·대기 목록을 새로고침 없이 갱신한다."
+        }
+      ],
+      "verificationTags": [
+        "P0",
+        "smoke"
+      ]
+    },
+    {
+      "id": "PC-DELTA-ASR-06",
+      "decisionIds": [
+        "WORDING-STAGED-APPROVAL"
+      ],
+      "finalExpected": "승인 단계 성공 뒤 다른 단계가 남으면 묶음은 대기·예약을 유지하고 재고는 그대로다. 마지막 승인 후 함께 반영하며 성공 단계 버튼·대기 목록은 새로고침 없이 갱신한다.",
+      "conditions": [
+        {
+          "id": "pending-reservation",
+          "expected": "다른 승인이 남으면 대기·예약을 유지한다."
+        },
+        {
+          "id": "no-early-stock",
+          "expected": "전체 완료 전에는 재고를 움직이지 않는다."
+        },
+        {
+          "id": "final-together",
+          "expected": "마지막 승인 뒤 묶음 전체를 함께 반영한다."
+        },
+        {
+          "id": "immediate-ui-update",
+          "expected": "단계 성공을 버튼·대기 목록에 즉시 반영한다."
+        }
+      ],
+      "verificationTags": [
+        "P0"
+      ]
+    },
+    {
+      "id": "8.17-10",
+      "decisionIds": [
+        "WORDING-CANCEL-DIRECTION"
+      ],
+      "finalExpected": "입고 취소는 원래 입고 수량을 차감하고 출고 취소는 원래 출고 수량을 증가시킨다. 원거래를 보존하며 취소 역효과는 정확히 한 번만 반영한다.",
+      "conditions": [
+        {
+          "id": "receive-reversal",
+          "expected": "입고 취소 시 원래 입고 수량을 차감한다."
+        },
+        {
+          "id": "outbound-reversal",
+          "expected": "출고 취소 시 원래 출고 수량을 증가시킨다."
+        },
+        {
+          "id": "original-preserved-once",
+          "expected": "원거래를 보존하고 역효과를 한 번만 반영한다."
+        }
+      ],
+      "verificationTags": [
+        "P0"
+      ]
+    },
+    {
+      "id": "PC-DELTA-DEFECT-02",
+      "decisionIds": [
+        "G02",
+        "WORDING-ORIGIN-REMAINDER"
+      ],
+      "finalExpected": "보관·분류 변경·정상 복귀는 기존 승인 계약을 유지한다. 전량 처리 원건만 활성 목록에서 제거하고 부분 처리 원건은 잔량으로 남긴다. 같은 품목의 다른 원건이 남으면 품목 카드를 유지하며 보관 건수는 잔량 원건 수로 센다.",
+      "conditions": [
+        {
+          "id": "full-origin-removed",
+          "expected": "전량 처리 원건만 활성 목록에서 빠진다."
+        },
+        {
+          "id": "partial-origin-remains",
+          "expected": "부분 처리 원건은 남은 수량으로 유지된다."
+        },
+        {
+          "id": "other-origin-card-remains",
+          "expected": "같은 품목의 다른 원건이 남으면 품목 카드는 남는다."
+        },
+        {
+          "id": "origin-count-not-card-count",
+          "expected": "보관 건수는 품목 카드 수가 아닌 잔량 원건 수다."
+        }
+      ],
+      "verificationTags": [
+        "P0"
+      ]
+    },
+    {
+      "id": "8.6-03",
+      "decisionIds": [
+        "WORDING-ORIGIN-REMAINDER"
+      ],
+      "finalExpected": "처리 후 잔량 = 처리 전 잔량 - 처리 수량이다. 전량 처리 원건만 제거하고 부분 원건·같은 품목의 다른 원건과 품목 카드는 유지한다. 보관 건수는 잔량이 남은 원건 수다.",
+      "conditions": [
+        {
+          "id": "remaining-arithmetic",
+          "expected": "처리 후 잔량은 처리 전 잔량에서 처리 수량을 뺀 값이다."
+        },
+        {
+          "id": "full-origin-removed",
+          "expected": "전량 처리 원건만 활성 목록에서 제거한다."
+        },
+        {
+          "id": "partial-origin-remains",
+          "expected": "부분 원건은 잔량으로 남는다."
+        },
+        {
+          "id": "other-origin-card-remains",
+          "expected": "같은 품목의 다른 원건이 남으면 품목 카드도 유지한다."
+        },
+        {
+          "id": "origin-count-not-card-count",
+          "expected": "보관 건수는 잔량 원건 수다."
+        }
+      ],
+      "verificationTags": [
+        "P0"
+      ]
+    },
+    {
+      "id": "8.9-02",
+      "decisionIds": [
+        "WORDING-ORIGIN-REMAINDER"
+      ],
+      "finalExpected": "전량 처리 원건만 제거하고 부분 원건은 잔량으로 남긴다. 같은 품목의 다른 원건이 남으면 품목 카드도 유지한다. 보관 건수는 잔량 원건 수이며 기간별 발생량 통계와 구분한다.",
+      "conditions": [
+        {
+          "id": "full-origin-removed",
+          "expected": "전량 처리 원건만 활성 목록에서 제거한다."
+        },
+        {
+          "id": "partial-origin-remains",
+          "expected": "부분 원건은 잔량으로 남긴다."
+        },
+        {
+          "id": "other-origin-card-remains",
+          "expected": "다른 원건이 남으면 같은 품목 카드도 유지한다."
+        },
+        {
+          "id": "origin-count-not-card-count",
+          "expected": "잔량 원건 수를 보관 건수로 표시한다."
+        }
+      ],
+      "verificationTags": [
+        "P0"
+      ]
+    },
+    {
+      "id": "8.18-01",
+      "decisionIds": [
+        "WORDING-MULTI-SELECT"
+      ],
+      "finalExpected": "다건 선택은 같은 부서·품목 안에서 하며 보관 화면은 관리 분류도 구분한다. 처리 대기·출처 없는 합산 원건은 선택하지 못한다. 부서·품목·필터 변경 시 선택을 초기화한다. 서버는 작업별 같은 품목·부서·대기·수량 변경 조건을 다시 검증한다.",
+      "conditions": [
+        {
+          "id": "ui-grouping",
+          "expected": "화면에서 같은 부서·품목·관리 분류로 묶어 선택한다."
+        },
+        {
+          "id": "pending-untraceable-block",
+          "expected": "처리 대기·출처 없는 합산 원건은 선택 불가다."
+        },
+        {
+          "id": "selection-reset",
+          "expected": "부서·품목·필터 변경 시 선택을 초기화한다."
+        },
+        {
+          "id": "server-group-validation",
+          "expected": "서버가 해당 작업의 같은 품목·부서 조건을 검증한다."
+        },
+        {
+          "id": "server-stale-validation",
+          "expected": "서버가 대기·수량 변경으로 오래된 선택을 거부한다."
+        }
+      ],
+      "verificationTags": [
+        "P0"
+      ]
+    },
+    {
+      "id": "PC-DELTA-PF-02",
+      "decisionIds": [
+        "WORDING-WEEKLY"
+      ],
+      "finalExpected": "이번 주는 한국 시간 월요일 0시부터 다음 월요일 0시 직전이다. 최종 완제품과 동반 출하품, 이번 주 취소와 마감된 지난주 보고 보존을 구분한다. 주간보고 구현 변경 없이 승인된 검수 절차로 확인한다.",
+      "conditions": [
+        {
+          "id": "kst-week-boundary",
+          "expected": "한국 시간 월요일 0시 이상 다음 월요일 0시 미만이다."
+        },
+        {
+          "id": "final-companion-distinct",
+          "expected": "최종 완제품과 동반 출하품 실적을 구분한다."
+        },
+        {
+          "id": "current-cancel-closed-preserved",
+          "expected": "이번 주 취소를 반영하면서 마감된 지난주 보고를 보존한다."
+        }
+      ],
+      "verificationTags": [
+        "P0"
+      ]
+    },
+    {
+      "id": "PC-DELTA-TEST-01",
+      "decisionIds": [
+        "WORDING-TEST-PROOF"
+      ],
+      "finalExpected": "기대값 ID와 개별 조건을 실제 테스트 selector·assertion 조각·파일 SHA에 연결한다. ID 주석·fixture 문자열은 증거가 아니며 일부 조건의 통과로 케이스 전체를 PASS 처리하지 않는다. 기술 구현 이해를 사용자 정책 승인으로 요구하지 않는다.",
+      "conditions": [
+        {
+          "id": "real-assertion-link",
+          "expected": "실제 selector와 assertion 조각·SHA를 연결하고 주석뿐인 ID를 거부한다."
+        },
+        {
+          "id": "individual-condition-proof",
+          "expected": "모든 개별 조건을 추적하고 일부 조건만 실행한 케이스를 PASS로 표시하지 않는다."
+        },
+        {
+          "id": "historical-review-separate",
+          "expected": "과거 관찰·사용자 판정은 현재 실행 증거와 분리해 보존한다."
+        }
+      ],
+      "verificationTags": [
+        "P0"
+      ]
+    },
+    {
+      "id": "PC-DELTA-TEST-02",
+      "decisionIds": [
+        "WORDING-TEST-PROOF"
+      ],
+      "finalExpected": "원장에서 기본 CONTRACT와 추가 DELTA 분모를 각각 산출하고 연결률·실행률을 분리한다. 누락·중복·알 수 없는 ID와 개별 조건 누락을 탐지하며 연결만으로 현재 PASS를 표시하지 않는다.",
+      "conditions": [
+        {
+          "id": "dynamic-denominators",
+          "expected": "기본·추가 분모를 원장에서 동적으로 산출한다."
+        },
+        {
+          "id": "link-execution-distinct",
+          "expected": "연결과 실제 실행률을 별도 지표로 표시한다."
+        },
+        {
+          "id": "missing-duplicate-detected",
+          "expected": "누락·중복·알 수 없는 ID·조건을 탐지한다."
+        }
+      ],
+      "verificationTags": [
+        "P0"
+      ]
+    },
+    {
+      "id": "PC-DELTA-TEST-03",
+      "decisionIds": [
+        "WORDING-TEST-PROOF"
+      ],
+      "finalExpected": "smoke·P0·개별 기대값 ID로 실제 테스트 selector 선택 계획을 만든다. 잘못된 ID나 연결되지 않은 조건은 거부한다. 선택 계획은 테스트 실행이나 전체 원장 PASS를 뜻하지 않으며, 실제 실행 결과는 개별 조건의 별도 근거로 등록한다.",
+      "conditions": [
+        {
+          "id": "filter-selects-intended",
+          "expected": "smoke·위험등급·ID 필터는 의도한 테스트만 선택한다."
+        },
+        {
+          "id": "selected-run-not-global-pass",
+          "expected": "선택 실행으로 전체 원장 PASS를 만들지 않는다."
+        }
+      ],
+      "verificationTags": [
+        "P0"
+      ]
+    },
+    {
+      "id": "PC-DELTA-MAP-02",
+      "decisionIds": [
+        "WORDING-MAP-DEFERRED"
+      ],
+      "deferred": true,
+      "finalExpected": "미사용 지도는 보류 범위를 유지한다. 지도 편집 권한·본인 확인·대조 조회 실패 대응의 원본 기대를 보존하되 이번 구현 범위나 현재 PASS로 전환하지 않는다.",
+      "conditions": [
+        {
+          "id": "unused-map-deferred",
+          "expected": "미사용 지도 검수 보류를 유지한다."
+        }
+      ],
+      "verificationTags": []
+    }
+  ]
+}

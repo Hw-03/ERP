@@ -256,9 +256,22 @@ describe("PaPfDefectWizard", () => {
       target: { value: "기능 불량" },
     });
 
-    // 게터 행의 폐기 수량을 5로 변경하면 정상 수량이 0으로 자동 보정된다.
+    // 합계 오류 입력을 보존하고 전체 제출을 막는다.
     fireEvent.change(screen.getByLabelText("게터 폐기 수량"), { target: { value: "5" } });
+    expect(screen.getByLabelText("게터 정상 수량")).toHaveValue(5);
+    expect(screen.getByLabelText("게터 폐기 수량")).toHaveValue(5);
+    expect(screen.getByText("합계가 총 수량과 같아야 합니다.")).toBeInTheDocument();
+    expect(screen.getByText("즉시 재작업 →")).toBeDisabled();
+    fireEvent.click(screen.getByText("즉시 재작업 →"));
+    expect(screen.queryByText("재작업 확인")).not.toBeInTheDocument();
+    expect(stockRequestsApi.createStockRequest).not.toHaveBeenCalled();
+
+    // 정상 수량을 명시적으로 수정한 뒤 같은 배분을 제출한다.
+    fireEvent.change(screen.getByLabelText("게터 정상 수량"), { target: { value: "0" } });
     expect(screen.getByLabelText("게터 정상 수량")).toHaveValue(0);
+    expect(screen.getByLabelText("게터 폐기 수량")).toHaveValue(5);
+    expect(screen.queryByText("합계가 총 수량과 같아야 합니다.")).not.toBeInTheDocument();
+    expect(screen.getByText("즉시 재작업 →")).toBeEnabled();
 
     // 즉시 처리 확인 팝업 → 확정 버튼
     fireEvent.click(screen.getByText("즉시 재작업 →"));

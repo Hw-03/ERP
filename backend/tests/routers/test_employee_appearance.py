@@ -8,10 +8,11 @@ from sqlalchemy import event
 
 
 @pytest.fixture
-def employee(db_session) -> Employee:
+def employee(db_session, client) -> Employee:
     employee = Employee(employee_code="APPEARANCE", name="Worker", role="worker", department="Assembly", theme="light", sidebar_mode="hover")
     db_session.add(employee)
     db_session.commit()
+    client.headers["X-MES-Employee-Code"] = employee.employee_code
     return employee
 
 

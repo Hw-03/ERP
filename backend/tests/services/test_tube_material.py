@@ -1,9 +1,12 @@
 """튜브 원자재 입출고와 업체 작업범위 계약."""
 import uuid
+from collections.abc import Callable
 
 import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
-from app.models import DepartmentEnum, Employee, Inventory, Supplier, TransactionLog
+from app.models import DepartmentEnum, Employee, Inventory, InventoryLocation, Item, Supplier, TransactionLog
 from app.schemas import IoSubmitRequest
 from app.schemas.io import IoPreviewTarget
 from app.services import io_actions, io_draft, io_preview
@@ -170,13 +173,105 @@ def test_tube_defect_return_requires_tube_supplier_at_all_boundaries(client, db_
     db_session.flush()
     payload = {"requester_employee_id": str(actor.employee_id), "request_type": "defect_return", "supplier_id": str(warehouse.supplier_id), "reason_category": "외관 불량", "lines": [{"record_id": str(record.record_id), "item_id": str(item.item_id), "quantity": 1, "from_bucket": "defective", "from_department": "튜브", "to_bucket": "none"}]}
     db_session.commit()
-    assert client.post("/api/stock-requests", json=payload).status_code == 422
-    assert client.put("/api/stock-requests/draft", json=payload).status_code == 422
+    for response in (
+        client.post("/api/stock-requests", json=payload),
+        client.put("/api/stock-requests/draft", json=payload),
+    ):
+        assert response.status_code == 422, response.text
+        assert "공급업체 작업범위" in response.json()["detail"]["message"]
+    assert record.remaining_quantity == 4
+    assert db_session.query(InventoryLocation).filter_by(item_id=item.item_id).one().quantity == 4
+    assert db_session.query(TransactionLog).filter_by(item_id=item.item_id).count() == 0
     payload["supplier_id"] = str(tube.supplier_id)
     response = client.post("/api/stock-requests", json=payload)
     assert response.status_code == 201, response.json()
     assert record.remaining_quantity == 3
     assert db_session.query(TransactionLog).filter_by(item_id=item.item_id).one().supplier_id == tube.supplier_id
+
+
+@pytest.mark.parametrize("code,has_record", [("TA", True), ("TR", False)], ids=["non-tr-record", "recordless-legacy"])
+def test_tube_defect_return_preserves_warehouse_supplier_fallback(
+    client: TestClient, db_session: Session, make_item: Callable[..., Item],
+    make_location: Callable[..., InventoryLocation], code: str, has_record: bool,
+) -> None:
+    """실제 TR 원건 외의 튜브 반품은 기존 warehouse 업체 계약을 보존한다."""
+    from app.models import DefectQuarantineRecord, LocationStatusEnum
+
+    actor = _actor(db_session)
+    item = make_item(process_type_code=code, warehouse_qty=7)
+    normal = make_location(item.item_id, department=DepartmentEnum.TUBE, quantity=6)
+    defective = make_location(item.item_id, department=DepartmentEnum.TUBE, status=LocationStatusEnum.DEFECTIVE, quantity=4)
+    inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
+    inventory.quantity = 17
+    supplier = Supplier(name="레거시 반품 업체", normalized_name="레거시 반품 업체", scope="warehouse")
+    record = DefectQuarantineRecord(item_id=item.item_id, department="튜브", original_quantity=4, remaining_quantity=4) if has_record else None
+    db_session.add(supplier)
+    if record is not None:
+        db_session.add(record)
+    db_session.flush()
+    line = {"item_id": str(item.item_id), "quantity": 1, "from_bucket": "defective", "from_department": "튜브", "to_bucket": "none"}
+    if record is not None:
+        line["record_id"] = str(record.record_id)
+    payload = {"requester_employee_id": str(actor.employee_id), "request_type": "defect_return", "supplier_id": str(supplier.supplier_id), "reason_category": "외관 불량", "lines": [line]}
+    db_session.commit()
+
+    response = client.post("/api/stock-requests", json=payload)
+
+    assert response.status_code == 201, response.text
+    assert response.json()["status"] == "completed"
+    db_session.expire_all()
+    assert defective.quantity == 3
+    assert normal.quantity == 6
+    assert inventory.warehouse_qty == 7
+    assert inventory.quantity == 16
+    if record is not None:
+        assert record.remaining_quantity == 3
+    else:
+        assert db_session.query(DefectQuarantineRecord).filter_by(item_id=item.item_id).count() == 0
+    log = db_session.query(TransactionLog).filter_by(item_id=item.item_id).one()
+    assert log.transaction_type.value == "SUPPLIER_RETURN"
+    assert log.department == "튜브"
+    assert log.supplier_id == supplier.supplier_id
+    assert log.supplier_name_snapshot == supplier.name
+    assert log.defect_quarantine_record_id == (record.record_id if record is not None else None)
+
+
+@pytest.mark.parametrize("boundary", ["create", "draft"])
+def test_other_department_defect_return_rejects_valid_warehouse_supplier_without_writes(
+    client: TestClient, db_session: Session, make_item: Callable[..., Item],
+    make_location: Callable[..., InventoryLocation], boundary: str,
+) -> None:
+    """업체 scope가 올바른 조립 원건도 부서 제한으로 쓰기 전에 거부한다."""
+    from app.models import (
+        DefectInventoryMovement, DefectQuarantineRecord, InventoryOperation,
+        LocationStatusEnum, StockRequest, StockRequestLine,
+    )
+
+    actor = _actor(db_session)
+    actor.department = "조립"
+    item = make_item(process_type_code="AR")
+    make_location(item.item_id, department=DepartmentEnum.ASSEMBLY, status=LocationStatusEnum.DEFECTIVE, quantity=4)
+    db_session.query(Inventory).filter_by(item_id=item.item_id).one().quantity = 4
+    record = DefectQuarantineRecord(item_id=item.item_id, department="조립", original_quantity=4, remaining_quantity=4)
+    supplier = Supplier(name="정상 창고 업체", normalized_name="정상 창고 업체", scope="warehouse")
+    db_session.add_all([record, supplier])
+    db_session.flush()
+    payload = {"requester_employee_id": str(actor.employee_id), "request_type": "defect_return", "supplier_id": str(supplier.supplier_id), "reason_category": "외관 불량", "lines": [{"record_id": str(record.record_id), "item_id": str(item.item_id), "quantity": 1, "from_bucket": "defective", "from_department": "조립", "to_bucket": "none"}]}
+    db_session.commit()
+    tables = [model.__table__ for model in (
+        Inventory, InventoryLocation, DefectQuarantineRecord, TransactionLog,
+        InventoryOperation, DefectInventoryMovement, StockRequest, StockRequestLine,
+    )]
+    before = {table.name: [tuple(row) for row in db_session.execute(table.select()).all()] for table in tables}
+
+    response = (client.post("/api/stock-requests", json=payload) if boundary == "create"
+                else client.put("/api/stock-requests/draft", json=payload))
+
+    assert response.status_code == 422, response.text
+    assert "창고 또는 튜브" in response.json()["detail"]["message"]
+    db_session.expire_all()
+    after = {table.name: [tuple(row) for row in db_session.execute(table.select()).all()] for table in tables}
+    assert after == before
 
 
 def test_tube_outbound_shortage_is_atomic_with_multiple_items(db_session, make_item, make_location):

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 3,
+  "kind": "reviewed-reuse",
+  "original": {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/not-run-closure-20261013-003/pytest-6eb3066497-execution.json",
+    "sha256": "c51d86b98ba2cbf7b59f7daa9b93f6799306751d238a10cc690275b29cf43661"
+  },
+  "review": {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/review.json",
+    "sha256": "072b01dc77907ae53c722ad93708c73f34a0603c0680ffac54a9f1d2920055b7"
+  }
+}

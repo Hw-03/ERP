@@ -184,7 +184,7 @@ export function DailyWorkReportEditor({
           </div>
         </div>
         <p className={`${mobile ? `mt-3 ${mobileFill ? "min-h-0 overflow-y-auto" : "min-h-32"} flex-1 whitespace-pre-wrap rounded-[16px] border px-3 py-3.5 [overflow-wrap:anywhere] text-base leading-7` : "mt-5 whitespace-pre-wrap rounded-[16px] border px-4 py-4 text-sm leading-7"} ${fillAvailableHeight && !mobile ? "lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1" : ""}`} style={{ color: initialContent ? LEGACY_COLORS.text : LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-          {loading ? <span role="status" aria-label="작업 내역 불러오는 중" className="block h-7 w-2/3 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} /> : initialContent || <><Image src="/images/dexray/daily-empty-blue.webp" alt="" width={360} height={240} className="mx-auto block h-36 w-auto object-contain" />작성된 일보가 없습니다.</>}
+          {loading ? <span role="status" aria-label="작업 내역 불러오는 중" className="block h-7 w-2/3 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} /> : initialContent || <><Image src="/images/dexray/daily-empty-blue.webp" loading="eager" alt="" width={360} height={240} className="mx-auto block h-36 w-auto object-contain" />작성된 일보가 없습니다.</>}
         </p>
       </section>
     );
@@ -219,7 +219,7 @@ export function DailyWorkReportEditor({
         <div className="h-5 w-4/5 motion-safe:animate-pulse rounded" style={{ background: LEGACY_COLORS.s3 }} />
         <div className="mt-2 h-5 w-2/3 motion-safe:animate-pulse rounded" style={{ background: LEGACY_COLORS.s3 }} />
       </div> : <div className={`relative flex ${mobile ? mobileFill ? `mt-3 min-h-0 flex-1 ${layoutStyles.compactField}` : "mt-3 min-h-[max(240px,40dvh)] flex-1" : "mt-4 min-h-44"} flex-col ${fillAvailableHeight ? "lg:min-h-0 lg:flex-1" : ""}`}>
-      {!content.trim() && !focused && <div data-testid="daily-empty-mascot" aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center justify-center"><Image src="/images/dexray/daily-empty-blue.webp" alt="" width={360} height={240} className="h-auto max-h-[80%] w-[min(240px,50%)] object-contain" /></div>}
+      {!content.trim() && !focused && <div data-testid="daily-empty-mascot" aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center justify-center"><Image src="/images/dexray/daily-empty-blue.webp" loading="eager" alt="" width={360} height={240} className="h-auto max-h-[80%] w-[min(240px,50%)] object-contain" /></div>}
       <textarea
         aria-label="작업 내역"
         onFocus={() => setFocused(true)}
@@ -242,6 +242,7 @@ export function DailyWorkReportEditor({
       /></div>}
       {(saveError || localSaveError) && <p role="alert" className="mt-3 rounded-[12px] px-3 py-2 text-sm font-bold" style={{ color: LEGACY_COLORS.red, background: LEGACY_COLORS.errorBg }}>{saveError || localSaveError}</p>}
       <div className={`${mobile ? "mt-3" : "mt-4"} flex shrink-0 flex-wrap items-center justify-end gap-3`}>
+        {(saveFailed || saveError) && <button type="button" onClick={() => void save().catch(() => {})} disabled={saving || savingLocal} className="min-h-11 rounded-[10px] border px-3 text-sm font-bold" style={{ borderColor: LEGACY_COLORS.border }}>다시 시도</button>}
         <p className="flex items-center gap-1.5 text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
           <CheckCircle2 className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />
           과거 일보도 수정할 수 있습니다.

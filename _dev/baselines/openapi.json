@@ -673,6 +673,74 @@
         "title": "AuditTerminalUpsert",
         "type": "object"
       },
+      "BOMConfigurationLine": {
+        "properties": {
+          "child_item_id": {
+            "format": "uuid",
+            "title": "Child Item Id",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "unit": {
+            "default": "EA",
+            "maxLength": 20,
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "child_item_id",
+          "quantity"
+        ],
+        "title": "BOMConfigurationLine",
+        "type": "object"
+      },
+      "BOMConfigurationUpdate": {
+        "properties": {
+          "expected_rows": {
+            "items": {
+              "$ref": "#/components/schemas/BOMResponse"
+            },
+            "title": "Expected Rows",
+            "type": "array"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/BOMConfigurationLine"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "expected_rows",
+          "rows"
+        ],
+        "title": "BOMConfigurationUpdate",
+        "type": "object"
+      },
       "BOMCreate": {
         "properties": {
           "child_item_id": {
@@ -3622,6 +3690,17 @@
             ],
             "title": "Color Hex"
           },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
           "display_order": {
             "title": "Display Order",
             "type": "integer"
@@ -3666,6 +3745,19 @@
               }
             ],
             "title": "Color Hex"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
           },
           "display_order": {
             "anyOf": [
@@ -6712,6 +6804,19 @@
             ],
             "title": "Bom Stock Exempt"
           },
+          "expected_mes_code": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "직원이 확인한 코드 미리보기; 현재 코드와 다르면 저장하지 않음",
+            "title": "Expected Mes Code"
+          },
           "initial_locations": {
             "anyOf": [
               {
@@ -7242,6 +7347,19 @@
               }
             ],
             "title": "Bom Stock Exempt"
+          },
+          "expected_mes_code": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "직원이 확인한 코드 미리보기; 현재 코드와 다르면 저장하지 않음",
+            "title": "Expected Mes Code"
           },
           "item_name": {
             "anyOf": [
@@ -10782,6 +10900,18 @@
             ],
             "title": "Bom Lines"
           },
+          "client_request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
+          },
           "companion_lines": {
             "anyOf": [
               {
@@ -13071,6 +13201,28 @@
             "title": "Created At",
             "type": "string"
           },
+          "current_item_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Item Name"
+          },
+          "current_mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Mes Code"
+          },
           "department": {
             "anyOf": [
               {
@@ -13164,6 +13316,11 @@
               }
             ],
             "title": "Item Process Type Code"
+          },
+          "item_snapshot_preserved": {
+            "default": false,
+            "title": "Item Snapshot Preserved",
+            "type": "boolean"
           },
           "item_unit": {
             "title": "Item Unit",
@@ -14967,6 +15124,13 @@
       },
       "WeeklyReportResponse": {
         "properties": {
+          "aggregation_scope": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Aggregation Scope",
+            "type": "object"
+          },
           "basis_version": {
             "default": 1,
             "title": "Basis Version",
@@ -17073,6 +17237,98 @@
           }
         },
         "summary": "Get Bom Flat",
+        "tags": [
+          "BOM"
+        ]
+      },
+      "put": {
+        "description": "Save one validated composition; reject a stale editor before any row changes.",
+        "operationId": "replace_bom_configuration_api_bom__parent_item_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "parent_item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Parent Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BOMConfigurationUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BOMResponse"
+                  },
+                  "title": "Response Replace Bom Configuration Api Bom  Parent Item Id  Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Replace Bom Configuration",
         "tags": [
           "BOM"
         ]
@@ -21683,6 +21939,23 @@
         "parameters": [
           {
             "in": "query",
+            "name": "log_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Log Id"
+            }
+          },
+          {
+            "in": "query",
             "name": "item_id",
             "required": false,
             "schema": {
@@ -23141,7 +23414,7 @@
     },
     "/api/inventory/transactions/{log_id}/cancel": {
       "post": {
-        "description": "거래 취소 — 내역 유지 + 재고 자동 롤백 + '취소됨' 표시.\n\n권한: 배치 요청자 본인(배치가 없으면 producer_employee_id) 또는 결재 권한자.\nBOM 배치(PRODUCE+BACKFLUSH)는 operation_batch_id 단위로 일괄 취소.",
+        "description": "거래 취소 — 내역 유지 + 재고 자동 롤백 + '취소됨' 표시.\n\n권한: 배치·작업 요청자 본인(원장 연결이 없으면 처리자) 또는 결재 권한자.\nBOM 배치(PRODUCE+BACKFLUSH)는 operation_batch_id 단위로 일괄 취소.",
         "operationId": "cancel_transaction_api_inventory_transactions__log_id__cancel_post",
         "parameters": [
           {
@@ -24160,6 +24433,121 @@
         ]
       }
     },
+    "/api/items/code-preview": {
+      "get": {
+        "description": "Read the exact prospective code; preview never allocates or reserves a serial.",
+        "operationId": "preview_item_code_api_items_code_preview_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "process_type_code",
+            "required": true,
+            "schema": {
+              "maxLength": 2,
+              "minLength": 2,
+              "title": "Process Type Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "model_slots",
+            "required": true,
+            "schema": {
+              "items": {
+                "type": "integer"
+              },
+              "minItems": 1,
+              "title": "Model Slots",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "item_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Item Id"
+            }
+          },
+          {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Preview Item Code Api Items Code Preview Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Item Code",
+        "tags": [
+          "Items"
+        ]
+      }
+    },
     "/api/items/export.csv": {
       "get": {
         "operationId": "export_items_csv_api_items_export_csv_get",
@@ -24336,7 +24724,7 @@
         ]
       },
       "put": {
-        "description": "직원의 품목 표시 순서 전체 교체.\n\n기존 행 전부 삭제 후 bulk insert (upsert 효과).\n존재하지 않는 item_id는 조용히 skip.",
+        "description": "직원의 품목 표시 순서 전체 교체.\n\n기존 행 전부 삭제 후 bulk insert (upsert 효과).\n존재하지 않거나 삭제된 item_id는 조용히 skip.",
         "operationId": "put_my_order_api_items_my_order_put",
         "requestBody": {
           "content": {
@@ -24762,6 +25150,88 @@
         ]
       }
     },
+    "/api/items/{item_id}/deletion-dependencies": {
+      "get": {
+        "description": "Let the confirmation UI inspect all blockers without attempting a write.",
+        "operationId": "get_item_deletion_dependencies_api_items__item_id__deletion_dependencies_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Item Deletion Dependencies Api Items  Item Id  Deletion Dependencies Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Item Deletion Dependencies",
+        "tags": [
+          "Items"
+        ]
+      }
+    },
     "/api/items/{item_id}/restore": {
       "patch": {
         "description": "삭제된 품목 복구 — deleted_at 초기화.",
@@ -24844,7 +25314,7 @@
     },
     "/api/items/{item_id}/soft-delete": {
       "patch": {
-        "description": "품목 소프트 삭제 — deleted_at 세팅 + BOM 연결 제거. 입출고 내역은 보존.",
+        "description": "연결 사실이 없는 품목만 삭제 표시하며 기존 삭제품목의 복구는 별도 유지한다.",
         "operationId": "soft_delete_item_api_items__item_id__soft_delete_patch",
         "parameters": [
           {

@@ -15,6 +15,8 @@ from app.models import (
     IoBatch,
     IoLine,
     LocationStatusEnum,
+    Notification,
+    NotificationTypeEnum,
     RequestBucketEnum,
     StockRequest,
     StockRequestStatusEnum,
@@ -411,6 +413,12 @@ def reclassify_undecided_if_no_active_approver(db: Session) -> int:
         .all()
     }
     for request in requests:
+        db.query(Notification).filter(
+            Notification.related_request_id == request.request_id,
+            Notification.type == NotificationTypeEnum.APPROVAL_REQUEST.value,
+            Notification.target_section == "as-research-queue",
+        ).update({Notification.is_read: True, Notification.target_tab: None,
+                  Notification.target_section: None}, synchronize_session="fetch")
         request.requires_as_research_approval = False
         request.requires_department_approval = True
         request.approval_department = (

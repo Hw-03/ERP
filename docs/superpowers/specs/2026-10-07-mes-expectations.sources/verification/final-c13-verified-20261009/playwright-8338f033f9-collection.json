@@ -1,0 +1,99 @@
+{
+  "config": {
+    "configFile": "C:\\Users\\user\\.codex\\worktrees\\mes-expectation-closure\\ERP\\frontend\\playwright.config.ts",
+    "rootDir": "C:/Users/user/.codex/worktrees/mes-expectation-closure/ERP/frontend/tests/e2e",
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": "C:\\Users\\user\\.codex\\worktrees\\mes-expectation-closure\\ERP\\frontend\\tests\\e2e\\global-setup.ts",
+    "globalTeardown": "C:\\Users\\user\\.codex\\worktrees\\mes-expectation-closure\\ERP\\frontend\\tests\\e2e\\global-teardown.ts",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {},
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/user/.codex/worktrees/mes-expectation-closure/ERP/frontend/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "C:/Users/user/.codex/worktrees/mes-expectation-closure/ERP/frontend/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": {
+      "current": 1,
+      "total": 1
+    },
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.60.0",
+    "workers": 1,
+    "webServer": {
+      "command": "npx next dev -p 3100",
+      "url": "http://localhost:3100",
+      "reuseExistingServer": false,
+      "timeout": 120000,
+      "env": {
+        "BACKEND_INTERNAL_URL": "http://127.0.0.1:8021"
+      }
+    }
+  },
+  "suites": [
+    {
+      "title": "as-research-expectations.spec.ts",
+      "file": "as-research-expectations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "ASR-FALLBACK PC-DELTA-ASR-03 마지막 전용역할 해제는 알림 읽음·실행차단·부서 대기·완료 이력·재활성 큐를 보존한다",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a1d13558c3bb931dd39a-170b2f42d2e792bbbf75",
+          "file": "as-research-expectations.spec.ts",
+          "line": 35,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-09T10:25:23.116Z",
+    "duration": 35.64499999999998,
+    "expected": 0,
+    "skipped": 1,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

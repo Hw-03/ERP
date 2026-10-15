@@ -90,6 +90,26 @@ describe("MobileShippingRequestWizard", () => {
     }));
   });
 
+  it("신규 요청의 응답 실패 뒤 재시도는 같은 제출 키를 유지하고 연속 클릭을 막는다", async () => {
+    const { setStep, onSaved } = mount();
+    fireEvent.change(await screen.findByLabelText("인보이스 번호"), { target: { value: "RETRY-1" } });
+    fireEvent.click(screen.getByRole("button", { name: "기준 PF 선택" }));
+    fireEvent.click(await within(screen.getByRole("dialog")).findByRole("button", { name: /PF pf-1/ }));
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    setStep(5);
+    api.createShippingRequest.mockRejectedValueOnce(new Error("응답 연결 끊김")).mockResolvedValueOnce(editableRequest());
+    const submit = screen.getByRole("button", { name: "출하 요청 저장" });
+    await waitFor(() => expect(submit).toBeEnabled());
+    fireEvent.click(submit);
+    expect(await screen.findByText("응답 연결 끊김")).toBeInTheDocument();
+    const firstKey = api.createShippingRequest.mock.calls[0][0].client_request_id;
+    expect(firstKey).toMatch(/^[0-9a-f]{8}-[0-9a-f-]{27}$/i);
+    act(() => { submit.click(); submit.click(); });
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+    expect(api.createShippingRequest).toHaveBeenCalledTimes(2);
+    expect(api.createShippingRequest.mock.calls[1][0].client_request_id).toBe(firstKey);
+  });
+
   it("기존 요청의 요청자와 동반품 변경을 보존하고 PF 변경은 막는다", async () => {
     const request = editableRequest();
     const { setStep, onSaved } = mount(1, request);

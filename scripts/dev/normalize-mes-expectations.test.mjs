@@ -10,6 +10,19 @@ async function load() {
   return import(pathToFileURL(modulePath).href);
 }
 const source = 'test("restores", () => {\n  expect(view.search).toBe("needle");\n});\n';
+test("같은 검사 안의 반복 근거는 한 소스 스냅샷을 쓰고 다음 검사는 최신 소스를 다시 읽는다", async () => {
+  const { normalizeExpectations, validateExpectations, sha256 } = await load();
+  const input = inputs();
+  input.registry.assertions = ["search", "selection"].map(conditionId => ({ caseId: "PC-DELTA-ITEM-01", conditionId, bindings: [{
+    file: "frontend/restore.test.ts", selector: "restores", assertion: 'expect(view.search).toBe("needle");', sourceHash: sha256(source),
+  }] }));
+  const model = normalizeExpectations(input);
+  let reads = 0;
+  assert.deepEqual(validateExpectations(model, () => { reads++; return source; }), []);
+  assert.equal(reads, 1);
+  const errors = validateExpectations(model, () => source.replace("needle", "changed"));
+  assert.ok(errors.some(error => error.includes("stale source hash")));
+});
 test("동일한 테스트의 LF와 CRLF는 같은 소스 근거이며 코드 변경은 거부한다", async () => {
   const { normalizeExpectations, validateExpectations, sha256 } = await load();
   const input = inputs();
@@ -59,6 +72,26 @@ test("범위 밖 원문은 문장별 미검토 조건으로 남기고 전부 실
   for (const condition of model.cases[0].assertions) condition.execution = { status: "PASS" };
   model.cases[0].currentVerification = "PASS";
   assert.ok(validateExpectations(model, () => source).some((error) => error.includes("unreviewed")));
+});
+
+test("확정된 기술 기대와 직원 안내 기대를 구분하고 원문은 보존한다", async () => {
+  const { normalizeExpectations } = await load();
+  const input = inputs();
+  input.policy.cases[0].finalStaffExpected = "검색과 선택한 품목을 다시 표시합니다.";
+  const row = normalizeExpectations(input).cases[1];
+  assert.equal(row.finalExpected, "restore search and selected item");
+  assert.equal(row.finalStaffExpected, "검색과 선택한 품목을 다시 표시합니다.");
+  assert.equal(row.original.staffExpected, "old restore");
+});
+
+test("브라우저 assertion의 정규식 괄호와 따옴표를 코드 경계로 오인하지 않는다", async () => {
+  const { normalizeExpectations, validateExpectations, sourceSha256 } = await load();
+  const body = 'test("regex UI", () => {\n  expect(view.text).toMatch(/[(]x["/]/);\n});\n';
+  const input = inputs();
+  input.registry.assertions.push({ caseId: "PC-DELTA-ITEM-01", conditionId: "search", bindings: [{
+    file: "frontend/restore.test.ts", selector: "regex UI", assertion: 'expect(view.text).toMatch(/[(]x["/]/);', sourceHash: sourceSha256(body),
+  }] });
+  assert.deepEqual(validateExpectations(normalizeExpectations(input), () => body), []);
 });
 
 test("알 수 없는 ID·중복 원장·중복 정책·누락 조건을 거부한다", async () => {
@@ -225,4 +258,66 @@ test("현재 PASS는 각 selector의 실행 결과 artifact와 SHA까지 일치�
     assert.ok(validateExpectations(candidate, (file) => file.endsWith("run.json") ? invalid : source).some((error) => error.includes("execution")));
   }
   assert.ok(validateExpectations(model, (file) => file.endsWith("run.json") ? report + " " : source).some((error) => error.includes("evidence hash")));
+});
+
+test("schema 2는 조건별 필수 근거와 파라미터 선언 위치를 보존한다", async () => {
+  const { normalizeExpectations, sha256 } = await load();
+  const input = inputs();
+  input.policy.schemaVersion = 2;
+  input.policy.cases[0].conditions[0].requiredEvidence = ["test", "browser"];
+  input.registry.tests = [{ id: "restore", file: "frontend/restore.test.ts", selector: "restores", line: 1, sourceHash: sha256(source) }];
+  input.registry.assertions.push({ caseId: "PC-DELTA-ITEM-01", conditionId: "search", bindings: [{ testId: "restore", assertion: 'expect(view.search).toBe("needle");' }] });
+  const model = normalizeExpectations(input);
+  assert.equal(model.schemaVersion, 2);
+  assert.deepEqual(model.cases[1].assertions[0].requiredEvidence, ["test", "browser"]);
+  assert.equal(model.cases[1].assertions[0].bindings[0].line, 1);
+});
+
+test("full 선택은 보류를 제외한 원장 전체이며 보류 ID 직접 실행은 거부한다", async () => {
+  const { normalizeExpectations, selectAssertions, sha256 } = await load();
+  const input = inputs();
+  input.policy.cases.push({ id: "8.1-01", deferred: true, conditions: [{ id: "deferred", expected: "map deferred" }] });
+  input.registry.assertions = ["search", "selection"].map((conditionId) => ({ caseId: "PC-DELTA-ITEM-01", conditionId, bindings: [{ file: "frontend/restore.test.ts", selector: "restores", assertion: 'expect(view.search).toBe("needle");', sourceHash: sha256(source) }] }));
+  const model = normalizeExpectations(input);
+  assert.deepEqual(selectAssertions(model, { tier: "full" }).caseIds, ["PC-DELTA-ITEM-01"]);
+  assert.throws(() => selectAssertions(model, { ids: ["8.1-01"] }), /deferred/);
+  assert.equal(model.metrics.CONTRACT.eligibleCases, 0);
+  assert.equal(model.metrics.CONTRACT.deferredCases, 1);
+  assert.equal(model.metrics.DELTA.eligibleCases, 1);
+  assert.equal(model.metrics.DELTA.eligibleConditions, 2);
+});
+
+test("엄격한 완료 검사는 eligible 미검토·미연결·미실행과 schema 1을 거부한다", async () => {
+  const { normalizeExpectations, validateExpectations } = await load();
+  const input = inputs(); input.policy.schemaVersion = 2;
+  const model = normalizeExpectations(input);
+  const errors = validateExpectations(model, () => source, { requireComplete: true });
+  assert.ok(errors.some((error) => error.includes("unreviewed")));
+  assert.ok(errors.some((error) => error.includes("required evidence")));
+  assert.ok(errors.some((error) => error.includes("not complete")));
+  model.schemaVersion = 1;
+  assert.ok(validateExpectations(model, () => source, { requireComplete: true }).some((error) => error.includes("schema 2")));
+});
+
+test("schema 2에서는 옛 요약 보고서만으로 현재 PASS를 기록할 수 없다", async () => {
+  const { normalizeExpectations, validateExpectations, sha256 } = await load();
+  const input = inputs(); input.policy.schemaVersion = 2;
+  input.policy.cases[0].conditions.forEach((condition) => condition.requiredEvidence = ["test"]);
+  const report = JSON.stringify({ command: "node --test", executedAt: "2026-10-07T00:00:00Z", results: [{ file: "frontend/restore.test.ts", selector: "restores", sourceHash: sha256(source), status: "PASS" }] });
+  input.registry.assertions = ["search", "selection"].map((conditionId) => ({ caseId: "PC-DELTA-ITEM-01", conditionId, bindings: [{ file: "frontend/restore.test.ts", selector: "restores", assertion: 'expect(view.search).toBe("needle");', sourceHash: sha256(source) }], execution: { status: "PASS", evidence: [{ evidenceFile: "_attic/runtime/run.json", evidenceHash: sha256(report) }] } }));
+  assert.ok(validateExpectations(normalizeExpectations(input), (file) => file.endsWith("run.json") ? report : source).some((error) => error.includes("schema 2")));
+});
+
+test("정책 문구 보존과 원자 조건 검토 완료는 별도이며 옛 연결을 현재 근거로 쓰지 않는다", async () => {
+  const { normalizeExpectations, validateExpectations } = await load();
+  const input = inputs(); input.policy.schemaVersion = 2;
+  input.policy.cases[0].atomicReview = "unreviewed";
+  input.registry.assertions = [{ caseId: "PC-DELTA-ITEM-01", conditionId: "search", historicalBindings: [{ file: "old.test.ts", sourceHash: "old" }], bindings: [] }];
+  const model = normalizeExpectations(input);
+  assert.equal(model.cases[1].finalExpected, input.policy.cases[0].finalExpected);
+  assert.equal(model.cases[1].atomicReview, "unreviewed");
+  assert.equal(model.cases[1].assertions[0].coverage, "missing");
+  assert.deepEqual(model.cases[1].assertions[0].historicalBindings, input.registry.assertions[0].historicalBindings);
+  assert.deepEqual(validateExpectations(model, () => source), []);
+  assert.ok(validateExpectations(model, () => source, { requireComplete: true }).some((error) => error.includes("unreviewed")));
 });

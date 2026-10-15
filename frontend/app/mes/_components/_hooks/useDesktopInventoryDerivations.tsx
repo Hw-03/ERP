@@ -6,7 +6,7 @@ import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { getStockState } from "@/lib/mes/inventory";
 import type { KpiCardData as KpiCard } from "../_inventory_sections/InventoryKpiPanel";
-import { getMinStock, isDisusedInventoryItem, safeQty } from "../_inventory_sections/inventoryFilter";
+import { getMinStock, isDisusedInventoryItem, isKpiInventoryItem, safeQty } from "../_inventory_sections/inventoryFilter";
 
 /**
  * Round-13 (#20) 추출 — DesktopInventoryView 의 summary/kpiCards/badge derivation hook.
@@ -16,11 +16,6 @@ export interface UseDesktopInventoryDerivationsResult {
   activeFilterCount: number;
   kpiCards: KpiCard[];
   headerBadge: ReactNode;
-}
-
-function isKpiInventoryItem(item: Item): boolean {
-  const mesCode = item.mes_code?.toUpperCase() ?? "";
-  return !mesCode.includes("-PA-") && !mesCode.includes("-PF-");
 }
 
 export function useDesktopInventoryDerivations({
@@ -97,7 +92,7 @@ export function useDesktopInventoryDerivations({
     {
       label: "전체",
       value: isFiltered ? kpiScopedItems.length : activeTotal,
-      hint: isFiltered ? `전체 ${activeTotal}건 · 클릭하면 초기화` : "전체 품목",
+      hint: isFiltered ? `전체 ${activeTotal}건 · PA·PF 제외 · 클릭하면 초기화` : "전체 품목 · PA·PF 제외",
       tone: LEGACY_COLORS.blue,
       key: "ALL",
     },

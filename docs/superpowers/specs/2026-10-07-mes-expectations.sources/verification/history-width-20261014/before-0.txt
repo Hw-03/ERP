@@ -1,0 +1,835 @@
+"use client";
+
+import Image from "next/image";
+import { ChevronDown, CircleHelp } from "lucide-react";
+import { useDesktopTabHome } from "../DesktopTabHome";
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import type { TransactionLog } from "@/lib/api";
+import type { TransactionReferenceSummary } from "@/lib/api/production";
+import { ioApi } from "@/lib/api/io";
+import type { IoBatch } from "@/lib/api/types/io";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { Tooltip } from "@/lib/ui/Tooltip";
+import { LoadFailureCard } from "../common";
+import { ReadEmpty } from "../common/ReadState";
+import type { HistorySelection } from "./historyConstants";
+import { HistoryLogRow } from "./HistoryLogRow";
+import {
+  BatchHeader,
+  HISTORY_CELL_TRANSITION,
+  HISTORY_ITEM_CODE_WIDTH_PX,
+  HISTORY_STOCK_SNAPSHOT_WIDTH_PX,
+  OpBatchHeader,
+  StockSnapshotCell,
+  ReferenceBatchDetail,
+  buildGroups,
+  getAdditionalDistinctItemCount,
+  getGroupPrimaryLog,
+  getHistoryGroupSummary,
+  getHistorySeparationHint,
+  getStockSnapshotQuantityWidth,
+  type LogGroup,
+} from "./historyTableHelpers";
+import { BomBatchDetail } from "./BomBatchDetail";
+import { ReworkBatchHeader } from "./ReworkBatchHeader";
+import { ReworkBatchDetail } from "./ReworkBatchDetail";
+
+export type HistoryTableFocusTarget = {
+  groupKey: string;
+  logId?: string | null;
+  itemId?: string | null;
+  nonce: number;
+};
+
+type Props = {
+  loading: boolean;
+  hasSearch?: boolean;
+  hasFilters?: boolean;
+  onResetFilters?: () => void;
+  error?: string | null;
+  onRetry?: () => void;
+  refreshError?: string | null;
+  onRetryRefresh?: () => void;
+  filteredLogs?: TransactionLog[];
+  /** PC 그룹 API가 보장한 대표 행 경계. 제공되면 원본 로그를 다시 묶지 않는다. */
+  displayGroups?: LogGroup[];
+  selection: HistorySelection | null;
+  onSelectLog: (log: TransactionLog) => void;
+  /** 묶음 하위 행은 상세 조회만 허용하고 취소는 부모 행에 남긴다. */
+  onSelectChildLog?: (log: TransactionLog) => void;
+  onSelectBatch: (batchId: string, logs: TransactionLog[]) => void;
+  onSelectSubmission?: (group: Extract<LogGroup, { type: "submission" }>) => void;
+  /** 부모(DesktopHistoryView)가 들고 있는 batchCache — 우측 패널과 공유. */
+  batchCache: Map<string, IoBatch>;
+  setBatchCache: React.Dispatch<React.SetStateAction<Map<string, IoBatch>>>;
+  cacheEpoch?: number | null;
+  canLoadMore: boolean;
+  loadingMore: boolean;
+  loadMoreError?: string | null;
+  onLoadMore: () => void;
+  focusTarget?: HistoryTableFocusTarget | null;
+  referenceSummaries?: Map<string, TransactionReferenceSummary>;
+  referenceSummariesLoading?: boolean;
+  collapseRequestNonce?: number;
+  /** 제출 작업을 같은 tbody의 행으로 이어 그린다. */
+  rowsOnly?: boolean;
+};
+
+type ColSpec = {
+  label: string;
+  help?: string;
+  width?: string;
+  minWidth?: string;
+  align?: "left" | "center" | "right";
+  hidden?: boolean;
+  px?: string;
+  colSpan?: number;
+};
+
+// 평상시(우측 패널 닫힘) — 현장 판단 순서: 언제 → 작업 → 대상 → 품목코드 → 위치별 증감 → 담당자.
+const COLUMNS: ColSpec[] = [
+  { label: "일시", width: "116px", align: "center", px: "px-2" },
+  { label: "작업", width: "184px", align: "center" },
+  { label: "대상" },
+  { label: "품목코드", width: `${HISTORY_ITEM_CODE_WIDTH_PX}px`, align: "center", px: "px-0" },
+  {
+    label: "수량 변동",
+    help: "재고는 요청 시각 순서로 계산합니다.\n요청이 승인되면 과거 표시도 변경될 수 있습니다.",
+    width: `${HISTORY_STOCK_SNAPSHOT_WIDTH_PX}px`,
+    align: "center",
+    px: "px-1",
+  },
+  { label: "담당자", width: "132px", align: "center", px: "px-2" },
+];
+const HISTORY_TABLE_COLUMN_SPAN = COLUMNS.reduce((total, column) => total + (column.colSpan ?? 1), 0);
+const VISIBLE_FETCH_CONCURRENCY = 4;
+const HISTORY_TABLE_SURFACE_CLASS = "min-w-0 overflow-clip rounded-[24px]";
+
+function historyTableHeaderClass(column: (typeof COLUMNS)[number], index: number): string {
+  const alignment = column.align === "center" ? "text-center" : column.align === "right" ? "text-right" : "text-left";
+  return [
+    "sticky top-0 z-10 whitespace-nowrap border-y",
+    column.px ?? "px-4",
+    "py-3 text-xs font-bold",
+    index === 0 ? "rounded-tl-[24px] border-l" : "",
+    index === COLUMNS.length - 1 ? "rounded-tr-[24px] border-r" : "",
+    column.hidden ? "hidden sm:table-cell" : "",
+    alignment,
+  ].filter(Boolean).join(" ");
+}
+
+function HistoryTableCornerMask() {
+  return (
+    <div
+      aria-hidden
+      data-testid="history-table-corner-mask"
+      className="pointer-events-none sticky top-0 z-20 -mb-6 flex h-6 justify-between"
+    >
+      <span
+        className="h-6 w-6"
+        style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 23px, color-mix(in srgb, var(--c-border) 50%, transparent) 23px 24px, var(--c-bg) 24px)" }}
+      />
+      <span
+        className="h-6 w-6"
+        style={{ background: "radial-gradient(circle at 0 100%, transparent 0 23px, color-mix(in srgb, var(--c-border) 50%, transparent) 23px 24px, var(--c-bg) 24px)" }}
+      />
+    </div>
+  );
+}
+
+function HistoryColumnLabel({ column }: { column: ColSpec }) {
+  return column.help ? (
+    <Tooltip
+      content={<span className="block whitespace-pre text-left">{column.help}</span>}
+      triggerTabIndex={0}
+      triggerAriaLabel="수량 변동 계산 기준"
+    >
+      <span className="inline-flex items-center gap-1">
+        {column.label}
+        <CircleHelp aria-hidden="true" className="h-3.5 w-3.5" />
+      </span>
+    </Tooltip>
+  ) : <>{column.label}</>;
+}
+
+export function HistoryTableSkeleton() {
+  return (
+    <div
+      data-testid="history-table-surface"
+      className={HISTORY_TABLE_SURFACE_CLASS}
+      style={{ background: LEGACY_COLORS.s1 }}
+    >
+      <HistoryTableCornerMask />
+      <table
+        aria-busy="true"
+        aria-label="입출고 내역 불러오는 중"
+        className="history-table-panel-motion w-full table-fixed border-separate border-spacing-0 text-sm"
+        data-panel-open="false"
+      >
+        <thead>
+          <tr>
+            {COLUMNS.map((column, index) => (
+              <th
+                key={column.label || `loading-spacer-${index}`}
+                scope={column.label ? "col" : undefined}
+                aria-hidden={column.label ? undefined : true}
+                colSpan={column.colSpan}
+                className={historyTableHeaderClass(column, index)}
+                style={{ background: "var(--c-history-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: column.width, minWidth: column.minWidth, transition: HISTORY_CELL_TRANSITION }}
+              >
+                <HistoryColumnLabel column={column} />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: 8 }, (_, rowIndex) => (
+            <tr key={rowIndex} data-history-loading-row="true" className="h-[65px]">
+              {COLUMNS.map((column, columnIndex) => (
+                columnIndex === 4 ? <StockSnapshotCell key={column.label} loading /> :
+                <td
+                  key={`${column.label}-${columnIndex}`}
+                  colSpan={column.colSpan}
+                  className="border-b px-4 py-2 align-middle"
+                  style={{ borderColor: LEGACY_COLORS.border }}
+                >
+                  {columnIndex === 0 ? (
+                    <div aria-hidden="true" data-history-loading-date className="flex items-center justify-center gap-1.5 whitespace-nowrap text-xs">
+                      <span className="h-5 w-5 shrink-0 rounded-[6px] motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} />
+                      <span className="relative shrink-0">
+                        <span className="invisible">00/00 00:00</span>
+                        <span className="absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 rounded-[4px] motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} />
+                      </span>
+                    </div>
+                  ) : <div
+                    aria-hidden="true"
+                    className="mx-auto h-4 motion-safe:animate-pulse rounded-[6px]"
+                    style={{ background: LEGACY_COLORS.s3, width: columnIndex === 2 ? "72%" : "58%" }}
+                  />}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function historyGroupPanelId(groupKey: string): string {
+  return `history-group-${encodeURIComponent(groupKey).replaceAll("%", "_")}`;
+}
+
+export function HistoryTable({
+  loading,
+  hasSearch = false,
+  hasFilters = false,
+  onResetFilters,
+  error,
+  onRetry,
+  refreshError,
+  onRetryRefresh,
+  filteredLogs = [],
+  displayGroups,
+  selection,
+  onSelectLog,
+  onSelectChildLog,
+  onSelectBatch,
+  onSelectSubmission,
+  batchCache,
+  setBatchCache,
+  cacheEpoch,
+  canLoadMore,
+  loadingMore,
+  loadMoreError,
+  onLoadMore,
+  focusTarget,
+  referenceSummaries,
+  referenceSummariesLoading = false,
+  collapseRequestNonce = 0,
+  rowsOnly = false,
+}: Props) {
+  const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
+  const [collapsedSearchGroupKeys, setCollapsedSearchGroupKeys] = useState<Set<string>>(new Set());
+  const [fetchGeneration, setFetchGeneration] = useState(0);
+  const previousCollapseRequestRef = useRef(collapseRequestNonce);
+  const groups = useMemo(() => displayGroups ?? buildGroups(filteredLogs), [displayGroups, filteredLogs]);
+
+  useEffect(() => {
+    if (previousCollapseRequestRef.current === collapseRequestNonce) return;
+    previousCollapseRequestRef.current = collapseRequestNonce;
+    setExpandedGroupKey(null);
+  }, [collapseRequestNonce]);
+
+  // 선택 변화에 따른 op_batch 자동 토글 — "선택해서 열린" 묶음만 자동 접힘.
+  // 단건/다른 묶음/none 으로 selection 이 바뀌면 이전 선택 묶음 접기 + 새 묶음이면 펼침.
+  // 수동 chevron 으로 펼친 다른 묶음은 그대로 유지(이전 selection 만 추적).
+  const prevSelectedBatchRef = useRef<string | null>(null);
+  useEffect(() => {
+    const currentBatchId = selection?.kind === "batch"
+      && groups.some((group) => group.type === "op_batch" && group.batchId === selection.batchId)
+      ? selection.batchId : null;
+    const prevBatchId = prevSelectedBatchRef.current;
+    prevSelectedBatchRef.current = currentBatchId;
+    if (prevBatchId === currentBatchId) return;
+    if (currentBatchId) {
+      setExpandedGroupKey(currentBatchId);
+    } else if (prevBatchId) {
+      setExpandedGroupKey((prev) => (prev === prevBatchId ? null : prev));
+    }
+  }, [selection, groups]);
+
+  useEffect(() => {
+    if (!focusTarget) return;
+    setExpandedGroupKey(focusTarget.groupKey);
+    const handle = window.setTimeout(() => {
+      const el = document.querySelector('[data-history-focus-line="true"]') as HTMLElement | null;
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 80);
+    return () => window.clearTimeout(handle);
+  }, [focusTarget]);
+
+  const searchGroupKeys = groups.flatMap((group) => {
+    if (group.matchedLogIds == null || group.type === "solo") return [];
+    return [group.type === "operation" ? group.operationId : group.type === "op_batch" ? group.batchId : group.type === "batch" ? group.refKey : group.key];
+  });
+  const homeRegistrationId = useId();
+  useDesktopTabHome(`history-expanded-row:${homeRegistrationId}`, {
+    isHome: expandedGroupKey === null && searchGroupKeys.every((key) => collapsedSearchGroupKeys.has(key)),
+    returnHome: () => {
+      setExpandedGroupKey(null);
+      setCollapsedSearchGroupKeys((previous) => new Set([...previous, ...searchGroupKeys]));
+    },
+  });
+  const searchMetadataActive = groups.some((group) => group.matchedLogIds != null);
+  const previousSearchMetadataActiveRef = useRef(searchMetadataActive);
+
+  useEffect(() => {
+    if (previousSearchMetadataActiveRef.current === searchMetadataActive) return;
+    previousSearchMetadataActiveRef.current = searchMetadataActive;
+    setExpandedGroupKey(null);
+    setCollapsedSearchGroupKeys(new Set());
+  }, [searchMetadataActive]);
+
+  // ── visible op_batch lazy fetch ──
+  // observer 는 마운트 시 한 번만. batchCache 변경마다 재생성하지 않게 ref 만 본다.
+  // observedRowsRef: row ref callback 이 observer 생성 전에 먼저 와도 누락 없도록 보존.
+  const mountedRef = useRef(true);
+  const pendingFetchesRef = useRef<Set<string>>(new Set());
+  const fetchQueueRef = useRef<string[]>([]);
+  const inFlightRef = useRef(0);
+  const batchCacheEpochRef = useRef(0);
+  const previousCacheEpochRef = useRef(cacheEpoch);
+  const resetCacheEpochRef = useRef(cacheEpoch);
+  const previousBatchCacheRef = useRef(batchCache);
+  const batchFetchControllersRef = useRef<Map<string, AbortController>>(new Map());
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const observedRowsRef = useRef<Set<HTMLTableRowElement>>(new Set());
+  const batchCacheRef = useRef(batchCache);
+  const staleBatchIdsRef = useRef<Set<string>>(new Set());
+  batchCacheRef.current = batchCache;
+
+  if (previousCacheEpochRef.current !== cacheEpoch) {
+    previousCacheEpochRef.current = cacheEpoch;
+    staleBatchIdsRef.current = new Set(batchCacheRef.current.keys());
+    batchCacheEpochRef.current += 1;
+  }
+
+  const resetBatchFetches = useCallback(() => {
+    batchFetchControllersRef.current.forEach((controller) => controller.abort());
+    batchFetchControllersRef.current.clear();
+    pendingFetchesRef.current.clear();
+    fetchQueueRef.current = [];
+    inFlightRef.current = 0;
+  }, []);
+
+  const invalidateBatchFetches = useCallback(() => {
+    batchCacheEpochRef.current += 1;
+    resetBatchFetches();
+  }, [resetBatchFetches]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      invalidateBatchFetches();
+    };
+  }, [invalidateBatchFetches]);
+
+  useEffect(() => {
+    if (resetCacheEpochRef.current === cacheEpoch) return;
+    resetCacheEpochRef.current = cacheEpoch;
+    resetBatchFetches();
+    setFetchGeneration((generation) => generation + 1);
+  }, [cacheEpoch, resetBatchFetches]);
+
+  useEffect(() => {
+    const previousCache = previousBatchCacheRef.current;
+    previousBatchCacheRef.current = batchCache;
+    if (previousCache === batchCache || batchCache.size > 0) return;
+
+    invalidateBatchFetches();
+  }, [batchCache, invalidateBatchFetches]);
+
+  const tryDrainQueue = useCallback(() => {
+    while (inFlightRef.current < VISIBLE_FETCH_CONCURRENCY && fetchQueueRef.current.length > 0) {
+      const next = fetchQueueRef.current.shift()!;
+      const requestEpoch = batchCacheEpochRef.current;
+      const controller = new AbortController();
+      batchFetchControllersRef.current.set(next, controller);
+      inFlightRef.current++;
+      void ioApi.getBatch(next, { signal: controller.signal })
+        .then((b) => {
+          if (mountedRef.current && requestEpoch === batchCacheEpochRef.current) {
+            setBatchCache((prev) => {
+              if (prev.get(next) === b) return prev;
+              const m = new Map(prev);
+              m.set(next, b);
+              return m;
+            });
+          }
+        })
+        .catch(() => { /* 무시 — 다음 시도에서 재요청 가능. */ })
+        .finally(() => {
+          if (requestEpoch !== batchCacheEpochRef.current) return;
+          if (batchFetchControllersRef.current.get(next) === controller) {
+            batchFetchControllersRef.current.delete(next);
+          }
+          pendingFetchesRef.current.delete(next);
+          inFlightRef.current--;
+          if (mountedRef.current) tryDrainQueue();
+        });
+    }
+  }, [setBatchCache]);
+
+  const enqueueBatchFetch = useCallback((batchId: string) => {
+    if (batchCacheRef.current.has(batchId) && !staleBatchIdsRef.current.has(batchId)) return;
+    if (pendingFetchesRef.current.has(batchId)) return;
+    staleBatchIdsRef.current.delete(batchId);
+    pendingFetchesRef.current.add(batchId);
+    fetchQueueRef.current.push(batchId);
+    tryDrainQueue();
+  }, [tryDrainQueue]);
+
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const id = (entry.target as HTMLElement).dataset.batchId;
+          if (id) enqueueBatchFetch(id);
+        }
+      },
+      { rootMargin: "120px" },
+    );
+    observerRef.current = obs;
+    // ref callback 이 먼저 실행되며 모인 row 들을 일괄 observe (누락 보완).
+    observedRowsRef.current.forEach((el) => obs.observe(el));
+    return () => {
+      obs.disconnect();
+      observerRef.current = null;
+    };
+  }, [enqueueBatchFetch]);
+
+  const opBatchRowRef = useCallback((el: HTMLTableRowElement | null) => {
+    if (!el) return;
+    observedRowsRef.current.add(el);
+    observerRef.current?.observe(el);
+  }, []);
+
+  // op_batch IoBatch eager 프리페치 — 접힌 묶음도 batch.sub_type 기준 구분 라벨/
+  // 변동요약이 즉시 정확해지도록(재작업 묶음이 접힘에서 "생산 등록"으로 오표시 방지, 3차 C7).
+  // 동시성 큐(VISIBLE_FETCH_CONCURRENCY)·dedup 은 enqueueBatchFetch 가 처리.
+  useEffect(() => {
+    for (const g of groups) {
+      for (const work of g.type === "submission" ? g.workGroups : [g]) {
+        if (work.type === "op_batch") enqueueBatchFetch(work.batchId);
+      }
+    }
+  }, [batchCache, enqueueBatchFetch, fetchGeneration, groups]);
+
+  function isGroupExpanded(key: string, matchedLogIds?: string[] | null): boolean {
+    return matchedLogIds != null
+      ? !collapsedSearchGroupKeys.has(key)
+      : expandedGroupKey === key;
+  }
+
+  function toggleGroup(key: string, matchedLogIds?: string[] | null) {
+    if (matchedLogIds != null) {
+      setCollapsedSearchGroupKeys((previous) => {
+        const next = new Set(previous);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+      return;
+    }
+    setExpandedGroupKey((prev) => (prev === key ? null : key));
+  }
+
+  function expandGroup(key: string, matchedLogIds?: string[] | null) {
+    if (matchedLogIds != null) {
+      setCollapsedSearchGroupKeys((previous) => {
+        if (!previous.has(key)) return previous;
+        const next = new Set(previous);
+        next.delete(key);
+        return next;
+      });
+      return;
+    }
+    setExpandedGroupKey(key);
+  }
+
+  function collapseGroup(key: string, matchedLogIds?: string[] | null) {
+    if (matchedLogIds != null) {
+      setCollapsedSearchGroupKeys((previous) => new Set(previous).add(key));
+      return;
+    }
+    setExpandedGroupKey((prev) => (prev === key ? null : prev));
+  }
+
+  function handleCacheBatch(batchId: string, batch: IoBatch) {
+    setBatchCache((prev) => {
+      if (prev.get(batchId) === batch) return prev;
+      const m = new Map(prev);
+      m.set(batchId, batch);
+      return m;
+    });
+  }
+
+  // selection helpers
+  const selectedLogId = selection?.kind === "log" ? selection.log.log_id : undefined;
+  const selectedBatchId = selection?.kind === "batch" ? selection.batchId : undefined;
+  const detailPanelOpen = selection !== null;
+
+  const rows = groups.map((group, index) => {
+    const rawSeparationHint = getHistorySeparationHint(
+      index > 0 ? getGroupPrimaryLog(groups[index - 1]) : null,
+      getGroupPrimaryLog(group),
+    );
+    const separationHint = rawSeparationHint === "다른 요청" || rawSeparationHint === "별도 시각"
+      ? null
+      : rawSeparationHint;
+    if (group.type === "solo") {
+      return (
+        <HistoryLogRow
+          key={group.log.log_id}
+          log={group.log}
+          selected={selectedLogId === group.log.log_id}
+          onSelect={group.allowCancellation === false ? onSelectChildLog ?? onSelectLog : onSelectLog}
+          separationHint={separationHint}
+        />
+      );
+    }
+
+    if (group.type === "submission") {
+      const summary = getHistoryGroupSummary(group, undefined, batchCache);
+      const expanded = isGroupExpanded(group.key, group.matchedLogIds);
+      const selected = selection?.kind === "submission" && selection.group.key === group.key;
+      const representative = { ...summary.primaryLog, cancelled: group.logs.every((log) => log.cancelled), operation_kind: null, operation_effective_status: null };
+      return <Fragment key={group.key}>
+        <HistoryLogRow log={representative} selected={selected}
+          onSelect={() => {
+            onSelectSubmission?.(group);
+            if (selected) collapseGroup(group.key, group.matchedLogIds);
+            else expandGroup(group.key, group.matchedLogIds);
+          }}
+          onToggle={() => toggleGroup(group.key, group.matchedLogIds)} expanded={expanded}
+          additionalItemCount={summary.additionalItemCount} operationLabel={summary.label}
+          targetHint="펼쳐서 개별 내역 확인"
+          stockSummary={`${group.workGroups.length}개 작업`} />
+        {expanded && <HistoryTable rowsOnly loading={false} displayGroups={group.workGroups} selection={selection}
+            onSelectLog={onSelectLog} onSelectChildLog={onSelectChildLog} onSelectBatch={onSelectBatch}
+            batchCache={batchCache} setBatchCache={setBatchCache} cacheEpoch={cacheEpoch}
+            canLoadMore={false} loadingMore={false} onLoadMore={onLoadMore} />}
+      </Fragment>;
+    }
+
+    if (group.type === "operation") {
+      const groupSummary = getHistoryGroupSummary(group);
+      const primaryLog = groupSummary.primaryLog;
+      const operationLabel = group.logs.find((log) => log.operation_display_label)?.operation_display_label ?? "";
+      const hasProduce = group.logs.some((log) => log.transaction_type === "PRODUCE");
+      const hasBackflush = group.logs.some((log) => log.transaction_type === "BACKFLUSH");
+      const isCustomBomSingleAdjustment = (operationLabel.startsWith("produce") || operationLabel.startsWith("disassemble"))
+        && hasProduce !== hasBackflush;
+      const childLogs = group.logs.filter((log) => log.log_id !== primaryLog.log_id);
+      const expanded = isGroupExpanded(group.operationId, group.matchedLogIds);
+      const controlsId = historyGroupPanelId(group.operationId);
+      const primarySelected = selectedLogId === primaryLog.log_id;
+      const selected = selectedLogId === primaryLog.log_id
+        || childLogs.some((log) => log.log_id === selectedLogId);
+      return (
+        <Fragment key={`operation-${group.operationId}`}>
+          <HistoryLogRow
+            log={primaryLog}
+            selected={selected}
+            onSelect={() => {
+              onSelectLog(primaryLog);
+              if (primarySelected) collapseGroup(group.operationId, group.matchedLogIds);
+              else expandGroup(group.operationId, group.matchedLogIds);
+            }}
+            expanded={expanded}
+            onToggle={childLogs.length > 0 ? () => toggleGroup(group.operationId, group.matchedLogIds) : undefined}
+            controlsId={childLogs.length > 0 ? controlsId : undefined}
+            toggleLabel="작업 구성"
+            separationHint={separationHint}
+            additionalItemCount={groupSummary.additionalItemCount}
+            displayType={groupSummary.displayType ?? undefined}
+            operationLabel={groupSummary.label}
+          />
+          {expanded && childLogs.length > 0 && (
+            <ReferenceBatchDetail
+              logs={childLogs}
+              highlightLogId={selectedLogId}
+              matchedLogIds={group.matchedLogIds}
+              onSelectLog={onSelectChildLog ?? onSelectLog}
+              controlsId={controlsId}
+              flat
+              singleAdjustment={isCustomBomSingleAdjustment}
+            />
+          )}
+        </Fragment>
+      );
+    }
+
+    if (group.type === "defect_lifecycle") {
+      const expanded = isGroupExpanded(group.key, group.matchedLogIds);
+      const controlsId = historyGroupPanelId(group.key);
+      const selected = selectedLogId === group.parent.log_id || selectedLogId === group.child.log_id;
+      return (
+        <Fragment key={group.key}>
+          <HistoryLogRow
+            log={group.parent}
+            selected={selected}
+            onSelect={onSelectLog}
+            expanded={expanded}
+            onToggle={() => toggleGroup(group.key, group.matchedLogIds)}
+            controlsId={controlsId}
+            separationHint={separationHint}
+            additionalItemCount={getAdditionalDistinctItemCount([group.parent, group.child], group.parent)}
+          />
+          {expanded && (
+            <ReferenceBatchDetail
+              logs={[group.child]}
+              highlightLogId={selectedLogId}
+              matchedLogIds={group.matchedLogIds}
+              onSelectLog={onSelectChildLog ?? onSelectLog}
+              controlsId={controlsId}
+            />
+          )}
+        </Fragment>
+      );
+    }
+
+    if (group.type === "op_batch") {
+      const expanded = isGroupExpanded(group.batchId, group.matchedLogIds);
+      const controlsId = historyGroupPanelId(group.batchId);
+      const batch = batchCache.get(group.batchId) ?? null;
+      const snapshotQuantityWidth = getStockSnapshotQuantityWidth(group.logs);
+      const isSelected = selectedBatchId === group.batchId;
+      const focusItemId = focusTarget?.groupKey === group.batchId ? focusTarget.itemId ?? null : null;
+      return (
+        <Fragment key={`op-${group.batchId}`}>
+          <OpBatchHeader
+            group={group}
+            expanded={expanded}
+            onToggle={() => toggleGroup(group.batchId, group.matchedLogIds)}
+            selected={isSelected}
+            onSelect={() => {
+              // 같은 묶음 재클릭 → 부모 selection 토글로 닫힘 + 펼침도 동시 접음.
+              onSelectBatch(group.batchId, group.logs);
+              if (isSelected) collapseGroup(group.batchId, group.matchedLogIds);
+              else expandGroup(group.batchId, group.matchedLogIds);
+            }}
+            batch={batch}
+            rowRef={opBatchRowRef}
+            controlsId={controlsId}
+            separationHint={separationHint}
+            snapshotQuantityWidth={snapshotQuantityWidth}
+          />
+          {expanded && (
+            <BomBatchDetail
+              batchId={group.batchId}
+              colSpan={HISTORY_TABLE_COLUMN_SPAN}
+              cache={batchCache}
+              onCached={handleCacheBatch}
+              logs={group.logs}
+              matchedLogIds={group.matchedLogIds}
+              snapshotQuantityWidth={snapshotQuantityWidth}
+              highlightItemId={focusItemId}
+              controlsId={controlsId}
+            />
+          )}
+        </Fragment>
+      );
+    }
+
+    // type === "batch" (reference_no 기준 레거시 그룹)
+    // 재작업(defect-disassemble) 배치 → 트리 뷰
+    const groupKey = group.refKey;
+    if (group.refNo.startsWith("defect-disassemble:")) {
+      const expanded = isGroupExpanded(groupKey, group.matchedLogIds);
+      const controlsId = historyGroupPanelId(groupKey);
+      const parentLog = group.logs.find((l) => l.transaction_type === "DISASSEMBLE") ?? group.logs[0];
+      const childLogs = group.logs.filter((l) => l.transaction_type !== "DISASSEMBLE");
+      const isSelected = selectedLogId === parentLog.log_id;
+      return (
+        <Fragment key={`ref-${groupKey}`}>
+          <ReworkBatchHeader
+            group={group}
+            expanded={expanded}
+            onToggle={() => toggleGroup(groupKey, group.matchedLogIds)}
+            selected={isSelected}
+            onSelect={() => {
+              onSelectLog(parentLog);
+              if (isSelected && expanded) collapseGroup(groupKey, group.matchedLogIds);
+              else expandGroup(groupKey, group.matchedLogIds);
+            }}
+            controlsId={controlsId}
+          />
+          {expanded && (
+            <ReworkBatchDetail
+              logs={childLogs}
+              parentItemId={parentLog.item_id}
+              colSpan={HISTORY_TABLE_COLUMN_SPAN}
+              controlsId={controlsId}
+              matchedLogIds={group.matchedLogIds}
+              cancelled={group.logs.some((log) => log.cancelled)}
+            />
+          )}
+        </Fragment>
+      );
+    }
+
+    // op_batch 가 아니라 IoBatch 가 없으므로 클릭 시 첫 로그 상세를 연다.
+    const expanded = isGroupExpanded(groupKey, group.matchedLogIds);
+    const controlsId = historyGroupPanelId(groupKey);
+    const isSelected = selectedLogId === group.logs[0]?.log_id;
+    const focusLogId = focusTarget?.groupKey === groupKey ? focusTarget.logId ?? null : null;
+    return (
+      <Fragment key={`ref-${groupKey}`}>
+        <BatchHeader
+          group={group}
+          expanded={expanded}
+          onToggle={() => toggleGroup(groupKey, group.matchedLogIds)}
+          selected={isSelected}
+          onSelect={() => {
+            onSelectLog(group.logs[0]);
+            if (isSelected && expanded) collapseGroup(groupKey, group.matchedLogIds);
+            else expandGroup(groupKey, group.matchedLogIds);
+          }}
+          controlsId={controlsId}
+          separationHint={separationHint}
+          referenceSummary={referenceSummaries?.get(group.refKey) ?? null}
+          referenceSummaryLoading={referenceSummariesLoading}
+        />
+        {expanded && (
+          <ReferenceBatchDetail
+            logs={group.logs}
+            highlightLogId={focusLogId}
+            matchedLogIds={group.matchedLogIds}
+            onSelectLog={onSelectChildLog ?? onSelectLog}
+            controlsId={controlsId}
+          />
+        )}
+      </Fragment>
+    );
+  });
+
+  if (rowsOnly) return <>{rows}</>;
+
+  return (
+    <div className="flex min-w-0 flex-1 flex-col">
+      {loading ? (
+        <HistoryTableSkeleton />
+      ) : error ? (
+        <LoadFailureCard
+          comfortable
+          message={error}
+          onRetry={onRetry}
+          retryLabel="다시 시도"
+          prefix="입출고 내역을 불러오지 못했습니다"
+        />
+      ) : groups.length === 0 ? (
+        <ReadEmpty hasSearch={hasSearch} hasFilters={hasFilters} onReset={onResetFilters}
+          prominent
+          className="min-h-[420px] flex-1"
+          title={hasSearch || hasFilters ? "현재 조건에 맞는 입출고 내역이 없습니다" : "아직 입출고 내역이 없습니다"}
+          description={hasSearch || hasFilters ? "기간이나 검색 조건을 바꾸거나 필터를 초기화해 보세요." : "입출고 작업이 완료되면 이곳에서 확인할 수 있습니다."}
+          icon={<Image data-testid="history-empty-mascot" src="/images/dexray/history-empty.webp" alt="" width={540} height={360} className="mb-1 h-52 w-auto object-contain" />}
+        />
+      ) : (
+        <div
+          data-testid="history-table-surface"
+          className={HISTORY_TABLE_SURFACE_CLASS}
+          style={{ background: LEGACY_COLORS.s1 }}
+        >
+          <HistoryTableCornerMask />
+          <table
+            className="history-table-panel-motion w-full table-fixed border-separate border-spacing-0 text-sm"
+            data-panel-open={detailPanelOpen ? "true" : "false"}
+          >
+            <thead>
+              <tr>
+                {COLUMNS.map((column, index) => (
+                  <th
+                    key={column.label || `spacer-${index}`}
+                    scope={column.label ? "col" : undefined}
+                    aria-label={column.help ? column.label : undefined}
+                    aria-hidden={column.label ? undefined : true}
+                    colSpan={column.colSpan}
+                    className={historyTableHeaderClass(column, index)}
+                    style={{ background: "var(--c-history-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: column.width, minWidth: column.minWidth, transition: HISTORY_CELL_TRANSITION }}
+                  >
+                    <HistoryColumnLabel column={column} />
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="mes-data-reveal">
+              {rows}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {!loading && !error && refreshError && (
+        <div className="mt-4">
+          <LoadFailureCard
+            message={refreshError}
+            onRetry={onRetryRefresh ?? onRetry}
+            retryLabel="다시 시도"
+            comfortable
+            prefix="최신 입출고 내역을 동기화하지 못했습니다. 기존 내용을 표시합니다"
+          />
+        </div>
+      )}
+
+      {!loading && !error && groups.length > 0 && loadMoreError && (
+        <div className="mt-4">
+          <LoadFailureCard
+            message={loadMoreError}
+            onRetry={onLoadMore}
+            retryLabel="다시 시도"
+            prefix="다음 내역을 불러오지 못했습니다"
+          />
+        </div>
+      )}
+
+      {!error && !loadMoreError && canLoadMore && (
+        <button
+          type="button"
+          onClick={onLoadMore}
+          disabled={loadingMore}
+          className="mt-4 flex w-full items-center justify-center gap-2 py-3 text-base font-bold disabled:opacity-50"
+          style={{ color: LEGACY_COLORS.blue }}
+        >
+          <ChevronDown className="h-4 w-4" />
+          {loadingMore ? "불러오는 중..." : "다음 100건 불러오기"}
+        </button>
+      )}
+    </div>
+  );
+}

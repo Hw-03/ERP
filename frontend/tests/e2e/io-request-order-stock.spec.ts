@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { TransactionLog } from "../../lib/api/types/production";
 import { loginAsOperator } from "./_helpers";
+import { test as layoutTest } from "./_isolated-api-expectations";
 
 function makeLog(overrides: Partial<TransactionLog>): TransactionLog {
   return {
@@ -121,6 +122,9 @@ test.describe("입출고 내역 — 요청 순 재고", () => {
     await expect(requestRow).not.toContainText("94");
 
     await requestRow.click();
+    await page.getByRole("complementary", { name: "COCOON 요청", exact: true }).evaluate(async (panel) => {
+      await Promise.all(panel.parentElement!.getAnimations({ subtree: true }).map((animation) => animation.finished));
+    });
 
     const assemblyStock = table.getByLabel("재고 변동: 창고 0 +50→50");
     await expect(assemblyStock).toBeVisible();
@@ -176,4 +180,103 @@ test.describe("입출고 내역 — 요청 순 재고", () => {
       "같은 처리 시각의 거래 순서를 확정할 수 없습니다.",
     );
   });
+
+  test("모바일 응답 fixture UI 계약은 요청 순 합계와 실제 창고·위치별 전후를 상세에서 분리한다", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    // 실제 거래 생성·서버 계산의 증거가 아니라 응답 fixture의 모바일 표시 계약이다.
+    const mobileLog = makeLog({
+      log_id: "mobile-request-order-location-log",
+      item_name: "모바일 요청 순 위치 검증",
+      transaction_type: "ADJUST",
+      quantity_change: -4,
+      quantity_before: 38,
+      quantity_after: 34,
+      warehouse_qty_before: 20,
+      warehouse_qty_after: 18,
+      department_qty_before: 18,
+      department_qty_after: 16,
+      transfer_qty: null,
+      request_order_stock: {
+        status: "available",
+        reason: null,
+        warehouse_qty_before: 10,
+        warehouse_qty_after: 8,
+        department_qty_before: 7,
+        department_qty_after: 5,
+      },
+      inventory_effect: [
+        { scope: "warehouse", delta: -2, quantity_before: 20, quantity_after: 18 },
+        { scope: "location", department: "튜브", status: "PRODUCTION", delta: -3, quantity_before: 15, quantity_after: 12 },
+        { scope: "location", department: "조립", status: "PRODUCTION", delta: 1, quantity_before: 3, quantity_after: 4 },
+      ],
+    });
+    await mockDisplayGroups(page, [{
+      type: "solo",
+      key: "mobile-request-order-location-fixture",
+      logs: [mobileLog],
+    }]);
+    await page.goto("/mes?tab=history");
+    await page.getByRole("button", { name: /모바일 요청 순 위치 검증/ }).click();
+
+    const detail = page.locator('[data-history-detail-log-id="mobile-request-order-location-log"]').filter({ visible: true });
+    await expect(detail).toBeVisible();
+    const requested = detail.getByText("요청 순 재고", { exact: true }).locator("..");
+    await expect(requested.getByLabel("창고 10 −2→8", { exact: true })).toBeVisible();
+    await expect(requested.getByLabel("부서 합계 7 −2→5", { exact: true })).toBeVisible();
+    await expect(requested.getByLabel("튜브 15 −3→12", { exact: true })).toHaveCount(0);
+    await expect(requested.getByLabel("조립 3 +1→4", { exact: true })).toHaveCount(0);
+
+    const actual = detail.getByText("실제 처리 재고", { exact: true }).locator("..");
+    await expect(actual.getByLabel("창고 20 −2→18", { exact: true })).toBeVisible();
+    await expect(actual.getByLabel("튜브 15 −3→12", { exact: true })).toBeVisible();
+    await expect(actual.getByLabel("조립 3 +1→4", { exact: true })).toBeVisible();
+    await expect(actual.getByLabel(/^창고(?: 재고)? 20 [−-]2→18(?: EA)?$/)).toHaveCount(1);
+    await expect(actual.getByLabel(/^튜브(?: 재고)? 15 [−-]3→12(?: EA)?$/)).toHaveCount(1);
+    await expect(actual.getByLabel(/^조립(?: 재고)? 3 \+1→4(?: EA)?$/)).toHaveCount(1);
+    await expect(actual.getByLabel("창고 재고 20 -2→18 EA", { exact: true })).toHaveCount(0);
+    await expect(actual.getByLabel("튜브 재고 15 -3→12 EA", { exact: true })).toHaveCount(0);
+    await expect(actual.getByLabel("조립 재고 3 +1→4 EA", { exact: true })).toHaveCount(0);
+    await expect(actual.getByLabel("창고 10 −2→8", { exact: true })).toHaveCount(0);
+    await expect(actual.getByLabel("부서 합계 7 −2→5", { exact: true })).toHaveCount(0);
+  });
 });
+
+for (const width of [1280, 1440, 1920]) {
+  layoutTest(`펼침 사이드바와 상세 패널에서도 품목명과 모든 열을 확인한다 (${width}px)`, async ({ page, actors }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 });
+    const employee = await loginAsOperator(page, { code: actors.approver.employee_code });
+    const appearance = await page.request.put(`/api/employees/${employee.employee_id}/appearance`, {
+      headers: { "X-MES-Employee-Code": employee.employee_code },
+      data: { theme: "light", sidebar_mode: "expanded" },
+    });
+    expect(appearance.ok()).toBeTruthy();
+    const parent = makeLog({});
+    const child = makeLog({ log_id: "layout-child", item_name: "COCOON 조립", operation_role: "COMPONENT" });
+    await mockDisplayGroups(page, [{ type: "operation", key: "layout-operation", logs: [parent, child] }]);
+    await page.goto("/mes?tab=history");
+    await expect.poll(() => page.evaluate(() => JSON.parse(sessionStorage.getItem("dexcowin_mes_operator")!).sidebar_mode)).toBe("expanded");
+    const table = page.locator("table").filter({ has: page.getByRole("columnheader", { name: "품목코드" }) });
+    await table.getByText(parent.item_name, { exact: true }).click();
+    const panel = page.getByRole("complementary", { name: parent.item_name, exact: true });
+    await expect(panel).toBeVisible();
+    await panel.evaluate(async (element) => {
+      await Promise.all(element.parentElement!.getAnimations({ subtree: true }).map((animation) => animation.finished));
+    });
+    const target = table.getByRole("columnheader", { name: "대상", exact: true });
+    const scroller = page.getByTestId("history-left-content");
+    await page.screenshot({ path: testInfo.outputPath("layout.png") });
+    await testInfo.attach("layout", { path: testInfo.outputPath("layout.png"), contentType: "image/png" });
+    // The name column needs usable space even when every other column has a fixed width.
+    expect((await target.boundingBox())!.width).toBeGreaterThanOrEqual(200);
+    await expect(table.getByText(child.item_name, { exact: true })).toBeVisible();
+    await table.getByText(child.item_name, { exact: true }).scrollIntoViewIfNeeded();
+    await expect(table.getByText(child.item_name, { exact: true })).toBeInViewport();
+    await scroller.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
+    await expect(table.getByRole("columnheader", { name: "담당자", exact: true })).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(panel).not.toBeVisible();
+    await scroller.evaluate((element) => { element.scrollLeft = 0; });
+    await expect(table.getByText(parent.item_name, { exact: true })).toBeInViewport();
+  });
+}

@@ -28,6 +28,7 @@ def test_update_employee_sidebar_mode_round_trips(db_session, client, sidebar_mo
 
     response = client.put(
         f"/api/employees/{employee.employee_id}/sidebar-mode",
+        headers={"X-MES-Employee-Code": employee.employee_code},
         json={"sidebar_mode": sidebar_mode},
     )
 
@@ -42,6 +43,7 @@ def test_update_employee_sidebar_mode_rejects_unknown_value(db_session, client):
 
     response = client.put(
         f"/api/employees/{employee.employee_id}/sidebar-mode",
+        headers={"X-MES-Employee-Code": employee.employee_code},
         json={"sidebar_mode": "floating"},
     )
 

@@ -1,8 +1,9 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryProvider } from "./client";
+import { queryKeys } from "./keys";
 import {
   invalidateOperationalQueries,
   RealtimeSyncProvider,
@@ -108,6 +109,7 @@ describe("invalidateOperationalQueries", () => {
     await invalidateOperationalQueries(client);
 
     expect(invalidateSpy.mock.calls.map(([filters]) => filters.queryKey)).toEqual([
+      ["models"],
       ["items"],
       ["inventory"],
       ["transactions"],
@@ -125,6 +127,29 @@ describe("invalidateOperationalQueries", () => {
 });
 
 describe("RealtimeSyncProvider", () => {
+  it("온라인 복귀 revision 변경은 아직 fresh인 실제 모델 query를 재조회한다", async () => {
+    const client = makeClient();
+    client.setQueryData(queryKeys.models.list(), [{ slot: 1, model_name: "이전 모델" }]);
+    let serverName = "이전 모델";
+    const readModels = vi.fn(async () => [{ slot: 1, model_name: serverName }]);
+    function ModelValue() {
+      const result = useQuery({ queryKey: queryKeys.models.list(), queryFn: readModels, staleTime: 60_000 });
+      return <output data-testid="model-name">{result.data?.[0]?.model_name}</output>;
+    }
+    render(<><RevisionValue /><ModelValue /></>, { wrapper: makeWrapper(client) });
+    await waitFor(() => expect(screen.getByTestId("model-name")).toHaveTextContent("이전 모델"));
+    act(() => FakeEventSource.instances[0].emitRevision(JSON.stringify(VALID_SNAPSHOT)));
+    await waitFor(() => expect(screen.getByTestId("revision")).toHaveTextContent("7"));
+    serverName = "다른 탭에서 변경한 모델";
+    vi.mocked(fetch).mockResolvedValue(makeResponse({ ...VALID_SNAPSHOT, revision: 8 }));
+    act(() => window.dispatchEvent(new Event("online")));
+    await waitFor(() => expect(screen.getByTestId("revision")).toHaveTextContent("8"));
+    await waitFor(() => expect(screen.getByTestId("model-name")).toHaveTextContent(serverName));
+    expect(readModels).toHaveBeenCalled();
+    expect(client.getQueryData(queryKeys.models.list())).toEqual([{ slot: 1, model_name: serverName }]);
+    client.clear();
+  });
+
   it("named revision SSE의 첫 valid snapshot을 context에 반영하고 operational cache를 무효화한다", async () => {
     const client = makeClient();
     const invalidateSpy = vi.spyOn(client, "invalidateQueries").mockResolvedValue();

@@ -8,5 +8,25 @@
     "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/original-feedback.json",
     "sha256": "7185b1cb6a267d44432608458b0b3ea6f55752c27b3de7252ef7d0df4d1dcf57",
     "purpose": "원본 사용자 판정·의견·갱신 시각 전체를 바이트 그대로 보존"
+  },
+  {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/schema1-policy.json",
+    "sha256": "70d46365f1df69a54012a154075dde602ae462ddcc5d7286078f1d364e6379b9",
+    "purpose": "검증 체계 전환 전 확정 정책과 조건 원본"
+  },
+  {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/schema1-registry.json",
+    "sha256": "af010a6225e81c460acb6c30b323b81834014f071b249bd7431fc8598bd6eff2",
+    "purpose": "검증 체계 전환 전 테스트 연결과 실행 기록 원본"
+  },
+  {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/recommendation-before.json",
+    "sha256": "24ae9159bd398992927a158db19120d264df4e44a4fe92899e23f05131086d10",
+    "purpose": "추천안 확정 직전 정책·미연결 사유의 원본 보존"
+  },
+  {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/main-integration-before.json",
+    "sha256": "4d7ca79270f92262a0204ed5a5142e7a14626a41a232a2320afded1c5ec005cb",
+    "purpose": "원격 main 튜브 반품 예외 통합 전의 확정 기대와 테스트 연결 보존"
   }
 ]

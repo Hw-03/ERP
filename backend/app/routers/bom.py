@@ -1,19 +1,24 @@
 """BOM router for Bill of Materials CRUD and tree queries."""
 
 import uuid
+import hashlib
+import json
 from decimal import Decimal
 from typing import Annotated, List, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
+from sqlalchemy import update
 
 from app.database import get_db
 from app.dependencies.admin import require_admin_pin
 from app.models import BOM, Item
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import BOMCreate, BOMDetailResponse, BOMResponse, BOMTreeNode, BOMUpdate
+from app.schemas.item import BOMConfigurationUpdate
+from app.services.bom_configuration import composition_snapshot, configuration_errors
 from app.services import audit, stock_math
-from app.services._tx import commit_and_refresh, commit_only
+from app.services._tx import commit_and_refresh, commit_only, transactional
 from app._evt import emit as _evt_emit
 from app.services.bom import BomCache, bom_child_item_ordering, bom_modal_tree_child_ordering_key, build_bom_cache
 from app.services.production_capacity import (
@@ -28,6 +33,8 @@ router = APIRouter()
 
 def _require_editable_bom_parent(db: Session, parent_item_id: uuid.UUID) -> Item:
     """완료 상태가 아닌 BOM 부모 품목을 반환한다."""
+    db.execute(update(Item).where(Item.item_id == parent_item_id).values(updated_at=Item.updated_at))
+    db.expire_all()
     parent = item_repository.get(db, parent_item_id)
     if not parent:
         raise http_error(404, ErrorCode.NOT_FOUND, "상위 품목을 찾을 수 없습니다.")
@@ -207,6 +214,45 @@ def get_bom_flat(parent_item_id: uuid.UUID, db: Session = Depends(get_db)):
         .order_by(*bom_child_item_ordering())
         .all()
     )
+
+
+@router.put("/{parent_item_id}", response_model=List[BOMResponse])
+def replace_bom_configuration(
+    parent_item_id: uuid.UUID,
+    payload: BOMConfigurationUpdate,
+    request: Request,
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    db: Session = Depends(get_db),
+) -> list[BOM]:
+    """Save one validated composition; reject a stale editor before any row changes."""
+    with transactional(db):
+        parent = _require_editable_bom_parent(db, parent_item_id)
+        current = db.query(BOM).filter(BOM.parent_item_id == parent_item_id).all()
+        before = composition_snapshot(current)
+        if before != composition_snapshot(payload.expected_rows):
+            raise http_error(409, ErrorCode.CONFLICT, "다른 작업에서 BOM을 변경했습니다. 최신 구성을 다시 읽고 수정해 주세요.")
+        if errors := configuration_errors(db, parent_item_id, payload.rows):
+            raise http_error(422, ErrorCode.UNPROCESSABLE, "\n".join(errors), errors=errors)
+        by_child = {row.child_item_id: row for row in current}
+        desired = {row.child_item_id for row in payload.rows}
+        for row in current:
+            if row.child_item_id not in desired:
+                db.delete(row)
+        for value in payload.rows:
+            row = by_child.get(value.child_item_id)
+            if row is None:
+                row = BOM(parent_item_id=parent_item_id, child_item_id=value.child_item_id)
+                db.add(row)
+            row.quantity, row.unit, row.notes = int(value.quantity), value.unit, value.notes
+        db.flush()
+        current = db.query(BOM).filter(BOM.parent_item_id == parent_item_id).all()
+        after = composition_snapshot(current)
+        if before != after:
+            encoded = json.dumps(after, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            audit.record(db, request=request, action="bom.replace", target_type="item", target_id=str(parent.item_id),
+                         payload_summary=json.dumps({"before": before, "after": after,
+                                                     "version": hashlib.sha256(encoded.encode()).hexdigest()}, ensure_ascii=False))
+    return get_bom_flat(parent_item_id, db)
 
 
 @router.get(

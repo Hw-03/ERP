@@ -101,6 +101,19 @@ const MIXED_SOURCE_APPROVAL_META = {
   accentColor: "yellow" as const,
 };
 
+const AS_RESEARCH_APPROVAL_META = {
+  ...APPROVAL_META.department,
+  summaryLabel: "AS·연구 전용 결재 요청",
+  badgeText: "AS·연구 전용 결재 필요",
+  submitText: (n: number) => `AS·연구 전용 결재 요청 ${n}건`,
+};
+
+const APPROVAL_ROUTE_LABEL = {
+  warehouse: "창고 결재",
+  as_research: "AS·연구 전용 결재",
+  department: "부서 결재",
+};
+
 const AUTO_APPROVAL_META = {
   summaryLabel: "자동 승인 후 즉시 반영",
   badgeText: "자동 승인 후 즉시 반영",
@@ -235,6 +248,15 @@ export function IoConfirmStep({
     : subTypeLabel(subType);
   const allLines = bundles.flatMap((bundle) => bundle.lines);
   const includedLines = allLines.filter((line) => line.included);
+  const approvalRoutes = new Map<keyof typeof APPROVAL_ROUTE_LABEL, number>();
+  if (subType === "internal_use_out") {
+    for (const line of includedLines) {
+      if (line.approval_kind && line.approval_kind !== "none") {
+        approvalRoutes.set(line.approval_kind, (approvalRoutes.get(line.approval_kind) ?? 0) + 1);
+      }
+    }
+  }
+  const serverApprovalKind = approvalRoutes.size === 1 ? [...approvalRoutes.keys()][0] : undefined;
   const internalUseHasWarehouse = subType === "internal_use_out" &&
     includedLines.some((line) => line.from_bucket === "warehouse");
   const internalUseHasDepartment = subType === "internal_use_out" &&
@@ -242,10 +264,16 @@ export function IoConfirmStep({
       line.from_bucket === "production" ||
       (line.direction === "in" && line.to_bucket === "production"),
     );
-  const meta = autoApprove
+  const meta = subType === "receive_supplier" && approvalKind === "none"
+    ? { ...APPROVAL_META.none, badgeText: "창고 권한으로 즉시 입고" }
+    : autoApprove
     ? AUTO_APPROVAL_META
-    : internalUseHasWarehouse && internalUseHasDepartment
+    : approvalRoutes.size > 1 || (internalUseHasWarehouse && internalUseHasDepartment)
     ? MIXED_SOURCE_APPROVAL_META
+    : serverApprovalKind === "as_research"
+      ? AS_RESEARCH_APPROVAL_META
+    : serverApprovalKind
+      ? APPROVAL_META[serverApprovalKind]
     : internalUseHasDepartment
       ? APPROVAL_META.department
       : APPROVAL_META[approvalKind];
@@ -319,6 +347,11 @@ export function IoConfirmStep({
           <div className="text-lg lg:text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
             {headerSummary}
           </div>
+          {approvalRoutes.size > 0 && (
+            <div data-testid="io-approval-routes" className="mt-1 flex flex-wrap gap-x-3 text-xs font-bold" style={{ color: LEGACY_COLORS.muted }}>
+              {[...approvalRoutes].map(([kind, count]) => <span key={kind}>{APPROVAL_ROUTE_LABEL[kind]} {count}건</span>)}
+            </div>
+          )}
         </div>
         {isApproval ? (
           <span

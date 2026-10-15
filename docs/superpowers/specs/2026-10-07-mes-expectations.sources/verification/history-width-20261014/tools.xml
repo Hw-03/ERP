@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="Vitest 원본 JSON의 모든 파라미터 인스턴스를 선언 위치에 연결한다" time="0.024366" classname="test"/>
+	<testcase name="0매칭·파라미터 일부·중복·SKIP·다른 선언 위치는 PASS가 아니다" time="0.001845" classname="test"/>
+	<testcase name="실제 runner 실패·재시도·expected failure는 성공 목록으로 덮어쓸 수 없다" time="0.002880" classname="test"/>
+	<testcase name="Playwright 프로젝트·선언 위치·재시도 없는 실제 성공을 검증한다" time="0.001555" classname="test"/>
+	<testcase name="JUnit은 XML parser로 읽으며 실패·skip과 HTML entity를 보존한다" time="0.831295" classname="test"/>
+	<testcase name="입력 snapshot은 CRLF 차이를 무시하고 파일 추가·삭제·본문 변경을 탐지한다" time="0.003796" classname="test"/>
+	<testcase name="조건 지문은 원문과 연결 변경을 탐지하고 실행 기록 갱신에는 영향받지 않는다" time="0.001633" classname="test"/>
+	<testcase name="schema 2는 raw runner·조건 지문·제품 snapshot을 함께 검증한다" time="0.003101" classname="test"/>
+	<testcase name="재사용 근거는 실패한 부모의 성공 그룹을 보존하고 변조·순환·재시도를 거부한다" time="0.004130" classname="test"/>
+	<testcase name="제품 변경·raw 변조·exit 실패·다른 조건·입력 축소·옛 요약 PASS를 거부한다" time="0.003463" classname="test"/>
+	<testcase name="browser 필수 조건은 unit 결과로 닫지 않으며 DB·fixture 식별을 요구한다" time="0.001676" classname="test"/>
+	<testcase name="전체 수집 목록에 있는 파라미터를 raw와 요약에서 함께 빼도 탐지한다" time="0.001776" classname="test"/>
+	<testcase name="Vitest 공식 JSON이 숨기는 retry/fails 상태는 runner 관찰 자료에서 확인한다" time="0.003464" classname="test"/>
+	<testcase name="공유 테스트 helper·bootstrap·실제 프론트 설정도 관련 입력에 포함한다" time="0.001433" classname="test"/>
+	<testcase name="브라우저 성공 화면은 원본 첨부와 연결된 바이트 근거가 있어야 한다" time="0.009199" classname="test"/>
+	<testcase name="기준 완료 연결은 제품 변경 뒤에도 과거 원문을 검증하고 현재 전체 PASS를 만들지 않는다" time="0.036247" classname="test"/>
+	<testcase name="기준 완료 연결도 변경 누락·현재 입력·원문·국소 결과 변조를 거부한다" time="0.045177" classname="test"/>
+	<testcase name="원장은 기준 완료와 현재 PASS를 분리하고 엄격 완료로 승격하지 않는다" time="0.012992" classname="test"/>
+	<testcase name="검토 재사용은 실행하지 않은 leaf E2E 변경만 이월하며 원래 실행은 보존한다" time="0.006857" classname="test"/>
+	<testcase name="검토 재사용은 변경 누락·업무 코드·공유 fixture·실행 대상·변조를 거부한다" time="0.020786" classname="test"/>
+	<testcase name="스냅샷이 맞아도 수집된 테스트 파일은 변경 제외할 수 없다" time="0.002527" classname="test"/>
+	<testcase name="이월된 원문도 raw·조건·바인딩 검사를 그대로 거친다" time="0.003559" classname="test"/>
+	<testcase name="원장 검사는 재사용 구분·리뷰 해시·현재 바인딩을 모두 요구한다" time="0.020455" classname="test"/>
+	<testcase name="변경 목록을 다시 작성해도 업무·설정·공유 fixture와 삭제는 제외할 수 없다" time="0.013404" classname="test"/>
+	<testcase name="수집 파일을 사용하지 않는 기존 Node 원문 형식도 보존한다" time="0.005449" classname="test"/>
+	<testcase name="이름이 spec여도 내보내는 helper 또는 기존 참조가 있으면 이월하지 않는다" time="0.005576" classname="test"/>
+	<testcase name="도구 변경은 소스에 묶인 전체 호환성 검사 원문을 요구한다" time="1.292582" classname="test"/>
+	<testcase name="같은 검사 안의 반복 근거는 한 소스 스냅샷을 쓰고 다음 검사는 최신 소스를 다시 읽는다" time="0.052270" classname="test"/>
+	<testcase name="동일한 테스트의 LF와 CRLF는 같은 소스 근거이며 코드 변경은 거부한다" time="0.003261" classname="test"/>
+	<testcase name="원장 ID·기대·피드백·과거 관찰을 보존하고 분모를 원장에서 산출한다" time="0.001845" classname="test"/>
+	<testcase name="범위 밖 원문은 문장별 미검토 조건으로 남기고 전부 실행돼도 PASS를 거부한다" time="0.002428" classname="test"/>
+	<testcase name="확정된 기술 기대와 직원 안내 기대를 구분하고 원문은 보존한다" time="0.001949" classname="test"/>
+	<testcase name="브라우저 assertion의 정규식 괄호와 따옴표를 코드 경계로 오인하지 않는다" time="0.002791" classname="test"/>
+	<testcase name="알 수 없는 ID·중복 원장·중복 정책·누락 조건을 거부한다" time="0.002355" classname="test"/>
+	<testcase name="실제 selector의 assertion 조각과 파일 SHA를 연결한다" time="0.001783" classname="test"/>
+	<testcase name="여러 개별 조건이 같은 selector를 참조해도 assertion은 각각 유지한다" time="0.002387" classname="test"/>
+	<testcase name="누락 selector·주석뿐인 ID/assertion·다른 테스트의 assertion·변경된 SHA를 탐지한다" time="0.010330" classname="test"/>
+	<testcase name="Python 예외 assertion은 실제 pytest.raises 본문으로 검증한다" time="0.003561" classname="test"/>
+	<testcase name="전체 테스트 선언이 여러 줄 fixture 문자열 안에 있으면 실행 근거로 인정하지 않는다" time="0.001614" classname="test"/>
+	<testcase name="종료된 테스트 다음의 미실행 helper assertion은 해당 selector의 근거가 아니다" time="0.002027" classname="test"/>
+	<testcase name="Python 테스트의 dedent 뒤 모듈 assertion은 해당 함수의 근거가 아니다" time="0.002310" classname="test"/>
+	<testcase name="Python decorator와 여러 줄 함수 서명은 유지하되 함수 밖 assertion은 제외한다" time="0.005048" classname="test"/>
+	<testcase name="smoke·P0·ID 필터가 실제 selector만 선택하고 알 수 없는 ID·미연결 조건은 거부한다" time="0.002426" classname="test"/>
+	<testcase name="개별 조건 일부만 실행한 경우 케이스 전체 PASS를 만들지 않는다" time="0.002796" classname="test"/>
+	<testcase name="개별 조건 누락·중복·registry 중복·근거 없는 실행 PASS를 탐지한다" time="0.002576" classname="test"/>
+	<testcase name="현재 PASS는 각 selector의 실행 결과 artifact와 SHA까지 일치해야 한다" time="0.004439" classname="test"/>
+	<testcase name="schema 2는 조건별 필수 근거와 파라미터 선언 위치를 보존한다" time="0.001660" classname="test"/>
+	<testcase name="full 선택은 보류를 제외한 원장 전체이며 보류 ID 직접 실행은 거부한다" time="0.004686" classname="test"/>
+	<testcase name="엄격한 완료 검사는 eligible 미검토·미연결·미실행과 schema 1을 거부한다" time="0.003619" classname="test"/>
+	<testcase name="schema 2에서는 옛 요약 보고서만으로 현재 PASS를 기록할 수 없다" time="0.002700" classname="test"/>
+	<testcase name="정책 문구 보존과 원자 조건 검토 완료는 별도이며 옛 연결을 현재 근거로 쓰지 않는다" time="0.002648" classname="test"/>
+	<testcase name="실행 계획은 파일을 중복 실행하지 않고 runner별 전체 인스턴스를 선택한다" time="0.038100" classname="test"/>
+	<testcase name="마지막 AS 역할 해제는 다른 브라우저 흐름과 분리된 새 DB에서 실행한다" time="0.001279" classname="test"/>
+	<testcase name="AS fallback UI와 마지막 역할 회수 파일은 서로도 별도 새 DB 그룹에서 실행한다" time="0.001752" classname="test"/>
+	<testcase name="미검토·필수 근거 미지정·브라우저 조건의 unit-only 연결은 실행 전에 거부한다" time="0.001883" classname="test"/>
+	<testcase name="실제 Node runner를 실행해 원본 JUnit·종료코드·현재 입력을 남긴다" time="2.984631" classname="test"/>
+	<testcase name="실제 실패 runner는 보고서를 보존하고 PASS로 승격하지 않는다" time="1.763348" classname="test"/>
+	<testcase name="재개는 성공 그룹의 원래 실행을 보존하고 새 집계를 승격한다" time="5.126056" classname="test"/>
+	<testcase name="실패한 부모에서 성공 그룹만 재사용하고 실패 그룹은 실제 재실행한다" time="10.999645" classname="test"/>
+	<testcase name="재개는 제품·설정·런타임 변경 또는 누락 근거를 현재 실행으로 갱신한다" time="20.862371" classname="test"/>
+	<testcase name="재개는 QA 인증 PIN 변경을 재사용하지 않으며 비밀 원문을 보존하지 않는다" time="8.802263" classname="test"/>
+	<testcase name="재개는 원문 변조와 잘못된 대상·완료 영수증을 실행 전에 거부한다" time="4.031979" classname="test"/>
+	<testcase name="검증된 raw와 manifest만 영구 보존하고 조건별 실행을 갱신한다" time="4.297837" classname="test"/>
+	<testcase name="같은 테스트의 서로 다른 assertion은 실행 인스턴스를 중복시키지 않는다" time="4.101522" classname="test"/>
+	<testcase name="실행 후 코드나 raw가 달라지면 원장과 영구 근거를 변경하지 않는다" time="6.572036" classname="test"/>
+	<testcase name="실제 실행 완료 영수증이 없는 결과는 승격하지 않는다" time="3.102358" classname="test"/>
+	<testcase name="완료 영수증의 실패·대상 변경·누락 그룹과 삭제된 실행 파일을 거부한다" time="2.389200" classname="test"/>
+	<testcase name="승격 후 runtime 없이 원본 영수증을 재검증하고 영수증 삭제를 거부한다" time="3.993249" classname="test"/>
+	<testcase name="raw와 execution 해시를 함께 갱신해도 완료 영수증과 다르면 승격하지 않는다" time="3.246612" classname="test"/>
+	<testcase name="브라우저 근거는 전용 DB의 실제 revision·논리 snapshot과 boot ID를 묶는다" time="1.708816" classname="test"/>
+	<testcase name="pytest 환경·설정의 -k가 실패 파라미터를 가려도 전체 PASS가 되지 않는다" time="8.363706" classname="test"/>
+	<testcase name="이미 PASS인 원장도 실행 계획과 재실행을 다시 만들 수 있다" time="4.407895" classname="test"/>
+	<testcase name="실행 도중 추가된 제품 파일은 같은 실행의 PASS를 무효화한다" time="3.017395" classname="test"/>
+	<testcase name="합성 브라우저 raw·수집·화면만으로 실제 실행 영수증 없이 승격하지 않는다" time="0.305024" classname="test"/>
+	<!-- tests 74 -->
+	<!-- suites 0 -->
+	<!-- pass 74 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 100614.0177 -->
+</testsuites>

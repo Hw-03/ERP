@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+import sqlite3
+from contextlib import closing
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -26,6 +30,50 @@ def _write_migration(path: Path, revision: str, policy: str | None) -> None:
     path.write_text(
         f'revision = "{revision}"\ndown_revision = None\n{declaration}', encoding="utf-8"
     )
+
+
+@pytest.mark.parametrize("check", ["snapshot", "unchanged", "policy", "copy"])
+def test_preflight_closes_connections_before_recovery_writer_fence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, check: str) -> None:
+    """A retained reader must not block the next process's exclusive recovery fence."""
+    module = _load_preflight_module()
+    database = tmp_path / "fixture.db"
+    with closing(sqlite3.connect(database)) as connection:
+        connection.execute("PRAGMA journal_mode=WAL")
+        connection.execute("CREATE TABLE example(id INTEGER)")
+        connection.execute("INSERT INTO example VALUES (1)")
+        connection.commit()
+    original_connect = sqlite3.connect
+    retained: list[sqlite3.Connection] = []
+
+    def tracked_connect(*args: Any, **kwargs: Any) -> sqlite3.Connection:
+        """Retain references so garbage collection cannot hide an unclosed connection."""
+        result = original_connect(*args, **kwargs)
+        retained.append(result)
+        return result
+
+    monkeypatch.setattr(module.sqlite3, "connect", tracked_connect)
+    try:
+        if check == "snapshot":
+            module.snapshot_existing_rows(database)
+        elif check == "unchanged":
+            module.assert_existing_rows_unchanged(database, {}, frozenset())
+        elif check == "policy":
+            module.assert_policy_validators(database, [SimpleNamespace(
+                validator_sql="SELECT COUNT(*) FROM example", validator_expected=1, revision="fixture",
+            )])
+        else:
+            module._copy_verified_snapshot(database, tmp_path / "runtime")
+        assert retained
+        for reader in retained:
+            with pytest.raises(sqlite3.ProgrammingError, match="closed"):
+                reader.execute("SELECT 1")
+        with closing(original_connect(database, timeout=0, isolation_level=None)) as writer:
+            writer.execute("PRAGMA locking_mode=EXCLUSIVE")
+            writer.execute("BEGIN EXCLUSIVE")
+            writer.execute("ROLLBACK")
+    finally:
+        for reader in retained:
+            reader.close()
 
 
 @pytest.mark.parametrize("content_changed", [False, True])

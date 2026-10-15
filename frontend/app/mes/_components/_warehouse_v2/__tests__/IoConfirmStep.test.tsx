@@ -65,6 +65,40 @@ function renderConfirmStep() {
   );
 }
 
+it.each([false, true])("서버가 판정한 AS·연구/일반/창고 경로와 포함 행 건수를 최종 확인에 구분한다: mobile=%s", (mobilePresentation) => {
+  const lines: IoBundle["lines"] = [
+    { ...parentLine, line_id: "special-raw", approval_kind: "as_research", from_bucket: "production" as const },
+    { ...childLine, line_id: "special-assembly", approval_kind: "as_research", from_bucket: "production" as const },
+    { ...parentLine, line_id: "normal", approval_kind: "department", from_bucket: "production" as const },
+    { ...parentLine, line_id: "warehouse", approval_kind: "warehouse" },
+    { ...childLine, line_id: "excluded", approval_kind: "as_research", included: false },
+  ];
+  render(<IoConfirmStep workType="internal_use" subType="internal_use_out" bundles={[{ ...bundle, source_kind: "direct_item", lines }]}
+    notes="" hasShortage={false} hasInvalidQuantity={false} submitting={false} saving={false} approvalKind="warehouse"
+    mobilePresentation={mobilePresentation} onNotesChange={vi.fn()} onSubmit={vi.fn()} onSaveDraft={vi.fn()} />);
+  expect(screen.getByTestId("io-approval-routes")).toHaveTextContent("AS·연구 전용 결재 2건");
+  expect(screen.getByTestId("io-approval-routes")).toHaveTextContent("부서 결재 1건");
+  expect(screen.getByTestId("io-approval-routes")).toHaveTextContent("창고 결재 1건");
+  expect(screen.getByRole("button", { name: "위치별 결재 요청" })).toBeInTheDocument();
+});
+
+it.each([false, true])("전용 승인자0의 서버 부서 fallback을 품목 코드로 다시 추정하지 않는다: mobile=%s", (mobilePresentation) => {
+  const line: IoBundle["lines"][number] = { ...parentLine, mes_code: "1-AR-0001", from_bucket: "production", approval_kind: "department" };
+  render(<IoConfirmStep workType="internal_use" subType="internal_use_out" bundles={[{ ...bundle, source_kind: "direct_item", lines: [line] }]}
+    notes="" hasShortage={false} hasInvalidQuantity={false} submitting={false} saving={false} approvalKind="warehouse"
+    mobilePresentation={mobilePresentation} onNotesChange={vi.fn()} onSubmit={vi.fn()} onSaveDraft={vi.fn()} />);
+  expect(screen.getByTestId("io-approval-routes")).toHaveTextContent("부서 결재 1건");
+  expect(screen.getByTestId("io-approval-routes")).not.toHaveTextContent("AS·연구 전용 결재");
+  expect(screen.getByText("부서 결재 필요")).toBeInTheDocument();
+});
+
+it("8.17-05 원자재 최종확인은 창고 권한 즉시 입고를 명시한다", () => {
+  render(<IoConfirmStep workType="receive" subType="receive_supplier" bundles={[{ ...bundle, source_kind: "direct_item", lines: [{ ...parentLine, direction: "in", from_bucket: "none", to_bucket: "warehouse" }] }]} notes="" hasShortage={false} hasInvalidQuantity={false} submitting={false} saving={false} approvalKind="none" onNotesChange={vi.fn()} onSubmit={vi.fn()} onSaveDraft={vi.fn()} />);
+  expect(screen.getByText("창고 권한으로 즉시 입고")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /즉시 반영하기/ })).toBeEnabled();
+  expect(screen.queryByText(/부서 결재|BOM 결재|창고 결재 요청/)).not.toBeInTheDocument();
+});
+
 it("원자재 출고의 빈 사유는 저장을 허용하고 확정만 차단한다", () => {
   const onSaveDraft = vi.fn();
   render(<IoConfirmStep workType="receive" subType="outbound_supplier" bundles={[{ ...bundle, source_kind: "direct_item", lines: [{ ...parentLine, to_bucket: "none" }] }]} notes="" hasShortage={false} hasInvalidQuantity={false} submitting={false} saving={false} approvalKind="none" onNotesChange={vi.fn()} onSubmit={vi.fn()} onSaveDraft={onSaveDraft} />);
