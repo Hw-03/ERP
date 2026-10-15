@@ -42,7 +42,7 @@ async function selectItem(page: Page, item: { mes_code: string; item_name: strin
 
 async function history(page: Page, logId: string, name: string, memo?: string) {
   await page.getByRole("navigation").getByRole("button", { name: "입출고 내역 입출고 이력 조회", exact: true }).click();
-  await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(memo ?? name);
+  await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(memo ?? name);
   const operationRow = page.locator('[data-history-main-row="true"]').filter({ visible: true });
   if (memo) {
     await expect(operationRow).toHaveCount(1);

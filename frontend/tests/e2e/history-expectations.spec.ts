@@ -116,7 +116,7 @@ async function seedReworkHistory(request: APIRequestContext): Promise<{ names: s
 }
 async function openHistory(page: Page, name: string): Promise<void> {
   await page.goto("/mes?tab=history");
-  await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(name);
+  await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(name);
   await expect(rows(page)).toHaveCount(100);
 }
 
@@ -148,7 +148,7 @@ test("HISTORY 8.3-01~05 실제 기간·부서OR·업무OR·그룹AND와 요약 �
   await expect(rows(page)).toHaveCount(10);
   await expect(stats(page)).toContainText("10건");
   await expect(rows(page).first()).toContainText("불량");
-  await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(`${fixture.name}-없음`);
+  await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(`${fixture.name}-없음`);
   await expect(rows(page)).toHaveCount(0);
   await expect(stats(page)).toContainText("0건");
   await expect(page.getByText("현재 조건에 맞는 입출고 내역이 없습니다", { exact: true })).toBeVisible();
@@ -186,7 +186,7 @@ test("HISTORY01 실제 cursor 추가조회 실패·반복클릭·필터 보존·
   expect(ids.slice(0, 100)).toEqual(initial);
   expect(new Set(ids).size).toBe(121);
   expect(new Set(ids)).toEqual(new Set(fixture.ids));
-  await expect(page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모")).toHaveValue(fixture.name);
+  await expect(page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true })).toHaveValue(fixture.name);
   await expect(page.getByRole("button", { name: "다음 100건 불러오기", exact: true })).toHaveCount(0);
 });
 
@@ -213,7 +213,7 @@ test("HISTORY04 요청자 본인 실제 상세·PIN취소는 역할 보존하고
   expect((await (await request.get(`/api/items/${item.item_id}`)).json()).warehouse_qty).toBe(17);
   await loginUi(page, actors.requester);
   await page.goto("/mes?tab=history");
-  await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(itemName);
+  await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(itemName);
   const row = page.locator(`[data-log-id="${original.log_id}"]`);
   await row.first().click();
   await expect(page.getByText(actors.requester.name, { exact: false }).filter({ visible: true }).first()).toBeVisible();
@@ -277,7 +277,7 @@ test("HISTORY02 실제 서버 변경은 받은 두 페이지와 끝 행을 보�
     expect(new Set(after)).toEqual(new Set([...before, newLogs[0].log_id]));
     expect(new Set(after).size).toBe(after.length);
     expect(after.at(-1)).toBe(before.at(-1));
-    await expect(page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모")).toHaveValue(fixture.name);
+    await expect(page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true })).toHaveValue(fixture.name);
   } finally { release(); }
 });
 
@@ -295,7 +295,7 @@ test("HISTORY03 늦은 이전 검색 응답은 최신 목록과 마지막 선택
       const response = await fetchWithoutIdleReuse(route); started(); await held; await route.fulfill({ response });
     } else await route.continue();
   });
-  const search = page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모");
+  const search = page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true });
   try {
     await search.fill(older.name);
     await waiting;
@@ -342,7 +342,7 @@ test("HISTORY05 HISTORY06 복원 재작업의 모품목·정상·불량·폐기 
   await expect(header).toContainText(/불량.*2.*[−-]2.*0/);
   await page.getByRole("button", { name: "다음 100건 불러오기", exact: true }).click();
   await expect(rows(page)).toHaveCount(expectedGroupCount);
-  await expect(page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모")).toHaveValue(fixture.search);
+  await expect(page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true })).toHaveValue(fixture.search);
   await expect(stats(page)).toContainText(`${expectedSummary.total}건`);
   const toggle = header.getByRole("button", { name: /^묶음 (펼치기|접기)$/ });
   if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();

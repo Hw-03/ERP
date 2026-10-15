@@ -94,7 +94,7 @@ test("IO-RAW-COMPLETE 8.17-02/04/05/07 원자재 입고는 부서 선택 없이 
   expect(log.warehouse_qty_after).toBe(21);
   await done.getByRole("button", { name: "확인", exact: true }).click();
   await page.getByRole("navigation").getByRole("button", { name: "입출고 내역 입출고 이력 조회", exact: true }).click();
-  await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(item.item_name);
+  await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(item.item_name);
   const history = page.locator(`[data-log-id="${log.log_id}"]`).filter({ visible: true }).first();
   await expect(history).toContainText("원자재 입고");
   await expect(history).toContainText(item.item_name);

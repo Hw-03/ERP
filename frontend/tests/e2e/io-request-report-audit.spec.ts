@@ -67,7 +67,7 @@ for (const scenario of [{ process: "TR", department: "튜브", other: "고압" }
       expect(log.inventory_effect).toHaveLength(1);
       expect(log.inventory_effect![0]).toMatchObject({ scope: "location", department: scenario.department, status: "PRODUCTION", quantity_before: 7, quantity_after: 8 });
       await page.getByRole("navigation").getByRole("button", { name: "입출고 내역 입출고 이력 조회", exact: true }).click();
-      await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(memo);
+      await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(memo);
       const row = page.locator(`[data-log-id="${log.log_id}"]`).filter({ visible: true }).first();
       await expect(row).toContainText("부서 입출고");
       await expect(row.getByLabel(/재고 변동:/)).toHaveAttribute("aria-label", new RegExp(`${scenario.department} 7 \\+1→8`));

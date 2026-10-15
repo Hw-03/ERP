@@ -107,7 +107,7 @@ async function openHistory(page: Page, request: APIRequestContext, item: Item, o
   expect(logs.length).toBeGreaterThan(0);
   for (const log of logs) expect(log.operation_id).toBe(operationId);
   await page.getByRole("navigation").getByRole("button", { name: "입출고 내역 입출고 이력 조회", exact: true }).click();
-  await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(item.item_name);
+  await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(item.item_name);
   // Item creation also leaves inventory history. Match the approved operation's
   // IDs, and include both role=button main rows and ordinary child rows.
   const operation = page.locator(logs.map(log => `[data-log-id="${log.log_id}"]`).join(",")).filter({ visible: true });

@@ -90,3 +90,13 @@ main 반영·직원 배포·원본 DB 변경·예약 변경은 수행하지 않�
 두 선택만 접근 가능한 `textbox` 역할과 정확한 이름으로 바꿨다. 단순 첫 항목 선택·고정 대기·재시도 추가·단언 삭제는 하지 않았다. 사유/메모 중복 여부·상세 표시·창고 수량·원건 잔량·과거 조회의 무변경 단언을 유지하고 두 검사를 각각 3회, 재시도 0으로 통과했다. 변경 파일 ESLint, 원본 mes.db 불변·전용 서버 종료도 확인했다. 실패 trace·원문은 `ci-third-general-report/`, 새 통과는 `e2e-reason-search-green.log`에 보존한다.
 
 원장에는 현재 파일의 sourceHash 63개만 갱신했다. 다른 모든 필드와 과거 실행·단언 이력은 동일하며 `ledger-reason-search-preservation.json`에 확인 결과를 남겼다. 제품·빌드·의존성·공통 검사 설정은 바뀌지 않아 직전 CI의 유효한 근거를 재사용한다. 최종 HEAD의 원격 CI는 별도로 확인한다.
+
+### 네 번째 CI와 동일 검색창의 직접 소비자 정렬
+
+`6a72606f`의 [네 번째 CI](https://github.com/Hw-03/ERP/actions/runs/38714069883)는 일곱 job 성공, 일반 E2E 299건 통과·1건 실패였다. 앞서 고친 사유 표시 두 검사는 통과했고, `defect-history-expectations.spec.ts`가 같은 전환 덮개의 입력을 중복 선택했다. 첫 실행과 재시도의 strict mode 오류·실제 렌더 경로를 대조했다. 실제 직원 화면의 입력 오류가 아니라 테스트가 숨겨진 비활성 입력까지 찾는 문제다.
+
+같은 검색창의 정적 문구·동적 변수·label·CSS 소비자를 함께 확인했다. 17파일의 27개 선택을 접근 가능한 정확한 `textbox` 이름으로 맞췄다. 기존 `:not(:disabled)` 보호는 유지했고, 동적 읽기 상태의 관리자 선택은 그대로 두고 내역 분기만 바꿨다. 수량·위치·예약·이력·담당자·오류 복구 단언, 공통 fixture, 제품 코드, 재시도·timeout은 변경하지 않았다. 읽기 전용 리뷰에서도 추가 누락과 업무 단언 축소는 없었다.
+
+직접 소비자 36건 (`e2e-history-search-consumers.log`)과 동적 history 읽기 상태 1건 (`e2e-history-search-state.log`), 총 37건을 재시도 0으로 통과했다. 각 실행의 합성 QA DB와 trace를 구분하며 원본 mes.db 불변과 소유 서버 종료를 확인했다. 변경 17파일의 ESLint·원장 생성/검사·문서 링크도 통과했다. 현재 sourceHash 944개와 선택 문장이 포함된 assertion 1개만 갱신했고, 새로 달라진 127조건의 원본 바인딩을 역사 이력에 추가했다. 기존 역사 실행·바인딩은 모두 그대로 남아 있다 (`ledger-history-search-preservation.json`). 새 전체 기대값 PASS로 승격하거나 원장 도구를 변경하지 않았다.
+
+네 번째 CI의 PostgreSQL 영수증에서도 필수 28건·확장 60건 모두 실행, 실패·오류·건너뜀 0을 확인했다 (`ci-fourth-postgres/postgres-required-contracts.json`). 두 번째 CI의 일반 E2E는 후속 push로 취소됐으며 성공으로 세지 않는다. 원문 실패·trace는 `ci-fourth-general-report/`와 `ci-fourth-general.log`에 보존했다. 제품 소스·빌드·설정이 같아 유효한 기존 결과는 재사용하고, 최종 HEAD의 모든 CI job 성공은 별도로 확인한다.

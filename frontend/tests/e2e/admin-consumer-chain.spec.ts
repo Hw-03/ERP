@@ -129,7 +129,7 @@ test("PC-DELTA-SUPPLIER-01 실제 업체 생성·정렬·이름수정·숨김·�
   await expect(picker.getByRole("button", { name: `${changedName} 선택됨`, exact: true })).toBeVisible();
   expect(await read(request, `/api/inventory/transactions?item_id=${item.item_id}`)).toEqual(logs);
   await page.goto("/mes?tab=history");
-  await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(item.item_name);
+  await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(item.item_name);
   await page.locator(`[data-log-id="${logs[0].log_id}"]`).first().click();
   await expect(page.locator(`[data-history-detail-log-id="${logs[0].log_id}"]`).filter({ visible: true })).toContainText(originalName);
 });
@@ -200,7 +200,7 @@ test("PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN
   expect(outbound[0].operation_id).toBeTruthy();
   expect(outbound[0]).toMatchObject({ quantity_change: -2, supplier_name_snapshot: supplier.name });
   await page.goto("/mes?tab=history");
-  await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(item.item_name);
+  await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(item.item_name);
   await page.locator(`[data-log-id="${outbound[0].log_id}"]`).first().click();
   const detail = page.locator(`[data-history-detail-log-id="${outbound[0].log_id}"]`).filter({ visible: true });
   await expect(detail).toContainText(supplier.name);

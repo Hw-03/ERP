@@ -87,7 +87,7 @@ for (const scenario of scenarios) {
       await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();
       await expect(failure).toHaveCount(0);
       if (scenario.searchLabel) {
-        const input = scenario.tab === "history" || scenario.tab === "admin" ? page.getByPlaceholder(scenario.searchLabel) : page.getByRole(scenario.tab === "shipping" || scenario.tab === "defect" ? "searchbox" : "textbox", { name: scenario.searchLabel, exact: true });
+        const input = scenario.tab === "admin" ? page.getByPlaceholder(scenario.searchLabel) : page.getByRole(scenario.tab === "shipping" || scenario.tab === "defect" ? "searchbox" : "textbox", { name: scenario.searchLabel, exact: true });
         await input.fill("QA-존재하지않는검색-0");
         if (scenario.tab === "shipping") await input.press("Enter");
         await expect(page.getByText(scenario.noResultsLabel!, { exact: true })).toBeVisible();

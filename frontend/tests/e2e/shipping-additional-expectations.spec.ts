@@ -275,7 +275,7 @@ test("SHIP-HISTORY-COUNT 8.12-15 G09 실제 출하 원작업1+취소1 보존·�
   const cancelled = await detail(request, actors.requester, created.request_id); expect(cancelled.transactions).toHaveLength(2);
   expect(cancelled.transactions.map((log) => log.quantity_change).sort()).toEqual([-2, 2]);
   await loginUi(page, actors.requester); await page.goto("/mes?tab=history");
-  await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(parts.pf.item_name);
+  await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(parts.pf.item_name);
   await page.getByRole("button", { name: "오늘", exact: true }).click();
   const rows = page.locator('[data-history-main-row="true"]');
   await page.getByRole("button", { name: /^필터/ }).click();
@@ -294,7 +294,7 @@ test("SHIP-HISTORY-LINK 8.12-15 원출하·취소 역거래 상세 양방향 이
   const reverse = result.transactions.find((log) => log.quantity_change > 0)!;
   expect(original).toBeTruthy(); expect(reverse).toBeTruthy();
   await loginUi(page, actors.requester); await page.goto("/mes?tab=history");
-  await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(parts.pf.item_name);
+  await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(parts.pf.item_name);
   await page.locator(`[data-log-id="${original.log_id}"]`).first().click();
   // These semantic links are a required contract, currently a source-read gap candidate.
   const panel = page.locator('[data-history-detail-log-id]');

@@ -80,7 +80,7 @@ test("8.19-07 실제 이름·분류 변경은 당시 품목·현재 연결과 �
   expect((await read(request, `/api/items/${item.item_id}`)).deleted_at).toBeNull();
   await page.getByRole("button", { name: "취소", exact: true }).click();
   await page.goto("/mes?tab=history");
-  await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(name);
+  await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(name);
   const logRow = page.locator(`[data-log-id="${original.log_id}"]`).first();
   await expect(logRow).toContainText(name);
   await expect(logRow).toContainText(item.mes_code);
@@ -119,7 +119,7 @@ test("8.19-12 퇴직 직원의 실제 완료 요청과 내역 처리자는 삭�
   expect(await read(request, `/api/stock-requests/${work.request_id}`)).toEqual(before);
   expect(await read(request, `/api/inventory/transactions?item_id=${item.item_id}`)).toEqual(logs);
   await page.goto("/mes?tab=history");
-  await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(item.item_name);
+  await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(item.item_name);
   await page.locator(`[data-log-id="${log.log_id}"]`).first().click();
   await expect(page.getByTestId("history-participant-row").filter({ hasText: "요청자" })).toContainText(actors.requester.name);
   await expect(page.getByTestId("history-participant-row").filter({ hasText: "승인자" })).toContainText(actors.approver.name);

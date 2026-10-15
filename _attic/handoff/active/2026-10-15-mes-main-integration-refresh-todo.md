@@ -52,6 +52,9 @@
 - 전용 PostgreSQL 16435는 실제 data_directory·PID 소유권을 확인한 뒤 종료했다. 새 수정은 기존 기대값 바인딩의 대상 파일이 아니므로 원장·과거 근거를 다시 생성하지 않는다. 로컬 전체 검사 대신 관련 검사와 변경 전 두 번째 CI의 유효한 결과를 재사용하고, 최종 HEAD 전체 CI는 이어서 확인한다.
 - `78956d02`(내역 cursor)·`de31356d`(PostgreSQL 표현 비교) push 후 [세 번째 CI](https://github.com/Hw-03/ERP/actions/runs/38707644906)의 일곱 job이 통과했다. 실제 PostgreSQL 필수 28건·확장 60건은 영수증상 모두 실행됐고 실패·건너뜀 0이다. 일반 E2E는 298건 통과, 같은 사유 표시 파일의 두 검색창 선택이 실패했다. 전환 종료 중 `aria-hidden`·`inert`인 로딩 덮개의 입력까지 placeholder가 중복 선택했다. 두 줄을 접근 가능한 textbox 선택으로 바꾸고 두 검사 각각 3회(총 6건), 재시도 0 통과·ESLint 통과를 확인했다. 업무/수량/사유/메모 단언은 그대로다 (`ci-third-general.log`, `e2e-reason-search-green.log`).
 - 사유 파일에 연결된 현재 sourceHash 63개만 갱신했다. 나머지 필드와 과거 1,058조건 실행·단언 이력은 동일하다 (`ledger-reason-search-preservation.json`). 제품 코드·공통 설정·빌드가 그대로이므로 직전 CI의 유효한 일곱 job 근거를 재사용하고 최종 원격 CI를 확인한다.
+- `6a72606f`의 [네 번째 CI](https://github.com/Hw-03/ERP/actions/runs/38714069883)는 일곱 job 성공, 일반 E2E 299건 통과·1건 실패였다. 앞서 수정한 두 검사는 통과했고 같은 검색창을 사용하는 `defect-history-expectations`에 같은 중복 선택이 남았다. 정적·동적 문자열의 직접 소비자를 함께 조사해 17개 파일의 27개 선택만 접근 가능한 정확한 textbox 이름으로 맞췄다. 업무 단언·공통 fixture·제품 코드·재시도 설정은 그대로다.
+- 직접 소비자 36건과 동적 history 읽기 상태 1건, 총 37건을 재시도 0으로 통과했다. 변경 파일 ESLint·원장 생성/검사·문서 링크 통과, 읽기 전용 리뷰에서 같은 원인의 추가 누락은 없었다. 현재 sourceHash 944개·검색 선택이 포함된 단언 문장 1개를 갱신하고, 처음 달라진 127조건의 원래 바인딩도 역사 이력에 보존했다. 기존 1,058조건 실행 이력과 나머지 필드 불변을 확인했다 (`ledger-history-search-preservation.json`).
+- 네 번째 CI의 실제 PostgreSQL 필수 28건·확장 60건은 모두 실행됐고 실패·오류·건너뜀 0이다. 두 번째 CI의 일반 E2E는 후속 push로 취소됐으므로 통과 근거로 사용하지 않는다. 최종 HEAD 전체 CI 성공은 계속 대기 상태다.
 - [x] 보호 자료 3개 해시·이전 검토판 보존. 최종 production 후보의 로그인·사유 확인·실행 전 취소 후 모든 위치 수량·업무 레코드 동일 확인. 후보 3036/8036 종료, 결과·한계 기록.
 
 결과와 한계: [검증 결과](../../../docs/superpowers/plans/2026-10-15-mes-main-integration-refresh-results.md). PostgreSQL은 최종 CI에서 실제 실행을 확인한다. 과거 기대값은 당시 근거로 보존한다.

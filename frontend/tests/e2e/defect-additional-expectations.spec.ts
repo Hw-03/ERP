@@ -141,7 +141,7 @@ for (const source of ["warehouse", "production"] as const) {
       expect(Number(log.quantity_change)).toBe(action === "격리 등록" ? 0 : -2);
       if (action === "격리 등록") expect(Number(log.transfer_qty)).toBe(2);
       await page.goto("/mes?tab=history");
-      await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(item.item_name);
+      await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(item.item_name);
       const historyRow = page.locator(`[data-log-id="${log.log_id}"]`).filter({ visible: true }).first();
       await expect(historyRow).toContainText(action === "격리 등록" ? "불량 격리" : "불량 폐기");
       const normalBefore = source === "warehouse" ? before.warehouse : before.cells.find((cell: { department: string; status: string }) => cell.department === "튜브" && cell.status === "PRODUCTION").quantity;

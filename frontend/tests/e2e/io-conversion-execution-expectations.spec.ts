@@ -110,7 +110,7 @@ test("IO-CONVERSION-EXECUTION 8.16-10/11/12/13/14 두 부족품·직접 BOM 차�
       && url.pathname === "/api/inventory/transactions/display-groups"
       && url.searchParams.get("search") === memo;
   });
-  await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(memo);
+  await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(memo);
   const searched = await searchReply;
   expect(searched.status(), await searched.text()).toBe(200);
   const history = page.locator('[data-history-main-row="true"]').filter({ hasText: "품목 전환", visible: true });

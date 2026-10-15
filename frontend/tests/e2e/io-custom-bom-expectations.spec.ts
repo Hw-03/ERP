@@ -115,7 +115,7 @@ for (const authorized of [true, false]) {
       expect(new Set(logs.map(log => log.item_id))).toEqual(new Set(children.slice(0, 6).map(child => child.item.item_id)));
       await done.getByRole("button", { name: "확인", exact: true }).click();
       await page.getByRole("navigation").getByRole("button", { name: "입출고 내역 입출고 이력 조회", exact: true }).click();
-      await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(`${family} 선택한 하위만 반영`);
+      await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(`${family} 선택한 하위만 반영`);
       const history = page.locator('[data-history-main-row="true"]').filter({ hasText: /생산|부서/, visible: true });
       await expect(history).toHaveCount(1);
       const expand = history.getByRole("button", { name: /^작업 구성 (펼치기|접기)$/ });

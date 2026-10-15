@@ -103,7 +103,7 @@ test("DEFECT-RETURN PC-DELTA-DEFECT-05/06 8.13-03/04/05 활성업체·숨김경�
   expect(original.supplier_name_snapshot).toBe(supplierName);
   expect((await request.patch(`/api/suppliers/${supplier.supplier_id}`, { data: { requester_employee_id: actors.approver.employee_id, name: `${supplierName}변경` } })).ok()).toBeTruthy();
   await page.goto("/mes?tab=history");
-  await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(item.item_name);
+  await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(item.item_name);
   const historyRow = page.locator(`[data-log-id="${original.log_id}"]`).filter({ visible: true }).first();
   await expect(historyRow).toContainText("반품");
   await historyRow.click();
@@ -249,7 +249,7 @@ test("DEFECT-BULK 8.18-01/03/04/07 같은품목 독립원건 전체잔량·각�
   expect(inverse.defect_records.map((record: { record_id: string }) => record.record_id).sort()).toEqual([first.record_id, second.record_id].sort());
   await expect(page.getByRole("article", { name: `${item.item_name} 격리 기록` })).toHaveCount(0);
   await page.goto("/mes?tab=history");
-  await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(item.item_name);
+  await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(item.item_name);
   const bundleRow = page.locator('[data-history-main-row="true"]').filter({ hasText: /정상\s*복귀/, visible: true });
   await expect(bundleRow).toHaveCount(1);
   const primaryId = await bundleRow.getAttribute("data-log-id");

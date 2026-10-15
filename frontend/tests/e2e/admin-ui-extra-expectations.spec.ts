@@ -406,7 +406,7 @@ test("PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 �
   expect(logs).toHaveLength(1);
   expect(logs[0]).toMatchObject({ warehouse_qty_before: 0, warehouse_qty_after: 20, produced_by: actors.approver.name });
   await page.goto("/mes?tab=history");
-  await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(`${name}-수정`);
+  await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(`${name}-수정`);
   await page.locator(`[data-log-id="${logs[0].log_id}"]`).first().click();
   const detail = page.locator(`[data-history-detail-log-id="${logs[0].log_id}"]`);
   await expect(detail).toBeVisible();

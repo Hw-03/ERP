@@ -133,7 +133,7 @@ test("DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상�
   expect(logs.filter(log => log.operation_role === "REWORK_CHILD_DEFECTIVE")).toHaveLength(2);
   expect(logs.filter(log => log.operation_role === "REWORK_CHILD_SCRAP")).toHaveLength(2);
   await page.getByRole("navigation").getByRole("button", { name: "입출고 내역 입출고 이력 조회", exact: true }).click();
-  await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(memo);
+  await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(memo);
   const history = page.locator('[data-history-main-row="true"]').filter({ hasText: "재작업", visible: true });
   await expect(history).toHaveCount(1);
   const expand = history.getByRole("button", { name: /^작업 구성 (펼치기|접기)$/ });

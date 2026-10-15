@@ -71,7 +71,7 @@ test("PC-DELTA-DEFECT-06 실제 반품취소 성공응답 유실 뒤 stale 확�
   });
   try {
     await page.goto("/mes?tab=history");
-    await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(item.item_name);
+    await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(item.item_name);
     await page.locator(`[data-log-id="${original!.log_id}"]`).filter({ visible: true }).first().click();
     await expect(page.getByTestId("history-key-point-summary")).toContainText(vendor.name);
     await expect(page.getByTestId("history-key-point-summary")).not.toContainText(`${vendor.name}현재`);

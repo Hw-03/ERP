@@ -49,7 +49,7 @@ test("DEFECT-HISTORY 8.5-10/11 8.6-07/08 8.13-03/12/13 격리·복귀·반품·�
   expect(returnLog).toBeTruthy();
   await loginUi(page, actors.requester);
   await page.getByRole("navigation").getByRole("button", { name: "입출고 내역 입출고 이력 조회", exact: true }).click();
-  await page.getByPlaceholder("작업 · 품명 · 코드 · 담당자 · 메모").fill(item.item_name);
+  await page.getByRole("textbox", { name: "작업 · 품명 · 코드 · 담당자 · 메모", exact: true }).fill(item.item_name);
   for (const step of [
     { log: quarantineLog, label: "불량 격리", normal: "20 -2→18", defective: "0 +2→2", memo: "격리 독립 메모" },
     { log: restoreLog, label: "정상 복귀", normal: "18 +1→19", defective: "2 -1→1", memo: "복귀 독립 메모" },
