@@ -45,13 +45,26 @@ const report = {
   },
 };
 const props = { departmentOptions: ["조립", "품질"], modelOptions: ["DX"], currentDepartment: "조립", onBack: vi.fn() };
+const manyEntriesReport = {
+  ...report,
+  summary: { ...report.summary, quantity: 130, record_count: 13 },
+  items: Array.from({ length: 13 }, (_, index) => item(`item-${index + 1}`, `품목 ${index + 1}`, 10)),
+  departments: Array.from({ length: 13 }, (_, index) => group(`부서 ${index + 1}`, 10)),
+  reasons: Array.from({ length: 13 }, (_, index) => group(`사유 ${index + 1}`, 10)),
+  comparison: { ...report.comparison, items: [item("item-1", "품목 1", 4), item("previous-only", "전기 전용 품목", 4)] },
+};
+const panelTitles = ["품목 비교", "부서별 집계", "사유별 집계"];
+
+function nextPages(): void {
+  panelTitles.forEach((title) => fireEvent.click(screen.getByRole("button", { name: `${title} 다음 페이지` })));
+}
 
 describe("DefectStatisticsView report", () => {
   it("filters a managed reason by ID while showing its current name", async () => {
     const id = "94b714e1-82d2-41a0-81bc-471d5030d052";
     api.getStatisticsReport.mockResolvedValue({ ...report, reasons: [{ ...group(id, 10), label: "표면 균열" }] });
     render(<DefectStatisticsView {...props} />);
-    await screen.findByText("10개");
+    await screen.findByRole("button", { name: "사유 표면 균열 선택" });
     fireEvent.click(screen.getByRole("button", { name: /사유 표면 균열/ }));
     await waitFor(() => expect(api.getStatisticsReport).toHaveBeenLastCalledWith(expect.objectContaining({ reason_category_id: id, reason: undefined })));
     expect(screen.getByRole("button", { name: "사유 표면 균열 ×" })).toBeInTheDocument();
@@ -81,7 +94,7 @@ describe("DefectStatisticsView report", () => {
     render(<DefectStatisticsView {...props} />);
     expect(api.getStatisticsReport).toHaveBeenCalledWith(expect.objectContaining({ period: "month", anchor: "2026-10-06", departments: [], models: [], process_steps: [] }));
     expect(await screen.findByText("10개")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /분류 조건/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: "필터 펼치기" })).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByRole("button", { name: "다음 기간" })).toBeDisabled();
     expect(screen.getByText(/조회 2026/)).toBeInTheDocument();
   });
@@ -98,7 +111,7 @@ describe("DefectStatisticsView report", () => {
     api.getStatisticsReport.mockResolvedValueOnce({ ...report, comparison: { ...report.comparison, departments: [group("옛 부서", 8)] } });
     render(<DefectStatisticsView {...props} departmentOptions={[]} />);
     await screen.findByText("10개");
-    fireEvent.click(screen.getByRole("button", { name: /분류 조건/ }));
+    fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
     expect(within(screen.getByRole("group", { name: "부서 구분" })).getByRole("button", { name: "옛 부서" })).toBeInTheDocument();
   });
 
@@ -135,8 +148,8 @@ describe("DefectStatisticsView report", () => {
   it("expands report-only categories and follows period navigation", async () => {
     render(<DefectStatisticsView {...props} />);
     await screen.findByText("10개");
-    fireEvent.click(screen.getByRole("button", { name: /분류 조건/ }));
-    expect(screen.getByRole("button", { name: /분류 조건/ })).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
+    expect(screen.getByRole("button", { name: "필터 접기" })).toHaveAttribute("aria-expanded", "true");
     fireEvent.click(screen.getByRole("button", { name: "DX" }));
     await waitFor(() => expect(api.getStatisticsReport).toHaveBeenLastCalledWith(expect.objectContaining({ models: ["DX"] })));
     fireEvent.click(screen.getByRole("button", { name: "중간공정" }));
@@ -256,7 +269,7 @@ describe("DefectStatisticsView report", () => {
 
   it("filters future trend buckets and retains keyboard-accessible scroll panels", async () => {
     api.getStatisticsReport.mockResolvedValueOnce({ ...report, trend: [...report.trend, { ...report.trend[0], bucket: "2026-11", label: "11월", start_date: "2026-11-01", end_date: "2026-11-30", is_partial: false, quantity: 0 }] });
-    render(<DefectStatisticsView {...props} />);
+    render(<DefectStatisticsView {...props} mobilePresentation />);
     await screen.findByText("10개");
     expect(screen.getByTestId("trend-chart")).toHaveAttribute("data-count", "1");
     expect(screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual(["최근 추이", "품목 비교", "부서별 집계", "사유별 집계"]);
@@ -266,6 +279,128 @@ describe("DefectStatisticsView report", () => {
       expect(panel).toHaveAttribute("data-keep-scroll");
       expect(panel).not.toContainElement(screen.getByRole("heading", { name: title }));
     }
+  });
+
+  it("pages desktop lists independently in sixes without refetching or changing full totals", async () => {
+    api.getStatisticsReport.mockResolvedValue(manyEntriesReport);
+    render(<DefectStatisticsView {...props} />);
+    await screen.findByText("130개");
+    expect(within(screen.getByRole("table", { name: "품목 비교 목록" })).getAllByRole("row")).toHaveLength(7);
+    for (const title of ["부서별 집계", "사유별 집계"]) {
+      expect(within(screen.getByRole("list", { name: `${title} 목록` })).getAllByRole("listitem")).toHaveLength(6);
+    }
+    expect(screen.getByText("30개 / 전체 130개")).toBeInTheDocument();
+    expect(within(screen.getByRole("table", { name: "품목 비교 목록" })).getAllByText("8%")).toHaveLength(6);
+    fireEvent.click(screen.getByRole("button", { name: "품목 비교 다음 페이지" }));
+    expect(screen.getByRole("status", { name: "품목 비교 현재 페이지" })).toHaveTextContent("2 / 3");
+    expect(screen.getByRole("status", { name: "부서별 집계 현재 페이지" })).toHaveTextContent("1 / 3");
+    expect(screen.getByRole("button", { name: "품목 품목 7 선택" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "품목 품목 1 선택" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "사유별 집계 다음 페이지" }));
+    expect(screen.getByRole("button", { name: "사유 사유 7 선택" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "품목 비교 다음 페이지" }));
+    const lastRows = within(screen.getByRole("table", { name: "품목 비교 목록" })).getAllByRole("row");
+    expect(lastRows.slice(1).map((row) => within(row).getByRole("button").getAttribute("aria-label"))).toEqual(["품목 품목 13 선택", "품목 전기 전용 품목 선택"]);
+    expect(lastRows[2]).toHaveTextContent("0개0건0%4개");
+    expect(screen.getByRole("button", { name: "품목 비교 다음 페이지" })).toBeDisabled();
+    expect(screen.getByText("30개 / 전체 130개")).toBeInTheDocument();
+    expect(api.getStatisticsReport).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("region", { name: /스크롤 영역/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "품목 비교 이전 페이지" }));
+    expect(screen.getByRole("status", { name: "품목 비교 현재 페이지" })).toHaveTextContent("2 / 3");
+  });
+
+  it.each(["기간", "기준일", "부서", "모델", "공정", "사유", "품목"])("resets every page when the %s identity changes", async (condition) => {
+    api.getStatisticsReport.mockResolvedValue(manyEntriesReport);
+    render(<DefectStatisticsView {...props} />);
+    await screen.findByText("130개");
+    nextPages();
+    if (["부서", "모델", "공정"].includes(condition)) fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
+    const names: Record<string, string> = { 기간: "연간", 기준일: "이전 기간", 부서: "조립", 모델: "DX", 공정: "중간공정", 사유: "사유 사유 7 선택", 품목: "품목 품목 7 선택" };
+    fireEvent.click(screen.getByRole("button", { name: names[condition], exact: true }));
+    await waitFor(() => expect(api.getStatisticsReport).toHaveBeenCalledTimes(2));
+    for (const title of panelTitles) expect(await screen.findByRole("status", { name: `${title} 현재 페이지` })).toHaveTextContent("1 / 3");
+  });
+
+  it("retains pages through refresh loading and clamps only after a successful smaller response", async () => {
+    let completeRefresh!: (value: typeof manyEntriesReport) => void;
+    api.getStatisticsReport.mockResolvedValueOnce(manyEntriesReport).mockImplementation(() => new Promise((resolve) => { completeRefresh = resolve; }));
+    render(<DefectStatisticsView {...props} />);
+    await screen.findByText("130개");
+    nextPages(); nextPages();
+    fireEvent.click(screen.getByRole("button", { name: "새로고침" }));
+    expect(screen.getByRole("status", { name: "불량 통계 불러오는 중" })).toBeInTheDocument();
+    await act(async () => { completeRefresh(manyEntriesReport); });
+    for (const title of panelTitles) expect(screen.getByRole("status", { name: `${title} 현재 페이지` })).toHaveTextContent("3 / 3");
+    fireEvent.click(screen.getByRole("button", { name: "새로고침" }));
+    await act(async () => { completeRefresh({ ...manyEntriesReport, items: manyEntriesReport.items.slice(0, 7), comparison: { ...manyEntriesReport.comparison, items: [] }, reasons: manyEntriesReport.reasons.slice(0, 3), departments: manyEntriesReport.departments.slice(0, 3) }); });
+    expect(screen.getByRole("status", { name: "품목 비교 현재 페이지" })).toHaveTextContent("2 / 2");
+    for (const title of ["부서별 집계", "사유별 집계"]) expect(screen.getByRole("status", { name: `${title} 현재 페이지` })).toHaveTextContent("1 / 1");
+    expect(screen.getByRole("button", { name: "품목 품목 7 선택" })).toBeInTheDocument();
+  });
+
+  it("ignores a refreshed old response and its page counts after a filter change", async () => {
+    let completeOld!: (value: typeof manyEntriesReport) => void;
+    api.getStatisticsReport.mockResolvedValueOnce(manyEntriesReport).mockReturnValueOnce(new Promise((resolve) => { completeOld = resolve; })).mockResolvedValue(report);
+    render(<DefectStatisticsView {...props} />);
+    await screen.findByText("130개");
+    nextPages(); nextPages();
+    fireEvent.click(screen.getByRole("button", { name: "새로고침" }));
+    fireEvent.click(screen.getByRole("button", { name: "이전 기간" }));
+    await screen.findByText("10개");
+    await act(async () => { completeOld(manyEntriesReport); });
+    for (const title of panelTitles) expect(screen.getByRole("status", { name: `${title} 현재 페이지` })).toHaveTextContent("1 / 1");
+    expect(screen.queryByRole("button", { name: "품목 품목 13 선택" })).not.toBeInTheDocument();
+  });
+
+  it("shows full labels through keyboard focus and hover without adding extra tab stops", async () => {
+    const label = "아주 긴 전체 이름이 두 줄을 넘어가는 품목 부서 사유 상세 설명";
+    api.getStatisticsReport.mockResolvedValueOnce({ ...report, items: [item("long", label, 10)], comparison: { ...report.comparison, items: [] }, departments: [{ ...group("long-dept", 10), label }], reasons: [{ ...group("long-reason", 10), label }] });
+    render(<DefectStatisticsView {...props} />);
+    await screen.findByRole("button", { name: `품목 ${label} 선택` });
+    for (const prefix of ["품목", "부서", "사유"]) {
+      const button = screen.getByRole("button", { name: `${prefix} ${label} 선택` });
+      fireEvent.focus(button);
+      expect(screen.getByRole("tooltip")).toHaveTextContent(label);
+      expect(button.parentElement).not.toHaveAttribute("tabindex");
+      fireEvent.blur(button);
+      fireEvent.mouseEnter(button.parentElement!);
+      expect(screen.getByRole("tooltip")).toHaveTextContent(label);
+      fireEvent.mouseLeave(button.parentElement!);
+    }
+  });
+
+  it("keeps all mobile rows scrollable and omits pagination", async () => {
+    api.getStatisticsReport.mockResolvedValueOnce(manyEntriesReport);
+    render(<DefectStatisticsView {...props} mobilePresentation />);
+    expect(await screen.findByRole("button", { name: "품목 전기 전용 품목 선택" })).toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: "사유별 집계 목록" })).getAllByRole("listitem")).toHaveLength(13);
+    expect(screen.getAllByRole("region", { name: /스크롤 영역/ })).toHaveLength(3);
+    expect(screen.queryByRole("button", { name: /다음 페이지/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "분류 조건 펼치기" })).toBeInTheDocument();
+  });
+
+  it("shows empty desktop lists without zero-page pagination", async () => {
+    api.getStatisticsReport.mockResolvedValueOnce({ ...report, items: [], departments: [], reasons: [], comparison: null, summary: { quantity: 0, record_count: 0, top_item: null, top_reason: null } });
+    render(<DefectStatisticsView {...props} />);
+    expect(await screen.findAllByText("집계 결과가 없습니다.")).toHaveLength(3);
+    expect(screen.queryByRole("navigation", { name: /페이지/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("0 / 0")).not.toBeInTheDocument();
+  });
+
+  it("uses the shared desktop filter disclosure while keeping selected chips visible when collapsed", async () => {
+    render(<DefectStatisticsView {...props} />);
+    await screen.findByText("10개");
+    fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
+    fireEvent.click(screen.getByRole("button", { name: "DX", exact: true }));
+    await waitFor(() => expect(api.getStatisticsReport).toHaveBeenCalledTimes(2));
+    fireEvent.click(screen.getByRole("button", { name: "필터 접기" }));
+    expect(screen.getByRole("button", { name: "모델 DX ×" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "전체 초기화" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "이전 기간" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "필터 펼치기" })).toHaveAttribute("aria-controls", "statistics-category-filters");
+    fireEvent.click(screen.getByRole("button", { name: "모델 DX ×" }));
+    await waitFor(() => expect(api.getStatisticsReport).toHaveBeenLastCalledWith(expect.objectContaining({ models: [] })));
   });
 
   it("retries a failed request without showing empty zero statistics", async () => {

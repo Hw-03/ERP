@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, type ReactElement, type ReactNode } from "react";
 import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useDesktopQueryState } from "../DesktopTabHome";
@@ -14,6 +14,8 @@ import type { DefectProcessStep } from "./DefectFilterBar";
 import { EmptyState } from "../common/EmptyState";
 import { SkeletonBlock } from "../common/LoadingSkeleton";
 import { ReadFailure } from "../common/ReadState";
+import { Tooltip as LabelTooltip } from "@/lib/ui/Tooltip";
+import { DefectFilterDisclosure } from "./DefectFilterDisclosure";
 
 interface Props {
   mobilePresentation?: boolean;
@@ -26,6 +28,45 @@ interface Props {
 const PERIOD_LABELS: Record<DefectStatisticsPeriodKind, string> = { week: "주간", month: "월간", year: "연간" };
 const PROCESS_LABELS: Record<DefectProcessStep, string> = { R: "원자재", A: "중간공정", F: "공정완료", UNCLASSIFIED: "미분류", DISUSED: "불용" };
 const REASON_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const STATISTICS_PAGE_SIZE = 6;
+
+interface ListPresentationProps {
+  mobilePresentation: boolean;
+  page: number;
+  onPageChange: (page: number) => void;
+}
+
+/** 당기 순서를 유지하고 전기에만 있는 품목을 뒤에 붙여 비교 대상을 보존한다. */
+function comparisonItems(result: DefectStatisticsReportResponse): DefectStatisticsItemBreakdown[] {
+  const currentIds = new Set(result.items.map((entry) => entry.item_id));
+  return [...result.items, ...(result.comparison?.items.filter((entry) => !currentIds.has(entry.item_id)) ?? [])];
+}
+
+/** 성공 응답의 마지막 페이지를 계산하며, 빈 목록의 내부 페이지 상태는 1로 유지한다. */
+function lastStatisticsPage(count: number): number {
+  return Math.max(1, Math.ceil(count / STATISTICS_PAGE_SIZE));
+}
+
+/** PC는 외곽 스크롤만 사용하고 모바일은 기존 내부 목록 스크롤을 유지한다. */
+function StatisticsListBody({ title, mobilePresentation, children }: { title: string; mobilePresentation: boolean; children: ReactNode }): ReactElement {
+  if (!mobilePresentation) return <div className="mt-2 min-h-0 min-w-0 flex-1">{children}</div>;
+  return <div className="relative -mx-4 mt-2 min-h-0 flex-1">
+    <div role="region" aria-label={`${title} 스크롤 영역`} tabIndex={0} data-keep-scroll className="absolute inset-y-0 left-0 right-0 overflow-y-auto overscroll-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]">
+      <div className="min-h-full min-w-full px-4">{children}</div>
+    </div>
+  </div>;
+}
+
+/** 목록마다 독립된 접근성 이름과 페이지 이동을 제공한다. 빈 목록에는 표시하지 않는다. */
+function StatisticsPagination({ title, count, page, onPageChange }: { title: string; count: number; page: number; onPageChange: (page: number) => void }): ReactElement | null {
+  if (count === 0) return null;
+  const lastPage = lastStatisticsPage(count);
+  return <nav aria-label={`${title} 페이지`} className="mt-2 flex min-h-11 shrink-0 items-center justify-between gap-2 border-t" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+    <button type="button" aria-label={`${title} 이전 페이지`} disabled={page <= 1} onClick={() => onPageChange(page - 1)} className="standard-hover flex min-h-11 items-center gap-1 rounded-[10px] px-2 text-sm font-bold disabled:opacity-40 focus-visible:ring-2"><ChevronLeft className="h-4 w-4" />이전</button>
+    <span role="status" aria-label={`${title} 현재 페이지`} className="text-sm font-bold tabular-nums">{page} / {lastPage}</span>
+    <button type="button" aria-label={`${title} 다음 페이지`} disabled={page >= lastPage} onClick={() => onPageChange(page + 1)} className="standard-hover flex min-h-11 items-center gap-1 rounded-[10px] px-2 text-sm font-bold disabled:opacity-40 focus-visible:ring-2">다음<ChevronRight className="h-4 w-4" /></button>
+  </nav>;
+}
 
 function todayInKst(): string {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
@@ -105,50 +146,49 @@ function Card({ label, value, detail, note, tone }: { label: string; value: stri
   </article>;
 }
 
-function BreakdownPanel({ title, entries, total, onSelect, selected }: { title: string; entries: DefectStatisticsBreakdown[]; total: number; onSelect: (key: string) => void; selected?: string }) {
-  return <section className="flex h-[255px] min-h-0 min-w-0 flex-col rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+function BreakdownPanel({ title, entries, total, onSelect, selected, mobilePresentation, page, onPageChange }: { title: string; entries: DefectStatisticsBreakdown[]; total: number; onSelect: (key: string) => void; selected?: string } & ListPresentationProps): ReactElement {
+  const visibleEntries = mobilePresentation ? entries : entries.slice((page - 1) * STATISTICS_PAGE_SIZE, page * STATISTICS_PAGE_SIZE);
+  return <section className={`flex ${mobilePresentation ? "h-[255px]" : "h-[560px]"} min-h-0 min-w-0 flex-col rounded-[20px] border p-4`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
     <div className="flex min-h-11 shrink-0 items-center justify-between gap-2"><h3 className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>{title}</h3><span className="text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>전체 수량 = 100%</span></div>
     {entries.length === 0 ? <EmptyState compact className="flex-1" title="집계 결과가 없습니다." description="" /> :
-      <div className="relative -mx-4 mt-2 min-h-0 flex-1">
-      <div role="region" aria-label={`${title} 스크롤 영역`} tabIndex={0} data-keep-scroll className="absolute inset-y-0 left-0 right-0 overflow-y-auto overscroll-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]">
-        <div className="min-h-full min-w-full px-4">
-        <ol aria-label={`${title} 목록`} className="space-y-1">{entries.map((entry) => <li key={entry.key}>
-          <button type="button" aria-label={`${title === "사유별 집계" ? "사유" : "부서"} ${entry.label} 선택`} aria-pressed={selected === entry.key} onClick={() => onSelect(entry.key)} className="standard-hover min-h-11 w-full rounded-[12px] px-2 py-1 text-left focus-visible:ring-2" style={{ background: selected === entry.key ? tint(LEGACY_COLORS.blue, 10) : "transparent", color: LEGACY_COLORS.text }}>
-            <span className="flex justify-between gap-2 text-sm font-bold"><span className="min-w-0 break-words">{entry.label}</span><span className="shrink-0 tabular-nums">{formatQty(entry.quantity)}개 · {share(entry.quantity, total)} · {entry.record_count}건</span></span>
+      <StatisticsListBody title={title} mobilePresentation={mobilePresentation}>
+        <ol aria-label={`${title} 목록`} className="space-y-1">{visibleEntries.map((entry) => <li key={entry.key}>
+          <LabelTooltip content={entry.label} disabled={mobilePresentation} multiline triggerClassName="relative block min-w-0 w-full">
+          <button type="button" aria-label={`${title === "사유별 집계" ? "사유" : "부서"} ${entry.label} 선택`} aria-pressed={selected === entry.key} onClick={() => onSelect(entry.key)} className={`standard-hover ${mobilePresentation ? "min-h-11" : "h-[64px]"} w-full rounded-[12px] px-2 py-1 text-left focus-visible:ring-2`} style={{ background: selected === entry.key ? tint(LEGACY_COLORS.blue, 10) : "transparent", color: LEGACY_COLORS.text }}>
+            <span className={`flex justify-between gap-2 text-sm font-bold ${mobilePresentation ? "" : "h-11 items-center"}`}><span className={`min-w-0 break-words ${mobilePresentation ? "" : "flex-1 line-clamp-2 leading-5"}`}>{entry.label}</span>{mobilePresentation ? <span className="shrink-0 tabular-nums">{formatQty(entry.quantity)}개 · {share(entry.quantity, total)} · {entry.record_count}건</span> : <span className="w-[46%] min-w-0 shrink-0 text-right text-xs leading-4 tabular-nums"><span className="block break-all">{formatQty(entry.quantity)}개</span><span className="block break-all font-medium" style={{ color: LEGACY_COLORS.muted2 }}>{share(entry.quantity, total)} · {formatQty(entry.record_count)}건</span></span>}</span>
             <span className="mt-1 block h-1.5 rounded-full" style={{ background: tint(LEGACY_COLORS.blue, 10) }}><span className="block h-full rounded-full" style={{ width: `${total > 0 ? entry.quantity / total * 100 : 0}%`, background: LEGACY_COLORS.blue }} /></span>
           </button>
+          </LabelTooltip>
         </li>)}</ol>
-        </div>
-      </div>
-      </div>}
+      </StatisticsListBody>}
+    {!mobilePresentation && <StatisticsPagination title={title} count={entries.length} page={page} onPageChange={onPageChange} />}
   </section>;
 }
 
-function ItemComparison({ result, selected, onSelect }: { result: DefectStatisticsReportResponse; selected?: string; onSelect: (itemId: string) => void }) {
+function ItemComparison({ result, selected, onSelect, mobilePresentation, page, onPageChange }: { result: DefectStatisticsReportResponse; selected?: string; onSelect: (itemId: string) => void } & ListPresentationProps): ReactElement {
   const previous = new Map(result.comparison?.items.map((entry) => [entry.item_id, entry]) ?? []);
   const current = new Map(result.items.map((entry) => [entry.item_id, entry]));
-  const items: DefectStatisticsItemBreakdown[] = [...result.items, ...(result.comparison?.items.filter((entry) => !current.has(entry.item_id)) ?? [])];
-  return <section className="flex h-[255px] min-h-0 min-w-0 flex-col rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+  const items = comparisonItems(result);
+  const visibleItems = mobilePresentation ? items : items.slice((page - 1) * STATISTICS_PAGE_SIZE, page * STATISTICS_PAGE_SIZE);
+  const numericCell = mobilePresentation ? "break-words pl-1 text-right tabular-nums lg:pl-2" : "break-all pl-1 text-right text-xs leading-4 tabular-nums";
+  return <section className={`flex ${mobilePresentation ? "h-[255px]" : "h-[560px]"} min-h-0 min-w-0 flex-col rounded-[20px] border p-4`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
     <h3 className="flex min-h-11 shrink-0 items-center text-base font-black" style={{ color: LEGACY_COLORS.text }}>품목 비교</h3>
     {items.length === 0 ? <EmptyState compact className="flex-1" title="집계 결과가 없습니다." description="" /> :
-      <div className="relative -mx-4 mt-2 min-h-0 flex-1">
-      <div role="region" aria-label="품목 비교 스크롤 영역" tabIndex={0} data-keep-scroll className="absolute inset-y-0 left-0 right-0 overflow-y-auto overscroll-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]">
-        <div className="min-h-full min-w-full px-4">
-        <table className="w-full table-fixed text-left text-sm" style={{ color: LEGACY_COLORS.text }}><thead className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}><tr>
-          <th className="w-[34%] py-2 lg:w-[46%]">품목</th><th className="w-[14%] pl-1 text-right lg:pl-2">현재 수량</th><th className="w-[12%] pl-1 text-right lg:w-[10%] lg:pl-2">건수</th><th className="w-[12%] pl-1 text-right lg:w-[10%] lg:pl-2">비중</th><th className="w-[28%] pl-1 text-right lg:w-[20%] lg:pl-2">이전 수량 · 증감</th>
-        </tr></thead><tbody>{items.map((entry) => {
+      <StatisticsListBody title="품목 비교" mobilePresentation={mobilePresentation}>
+        <table aria-label="품목 비교 목록" className="w-full table-fixed text-left text-sm" style={{ color: LEGACY_COLORS.text }}><thead className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}><tr className={mobilePresentation ? undefined : "h-9"}>
+          <th className={mobilePresentation ? "w-[34%] py-2 lg:w-[46%]" : "w-[34%] py-2"}>품목</th><th className={mobilePresentation ? "w-[14%] pl-1 text-right lg:pl-2" : "w-[18%] pl-1 text-right"}>현재 수량</th><th className={mobilePresentation ? "w-[12%] pl-1 text-right lg:w-[10%] lg:pl-2" : "w-[12%] pl-1 text-right"}>건수</th><th className={mobilePresentation ? "w-[12%] pl-1 text-right lg:w-[10%] lg:pl-2" : "w-[10%] pl-1 text-right"}>비중</th><th className={mobilePresentation ? "w-[28%] pl-1 text-right lg:w-[20%] lg:pl-2" : "w-[26%] pl-1 text-right"}>이전 수량 · 증감</th>
+        </tr></thead><tbody>{visibleItems.map((entry) => {
           const now = current.get(entry.item_id);
           const before = previous.get(entry.item_id);
           const delta = (now?.quantity ?? 0) - (before?.quantity ?? 0);
-          return <tr key={entry.item_id} className="border-t" style={{ borderColor: LEGACY_COLORS.border }}>
-            <td className="py-1 pr-1"><button type="button" aria-label={`품목 ${entry.label} 선택`} aria-pressed={selected === entry.item_id} onClick={() => onSelect(entry.item_id)} className="standard-hover min-h-11 w-full break-words rounded-[10px] text-left font-bold focus-visible:ring-2" style={{ color: LEGACY_COLORS.blue }}>{entry.label}<span className="block text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>{entry.mes_code}</span></button></td>
-            <td className="break-words pl-1 text-right tabular-nums lg:pl-2">{formatQty(now?.quantity ?? 0)}개</td><td className="pl-1 text-right tabular-nums lg:pl-2">{now?.record_count ?? 0}건</td><td className="pl-1 text-right tabular-nums lg:pl-2">{share(now?.quantity ?? 0, result.summary.quantity)}</td>
-            <td className="break-words pl-1 text-right tabular-nums lg:pl-2">{formatQty(before?.quantity ?? 0)}개 <span style={{ color: delta > 0 ? LEGACY_COLORS.red : LEGACY_COLORS.green }}>({signedQty(delta)})</span></td>
+          return <tr key={entry.item_id} className={`border-t ${mobilePresentation ? "" : "h-[62px]"}`} style={{ borderColor: LEGACY_COLORS.border }}>
+            <td className="py-1 pr-1"><LabelTooltip content={entry.label} disabled={mobilePresentation} multiline triggerClassName="relative block min-w-0 w-full"><button type="button" aria-label={`품목 ${entry.label} 선택`} aria-pressed={selected === entry.item_id} onClick={() => onSelect(entry.item_id)} className="standard-hover min-h-11 w-full break-words rounded-[10px] text-left font-bold focus-visible:ring-2" style={{ color: LEGACY_COLORS.blue }}><span className={mobilePresentation ? undefined : "line-clamp-2 break-words leading-4"}>{entry.label}</span><span className={`block text-xs font-medium ${mobilePresentation ? "" : "truncate leading-4"}`} style={{ color: LEGACY_COLORS.muted2 }}>{entry.mes_code}</span></button></LabelTooltip></td>
+            <td className={numericCell}>{formatQty(now?.quantity ?? 0)}개</td><td className={numericCell}>{now?.record_count ?? 0}건</td><td className={numericCell}>{share(now?.quantity ?? 0, result.summary.quantity)}</td>
+            <td className={numericCell}>{formatQty(before?.quantity ?? 0)}개 <span className={mobilePresentation ? undefined : "block"} style={{ color: delta > 0 ? LEGACY_COLORS.red : LEGACY_COLORS.green }}>({signedQty(delta)})</span></td>
           </tr>;
         })}</tbody></table>
-        </div>
-      </div>
-      </div>}
+      </StatisticsListBody>}
+    {!mobilePresentation && <StatisticsPagination title="품목 비교" count={items.length} page={page} onPageChange={onPageChange} />}
   </section>;
 }
 
@@ -168,9 +208,11 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
   const [stored, setStored] = useState<{ key: string; value: DefectStatisticsReportResponse } | null>(null);
   const [errorState, setErrorState] = useState<{ key: string; message: string } | null>(null);
   const [retryNonce, setRetryNonce] = useState(0);
+  const [pages, setPages] = useState({ items: 1, departments: 1, reasons: 1 });
   const today = todayInKst();
   const queryAnchor = periodIdentity(anchor, period) > periodIdentity(today, period) ? today : anchor;
-  const key = JSON.stringify([period, queryAnchor, selectedDepartments, selectedModels, selectedProcessSteps, reason, itemId, retryNonce]);
+  const conditionKey = JSON.stringify([period, queryAnchor, selectedDepartments, selectedModels, selectedProcessSteps, reason, itemId]);
+  const key = JSON.stringify([conditionKey, retryNonce]);
   const result = stored?.key === key ? stored.value : null;
   const reasonLabel = result?.reasons.find((entry) => entry.key === reason)?.label ?? savedReasonLabel ?? reason;
   const error = errorState?.key === key ? errorState.message : null;
@@ -184,6 +226,10 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
   }, [key]);
 
   useLayoutEffect(() => {
+    setPages({ items: 1, departments: 1, reasons: 1 });
+  }, [conditionKey]);
+
+  useLayoutEffect(() => {
     if (anchor !== queryAnchor) setAnchor(queryAnchor);
   }, [anchor, queryAnchor, setAnchor]);
 
@@ -195,6 +241,11 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
       if (!active) return;
       setErrorState(null);
       setStored({ key, value });
+      setPages((current) => ({
+        items: Math.min(current.items, lastStatisticsPage(comparisonItems(value).length)),
+        departments: Math.min(current.departments, lastStatisticsPage(value.departments.length)),
+        reasons: Math.min(current.reasons, lastStatisticsPage(value.reasons.length)),
+      }));
       setHistoricalDepartments((current) => Array.from(new Set([...current, ...value.departments.map((entry) => entry.label), ...(value.comparison?.departments.map((entry) => entry.label) ?? [])])));
     }).catch((failure: unknown) => {
       if (active) setErrorState({ key, message: failure instanceof Error ? failure.message : "불량 통계를 불러오지 못했습니다." });
@@ -237,8 +288,8 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
     </header>
 
     <section className="min-w-0 rounded-[20px] border px-3 py-2" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}><div className="flex flex-wrap items-center gap-2">
-      <button type="button" aria-label="분류 조건 펼치기" aria-expanded={filtersOpen} aria-controls="statistics-category-filters" onClick={() => setFiltersOpen((value) => !value)} className="standard-hover flex min-h-11 items-center gap-1 rounded-[12px] px-2 text-sm font-bold focus-visible:ring-2" style={{ color: LEGACY_COLORS.blue }}>분류 조건 <ChevronDown className={`h-4 w-4 transition-transform ${filtersOpen ? "rotate-180" : ""}`} /></button>
-      <span className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>{categoryCount ? `${categoryCount}개 조건 선택` : "전체 부서 · 전체 모델 · 전체 공정"}</span>
+      {mobilePresentation ? <><button type="button" aria-label="분류 조건 펼치기" aria-expanded={filtersOpen} aria-controls="statistics-category-filters" onClick={() => setFiltersOpen((value) => !value)} className="standard-hover flex min-h-11 items-center gap-1 rounded-[12px] px-2 text-sm font-bold focus-visible:ring-2" style={{ color: LEGACY_COLORS.blue }}>분류 조건 <ChevronDown className={`h-4 w-4 transition-transform ${filtersOpen ? "rotate-180" : ""}`} /></button>
+      <span className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>{categoryCount ? `${categoryCount}개 조건 선택` : "전체 부서 · 전체 모델 · 전체 공정"}</span></> : <DefectFilterDisclosure expanded={filtersOpen} onToggle={() => setFiltersOpen((value) => !value)} controlsId="statistics-category-filters" summary={categoryCount ? `${categoryCount}개 조건 선택` : "전체 부서 · 전체 모델 · 전체 공정"} />}
       {selectedDepartments.map((value) => <button key={value} type="button" onClick={() => setSelectedDepartments((current) => current.filter((entry) => entry !== value))} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.green, 12), color: LEGACY_COLORS.green }}>부서 {value} ×</button>)}
       {selectedModels.map((value) => <button key={value} type="button" onClick={() => setSelectedModels((current) => current.filter((entry) => entry !== value))} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.cyan, 12), color: LEGACY_COLORS.cyan }}>모델 {value} ×</button>)}
       {selectedProcessSteps.map((value) => <button key={value} type="button" onClick={() => setSelectedProcessSteps((current) => current.filter((entry) => entry !== value))} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.yellow, 12), color: LEGACY_COLORS.yellow }}>공정 {PROCESS_LABELS[value]} ×</button>)}
@@ -248,7 +299,7 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
       {result && !error && !futureResult && <p className="min-w-0 basis-full break-words text-sm font-medium lg:ml-auto lg:basis-auto lg:flex-1 lg:text-right" style={{ color: LEGACY_COLORS.muted2 }}>{result.is_partial ? "현재까지" : "선택 기간"} 발생 합계 {formatQty(result.summary.quantity)}개({result.summary.record_count}건). 최다 등록 사유는 {topReasons.length ? `${topReasons.map((entry) => entry.label).join(" · ")}(${topReasons.length > 1 ? "각 " : ""}${formatQty(topReasonQty)}개, 전체 ${share(topReasonQty, result.summary.quantity)})` : "없습니다"}. {comparison ? comparison.quantity_delta === 0 ? "이전 비교 기간과 수량이 같습니다." : `이전 비교 기간보다 ${formatQty(Math.abs(comparison.quantity_delta))}개 ${comparison.quantity_delta > 0 ? "많습니다" : "적습니다"}.` : "비교할 이전 기간이 없습니다."}</p>}
     </div><div id="statistics-category-filters" hidden={!filtersOpen}>{filtersOpen && <div className="mt-2"><DefectCategoryFilters departments={availableDepartments} models={modelOptions} currentDept={currentDepartment} showMyDepartment={false} selectedDepartments={selectedDepartments} selectedModels={selectedModels} selectedProcessSteps={selectedProcessSteps} onDepartmentsChange={setSelectedDepartments} onModelsChange={setSelectedModels} onProcessStepsChange={setSelectedProcessSteps} onResetCategoryFilters={resetFilters} /></div>}</div></section>
 
-    {!result && !error ? <div role="status" aria-label="불량 통계 불러오는 중" aria-busy="true" className="space-y-3"><span className="sr-only">불량 통계 불러오는 중</span><div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">{[0, 1, 2, 3].map((index) => <SkeletonBlock key={index} className="h-[100px] rounded-[20px]" />)}</div><div className="grid gap-3 lg:grid-cols-2">{[0, 1, 2, 3].map((index) => <div key={index} data-testid="statistics-panel-skeleton"><SkeletonBlock className="h-[255px] rounded-[20px]" /></div>)}</div></div>
+    {!result && !error ? <div role="status" aria-label="불량 통계 불러오는 중" aria-busy="true" className="space-y-3"><span className="sr-only">불량 통계 불러오는 중</span><div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">{[0, 1, 2, 3].map((index) => <SkeletonBlock key={index} className="h-[100px] rounded-[20px]" />)}</div><div className={`grid gap-3 ${mobilePresentation ? "lg:grid-cols-2" : "xl:grid-cols-2"}`}>{[0, 1, 2, 3].map((index) => <div key={index} data-testid="statistics-panel-skeleton"><SkeletonBlock className={`${mobilePresentation ? "h-[255px]" : "h-[560px]"} rounded-[20px]`} /></div>)}</div></div>
       : error ? <div tabIndex={-1} ref={(node) => { node?.focus(); }}><ReadFailure message={error} onRetry={refresh} /></div>
       : futureResult ? <div role="status" className="rounded-[20px] border p-5 text-sm font-bold" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>미래 기간은 아직 집계하지 않았습니다.</div>
       : result && <>
@@ -273,13 +324,13 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
             })}</tbody>
           </table>
         </section>
-        <div className="grid min-w-0 gap-3 lg:grid-cols-2">
-          <section className="flex h-[255px] min-h-0 min-w-0 flex-col rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}><div className="flex shrink-0 items-center justify-between gap-2"><h3 className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>{detailTrend ? "선택 기간 상세" : "최근 추이"}</h3><button type="button" onClick={() => setDetailTrend((value) => !value)} className="standard-hover min-h-11 rounded-[10px] px-2 text-sm font-bold focus-visible:ring-2" style={{ color: LEGACY_COLORS.blue }}>{detailTrend ? "최근 추이 보기" : "선택 기간 상세"}</button></div><p className="shrink-0 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{detailTrend ? "선택 기간의 일별·월별 발생 수량" : period === "week" ? "최근 8주" : period === "month" ? "최근 6개월" : "최근 3년"}{!detailTrend && result.trend.some((entry) => entry.is_partial) ? " · 집계 중" : ""}</p>
+        <div className={`grid min-w-0 gap-3 ${mobilePresentation ? "lg:grid-cols-2" : "xl:grid-cols-2"}`}>
+          <section className={`flex ${mobilePresentation ? "h-[255px]" : "h-[560px]"} min-h-0 min-w-0 flex-col rounded-[20px] border p-4`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}><div className="flex shrink-0 items-center justify-between gap-2"><h3 className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>{detailTrend ? "선택 기간 상세" : "최근 추이"}</h3><button type="button" onClick={() => setDetailTrend((value) => !value)} className="standard-hover min-h-11 rounded-[10px] px-2 text-sm font-bold focus-visible:ring-2" style={{ color: LEGACY_COLORS.blue }}>{detailTrend ? "최근 추이 보기" : "선택 기간 상세"}</button></div><p className="shrink-0 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{detailTrend ? "선택 기간의 일별·월별 발생 수량" : period === "week" ? "최근 8주" : period === "month" ? "최근 6개월" : "최근 3년"}{!detailTrend && result.trend.some((entry) => entry.is_partial) ? " · 집계 중" : ""}</p>
             {trend.length === 0 ? <EmptyState compact className="min-h-0 flex-1" title="표시할 추이가 없습니다." description="" /> : <div className="mt-2 min-h-0 flex-1"><ResponsiveContainer width="100%" height="100%"><BarChart data={trend} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}><CartesianGrid stroke={LEGACY_COLORS.border} vertical={false} /><XAxis dataKey="label" tick={{ fill: LEGACY_COLORS.muted2, fontSize: 12 }} axisLine={false} tickLine={false} /><YAxis tick={{ fill: LEGACY_COLORS.muted2, fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} /><Tooltip contentStyle={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, borderRadius: 12 }} /><Bar dataKey="quantity" name="발생 수량" fill={LEGACY_COLORS.red} radius={[8, 8, 2, 2]} /></BarChart></ResponsiveContainer></div>}
           </section>
-          <ItemComparison result={result} selected={itemId} onSelect={selectItem} />
-          <BreakdownPanel title="부서별 집계" entries={result.departments} total={result.summary.quantity} onSelect={selectDepartment} selected={selectedDepartments.length === 1 ? selectedDepartments[0] : undefined} />
-          <BreakdownPanel title="사유별 집계" entries={result.reasons} total={result.summary.quantity} onSelect={selectReason} selected={reason} />
+          <ItemComparison result={result} selected={itemId} onSelect={selectItem} mobilePresentation={mobilePresentation} page={pages.items} onPageChange={(page) => setPages((current) => ({ ...current, items: page }))} />
+          <BreakdownPanel title="부서별 집계" entries={result.departments} total={result.summary.quantity} onSelect={selectDepartment} selected={selectedDepartments.length === 1 ? selectedDepartments[0] : undefined} mobilePresentation={mobilePresentation} page={pages.departments} onPageChange={(page) => setPages((current) => ({ ...current, departments: page }))} />
+          <BreakdownPanel title="사유별 집계" entries={result.reasons} total={result.summary.quantity} onSelect={selectReason} selected={reason} mobilePresentation={mobilePresentation} page={pages.reasons} onPageChange={(page) => setPages((current) => ({ ...current, reasons: page }))} />
         </div>
         <p className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>발생 시각의 원래 수량과 최초 발생 분류를 보존합니다. 이후 분류 변경·정상 복귀·폐기·반품으로 과거 발생량이 달라지지 않습니다. 현재 보관 잔량은 보관 화면에서 별도로 확인합니다. 발생 시각을 신뢰할 수 없는 레거시 합산 기록은 현재 {result.excluded_legacy_count}건{comparison ? `, 비교 기간 ${comparison.excluded_legacy_count}건` : ""} 제외했습니다.{comparison && ` 비교 기준: ${comparisonBasis(comparison, result.is_partial)}.`}</p>
         {(result.excluded_category_count > 0 || (comparison?.excluded_category_count ?? 0) > 0) && <p role="status" className="text-xs" style={{ color: LEGACY_COLORS.yellow }}>최초 분류를 확인할 수 없는 기록은 현재 {result.excluded_category_count}건{comparison ? `, 비교 기간 ${comparison.excluded_category_count}건` : ""} 제외했습니다.</p>}

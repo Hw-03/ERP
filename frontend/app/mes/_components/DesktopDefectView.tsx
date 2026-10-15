@@ -52,7 +52,7 @@ function workViewFromHistory(state: WorkHistoryState): Extract<ViewMode, { kind:
   }
   if (state?.defect !== "cart" || (state.mode !== "add" && state.mode !== "scrap")) return null;
   const action = state.mode === "add" ? "add" : state.directAction === "rework" ? "rework" : state.directAction === "scrap" ? "scrap" : null;
-  const valid = (state.step === 2 || (state.step === 3 && action === "rework"))
+  const valid = (state.step === 2 || state.step === 3 || (state.step === 4 && action === "rework"))
     && action !== null && !(state.mode === "add" && state.directAction === "rework");
   if (valid && action) return { kind: "cart", mode: state.mode, action, source: action === "rework" ? "production" : state.source === "warehouse" ? "warehouse" : "production" };
   return { kind: "work-choice", action: action === "rework" ? null : action, source: null };
@@ -354,7 +354,7 @@ function DefectViewInner({
   function openCart(action: DefectWorkAction, source: DefectSourceKind): void {
     const mode = action === "add" ? "add" : "scrap";
     window.history.replaceState({ defect: "work-choice", action, source }, "");
-    window.history.pushState({ defect: "cart", mode, directAction: action === "rework" ? "rework" : "scrap", source, step: 2 }, "");
+    window.history.pushState({ defect: "cart", mode, directAction: action === "rework" ? "rework" : "scrap", source, step: 2, workChoiceDepth: 1 }, "");
     setView({ kind: "cart", mode, action, source });
   }
 
@@ -462,7 +462,7 @@ function DefectViewInner({
                 items={items}
                 productModels={productModels}
                 currentEmployee={employee}
-                onCancel={() => window.history.back()}
+                onCancel={(historyDepth) => window.history.go(-historyDepth)}
                 onDone={(directAction) =>
                   handleProcessed(
                     view.mode === "add"
@@ -475,7 +475,7 @@ function DefectViewInner({
               />
             )}
             {view.kind === "work-choice" && (
-              <DefectWorkChoice action={view.action} source={view.source} onActionChange={selectWork} onProceed={openCart} onCancel={() => window.history.back()} />
+              <DefectWorkChoice action={view.action} source={view.source} onActionChange={selectWork} onProceed={openCart} onMenuSelect={() => window.history.back()} />
             )}
             {view.kind === "process" && (
               <DefectProcessPanel
@@ -503,7 +503,7 @@ function DefectViewInner({
               <button
                 type="button"
                 onClick={() => window.history.back()}
-                className="standard-hover flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-sm font-bold transition-colors"
+                className="standard-hover flex min-h-11 items-center gap-1 rounded-[10px] border px-3 text-sm font-bold transition-colors"
                 style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -522,6 +522,7 @@ function DefectViewInner({
             />
 
             <DefectFilterBar
+              searchInput={<DefectSearchInput value={search} onChange={setSearch} />}
               scope={scope}
               actorScope={actorScope}
               poolMode={poolMode}
@@ -563,8 +564,6 @@ function DefectViewInner({
               }}
             />
 
-            <DefectSearchInput value={search} onChange={setSearch} />
-
             {refreshError && (
               <ReadFailure
                 refresh
@@ -580,11 +579,11 @@ function DefectViewInner({
             ) : (
               <>
                 <DefectDepartmentList
-                  emptyContent={<ReadEmpty hasSearch={!!search.trim()} hasFilters={locations.length > 0}
+                  emptyContent={<ReadEmpty hasSearch={!!search.trim()} hasFilters={locations.some((location) => (location.management_category ?? "DEFECT") === "DEFECT")}
                     illustrated
                     className="min-h-[260px] flex-1"
-                    title={!search.trim() && locations.length === 0 ? "격리된 불량 재고가 없습니다." : undefined}
-                    onReset={() => { setSearch(""); setScope("all"); resetCategoryFilters(); setKpiFilter(null); }} />}
+                    title={!search.trim() && !locations.some((location) => (location.management_category ?? "DEFECT") === "DEFECT") ? "격리된 불량 재고가 없습니다." : undefined}
+                    onReset={() => { setSearch(""); setScope("all"); setActorScope("all"); resetCategoryFilters(); setKpiFilter(null); }} />}
                   locations={filteredLocations}
                   currentEmployee={employee}
                   onMemoUpdated={handleMemoUpdated}

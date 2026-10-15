@@ -1,9 +1,9 @@
 "use client";
 import { useDesktopWorkGuard } from "../DesktopTabHome";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ChevronRight, Copy, Plus, Trash2 } from "lucide-react";
+import { Copy, Plus, Trash2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { defectsApi } from "@/lib/api/defects";
@@ -22,12 +22,13 @@ import { queryKeys } from "@/lib/queries/keys";
 import { defectCartLineErrors } from "./defectCartValidation";
 import { MAX_QUARANTINE_LINES, groupDefectCartLines, insertDefectCartLine, defectCartGroupErrors } from "./defectCartGroups";
 import quarantineConfirmStyles from "./DefectQuarantineConfirm.module.css";
+import { DefectFlowStepper } from "./DefectFlowStepper";
 
 type SourceKind = "warehouse" | "production";
 type DirectAction = "scrap" | "rework";
-type FlowStep = 2 | 3;
+type FlowStep = 2 | 3 | 4;
 
-type CartHistoryState = { defect?: string; mode?: DefectCartMode; step?: number; directAction?: DirectAction | null; source?: SourceKind } | null;
+type CartHistoryState = { defect?: string; mode?: DefectCartMode; step?: number; directAction?: DirectAction | null; source?: SourceKind; workChoiceDepth?: number } | null;
 
 export type DefectCartMode = "add" | "scrap";
 
@@ -40,6 +41,7 @@ interface CartLine {
   memo: string;
   managementCategory: DefectManagementCategory;
   decisions: ChildDecision[];
+  parentNormalQty?: number;
 }
 
 interface LineFailure {
@@ -56,7 +58,16 @@ interface Props {
   productModels: ProductModel[];
   currentEmployee: { employee_id: string; name: string; department: string };
   onDone: (directAction: DirectAction | null) => void;
-  onCancel: () => void;
+  /** 새로고침으로 화면 단계가 바뀌어도 목표 화면까지의 실제 이력 거리를 전달한다. */
+  onCancel: (historyDepth: number) => void;
+}
+
+/** 오래된 이력은 원래 단계에서 거리를 추정하고 이후에는 저장된 실제 거리를 유지한다. */
+function workChoiceHistoryDepth(state: CartHistoryState): number {
+  const storedDepth = state?.workChoiceDepth;
+  return typeof storedDepth === "number" && Number.isInteger(storedDepth) && storedDepth > 0
+    ? storedDepth
+    : state?.step === 4 ? 3 : state?.step === 3 ? 2 : 1;
 }
 
 function isReworkCandidate(item: Item): boolean {
@@ -76,7 +87,7 @@ export function DefectCartFlow({
   currentEmployee,
   onDone,
   onCancel,
-}: Props) {
+}: Props): JSX.Element {
   const queryClient = useQueryClient();
   const [directAction, setDirectAction] = useState<DirectAction>(mode === "add" ? "scrap" : initialAction);
   const [source, setSource] = useState<SourceKind>(initialAction === "rework" ? "production" : initialSource);
@@ -89,24 +100,24 @@ export function DefectCartFlow({
   const [failures, setFailures] = useState<LineFailure[]>([]);
   const [batchError, setBatchError] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const [leaveTarget, setLeaveTarget] = useState<0 | 1 | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const quantityRefs = useRef(new Map<string, HTMLInputElement>());
-  const groupRefs = useRef(new Map<string, HTMLDivElement>());
   const pendingFocusRef = useRef<{ key?: string; itemId?: string } | null>(null);
   useDesktopWorkGuard("defect-cart", lines.length > 0, busy);
 
   useEffect(() => {
-    function restore(state: CartHistoryState, restoreBom: boolean): void {
+    function restore(state: CartHistoryState, restoreInputs: boolean): void {
       const validCart = state?.defect === "cart" && state.mode === mode;
       const nextAction = mode === "add" ? "scrap" : validCart && (state.directAction === "rework" || state.directAction === "scrap") ? state.directAction : initialAction;
       const nextSource = nextAction === "rework" ? "production" : validCart && (state.source === "warehouse" || state.source === "production") ? state.source : initialSource;
-      const nextStep: FlowStep = restoreBom && nextAction === "rework" && state?.step === 3 ? 3 : 2;
+      const nextStep: FlowStep = restoreInputs && state?.step === 4 && nextAction === "rework" ? 4 : restoreInputs && state?.step === 3 ? 3 : 2;
+      const workChoiceDepth = workChoiceHistoryDepth(state);
       setDirectAction(nextAction);
       setSource(nextSource);
       setStep(nextStep);
-      if (!validCart || state?.step !== nextStep || state?.directAction !== nextAction || state?.source !== nextSource) {
-        window.history.replaceState({ ...(window.history.state ?? {}), defect: "cart", mode, step: nextStep, directAction: nextAction, source: nextSource }, "");
+      if (!validCart || state?.step !== nextStep || state?.directAction !== nextAction || state?.source !== nextSource || state?.workChoiceDepth !== workChoiceDepth) {
+        window.history.replaceState({ ...(window.history.state ?? {}), defect: "cart", mode, step: nextStep, directAction: nextAction, source: nextSource, workChoiceDepth }, "");
       }
     }
 
@@ -120,7 +131,7 @@ export function DefectCartFlow({
         return;
       }
       setConfirmOpen(false);
-      setLeaveConfirmOpen(false);
+      setLeaveTarget(null);
       restore(s, true);
     }
     window.addEventListener("popstate", onPop);
@@ -155,7 +166,6 @@ export function DefectCartFlow({
   const selectedIds = useMemo(() => new Set(lines.map((l) => l.item.item_id)), [lines]);
   const groups = useMemo(() => groupDefectCartLines(lines), [lines]);
   const groupErrors = useMemo(() => mode === "add" ? defectCartGroupErrors(groups, source) : new Map<string, string>(), [groups, mode, source]);
-  const selectedLineCounts = useMemo(() => new Map(groups.map((group) => [group.item.item_id, group.lines.length])), [groups]);
   const atLineLimit = mode === "add" && lines.length >= MAX_QUARANTINE_LINES;
   const selectedReworkLine = isRework ? lines[0] : null;
   const reworkLineReady = Boolean(
@@ -178,13 +188,6 @@ export function DefectCartFlow({
     setLines((prev) => isRework ? [line] : insertDefectCartLine(prev, line));
     setFailures([]);
     setBatchError("");
-  }
-
-  function focusItem(item: Item): void {
-    if (busy) return;
-    groupRefs.current.get(item.item_id)?.scrollIntoView?.({ block: "start", behavior: "smooth" });
-    const line = lines.find((entry) => entry.item.item_id === item.item_id);
-    if (line) quantityRefs.current.get(line.key)?.focus({ preventScroll: true });
   }
 
   function addItem(item: Item): void {
@@ -221,18 +224,14 @@ export function DefectCartFlow({
   function removeItemById(item: Item): void {
     if (busy) return;
     setBatchError("");
-    setLines((prev) => {
-      const target = prev.find((line) => line.item.item_id === item.item_id);
-      if (target) {
-        setRequestIds((ids) => {
-          const next = { ...ids };
-          delete next[target.key];
-          return next;
-        });
-      }
-      setBatchRequestId(makeClientRequestId());
-      return prev.filter((l) => l.item.item_id !== item.item_id);
+    const removedKeys = new Set(lines.filter((line) => line.item.item_id === item.item_id).map((line) => line.key));
+    setRequestIds((ids) => {
+      const next = { ...ids };
+      removedKeys.forEach((key) => { delete next[key]; });
+      return next;
     });
+    setBatchRequestId(makeClientRequestId());
+    setLines((prev) => prev.filter((line) => line.item.item_id !== item.item_id));
   }
 
   function copyReasonDown(index: number): void {
@@ -371,78 +370,39 @@ export function DefectCartFlow({
     }
     setLines((prev) => prev.filter((l) => failedKeys.has(l.key)));
     setFailures(nextFailures);
-    setStep(2);
+    const currentHistory = window.history.state as CartHistoryState;
+    if (currentHistory?.defect === "cart" && currentHistory.mode === mode && currentHistory.step === 4) window.history.back();
   }
 
-  function pushStep(nextStep: FlowStep, nextAction = directAction, nextSource = source) {
-    window.history.pushState({ defect: "cart", mode, step: nextStep, directAction: nextAction, source: nextSource }, "");
+  function pushStep(nextStep: FlowStep, nextAction: DirectAction = directAction, nextSource: SourceKind = source): void {
+    if (busy || nextStep !== step + 1 || (nextStep === 3 ? lines.length === 0 : !isRework || !reworkLineReady)) return;
+    const workChoiceDepth = workChoiceHistoryDepth(window.history.state as CartHistoryState) + 1;
+    window.history.pushState({ defect: "cart", mode, step: nextStep, directAction: nextAction, source: nextSource, workChoiceDepth }, "");
     setStep(nextStep);
   }
 
-  function goBack(): void {
+  /** 메뉴는 작업 선택보다 한 칸 앞이므로 새로고침 후에도 저장된 이력 거리에 한 칸을 더한다. */
+  function leaveCart(target: 0 | 1): void {
+    onCancel(workChoiceHistoryDepth(window.history.state as CartHistoryState) + (target === 0 ? 1 : 0));
+  }
+
+  function goToStep(target: 0 | 1 | 2 | 3): void {
     if (busy) return;
-    if (step === 3) {
-      window.history.back();
+    if (target === 2 || target === 3) {
+      if (target < step) window.history.go(target - step);
       return;
     }
     if (lines.length > 0) {
-      setLeaveConfirmOpen(true);
+      setLeaveTarget(target);
       return;
     }
-    onCancel();
+    leaveCart(target);
   }
 
-  const flowSteps = isRework
-    ? [{ number: 1, label: "작업 선택", active: false }, { number: 2, label: "품목 선택", active: step === 2 }, { number: 3, label: "BOM 확인", active: step === 3 }]
-      : [{ number: 1, label: "작업·출처", active: false }, { number: 2, label: "품목 선택", active: step === 2 }];
-  const stepIndicator = (
-    <div data-testid="defect-flow-stepper" className="flex flex-wrap items-center justify-end gap-4 text-base font-black">
-      {flowSteps.map((flowStep, idx) => {
-        const active = flowStep.active;
-        return (
-          <div key={flowStep.label} className="flex items-center gap-2 whitespace-nowrap">
-            {idx > 0 && <ChevronRight className="h-5 w-5" style={{ color: LEGACY_COLORS.muted }} />}
-            <span className="inline-flex items-center gap-2" style={{ color: active ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }}>
-              <span
-                className="inline-flex h-7 w-7 items-center justify-center rounded-full border text-sm font-black"
-                style={{
-                  background: active ? tint(LEGACY_COLORS.red, 12) : LEGACY_COLORS.s2,
-                  borderColor: active ? tint(LEGACY_COLORS.red, 42) : LEGACY_COLORS.border,
-                  color: active ? LEGACY_COLORS.red : LEGACY_COLORS.muted2,
-                }}
-              >
-                {flowStep.number}
-              </span>
-              {flowStep.label}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={goBack}
-          disabled={busy}
-          className="standard-hover flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-sm font-bold transition-colors disabled:opacity-50"
-          style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          이전
-        </button>
-        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-8 gap-y-1">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h2 ref={headingRef} tabIndex={-1} className="text-xl font-black outline-none" style={{ color: LEGACY_COLORS.text }}>{title}</h2>
-            <span className="rounded-full px-3 py-1 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}>{source === "warehouse" ? "창고 재고" : "부서 재고"}</span>
-          </div>
-          <div className="min-w-[320px] flex-1">
-            {stepIndicator}
-          </div>
-        </div>
-      </div>
+      <h2 ref={headingRef} tabIndex={-1} className="sr-only">{title}</h2>
+      <DefectFlowStepper action={mode === "add" ? "add" : directAction} source={source} currentStep={step} busy={busy} onMenuSelect={() => goToStep(0)} onStepSelect={goToStep} />
 
       {step === 2 && (
         <div key="step2" className="animate-desktop-navigation-enter flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
@@ -455,28 +415,51 @@ export function DefectCartFlow({
                 selectedIds={selectedIds}
                 onAdd={addItem}
                 onRemove={removeItemById}
-                onSelected={mode === "add" ? focusItem : undefined}
-                selectedLineCounts={mode === "add" ? selectedLineCounts : undefined}
                 disabled={busy}
                 addingDisabled={atLineLimit}
               />
             </div>
 
             <div data-testid="defect-cart-pane" className="flex h-full min-h-0 flex-col gap-3">
-              <div data-testid="defect-side-toolbar" className="flex h-[50px] shrink-0 items-center px-4 text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="flex h-[50px] shrink-0 items-center px-4 text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>
+                장바구니 {groups.length}품목
+              </div>
+              <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto rounded-[16px] border p-3" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
+                {groups.length === 0 ? <div className="px-4 py-8 text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>왼쪽에서 품목을 추가하세요.</div> : groups.map((group) => (
+                  <div key={group.item.item_id} className="flex shrink-0 items-center justify-between gap-3 rounded-[12px] border p-4" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+                    <div className="min-w-0">
+                      <div className="break-words text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{group.item.item_name}</div>
+                      <div className="mt-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{group.item.mes_code ?? "(코드 없음)"} · {source === "warehouse" ? "창고" : itemDepartment(group.item) ?? "부서 미지정"}</div>
+                    </div>
+                    <button type="button" disabled={busy} onClick={() => removeItemById(group.item)} aria-label={`${group.item.item_name} 선택 해제`}
+                      className="standard-hover no-btn-inset flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] disabled:opacity-50" style={{ color: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 10) }}><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <button type="button" onClick={() => pushStep(3)} disabled={groups.length === 0 || busy}
+            className="flex min-h-11 shrink-0 items-center justify-between gap-3 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50" style={{ background: LEGACY_COLORS.blue }}>
+            <span aria-hidden="true">선택 {groups.length}품목</span><span>수량·처리 정보 →</span>
+          </button>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div key="step3" className="animate-desktop-navigation-enter flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+              <div data-testid="defect-side-toolbar" className="flex shrink-0 items-center px-4 py-1 text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>
                 {isRework ? "재작업 품목" : mode === "add" ? `장바구니 ${groups.length}품목 · ${lines.length}건` : `장바구니 ${lines.length}건`}
               </div>
-              <div data-testid="defect-cart-panel" className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
+              <fieldset disabled={busy} data-testid="defect-cart-panel" className="m-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto rounded-[16px] border p-0" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
                 {batchError && <p role="alert" className="px-3 pt-3 text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>{batchError}</p>}
                 {lines.length === 0 ? (
                   <div className="px-4 py-8 text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
-                    왼쪽에서 품목을 추가하세요.
+                    선택한 품목이 없습니다. 품목 선택 단계에서 추가하세요.
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3 p-3">
                   {mode === "add" ? groups.map((group) => (
                     <div key={group.item.item_id} data-testid="defect-quarantine-item-group" data-item-id={group.item.item_id}
-                      ref={(element) => { if (element) groupRefs.current.set(group.item.item_id, element); else groupRefs.current.delete(group.item.item_id); }}
                       className="flex flex-col overflow-hidden rounded-[12px] border" style={{ background: LEGACY_COLORS.s1, borderColor: groupErrors.has(group.item.item_id) ? tint(LEGACY_COLORS.red, 30) : LEGACY_COLORS.border }}>
                       <div className="flex items-start justify-between gap-3 px-3 py-3">
                         <div className="min-w-0">
@@ -496,7 +479,7 @@ export function DefectCartFlow({
                               quantity: <div className="flex min-w-0 flex-col gap-1">
                                 <label className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }} htmlFor={`defect-qty-${line.key}`}>수량</label>
                                 <QuantityInput id={`defect-qty-${line.key}`} aria-label="수량" ref={(element) => { if (element) quantityRefs.current.set(line.key, element); else quantityRefs.current.delete(line.key); }}
-                                  min={0} step="1" value={line.qty} onChange={(event) => updateLine(line.key, { qty: event.target.value, decisions: [] })} placeholder="예: 3"
+                                  min={0} step="1" value={line.qty} onChange={(event) => updateLine(line.key, { qty: event.target.value, decisions: [], parentNormalQty: undefined })} placeholder="예: 3"
                                   className="h-11 min-h-11 w-20 rounded-[10px] border px-2 text-sm font-bold outline-none focus-visible:ring-2" />
                               </div>,
                               management: <DefectManagementCategoryControl value={line.managementCategory} onChange={(managementCategory) => updateLine(line.key, { managementCategory })} />,
@@ -520,14 +503,14 @@ export function DefectCartFlow({
                             <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{line.item.item_name}</div>
                             <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>자동 부서 · {source === "warehouse" ? "창고" : itemDepartment(line.item) ?? "부서 미지정"}</div>
                           </div>
-                          <button type="button" onClick={() => removeLine(line.key)} className="standard-hover no-btn-inset flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors" style={{ color: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 10) }} aria-label="삭제">
+                          <button type="button" onClick={() => removeLine(line.key)} className="standard-hover no-btn-inset flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] transition-colors" style={{ color: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 10) }} aria-label="삭제">
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
 
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>수량</span>
-                          <QuantityInput min={0} step="1" value={line.qty} onChange={(e) => updateLine(line.key, { qty: e.target.value, decisions: [] })} placeholder="예: 3" className="w-16 rounded-[8px] border px-2 py-1 text-sm font-bold" />
+                          <QuantityInput aria-label="수량" min={0} step="1" value={line.qty} onChange={(e) => updateLine(line.key, { qty: e.target.value, decisions: [], parentNormalQty: undefined })} placeholder="예: 3" className="h-11 min-h-11 w-20 rounded-[10px] border px-2 text-sm font-bold" />
                           {idx < lines.length - 1 && (line.category || line.memo) && !isRework && (
                             <button type="button" onClick={() => copyReasonDown(idx)} className="ml-auto flex items-center gap-1 text-xs font-bold hover:underline" style={{ color: LEGACY_COLORS.blue }}>
                               <Copy className="h-3 w-3" />
@@ -553,26 +536,24 @@ export function DefectCartFlow({
                   })}
                   </div>
                 )}
-              </div>
-            </div>
-          </div>
+              </fieldset>
 
           <div className="flex shrink-0 items-center justify-between gap-2 pt-1">
             {atLineLimit ? (
               <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>한 번에 사유 {MAX_QUARANTINE_LINES}건까지 등록할 수 있습니다.</span>
             ) : failures.length > 0 ? (
               <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>{failures.length}건 실패 — 남은 줄을 확인 후 다시 제출하세요.</span>
-            ) : (
+            ) : isRework ? (
               <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                {isRework ? "품목, 처리 수량, 사유를 확인한 뒤 BOM을 확인하세요." : "줄마다 수량·사유를 입력하세요."}
+                품목, 처리 수량, 사유를 확인한 뒤 BOM을 확인하세요.
               </span>
-            )}
+            ) : null}
             {isRework ? (
-              <button type="button" onClick={() => pushStep(3)} disabled={!reworkLineReady || busy} className="rounded-[14px] px-6 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50" style={{ background: LEGACY_COLORS.redSolid }}>
+              <button type="button" onClick={() => pushStep(4)} disabled={!reworkLineReady || busy} className="ml-auto min-h-11 flex-1 rounded-[14px] px-6 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50" style={{ background: LEGACY_COLORS.blue }}>
                 BOM 확인 →
               </button>
             ) : (
-              <button type="button" onClick={() => setConfirmOpen(true)} disabled={!allValid || busy} className="rounded-[14px] px-6 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50" style={{ background: LEGACY_COLORS.redSolid }}>
+              <button type="button" onClick={() => setConfirmOpen(true)} disabled={!allValid || busy} className="ml-auto min-h-11 flex-1 rounded-[14px] px-6 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50" style={{ background: LEGACY_COLORS.redSolid }}>
                 {busy ? "처리 중..." : `${submitLabel} (${lines.length}건) →`}
               </button>
             )}
@@ -580,8 +561,8 @@ export function DefectCartFlow({
         </div>
       )}
 
-      {step === 3 && isRework && selectedReworkLine && (
-        <div key="step3" className="animate-desktop-navigation-enter flex min-h-0 flex-1 flex-col gap-3">
+      {step === 4 && isRework && selectedReworkLine && (
+        <div key="step4" className="animate-desktop-navigation-enter flex min-h-0 flex-1 flex-col gap-3">
           <div className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-stretch rounded-[16px] border px-5 py-4" style={{ background: tint(LEGACY_COLORS.blue, 8), borderColor: tint(LEGACY_COLORS.blue, 35) }}>
             <div className="min-w-0">
               <div className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>품목</div>
@@ -602,18 +583,20 @@ export function DefectCartFlow({
             </div>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto rounded-[16px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+          <fieldset disabled={busy} className="m-0 flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-y-auto rounded-[16px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
             <div className="text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>BOM 재작업 트리</div>
             <DisassembleTree
               parentItemId={selectedReworkLine.item.item_id}
               parentItemName={selectedReworkLine.item.item_name}
               parentMesCode={selectedReworkLine.item.mes_code ?? ""}
               parentQty={Number(selectedReworkLine.qty) || 0}
+              parentNormalQty={selectedReworkLine.parentNormalQty ?? (Number(selectedReworkLine.qty) || 0)}
+              onParentNormalQtyChange={(parentNormalQty) => updateLine(selectedReworkLine.key, { parentNormalQty })}
               parentDept={source === "warehouse" ? "창고" : itemDepartment(selectedReworkLine.item) ?? "부서 미지정"}
               decisions={selectedReworkLine.decisions}
               onChange={(decisions) => updateLine(selectedReworkLine.key, { decisions })}
             />
-          </div>
+          </fieldset>
 
           <div className="flex shrink-0 items-center justify-between gap-2 pt-1">
             <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -626,7 +609,7 @@ export function DefectCartFlow({
         </div>
       )}
 
-      <ConfirmModal open={leaveConfirmOpen} onClose={() => setLeaveConfirmOpen(false)} onConfirm={() => { setLeaveConfirmOpen(false); onCancel(); }} title="작업 선택으로 돌아갈까요?" confirmLabel="나가기" tone="danger">
+      <ConfirmModal open={leaveTarget !== null} onClose={() => setLeaveTarget(null)} onConfirm={() => { if (busy || leaveTarget === null) return; const target = leaveTarget; setLeaveTarget(null); leaveCart(target); }} title={leaveTarget === 0 ? "불량 메뉴로 돌아갈까요?" : "작업 선택으로 돌아갈까요?"} confirmLabel="나가기" tone="danger">
         담은 품목과 입력 내용이 사라집니다.
       </ConfirmModal>
       <ConfirmModal open={confirmOpen} onClose={() => setConfirmOpen(false)} onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }} tone={isScrap || isRework ? "danger" : "normal"} title={isRework ? "즉시 재작업 확인" : isScrap ? "즉시 폐기 확인" : "불량 격리 확인"} confirmLabel={submitLabel} busy={busy} busyLabel="처리 중..." wide={mode === "add"} className={mode === "add" ? quarantineConfirmStyles.modal : undefined}>

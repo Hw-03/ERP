@@ -2,8 +2,9 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { describe, expect, it, vi } from "vitest";
 import type { Item } from "../../_warehouse_v2/types";
 import { DefectItemPicker } from "../DefectItemPicker";
+const preferences = vi.hoisted(() => ({ order: undefined as undefined | { item_id: string; display_order: number }[] }));
 
-vi.mock("../useItemOrderDrag", () => ({
+vi.mock("../../_warehouse_v2/useItemOrderDrag", () => ({
   useItemOrderDrag: () => ({
     dragId: null,
     dropTargetId: null,
@@ -12,13 +13,13 @@ vi.mock("../useItemOrderDrag", () => ({
 }));
 
 vi.mock("@/lib/queries/useMyItemOrderQuery", () => ({
-  useMyItemOrderQuery: () => ({ data: null }),
+  useMyItemOrderQuery: () => ({ data: preferences.order }),
   usePutMyItemOrderMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useResetMyItemOrderMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
-vi.mock("../login/useCurrentOperator", () => ({
-  useCurrentOperator: () => ({ employee_id: "emp-1", assigned_model_slots: [] }),
+vi.mock("../../login/useCurrentOperator", () => ({
+  useCurrentOperator: () => ({ employee_id: "emp-1", department: "조립", assigned_model_slots: [] }),
 }));
 
 function makeItem(index: number): Item {
@@ -40,6 +41,24 @@ function makeItem(index: number): Item {
 }
 
 describe("DefectItemPicker mobile scroll", () => {
+  it("PC 전체 목록은 로그인 부서를 우선하고 모바일 순서는 유지한다", () => {
+    const items = [{ ...makeItem(1), process_type_code: "TR" }, { ...makeItem(2), process_type_code: "AR" }];
+    const props = { items, productModels: [], source: "warehouse" as const, selectedIds: new Set<string>(), onAdd: vi.fn(), onRemove: vi.fn() };
+    const { rerender } = render(<DefectItemPicker {...props} />);
+    expect(screen.getAllByTestId(/defect-picker-row-/).map((row) => row.dataset.testid)).toEqual(["defect-picker-row-item-2", "defect-picker-row-item-1"]);
+    rerender(<DefectItemPicker {...props} mobilePresentation />);
+    expect(screen.getAllByTestId(/defect-picker-row-/).map((row) => row.dataset.testid)).toEqual(["defect-picker-row-item-1", "defect-picker-row-item-2"]);
+    rerender(<DefectItemPicker {...props} />);
+    fireEvent.click(screen.getByRole("combobox", { name: "부서" }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "튜브" }));
+    expect(screen.getAllByTestId(/defect-picker-row-/).map((row) => row.dataset.testid)).toEqual(["defect-picker-row-item-1"]);
+  });
+  it("PC 로그인 부서보다 저장된 개인 순서를 먼저 따른다", () => {
+    preferences.order = [{ item_id: "item-1", display_order: 0 }];
+    render(<DefectItemPicker items={[{ ...makeItem(1), process_type_code: "TR" }, { ...makeItem(2), process_type_code: "AR" }]} productModels={[]} source="warehouse" selectedIds={new Set()} onAdd={vi.fn()} onRemove={vi.fn()} />);
+    expect(screen.getAllByTestId(/defect-picker-row-/).map((row) => row.dataset.testid)).toEqual(["defect-picker-row-item-1", "defect-picker-row-item-2"]);
+    preferences.order = undefined;
+  });
   it("격리 등록은 담긴 건수를 표시하고 선택된 품목으로 이동한다", () => {
     const onSelected = vi.fn();
     const onRemove = vi.fn();

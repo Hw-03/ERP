@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { Check, GripVertical, Plus, RotateCcw, Save, Search, Settings2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
@@ -76,7 +76,7 @@ export function DefectItemPicker({
   disabled = false,
   addingDisabled = false,
   mobilePresentation = false,
-}: Props) {
+}: Props): JSX.Element {
   const [dept, setDept] = useState("ALL");
   const [model, setModel] = useState("\uc804\uccb4");
   const [stage, setStage] = useState("ALL");
@@ -94,8 +94,8 @@ export function DefectItemPicker({
 
   const keyword = search.trim().toLowerCase();
   const deptPriorityByLetter = useMemo(
-    () => buildDeptPriorityByLetter(dept === "ALL" ? undefined : dept),
-    [dept],
+    () => buildDeptPriorityByLetter(dept === "ALL" ? mobilePresentation ? undefined : operator?.department : dept),
+    [dept, mobilePresentation, operator?.department],
   );
   const assignedPriorityBySlot = useMemo(
     () => buildAssignedPriorityBySlot(operator?.assigned_model_slots),
