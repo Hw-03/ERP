@@ -1,9 +1,11 @@
 import { useId, type ReactNode } from "react";
+import Image from "next/image";
 import { ArrowRight, Check, ClipboardList, Clock3, History, Play, SearchCheck } from "lucide-react";
 import type { StocktakeLatestRoundSummary } from "@/lib/api/types/stocktake";
 import { formatKstDateTime } from "@/lib/mes-format";
 import { SkeletonBlock } from "../common/LoadingSkeleton";
 import { STOCKTAKE_BUTTON, STOCKTAKE_CARD } from "./StocktakeCountEditor";
+import styles from "./StocktakeIdlePanel.module.css";
 
 type Props = {
   summary?: StocktakeLatestRoundSummary | null;
@@ -21,25 +23,25 @@ export function StocktakeIdlePanel({ summary, loading = false, error, disabled =
   const id = useId();
   const longestMetric = Math.max(...[summary?.item_summary?.total, summary?.item_summary?.confirmed, summary?.item_summary?.applied].map(value => value?.toLocaleString("ko-KR").length ?? 1));
   const metricSize = longestMetric > 10 ? "text-sm sm:text-2xl" : longestMetric > 6 ? "text-base sm:text-3xl" : "text-2xl sm:text-3xl";
-  return <div className="min-w-0 space-y-4 text-sm text-[var(--c-text)]">
-    <section className={`${STOCKTAKE_CARD} !p-5 sm:!p-6`} aria-labelledby={`${id}-title`}>
-      <div className="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-start gap-4">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--c-blue)_10%,var(--c-s1))] text-[var(--c-blue)]"><ClipboardList size={24} aria-hidden="true" /></span>
-          <div className="min-w-0">
-            <p className="mb-1 flex items-center gap-1.5 text-xs font-medium text-[var(--c-muted2)]"><Clock3 size={14} aria-hidden="true" />시작 대기</p>
-            <h2 id={`${id}-title`} className="break-words text-xl font-semibold sm:text-2xl">전수조사 시작 대기</h2>
-            <p className="mt-2 leading-6 text-[var(--c-muted2)]">진행 중인 회차가 없습니다.</p>
-            <p className="mt-1 text-xs leading-5 text-[var(--c-muted2)]">{onStart ? "새 회차를 시작하면 직원들이 조사할 수 있습니다." : "부서 결재 담당자가 회차를 시작하면 조사할 수 있습니다."}</p>
-          </div>
-        </div>
-        {(onStart || onHistory) && <div className="flex shrink-0 flex-col gap-2 sm:min-w-44">
-          {onStart && <button type="button" disabled={disabled} className={`${STOCKTAKE_BUTTON} flex items-center justify-center gap-2 bg-[var(--c-blue-solid)] !text-white`} onClick={onStart}><Play size={16} aria-hidden="true" />새 회차 시작</button>}
-          {onHistory && <button type="button" disabled={disabled} className={`${STOCKTAKE_BUTTON} flex items-center justify-center gap-2`} onClick={onHistory}><History size={16} aria-hidden="true" />회차 이력 관리</button>}
+  return <div className={`${styles.workspace} min-w-0 text-sm text-[var(--c-text)]`}>
+    <section className={`${STOCKTAKE_CARD} ${styles.hero}`} aria-labelledby={`${id}-title`}>
+      <div className="min-w-0">
+        <span className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--c-blue)_10%,var(--c-s1))] text-[var(--c-blue)]"><ClipboardList size={24} aria-hidden="true" /></span>
+        <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-[var(--c-muted2)]"><Clock3 size={14} aria-hidden="true" />시작 대기</p>
+        <h2 id={`${id}-title`} className="break-words text-2xl font-semibold sm:text-3xl">전수조사 시작 대기</h2>
+        <p className="mt-4 leading-6 text-[var(--c-muted2)]">진행 중인 회차가 없습니다.</p>
+        <p className="mt-1 text-xs leading-5 text-[var(--c-muted2)]">{onStart ? "새 회차를 시작하면 직원들이 조사할 수 있습니다." : "부서 결재 담당자가 회차를 시작하면 조사할 수 있습니다."}</p>
+        {(onStart || onHistory) && <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          {onStart && <button type="button" disabled={disabled} className={`${STOCKTAKE_BUTTON} flex items-center justify-center gap-2 bg-[var(--c-blue-solid)] !text-white sm:min-w-44`} onClick={onStart}><Play size={16} aria-hidden="true" />새 회차 시작</button>}
+          {onHistory && <button type="button" disabled={disabled} className={`${STOCKTAKE_BUTTON} flex items-center justify-center gap-2 sm:min-w-44`} onClick={onHistory}><History size={16} aria-hidden="true" />회차 이력 관리</button>}
         </div>}
       </div>
+      <div className={styles.illustration} aria-hidden="true">
+        <Image src="/images/dexray/warehouse-adjust.webp" alt="" width={840} height={560} loading="eager"
+          sizes="(min-width: 1280px) 520px, (min-width: 640px) 40vw, 220px" className={styles.mascot} />
+      </div>
     </section>
-    <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+    <div className={`${styles.support} grid min-w-0 gap-4 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]`}>
       <section className={`${STOCKTAKE_CARD} flex min-w-0 flex-col !p-5 sm:!p-6`} aria-labelledby={`${id}-result`}>
         <div className="flex flex-wrap items-baseline justify-between gap-2"><h2 id={`${id}-result`} className="text-base font-semibold">최근 회차 결과</h2><span className="text-xs text-[var(--c-muted2)]">최근 종료 회차 기준</span></div>
         {loading ? <div role="status" aria-label="최근 회차 결과를 불러오는 중입니다" className="mt-5">

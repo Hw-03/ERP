@@ -6,6 +6,17 @@ const summary = { round_id: "previous", title: "지난 전수조사", status: "C
   closed_at: "2026-10-14T06:00:00Z", item_summary: { total: 100, confirmed: 80, applied: 60, unconfirmed: 20 } };
 
 describe("StocktakeIdlePanel", () => {
+  it("keeps the counting illustration decorative alongside the waiting instructions", () => {
+    render(<StocktakeIdlePanel onRetry={vi.fn()} />);
+    const waiting = screen.getByRole("region", { name: "전수조사 시작 대기" });
+    const illustration = waiting.querySelector("img");
+    expect(illustration).toHaveAttribute("alt", "");
+    expect(illustration).toHaveAttribute("width", "840");
+    expect(illustration).toHaveAttribute("height", "560");
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(within(waiting).getByText("진행 중인 회차가 없습니다.")).toBeVisible();
+  });
+
   it("shows frozen item counts without history actions for workers", () => {
     render(<StocktakeIdlePanel summary={summary} onRetry={vi.fn()} />);
     expect(screen.getByRole("heading", { name: "전수조사 시작 대기" })).toBeInTheDocument();
