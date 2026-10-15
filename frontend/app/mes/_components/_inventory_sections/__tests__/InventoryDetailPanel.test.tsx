@@ -106,6 +106,10 @@ afterEach(() => {
 });
 
 describe("InventoryDetailPanel desktop quick actions", () => {
+  it.each(["desktop", "mobile"] as const)("%s 상세 정보에는 검색용 이름 편집을 표시하지 않는다", (variant) => {
+    render(<InventoryDetailPanel item={makeItem()} onGoToWarehouse={vi.fn()} quickActionVariant={variant} />);
+    expect(screen.queryByRole("region", { name: "검색용 이름" })).not.toBeInTheDocument();
+  });
   it.each(["desktop", "mobile"] as const)("삭제된 품목의 %s 입출고 작업을 차단한다", (variant) => {
     const onGoToWarehouse = vi.fn();
     render(<InventoryDetailPanel item={{ ...makeItem(), deleted_at: "2026-10-07T00:00:00Z" }} onGoToWarehouse={onGoToWarehouse} quickActionVariant={variant} />);

@@ -7,6 +7,7 @@ import type { Item, ShippingBomMatchResponse, ShippingHistoryMonth, ShippingRequ
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { queryKeys } from "@/lib/queries/keys";
 import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
+import { ApiError } from "@/lib/api-core";
 import { DesktopTabHomeProvider, useDesktopTabHomeController } from "../DesktopTabHome";
 
 const navigationMock = vi.hoisted(() => ({
@@ -20,6 +21,15 @@ const navigationMock = vi.hoisted(() => ({
 const realtimeMock = vi.hoisted(() => ({
   revision: 1 as number | null,
 }));
+
+const searchConfigMock = vi.hoisted(() => ({ version: 1 }));
+vi.mock("@/lib/queries/useItemSearch", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/queries/useItemSearch")>();
+  return { ...actual, useItemSearch: () => {
+    const state = actual.useItemSearch();
+    return { ...state, config: { ...state.config, version: searchConfigMock.version } };
+  } };
+});
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -236,6 +246,7 @@ function shippingWithHome() {
 beforeEach(() => {
   vi.clearAllMocks();
   realtimeMock.revision = 1;
+  searchConfigMock.version = 1;
   navigationMock.search = "tab=shipping";
   vi.mocked(api.getItems).mockResolvedValue(items);
   vi.mocked(api.getShippingRequests).mockResolvedValue([
@@ -1560,6 +1571,21 @@ describe("DesktopShippingView", () => {
     expect(api.getShippingHistory).toHaveBeenCalledTimes(3);
   });
 
+  it("keeps history results during IME composition and searches after completion", async () => {
+    navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
+    const overview = request({ request_id: "ime-overview", status: "PICKED_UP", invoice_number: "INV-IME", picked_up_at: "2026-07-01T01:00:00Z" });
+    vi.mocked(api.getShippingHistoryMonths).mockResolvedValue([{ year: 2026, month: 7, count: 1 }]);
+    vi.mocked(api.getShippingHistory).mockResolvedValue({ requests: [overview], next_cursor: null, has_more: false });
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+    expect(await screen.findByText("INV-IME")).toBeInTheDocument();
+    const search = screen.getByRole("searchbox", { name: "출하 이력 검색" });
+    fireEvent.compositionStart(search);
+    fireEvent.change(search, { target: { value: "한글" } });
+    expect(fireEvent.keyDown(search, { key: "Enter" })).toBe(false);
+    fireEvent.compositionEnd(search, { data: "한글" });
+    await waitFor(() => expect(api.getShippingHistory).toHaveBeenCalledWith(expect.objectContaining({ q: "한글" })));
+  });
+
   it("applies and clears the history search as the input changes", async () => {
     navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
     const overview = request({ request_id: "search-overview", status: "PICKED_UP", invoice_number: "INV-OVERVIEW", picked_up_at: "2026-07-01T01:00:00Z" });
@@ -1584,6 +1610,161 @@ describe("DesktopShippingView", () => {
     fireEvent.change(search, { target: { value: "" } });
     await waitFor(() => expect(api.getShippingHistoryMonths).toHaveBeenCalledTimes(2));
     expect(await screen.findByText("INV-OVERVIEW")).toBeInTheDocument();
+  });
+
+  it.each([false, true])("refreshes the applied history search once on config change (realtime changes: %s)", async (changeRealtime) => {
+    navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
+    const oldRow = request({ request_id: "config-old", status: "PICKED_UP", invoice_number: "INV-OLD", picked_up_at: "2026-07-01T01:00:00Z" });
+    const newRow = request({ request_id: "config-new", status: "PICKED_UP", invoice_number: "INV-NEW", picked_up_at: "2026-07-01T01:00:00Z" });
+    vi.mocked(api.getShippingHistoryMonths).mockResolvedValue([{ year: 2026, month: 7, count: 1 }]);
+    vi.mocked(api.getShippingHistory).mockImplementation(async () => ({
+      requests: searchConfigMock.version === 1 ? [oldRow] : [newRow],
+      next_cursor: searchConfigMock.version === 1 ? "old-config-cursor" : null,
+      has_more: searchConfigMock.version === 1,
+    }));
+    const { rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
+    expect(await screen.findByText("INV-OLD")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox", { name: "출하 이력 검색" }), { target: { value: "별칭" } });
+    fireEvent.click(screen.getByRole("button", { name: "검색" }));
+    await waitFor(() => expect(api.getShippingHistory).toHaveBeenCalledTimes(2));
+    searchConfigMock.version = 2;
+    if (changeRealtime) realtimeMock.revision = 2;
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    expect(await screen.findByText("INV-NEW")).toBeInTheDocument();
+    expect(api.getShippingHistory).toHaveBeenCalledTimes(3);
+    expect(api.getShippingHistory).toHaveBeenLastCalledWith({ status: "PICKED_UP", q: "별칭", limit: 50 });
+    expect(screen.queryByRole("button", { name: "더 보기" })).not.toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "출하 이력 검색" })).toHaveValue("별칭");
+  });
+
+  it("refreshes a retained history search once after config changes while the history view is hidden", async () => {
+    navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
+    vi.mocked(api.getShippingHistoryMonths).mockResolvedValue([{ year: 2026, month: 7, count: 1 }]);
+    vi.mocked(api.getShippingHistory).mockImplementation(async () => ({
+      requests: [request({ request_id: `hidden-${searchConfigMock.version}`, status: "PICKED_UP", invoice_number: `HIDDEN-${searchConfigMock.version}`, picked_up_at: "2026-07-01T01:00:00Z" })],
+      next_cursor: null, has_more: false,
+    }));
+    const { rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
+    expect(await screen.findByText("HIDDEN-1")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox", { name: "출하 이력 검색" }), { target: { value: "별칭" } });
+    fireEvent.click(screen.getByRole("button", { name: "검색" }));
+    await waitFor(() => expect(api.getShippingHistory).toHaveBeenCalledTimes(2));
+    navigationMock.search = "tab=shipping";
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    await screen.findByText("출하 관리");
+    searchConfigMock.version = 2;
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    expect(api.getShippingHistory).toHaveBeenCalledTimes(2);
+    navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    expect(await screen.findByText("HIDDEN-2")).toBeInTheDocument();
+    expect(api.getShippingHistory).toHaveBeenCalledTimes(3);
+    expect(api.getShippingHistory).toHaveBeenLastCalledWith({ status: "PICKED_UP", q: "별칭", limit: 50 });
+    expect(api.getShippingHistoryMonths).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("searchbox", { name: "출하 이력 검색" })).toHaveValue("별칭");
+  });
+
+  it("uses one initial history read after config changes before the first history entry", async () => {
+    vi.mocked(api.getShippingHistoryMonths).mockResolvedValue([{ year: 2026, month: 7, count: 1 }]);
+    vi.mocked(api.getShippingHistory).mockResolvedValue({ requests: [request({ request_id: "first-entry", status: "PICKED_UP", invoice_number: "FIRST-ENTRY", picked_up_at: "2026-07-01T01:00:00Z" })], next_cursor: null, has_more: false });
+    const { rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
+    await screen.findByText("출하 관리");
+    searchConfigMock.version = 2;
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    expect(await screen.findByText("FIRST-ENTRY")).toBeInTheDocument();
+    expect(api.getShippingHistoryMonths).toHaveBeenCalledTimes(1);
+    expect(api.getShippingHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([false, true])("refreshes the selected history month on config changes without a realtime revision (hidden: %s)", async (hidden) => {
+    realtimeMock.revision = null;
+    navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
+    vi.mocked(api.getShippingHistoryMonths).mockResolvedValue([{ year: 2026, month: 7, count: 1 }, { year: 2026, month: 6, count: 1 }]);
+    vi.mocked(api.getShippingHistory).mockImplementation(async (params) => ({
+      requests: [request({ request_id: `month-${params?.month}`, status: "PICKED_UP", invoice_number: `MONTH-${params?.month}` })],
+      next_cursor: null, has_more: false,
+    }));
+    const { rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
+    const june = await screen.findByText("6월 · 1건", { selector: "summary" });
+    fireEvent.click(june);
+    await waitFor(() => expect(api.getShippingHistory).toHaveBeenCalledTimes(2));
+    if (hidden) {
+      navigationMock.search = "tab=shipping&shippingView=requestList";
+      rerender(<DesktopShippingView onStatusChange={() => {}} />);
+      await screen.findByTestId("shipping-request-list-panel");
+    }
+    searchConfigMock.version = 2;
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    if (hidden) {
+      expect(api.getShippingHistory).toHaveBeenCalledTimes(2);
+      navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
+      rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    }
+    await waitFor(() => expect(api.getShippingHistory).toHaveBeenCalledTimes(3));
+    expect(api.getShippingHistory).toHaveBeenLastCalledWith({ status: "PICKED_UP", year: 2026, month: 6, limit: 50 });
+    expect(screen.getByText("6월 · 1건", { selector: "summary" }).closest("details")).toHaveAttribute("open");
+    expect(api.getShippingHistoryMonths).toHaveBeenCalledTimes(1);
+  });
+
+  it("restarts the current history search at its first page after a stale-config cursor conflict", async () => {
+    navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
+    const oldRow = request({ request_id: "cursor-old", status: "PICKED_UP", invoice_number: "CURSOR-OLD", picked_up_at: "2026-07-01T01:00:00Z" });
+    const freshRow = request({ request_id: "cursor-fresh", status: "PICKED_UP", invoice_number: "CURSOR-FRESH", picked_up_at: "2026-07-01T01:00:00Z" });
+    let firstReads = 0;
+    vi.mocked(api.getShippingHistoryMonths).mockResolvedValue([{ year: 2026, month: 7, count: 1 }]);
+    vi.mocked(api.getShippingHistory).mockImplementation(async (params) => {
+      if (params?.cursor) throw new ApiError("검색 설정이 변경됐습니다.", 409, "SEARCH_CONFIG_STALE");
+      firstReads += 1;
+      return { requests: firstReads <= 2 ? [oldRow] : [freshRow], next_cursor: firstReads <= 2 ? "stale-cursor" : null, has_more: firstReads <= 2 };
+    });
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+    expect(await screen.findByText("CURSOR-OLD")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox", { name: "출하 이력 검색" }), { target: { value: "별칭" } });
+    fireEvent.click(screen.getByRole("button", { name: "검색" }));
+    await waitFor(() => expect(api.getShippingHistory).toHaveBeenCalledTimes(2));
+    fireEvent.click(screen.getByRole("button", { name: "더 보기" }));
+    expect(await screen.findByText("CURSOR-FRESH")).toBeInTheDocument();
+    expect(screen.queryByText("CURSOR-OLD")).not.toBeInTheDocument();
+    expect(api.getShippingHistory).toHaveBeenLastCalledWith({ status: "PICKED_UP", q: "별칭", limit: 50 });
+    expect(screen.getByRole("searchbox", { name: "출하 이력 검색" })).toHaveValue("별칭");
+  });
+
+  it("keeps a shipping draft and its quantity when search config changes", async () => {
+    navigationMock.search = "tab=shipping&shippingView=requestWork";
+    const { container, rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
+    fireEvent.change(await screen.findByRole("textbox", { name: "인보이스 번호" }), { target: { value: "KEEP-DRAFT" } });
+    await selectBasePf();
+    nextStep(container);
+    const quantity = await screen.findByRole("spinbutton", { name: "출하 수량" });
+    fireEvent.change(quantity, { target: { value: "7" } });
+    searchConfigMock.version = 2;
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    expect(screen.getByRole("spinbutton", { name: "출하 수량" })).toHaveValue(7);
+    fireEvent.click(screen.getByRole("button", { name: "이전" }));
+    expect(await screen.findByRole("textbox", { name: "인보이스 번호" })).toHaveValue("KEEP-DRAFT");
+    expect(api.getShippingHistory).not.toHaveBeenCalled();
+  });
+
+  it("keeps the selected history detail when a config refresh no longer returns that row", async () => {
+    const selected = request({ request_id: "config-selection", status: "PICKED_UP", invoice_number: "KEEP-SELECTION", picked_up_at: "2026-07-01T01:00:00Z" });
+    navigationMock.search = "tab=shipping&shippingView=historyWork&shippingRequestId=config-selection&shippingHistoryStatus=PICKED_UP";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([selected]);
+    vi.mocked(api.getShippingHistoryMonths).mockResolvedValue([{ year: 2026, month: 7, count: 1 }]);
+    vi.mocked(api.getShippingHistory).mockImplementation(async () => ({
+      requests: searchConfigMock.version === 1 ? [selected] : [request({ request_id: "another-history", status: "PICKED_UP", invoice_number: "OTHER", picked_up_at: "2026-07-02T01:00:00Z" })],
+      next_cursor: null, has_more: false,
+    }));
+    const { rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
+    const header = await screen.findByTestId("shipping-history-view-header");
+    expect(await within(header).findByRole("textbox", { name: "인보이스 번호" })).toHaveValue("KEEP-SELECTION");
+    await waitFor(() => expect(api.getShippingHistory).toHaveBeenCalledTimes(1));
+    searchConfigMock.version = 2;
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    await waitFor(() => expect(api.getShippingHistory).toHaveBeenCalledTimes(2));
+    expect(within(header).getByRole("textbox", { name: "인보이스 번호" })).toHaveValue("KEEP-SELECTION");
+    expect(screen.getByTestId("shipping-history-detail")).toBeInTheDocument();
   });
 
   it("keeps the selected history month and avoids a duplicate overview fetch on realtime refresh", async () => {

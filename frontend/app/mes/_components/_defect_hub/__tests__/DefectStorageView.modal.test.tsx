@@ -136,6 +136,20 @@ describe("모바일 B급·구형 목록", () => {
     expect(screen.getByRole("checkbox", { name: "필터 고정" })).toBeChecked();
     expect(screen.getByRole("combobox", { name: "정렬" })).toHaveValue("oldest");
   });
+  it("조합 입력 도중에도 보관 목록을 필터링한다", () => {
+    window.localStorage.clear();
+    render(<DefectStorageView mobilePresentation locations={[location]}
+      currentEmployee={{ employee_id: "employee-1", name: "Kim", department: "조립" }}
+      onBack={vi.fn()} onRestore={vi.fn()} onUpdated={vi.fn()} />);
+    const input = screen.getByRole("textbox", { name: "B급·구형 검색" });
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: "없는 검색어" } });
+    expect(screen.queryByText(location.item_name)).not.toBeInTheDocument();
+    fireEvent.compositionEnd(input);
+    expect(screen.queryByText(location.item_name)).not.toBeInTheDocument();
+    expect(screen.getByText("검색 결과가 없습니다.")).toBeInTheDocument();
+  });
+
   it("필터를 접어 시작하고 조건·정렬·분류 선택을 접은 뒤에도 유지한다", () => {
     window.localStorage.clear();
     render(<DefectStorageView mobilePresentation locations={[

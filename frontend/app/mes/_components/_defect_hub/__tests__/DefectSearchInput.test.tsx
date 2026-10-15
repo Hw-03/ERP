@@ -10,6 +10,17 @@ describe("DefectSearchInput", () => {
     fireEvent.click(screen.getByRole("button", { name: "B급·구형 검색 지우기" }));
     expect(onChange).toHaveBeenCalledWith("");
   });
+  it("불량 검색도 한글 조합 중 검색을 갱신한다", () => {
+    const onChange = vi.fn();
+    render(<DefectSearchInput value="" onChange={onChange} />);
+    const input = screen.getByRole("searchbox", { name: "불량 검색" });
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: "불" } });
+    expect(onChange).toHaveBeenCalledWith("불");
+    fireEvent.compositionEnd(input, { data: "불" });
+    expect(onChange).toHaveBeenCalledWith("불");
+  });
+
   it("uses the dashboard search treatment and clears its controlled value", () => {
     const onChange = vi.fn();
     render(<DefectSearchInput value="메모" onChange={onChange} />);

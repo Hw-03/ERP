@@ -2,6 +2,7 @@
 
 import { CalendarDays, ChevronDown, Filter, Search, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { SearchInput } from "../common/SearchInput";
 import { DATE_OPTIONS, formatHistoryMonthLabel, type SelectedHistoryMonth } from "./historyQuery";
 
 // 데스크톱은 [검색][기간][필터][달력], 모바일은 제어줄 아래 검색만 고정.
@@ -53,25 +54,16 @@ export function HistoryFilterBar({
   mineDisabled = false,
 }: Props) {
   const searchBar = (
-        <div
-          className={mobile ? "flex min-h-11 w-full items-center gap-2 rounded-[12px] border pl-3 pr-1" : "flex min-h-[44px] flex-1 items-center gap-2 rounded-[12px] border px-3 py-2 lg:min-h-0"}
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="작업 · 품명 · 코드 · 담당자 · 메모"
+          disabled={disabled}
+          leading={<Search className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
+          inputProps={{ className: mobile ? "!text-base focus-visible:ring-2 focus-visible:ring-[var(--c-blue)]" : "lg:!h-auto !font-normal" }}
+          className={mobile ? "flex min-h-11 w-full items-center gap-2 !rounded-[12px] border pl-3 !pr-1" : "flex min-h-[44px] flex-1 items-center gap-2 !rounded-[12px] border px-3 py-2 lg:min-h-0"}
           style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-        >
-          <Search className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="작업 · 품명 · 코드 · 담당자 · 메모"
-            disabled={disabled}
-            className={mobile ? "h-11 min-w-0 flex-1 bg-transparent text-base outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)]" : "h-11 flex-1 bg-transparent text-sm outline-none lg:h-auto"}
-            style={{ color: LEGACY_COLORS.text }}
-          />
-          {search && (
-            <button onClick={() => setSearch("")} className={mobile ? "flex h-11 w-11 shrink-0 items-center justify-center text-sm" : "text-xs"} style={{ color: LEGACY_COLORS.muted2 }} aria-label={mobile ? "검색어 지우기" : undefined}>
-              ✕
-            </button>
-          )}
-        </div>
+        />
   );
   const controls = (
     <>

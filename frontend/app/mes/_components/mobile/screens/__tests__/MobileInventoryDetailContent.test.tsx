@@ -16,6 +16,26 @@ vi.mock("../../../_inventory_sections/InventoryDetailPanel", () => ({
 const item = { item_id: "one", item_name: "테스트 품목", mes_code: "9-TR-0004" } as Item;
 beforeEach(() => historyRender.mockClear());
 
+it("검색용 이름 전용 탭으로 키보드 이동하고 입력을 유지한다", () => {
+  render(<MobileInventoryDetailContent item={item} headerBadge={null} onGoToWarehouse={vi.fn()} />);
+  expect(screen.queryByRole("textbox", { name: "검색용 이름 추가" })).not.toBeInTheDocument();
+  fireEvent.keyDown(screen.getByRole("tab", { name: "상세 정보" }), { key: "End" });
+  const aliasesTab = screen.getByRole("tab", { name: "검색용 이름" });
+  expect(aliasesTab).toHaveFocus();
+  expect(screen.getByRole("tabpanel", { name: "검색용 이름" })).toBeVisible();
+  fireEvent.change(screen.getByRole("textbox", { name: "검색용 이름 추가" }), { target: { value: "현장 이름" } });
+  fireEvent.keyDown(aliasesTab, { key: "ArrowRight" });
+  expect(screen.getByRole("tab", { name: "상세 정보" })).toHaveFocus();
+  fireEvent.click(aliasesTab);
+  expect(screen.getByRole("textbox", { name: "검색용 이름 추가" })).toHaveValue("현장 이름");
+});
+
+it("편집이 차단된 품목은 검색용 이름 탭에서도 입력을 비활성화한다", () => {
+  render(<MobileInventoryDetailContent item={item} headerBadge={null} onGoToWarehouse={vi.fn()} actionsDisabled />);
+  fireEvent.click(screen.getByRole("tab", { name: "검색용 이름" }));
+  expect(screen.getByRole("textbox", { name: "검색용 이름 추가" })).toBeDisabled();
+});
+
 it("최근 내역 탭에도 삭제 안내를 표시하고 내역을 유지한다", () => {
   render(<MobileInventoryDetailContent item={{ ...item, deleted_at: "2026-10-07T00:00:00Z" }} headerBadge={null} onGoToWarehouse={vi.fn()} actionsDisabled />);
   fireEvent.click(screen.getByRole("tab", { name: "최근 내역" }));

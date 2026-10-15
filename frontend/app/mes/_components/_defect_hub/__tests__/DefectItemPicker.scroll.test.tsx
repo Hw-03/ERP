@@ -59,6 +59,16 @@ describe("DefectItemPicker mobile scroll", () => {
     expect(screen.getAllByTestId(/defect-picker-row-/).map((row) => row.dataset.testid)).toEqual(["defect-picker-row-item-1", "defect-picker-row-item-2"]);
     preferences.order = undefined;
   });
+  it("한글 조합 중에도 품목 목록을 필터링한다", () => {
+    render(<DefectItemPicker items={[makeItem(1)]} productModels={[]} source="warehouse" selectedIds={new Set()} onAdd={vi.fn()} onRemove={vi.fn()} />);
+    const input = screen.getByPlaceholderText("품목명 · 품목 코드");
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: "없는품목" } });
+    expect(screen.queryByText("SOLO item 1")).not.toBeInTheDocument();
+    fireEvent.compositionEnd(input, { data: "없는품목" });
+    expect(screen.queryByText("SOLO item 1")).not.toBeInTheDocument();
+  });
+
   it("격리 등록은 담긴 건수를 표시하고 선택된 품목으로 이동한다", () => {
     const onSelected = vi.fn();
     const onRemove = vi.fn();

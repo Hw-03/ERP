@@ -54,6 +54,7 @@ export function DesktopRightPanel({
   headerBadge,
   backButton,
   headerAction,
+  headerAlign = "start",
   topContent,
   onClose,
   fillAvailableWidth = false,
@@ -69,6 +70,7 @@ export function DesktopRightPanel({
   headerBadge?: React.ReactNode;
   backButton?: React.ReactNode;
   headerAction?: React.ReactNode;
+  headerAlign?: "start" | "center";
   topContent?: ReactNode;
   onClose?: () => void;
   /** SlidePanel 내부의 사용 가능한 전체 폭을 사용할지 여부. */
@@ -106,7 +108,7 @@ export function DesktopRightPanel({
                 : LEGACY_COLORS.border,
             }}
           >
-            <div className="flex items-start gap-3">
+            <div className={`flex ${headerAlign === "center" ? "items-center" : "items-start"} gap-3`}>
               {backButton ? <div className="shrink-0 pt-0.5">{backButton}</div> : null}
               <div className="min-w-0 flex-1 pr-1">
                 <TruncatedText

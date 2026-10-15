@@ -3,7 +3,7 @@
 .heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .code { margin-top: 4px; overflow-wrap: anywhere; color: var(--c-muted2); font-size: 12px; }
 .tabs { display: flex; gap: 4px; margin-top: 12px; padding: 4px; border: 1px solid var(--c-border); border-radius: 14px; background: var(--c-s2); }
-.tabs button { min-height: 44px; min-width: 0; flex: 1; border-radius: 10px; color: var(--c-muted2); font-size: 14px; font-weight: 700; }
+.tabs button { min-height: 44px; min-width: 0; flex: 1; white-space: nowrap; border-radius: 10px; color: var(--c-muted2); font-size: 14px; font-weight: 700; }
 .tabs button[aria-selected="true"] { color: var(--c-blue); background: var(--c-s1); }
 .tabs button:focus-visible { outline: 2px solid var(--c-blue); outline-offset: 2px; }
 .history { min-height: min(360px, 50dvh); }

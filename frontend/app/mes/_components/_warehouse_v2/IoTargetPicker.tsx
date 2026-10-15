@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Check, GripVertical, Maximize2, Minimize2, Plus, RotateCcw, Save, Search, Settings2 } from "lucide-react";
+import { ArrowRight, Check, GripVertical, Maximize2, Minimize2, Plus, RotateCcw, Save, Settings2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
@@ -9,13 +9,14 @@ import { findInventoryLocation, locationAvailable, locationPending, warehouseAva
 import { Tooltip } from "@/lib/ui";
 import { EmptyState } from "../common";
 import { SkeletonBlock } from "../common/LoadingSkeleton";
+import { SearchInput } from "../common/SearchInput";
 import { ReadFailure } from "../common/ReadState";
 import scrollStyles from "../mobile/primitives/MobileScrollFrame.module.css";
 import { useCurrentOperator } from "../login/useCurrentOperator";
+import { useItemSearch } from "@/lib/queries/useItemSearch";
 import {
   DEPT_OPTIONS,
   PAGE_SIZE,
-  matchesSearch,
 } from "../_warehouse_steps/_constants";
 import { DEPT_LETTER_TO_NAME, deptOf } from "../_admin_sections/_bom_workbench/bomDept";
 import { LabeledSelect, SettingLabel } from "./_atoms";
@@ -326,6 +327,7 @@ export function IoTargetPicker({
   const activeFilters = filters ?? localFilters;
   const { department: dept, model, stage } = activeFilters;
   const keyword = search.trim().toLowerCase();
+  const { matchesItem: matchesSearch } = useItemSearch();
   const deptOptions = DEPT_OPTIONS;
 
   // 자동 부서 작업은 로그인 부서, 그 외는 Step 2 대상 부서를 먼저 표시한다.
@@ -366,7 +368,7 @@ export function IoTargetPicker({
         matchesSearch(item, keyword),
     );
     return sortItemsForPicker(filtered, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank);
-  }, [items, subType, dept, model, stage, keyword, productModels, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank]);
+  }, [items, subType, dept, model, stage, keyword, productModels, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank, matchesSearch]);
 
   const hasInvalidSelection = bundles.some((bundle) => {
     const selectedIds = [bundle.source_item_id, ...bundle.lines.filter((line) => line.included && !line.bom_stock_exempt).map((line) => line.item_id)];
@@ -483,19 +485,8 @@ export function IoTargetPicker({
               >
                 검색
               </span>
-              <div
-                className="flex items-center gap-1.5 rounded-[10px] border px-2 py-0 lg:py-1.5"
-                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-              >
-                <Search className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-                <input
-                  value={search}
-                  onChange={(e) => onSearchChange(e.target.value)}
-                  placeholder="품목명 · 품목 코드"
-                  className="flex-1 bg-transparent text-sm outline-none"
-                  style={{ color: LEGACY_COLORS.text }}
-                />
-              </div>
+              <SearchInput value={search} onChange={onSearchChange} placeholder="품목명 · 품목 코드"
+                ariaLabel="품목 검색" className="rounded-[10px] px-2" />
             </label>
           </div>
           {operator?.employee_id && (

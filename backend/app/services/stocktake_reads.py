@@ -13,6 +13,7 @@ from app.services.stocktake_target_policy import code_department, code_departmen
 from app.services import stocktake_counts, stocktake_targets
 from app.services.inventory_conflicts import InventoryConflict
 from app.services.stocktake_common import fingerprint, receipt_response
+from app.services.item_search import build_item_search_filter, get_search_config
 
 
 def get_round(db: Session, round_id: uuid.UUID) -> StocktakeRound:
@@ -102,6 +103,8 @@ def targets(db: Session, round_id: uuid.UUID, *, scope_id: str | None = None, st
     context_fields = [str(round_id), round_.target_generation, scope_id, status, search,
                       scope_kind, slots, steps, logic, status_group, depts,
                       "dashboard-v5-owned-waiting" if waiting_owner_id else ("dashboard-v4-item-kpi" if group_by_item else "dashboard-v2")]
+    search_config = get_search_config(db)
+    context_fields.append(search_config["version"])
     if waiting_owner_id:
         context_fields.append(str(waiting_owner_id))
     context = fingerprint(context_fields)
@@ -139,11 +142,12 @@ def targets(db: Session, round_id: uuid.UUID, *, scope_id: str | None = None, st
         raw_status = func.coalesce(StocktakeCount.status, "UNCOUNTED")
         group = ["UNCOUNTED", "DRAFT", "ABANDONED"] if status_group == "UNCONFIRMED" else (["CONFIRMED"] if status_group == "CONFIRMED_WAITING" else ["CONFIRMED", "APPLIED"])
         query = query.filter(raw_status.in_(group))
-    if search:
-        term = "%" + search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-        query = query.filter(or_(StocktakeTarget.item_code.ilike(term, escape="\\"),
-            StocktakeTarget.item_name.ilike(term, escape="\\"), Item.item_name.ilike(term, escape="\\"),
-            Item.mes_code.ilike(term, escape="\\")))
+    search_filter = build_item_search_filter(db, search,
+        name_columns=[StocktakeTarget.item_name, Item.item_name],
+        literal_columns=[StocktakeTarget.item_code, Item.mes_code], item_id_column=Item.item_id,
+        groups=[group["terms"] for group in search_config["synonym_groups"]])
+    if search_filter is not None:
+        query = query.filter(search_filter)
     if group_by_item:
         query = query.filter(canonical_scope)
     groups = []

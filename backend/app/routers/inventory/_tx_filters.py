@@ -31,7 +31,7 @@ from app.models import (
     TransactionTypeEnum,
 )
 from app.schemas import TransactionHistoryBatchResponse, TransactionLogResponse
-from app.utils.search import build_normalized_search_filter
+from app.services.item_search import build_item_search_filter
 
 
 # /transactions/summary 카테고리 — 프론트 historyShared.ts 의 scope 멤버와 일치.
@@ -525,25 +525,25 @@ def _apply_common_filters(
         query = query.filter(request_date_expr < date_to_end)
     if not include_archived:
         query = query.filter(TransactionLog.archived_at.is_(None))
-    search_filter = _history_search_filter(search)
+    search_filter = _history_search_filter(search, db)
     if search_filter is not None:
         query = query.filter(search_filter)
     return query
 
 
-def _history_search_filter(search: Optional[str]) -> Optional[ColumnElement[bool]]:
+def _history_search_filter(search: Optional[str], db: Session | None = None, *,
+                           groups: list[list[str]] | None = None) -> Optional[ColumnElement[bool]]:
     """목록과 묶음 내 검색 일치 여부에 동일한 정규화 조건을 사용한다."""
-    return build_normalized_search_filter(
-        search,
+    return build_item_search_filter(db, search, name_columns=[Item.item_name], item_id_column=Item.item_id, groups=groups,
+        literal_columns=[
         _history_list_operation_label_expr(),
-        Item.item_name,
         Item.mes_code,
         TransactionLog.reference_no,
         TransactionLog.notes,
         TransactionLog.produced_by,
         TransactionLog.supplier_name_snapshot,
         IoBatch.requester_name,
-    )
+    ])
 
 
 def _history_list_operation_label_expr() -> ColumnElement[str]:

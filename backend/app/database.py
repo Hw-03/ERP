@@ -8,6 +8,7 @@ from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
+from app.utils import search as _search  # noqa: F401  # register deterministic SQLite search functions
 
 load_dotenv()
 

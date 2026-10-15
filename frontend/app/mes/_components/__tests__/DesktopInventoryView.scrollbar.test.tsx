@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import type { Item } from "@/lib/api";
 
 import { DesktopInventoryView } from "../DesktopInventoryView";
 
@@ -88,18 +89,37 @@ vi.mock("../_inventory_sections/InventoryFilterBar", () => ({
       </button>
     </div>
   ),
-  InventoryTableStickyHeader: () => <div data-testid="inventory-table-header" />,
+  InventoryTableStickyHeader: ({ onManageSearch }: { onManageSearch?: () => void }) => <div data-testid="inventory-table-header"><button onClick={onManageSearch}>검색어 연결</button></div>,
 }));
 
 vi.mock("../_inventory_sections/InventoryItemsTable", () => ({
-  InventoryItemsTable: () => <div data-testid="inventory-items-table" />,
+  InventoryItemsTable: ({ selectedItem, detailOpen, onSelectItem }: { selectedItem: Item | null; detailOpen: boolean; onSelectItem: (item: Item | null) => void }) => <div data-testid="inventory-items-table">
+    <button onClick={() => onSelectItem(selectedItem?.item_id === "test-item" && detailOpen ? null : { item_id: "test-item", item_name: "전극" } as Item)}>전극 행 선택</button>
+  </div>,
 }));
 
 vi.mock("../_inventory_sections/DesktopInventoryRightPanel", () => ({
-  DesktopInventoryRightPanel: () => <aside data-testid="inventory-right-panel" />,
+  DesktopInventoryRightPanel: ({ open, displayItem }: { open: boolean; displayItem: Item | null }) => <aside data-testid="inventory-right-panel" data-open={open}>{open ? displayItem?.item_name : null}</aside>,
 }));
 
 describe("DesktopInventoryView scrollbar", () => {
+  it("검색어 연결에서 행을 선택하면 같은 품목을 다시 선택해도 상세로 전환한다", () => {
+    render(<DesktopInventoryView globalSearch="" onStatusChange={vi.fn()} onGoToWarehouse={vi.fn()} />);
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      fireEvent.click(screen.getByRole("button", { name: "검색어 연결" }));
+      expect(screen.getByRole("dialog", { name: "같은 뜻의 검색어" })).toBeVisible();
+      fireEvent.click(screen.getByRole("button", { name: "전극 행 선택" }));
+      expect(screen.queryByRole("dialog", { name: "같은 뜻의 검색어" })).not.toBeInTheDocument();
+      expect(screen.getByTestId("inventory-right-panel")).toHaveAttribute("data-open", "true");
+      expect(screen.getByTestId("inventory-right-panel")).toHaveTextContent("전극");
+    }
+  });
+  it("검색창에서 같은 뜻의 검색어 오른쪽 패널을 열 수 있다", () => {
+    render(<DesktopInventoryView globalSearch="" onStatusChange={vi.fn()} onGoToWarehouse={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "검색어 연결" }));
+    expect(screen.getByRole("dialog", { name: "같은 뜻의 검색어" })).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "검색어", exact: true })).toBeVisible();
+  });
   it("keeps the original sticky boundary while the outer content scrolls the full dashboard", () => {
     const { container } = render(
       <DesktopInventoryView

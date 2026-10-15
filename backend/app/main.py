@@ -54,6 +54,7 @@ from app.routers import (
     inventory,
     io,
     items,
+    item_search,
     models as models_router,
     notifications,
     operator_sessions,
@@ -314,6 +315,7 @@ def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONRespon
 
 app.include_router(employee_item_order.router, prefix="/api/items", tags=["Items"])
 app.include_router(items.router, prefix="/api/items", tags=["Items"])
+app.include_router(item_search.router, prefix="/api/item-search", tags=["Items"])
 app.include_router(employees.router, prefix="/api/employees", tags=["Employees"])
 app.include_router(operator_sessions.router, prefix="/api/operator-sessions", tags=["Employees"])
 app.include_router(stocktakes.router, prefix="/api/stocktakes", tags=["Stocktakes"])

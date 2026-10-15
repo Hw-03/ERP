@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { productionApi, type TransactionDisplayGroup, type TransactionDisplayGroupPage } from "@/lib/api/production";
 import { queryKeys } from "@/lib/queries/keys";
+import { useItemSearch } from "@/lib/queries/useItemSearch";
+import { ApiError } from "@/lib/api-core";
 import { STALE_TIME } from "@/lib/queries/client";
 import { HISTORY_PAGE_SIZE } from "../_history_sections/historyConstants";
 import { resolveHistoryDateRange } from "../_history_sections/historyQuery";
@@ -59,6 +61,7 @@ export function useHistoryGroups({
   realtimeRevision,
 }: UseHistoryGroupsArgs): UseHistoryGroupsResult {
   const queryClient = useQueryClient();
+  const { config: searchConfig, retry: retrySearchConfig } = useItemSearch();
   const operationKeys = operations || undefined;
   const { dateFrom, dateTo } = resolveHistoryDateRange(dateFilter, selectedDateKey, selectedMonth);
   const search = debouncedSearch.trim() || undefined;
@@ -72,6 +75,7 @@ export function useHistoryGroups({
     departmentParam ?? null,
     modelParam ?? null,
     requesterEmployeeId ?? null,
+    searchConfig.version,
   ]);
 
   function pageParams(cursor: string | null = null) {
@@ -90,7 +94,7 @@ export function useHistoryGroups({
 
   const initialParams = pageParams();
   const [initialCached] = useState(() =>
-    queryClient.getQueryData<TransactionDisplayGroupPage>(queryKeys.transactions.displayGroups(initialParams)),
+    queryClient.getQueryData<TransactionDisplayGroupPage>([...queryKeys.transactions.displayGroups(initialParams), ...(searchConfig.version ? [searchConfig.version] : [])]),
   );
   const [groups, setGroups] = useState<TransactionDisplayGroup[]>(() => initialCached?.groups ?? []);
   const [loading, setLoading] = useState(() => initialCached === undefined);
@@ -155,7 +159,7 @@ export function useHistoryGroups({
       const refreshedPages: TransactionDisplayGroupPage[] = [];
       let nextParams = params;
       for (let pageIndex = 0; ; pageIndex += 1) {
-        const pageQueryKey = queryKeys.transactions.displayGroups(nextParams);
+        const pageQueryKey = [...queryKeys.transactions.displayGroups(nextParams), ...(searchConfig.version ? [searchConfig.version] : [])];
         if (revisionChanged || isRefreshRetry || isExplicitRefresh) {
           await queryClient.cancelQueries({ queryKey: pageQueryKey, exact: true });
           await queryClient.invalidateQueries({ queryKey: pageQueryKey, exact: true, refetchType: "none" });
@@ -189,8 +193,21 @@ export function useHistoryGroups({
       setRefreshError(null);
       loadingRef.current = false;
       setLoading(false);
-    }).catch((caught: unknown) => {
+    }).catch(async (caught: unknown) => {
       if (generationRef.current !== generation || queryIdentityRef.current !== queryIdentity) return;
+      if (caught instanceof ApiError && caught.code === "SEARCH_CONFIG_STALE") {
+        cursorRef.current = null;
+        loadedPageCountRef.current = 1;
+        loadedTailGroupKeyRef.current = null;
+        await queryClient.invalidateQueries({
+          queryKey: [...queryKeys.transactions.displayGroups(params), ...(searchConfig.version ? [searchConfig.version] : [])],
+          exact: true, refetchType: "none",
+        });
+        if (generationRef.current !== generation || queryIdentityRef.current !== queryIdentity) return;
+        retrySearchConfig();
+        setRetryNonce((value) => value + 1);
+        return;
+      }
       const message = historyLoadError(caught, "입출고 내역을 불러오지 못했습니다.");
       if (backgroundRefresh) setRefreshError(message);
       else setError(message);
@@ -234,7 +251,7 @@ export function useHistoryGroups({
     try {
       const params = pageParams(cursor);
       const page = await queryClient.fetchQuery({
-        queryKey: queryKeys.transactions.displayGroups(params),
+        queryKey: [...queryKeys.transactions.displayGroups(params), ...(searchConfig.version ? [searchConfig.version] : [])],
         queryFn: ({ signal }) => productionApi.getTransactionDisplayGroups(params, { signal }),
         staleTime: STALE_TIME.VOLATILE,
       });
@@ -247,6 +264,19 @@ export function useHistoryGroups({
       setHasMore(page.hasMore);
     } catch (caught: unknown) {
       if (generationRef.current === generation && queryIdentityRef.current === identity) {
+        if (caught instanceof ApiError && caught.code === "SEARCH_CONFIG_STALE") {
+          cursorRef.current = null;
+          loadedPageCountRef.current = 1;
+          loadedTailGroupKeyRef.current = null;
+          await queryClient.invalidateQueries({
+            queryKey: [...queryKeys.transactions.displayGroups(pageParams()), ...(searchConfig.version ? [searchConfig.version] : [])],
+            exact: true, refetchType: "none",
+          });
+          if (generationRef.current !== generation || queryIdentityRef.current !== identity) return;
+          retrySearchConfig();
+          setRetryNonce((value) => value + 1);
+          return;
+        }
         setLoadMoreError(historyLoadError(caught, "추가 내역을 불러오지 못했습니다."));
       }
     } finally {
@@ -256,7 +286,7 @@ export function useHistoryGroups({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [operationKeys, dateFrom, dateTo, search, departmentParam, modelParam, requesterEmployeeId, queryIdentity, queryClient]);
+  }, [operationKeys, dateFrom, dateTo, search, departmentParam, modelParam, requesterEmployeeId, queryIdentity, queryClient, searchConfig.version, retrySearchConfig]);
 
   const queryChanged = queryIdentityRef.current !== queryIdentity;
   return {

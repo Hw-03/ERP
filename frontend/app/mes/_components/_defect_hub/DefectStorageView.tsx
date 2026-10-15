@@ -10,6 +10,7 @@ import { PIN_LENGTH } from "@/lib/auth/constants";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { matchesDefectSearch } from "./defectSearch";
+import { useItemSearch } from "@/lib/queries/useItemSearch";
 import { DefectManagementCategoryControl } from "./DefectManagementCategoryControl";
 import { DefectDepartmentList } from "./DefectDepartmentList";
 import { DefectFilterBar, type DefectScope } from "./DefectFilterBar";
@@ -22,6 +23,7 @@ import type { Item, ProductModel } from "../_warehouse_v2/types";
 import { DesktopPanelCloseButton } from "../DesktopRightPanel";
 import { SkeletonBlock, dataRevealClassName } from "../common/LoadingSkeleton";
 import { ReadEmpty, ReadLoading } from "../common/ReadState";
+import { SearchInput } from "../common/SearchInput";
 import { DefectListSkeleton } from "./DefectListSkeleton";
 
 type StorageFilter = "ALL" | "B_GRADE" | "OBSOLETE";
@@ -81,7 +83,8 @@ export function DefectStorageView({
     if (actorScope === "mine" && !poolMode) result = result.filter((location) => location.quarantined_by_employee_id === currentEmployee.employee_id);
     return filterDefectLocations(result, items, productModels, { departments: selectedDepartments, models: selectedModels, processSteps: selectedProcessSteps });
   }, [locations, scope, actorScope, poolMode, currentEmployee.department, currentEmployee.employee_id, items, productModels, selectedDepartments, selectedModels, selectedProcessSteps]);
-  const searched = useMemo(() => scoped.filter((location) => matchesDefectSearch(location, search)), [scoped, search]);
+  const { config: searchConfig } = useItemSearch();
+  const searched = useMemo(() => scoped.filter((location) => matchesDefectSearch(location, search, searchConfig)), [scoped, search, searchConfig]);
   const storage = useMemo(() => searched.filter((location) => {
     const category = categoryOf(location);
     return (category === "B_GRADE" || category === "OBSOLETE")
@@ -107,7 +110,7 @@ export function DefectStorageView({
       {(["ALL", "B_GRADE", "OBSOLETE"] as StorageFilter[]).map((value) => <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)} className="rounded-[14px] border px-4 py-3 text-left" style={{ background: filter === value ? tint(value === "B_GRADE" ? LEGACY_COLORS.purple : value === "OBSOLETE" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.blue, 12) : LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}><span className="block text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{value === "ALL" ? "전체 보관" : categoryLabel[value]}</span><span className="mt-1 block text-2xl font-black" style={{ color: LEGACY_COLORS.muted2 }}>{mobilePresentation && loading && !hasData ? <SkeletonBlock className="h-8 w-14" /> : <span className={mobilePresentation ? dataRevealClassName : undefined}>{counts[value]}{poolMode ? "종" : "건"}</span>}</span></button>)}
     </div>
     <DefectFilterBar mobilePresentation={mobilePresentation} searchInput={mobilePresentation ? undefined : <DefectSearchInput value={search} onChange={setSearch} ariaLabel="B급·구형 검색" placeholder="품목명 · 품목 코드 · 사유 검색" />} scope={scope} actorScope={actorScope} poolMode={poolMode} sort={sort} filterLocked={filterLocked} onScopeChange={setScope} onActorScopeChange={setActorScope} onSortChange={setSort} onFilterLockedChange={setFilterLocked} currentDept={currentEmployee.department} departments={departmentOptions} selectedDepartments={selectedDepartments} onDepartmentsChange={setSelectedDepartments} models={modelOptions} selectedModels={selectedModels} onModelsChange={setSelectedModels} selectedProcessSteps={selectedProcessSteps} onProcessStepsChange={setSelectedProcessSteps} onResetCategoryFilters={resetCategoryFilters} />
-    {mobilePresentation && <input aria-label="B급·구형 검색" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="품목명 · 품목 코드 · 사유 검색" className="min-h-11 rounded-[10px] border px-3 text-sm font-bold outline-none" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }} />}
+    {mobilePresentation && <SearchInput ariaLabel="B급·구형 검색" value={search} onChange={setSearch} placeholder="품목명 · 품목 코드 · 사유 검색" className="!rounded-[10px]" inputProps={{ className: "!font-bold" }} />}
     {loadError && <LoadFailureCard prefix="최신 B급·구형 보관 목록을 동기화하지 못했습니다" message={loadError} retryLabel="다시 동기화" onRetry={onRetry} />}
     {mobilePresentation && loading && !hasData ? <ReadLoading label="B급·구형 자재 불러오는 중" skeleton={<DefectListSkeleton />} /> : mobilePresentation && loadError && !hasData ? null : storage.length === 0 ? mobilePresentation ? <EmptyState
       illustrated

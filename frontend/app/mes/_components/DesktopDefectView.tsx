@@ -26,6 +26,7 @@ import { DefectProcessPanel } from "./_defect_hub/DefectProcessPanel";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { ReadEmpty, ReadFailure, ReadLoading } from "./common/ReadState";
 import { matchesDefectSearch } from "./_defect_hub/defectSearch";
+import { useItemSearch } from "@/lib/queries/useItemSearch";
 
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -99,6 +100,7 @@ function DefectViewInner({
   onStatusChange?: (status: string) => void;
 }) {
   const realtimeRevision = useRealtimeRevision();
+  const { config: searchConfig } = useItemSearch();
   const noop = useMemo(() => () => {}, []);
   // 피커용 품목/모델 — 입출고와 동일하게 자체 로드(shell 은 넘겨주지 않음).
   const { items, productModels } = useWarehouseData({
@@ -258,14 +260,14 @@ function DefectViewInner({
           Date.now() - new Date(loc.defective_at).getTime() > ONE_YEAR_MS,
       );
     }
-    result = result.filter((loc) => matchesDefectSearch(loc, search));
+    result = result.filter((loc) => matchesDefectSearch(loc, search, searchConfig));
 
     return [...result].sort((a, b) => {
       const ta = a.defective_at ? new Date(a.defective_at).getTime() : 0;
       const tb = b.defective_at ? new Date(b.defective_at).getTime() : 0;
       return sort === "oldest" ? ta - tb : tb - ta;
     });
-  }, [scopedLocations, sort, kpiFilter, search, poolMode]);
+  }, [scopedLocations, sort, kpiFilter, search, poolMode, searchConfig]);
 
   // KPI 집계 범위 라벨 — 숫자가 어느 범위인지 카드 부제로 노출
   const departmentScopeLabel = selectedDepartments.length > 0

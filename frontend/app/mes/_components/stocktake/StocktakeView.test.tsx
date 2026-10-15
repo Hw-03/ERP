@@ -7,6 +7,9 @@ import type { StocktakeCount, StocktakeRound, StocktakeTarget } from "@/lib/api/
 import type { Operator } from "../login/useCurrentOperator";
 import { StocktakeView } from "./StocktakeView";
 import { ApiError } from "@/lib/api-core";
+import { SearchConfigProvider } from "@/lib/queries/useItemSearch";
+import { queryKeys } from "@/lib/queries/keys";
+import { itemSearchApi } from "@/lib/api/item-search";
 
 const state = vi.hoisted(() => ({
   actor: { employee_id: "employee-a", name: "계수 작업자", level: "staff", department_role: "primary", warehouse_role: "none" },
@@ -22,6 +25,7 @@ vi.mock("@/lib/api/stocktake", async (importOriginal) => ({
   listPendingStocktakeCommands: () => [], subscribePendingStocktakeCommands: () => () => {}, recoverStocktakeCommand: vi.fn(),
 }));
 vi.mock("./StocktakeManagement", () => ({ StocktakeManagement: ({ focusStart, onStarted }: { focusStart?: boolean; onStarted?: () => void }) => <div><p data-focus-start={focusStart}>회차 관리</p>{onStarted && <button onClick={onStarted}>시작 완료 알림</button>}</div> }));
+vi.mock("@/lib/api/item-search", () => ({ itemSearchApi: { getConfig: vi.fn() } }));
 vi.mock("./StocktakeMenuVisibilityCard", () => ({ StocktakeMenuVisibilityCard: () => <p>참여 직원 메뉴 표시</p> }));
 vi.mock("../_hooks/useItemImageManifest", () => ({ useItemImageManifest: () => ({}) }));
 vi.mock("../DepartmentsContext", () => ({ useDeptColorLookup: () => () => "var(--c-green)" }));
@@ -99,9 +103,12 @@ function readFixture(path: string): unknown {
   throw new Error(`Unexpected read: ${path}`);
 }
 
-function mount(variant: "desktop" | "mobile" = "desktop") {
+function mount(variant: "desktop" | "mobile" = "desktop", withSearchConfig = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-  const tree = (operator: Operator) => <QueryClientProvider client={client}><DirtyGuardProvider><StocktakeView operator={operator} variant={variant} /></DirtyGuardProvider></QueryClientProvider>;
+  const tree = (operator: Operator) => {
+    const workspace = <DirtyGuardProvider><StocktakeView operator={operator} variant={variant} /></DirtyGuardProvider>;
+    return <QueryClientProvider client={client}>{withSearchConfig ? <SearchConfigProvider>{workspace}</SearchConfigProvider> : workspace}</QueryClientProvider>;
+  };
   const view = render(tree({ ...state.actor } as Operator));
   return { ...view, client, changeOperator: (operator: Operator) => view.rerender(tree(operator)) };
 }
@@ -113,6 +120,36 @@ async function openWaiting(): Promise<void> {
 }
 
 describe("StocktakeView integration", () => {
+  it.each(["desktop", "mobile"] as const)("%s 검색 사전 갱신은 대상 재조회와 계수 입력 보존을 함께 수행한다", async variant => {
+    const { client } = mount(variant, true);
+    await waitFor(() => expect(client.getQueryData(queryKeys.itemSearch.config())).toMatchObject({ version: "search-v1" }));
+    fireEvent.click(await screen.findByRole("button", { name: /시험 품목 A/ }));
+    const input = await screen.findByLabelText("정상 수량");
+    fireEvent.change(input, { target: { value: "19" } });
+    await waitFor(() => expect(client.isFetching({ predicate: query => query.queryKey.includes("targets") })).toBe(0));
+    const callsBefore = vi.mocked(stocktakeApi.read).mock.calls.filter(([path]) => path.includes("/targets?")).length;
+    act(() => client.setQueryData(queryKeys.itemSearch.config(), { version: "search-v2", synonym_groups: [], item_aliases: { "item-a": [{ alias_id: "alias-a", alias: "새 검색용 이름" }] } }));
+    await waitFor(() => expect(vi.mocked(stocktakeApi.read).mock.calls.filter(([path]) => path.includes("/targets?")).length).toBeGreaterThan(callsBefore));
+    await waitFor(() => expect(client.isFetching({ predicate: query => query.queryKey.includes("targets") })).toBe(0));
+    expect(screen.getByLabelText("정상 수량")).toBe(input);
+    expect(input).toHaveValue("19");
+  });
+
+  it.each(["desktop", "mobile"] as const)("%s 검색 사전 갱신은 반영 대기를 재조회하고 품목 선택을 유지한다", async variant => {
+    targets = [confirmedTarget()];
+    const { client } = mount(variant, true);
+    await waitFor(() => expect(client.getQueryData(queryKeys.itemSearch.config())).toMatchObject({ version: "search-v1" }));
+    await openWaiting();
+    if (variant === "desktop") await screen.findByRole("button", { name: "재고 반영", exact: true });
+    await waitFor(() => expect(client.isFetching({ predicate: query => query.queryKey.includes("targets") })).toBe(0));
+    expect(screen.getByRole("checkbox", { name: "시험 품목 A 선택" })).toBeChecked();
+    const callsBefore = vi.mocked(stocktakeApi.read).mock.calls.filter(([path]) => path.includes("/waiting-targets?")).length;
+    act(() => client.setQueryData(queryKeys.itemSearch.config(), { version: "search-v2", synonym_groups: [{ group_id: "g", version: 2, terms: ["시험", "test"] }], item_aliases: {} }));
+    await waitFor(() => expect(vi.mocked(stocktakeApi.read).mock.calls.filter(([path]) => path.includes("/waiting-targets?")).length).toBeGreaterThan(callsBefore));
+    await waitFor(() => expect(client.isFetching({ predicate: query => query.queryKey.includes("targets") })).toBe(0));
+    expect(screen.getByRole("checkbox", { name: "시험 품목 A 선택" })).toBeChecked();
+    expect(screen.getByRole("button", { name: variant === "desktop" ? "재고 반영" : "선택 1개 검토", exact: true })).toBeVisible();
+  });
   it.each(["APPLIED", "UNCOUNTED"] as const)("%s 위치의 계수 시작 버튼에만 처리 상태를 표시한다", async status => {
     targets = [target({ status, count: status === "UNCOUNTED" ? null : count({ status }) })];
     const delivery = deferred<StocktakeCount>();
@@ -522,6 +559,7 @@ describe("StocktakeView integration", () => {
   });
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(itemSearchApi.getConfig).mockResolvedValue({ version: "search-v1", synonym_groups: [], item_aliases: {} });
     state.actor = { employee_id: "employee-a", name: "계수 작업자", level: "staff", department_role: "primary", warehouse_role: "none" };
     targets = [target()];
     state.validate.mockResolvedValue(true);
@@ -925,7 +963,7 @@ describe("StocktakeView integration", () => {
     const { client } = mount("mobile");
     fireEvent.click(await screen.findByRole("button", { name: /시험 품목 A/ }));
     await screen.findByLabelText("정상 수량");
-    await act(async () => client.setQueryData(["stocktake", "employee-a", "round-a", "targets", "dashboard-v4-item-kpi", "", "", "", "", "", "AND"], { pages: [{ items: [], next_cursor: null }], pageParams: [null] }));
+    await act(async () => client.setQueriesData({ predicate: query => query.queryKey.includes("targets") }, { pages: [{ items: [], next_cursor: null }], pageParams: [null] }));
     fireEvent.click(screen.getByRole("button", { name: "시트 닫기 핸들" }));
     await waitFor(() => expect(screen.getByLabelText("품목 검색")).toHaveFocus());
   });

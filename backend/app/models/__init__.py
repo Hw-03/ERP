@@ -5,6 +5,7 @@ W9-B: 단일 `models.py` (705줄) → 도메인별 패키지로 분리. 모든 �
 """
 
 from app.models.audit import AdminAuditLog
+from app.models.item_search import ItemAlias, ItemSynonymGroup, ItemSynonymTerm
 from app.models.activity_audit import ActivityAuditLog, AuditTerminal
 from app.models.base import (
     Base,
@@ -129,6 +130,7 @@ from .business_correction import BusinessCorrection, BusinessCorrectionEvent, Bu
 from .stocktake_close import StocktakeCloseManifest, StocktakeCloseChunk, StocktakeCloseSeal, StocktakeCloseCommit
 
 __all__ = [
+    "ItemAlias", "ItemSynonymGroup", "ItemSynonymTerm",
     "BusinessCorrection", "BusinessCorrectionEvent", "BusinessCorrectionSource", "BusinessCorrectionEffectLink",
     "StocktakeRound", "StocktakePreview", "StocktakeTargetSet", "StocktakeTarget",
     "StocktakeCount", "StocktakeEvent", "StocktakeReceipt", "StocktakePendingTarget",

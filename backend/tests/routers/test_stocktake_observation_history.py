@@ -24,6 +24,17 @@ def test_unchanged_application_is_one_searchable_history_work(client, db_session
     assert summary['total'] == summary['adjust_count'] == 1
 
 
+def test_observation_history_retains_snapshot_name_after_rename(client, db_session, make_item):
+    env = setup_round(db_session, make_item)
+    count = confirm(db_session, env)
+    apply(db_session, env, preview(db_session, env, count))
+    env[2].item_name = 'Renamed current name'
+    db_session.commit()
+    response = client.get('/api/inventory/transactions/display-groups', params={'search': 'Counted item'})
+    assert response.status_code == 200, response.text
+    assert len(response.json()['groups']) == 1
+
+
 def test_observation_history_reports_classification_changes(client, db_session, make_item):
     env = setup_round(db_session, make_item)
     count = confirm(db_session, env, normal=12)

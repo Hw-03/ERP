@@ -7,9 +7,9 @@ from uuid import UUID
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from app.models import InventoryOperation, Item, StocktakeApplication, StocktakeApplicationLine
+from app.models import InventoryOperation, Item, StocktakeApplication, StocktakeApplicationLine, StocktakeCount, StocktakeTarget
 from app.schemas.transaction import TransactionDisplayGroupResponse
-from app.utils.search import normalize_search_text
+from app.services.item_search import get_search_config, matches_item_search
 
 
 def observation_groups(db: Session, *, search: str | None = None, department: str | None = None,
@@ -18,7 +18,8 @@ def observation_groups(db: Session, *, search: str | None = None, department: st
                        operation_keys: str | None = None, transaction_types: str | None = None,
                        include_archived: bool = False, item_id: Any = None,
                        reference_no: str | None = None, operation_batch_id: Any = None,
-                       requester_employee_id: UUID | None = None) -> list[TransactionDisplayGroupResponse]:
+                       requester_employee_id: UUID | None = None,
+                       search_config: dict | None = None) -> list[TransactionDisplayGroupResponse]:
     """Filter membership first, retain whole operations, and use sealed quantities only."""
     from app.routers.inventory._tx_filters import _model_filter, _process_step_filter, _kst_date_to_utc_naive_bounds
     if reference_no or operation_batch_id or (operation_keys and 'stocktake' not in operation_keys.split(',')):
@@ -28,10 +29,13 @@ def observation_groups(db: Session, *, search: str | None = None, department: st
     changed = or_(*(StocktakeApplicationLine.before_quantities[key].as_integer() !=
                     StocktakeApplicationLine.after_quantities[key].as_integer()
                     for key in ('normal', 'defect', 'b_grade', 'obsolete')))
-    query = (db.query(InventoryOperation, Item, changed.label('changed')).select_from(StocktakeApplicationLine)
+    query = (db.query(InventoryOperation, Item, changed.label('changed'), StocktakeTarget.item_name,
+                     StocktakeTarget.item_code).select_from(StocktakeApplicationLine)
              .join(StocktakeApplication, StocktakeApplicationLine.application_id == StocktakeApplication.application_id)
              .join(InventoryOperation, StocktakeApplication.operation_id == InventoryOperation.operation_id)
-             .join(Item, StocktakeApplicationLine.item_id == Item.item_id))
+             .join(Item, StocktakeApplicationLine.item_id == Item.item_id)
+             .join(StocktakeCount, StocktakeApplicationLine.count_id == StocktakeCount.count_id)
+             .join(StocktakeTarget, StocktakeCount.target_id == StocktakeTarget.target_id))
     if date_from:
         query = query.filter(InventoryOperation.effective_at >= _kst_date_to_utc_naive_bounds(date_from)[0])
     if date_to:
@@ -51,7 +55,8 @@ def observation_groups(db: Session, *, search: str | None = None, department: st
         if clause is not None:
             item_query = item_query.filter(clause)
     eligible = {row[0] for row in item_query.all()}
-    term = normalize_search_text(search or '')
+    search_config = search_config or (get_search_config(db) if search else {"synonym_groups": [], "item_aliases": {}})
+    synonym_groups = [group["terms"] for group in search_config["synonym_groups"]]
     grouped = defaultdict(list)
     for row in rows:
         grouped[row[0].operation_id].append(row)
@@ -59,10 +64,12 @@ def observation_groups(db: Session, *, search: str | None = None, department: st
     for operation_id, members in grouped.items():
         operation = members[0][0]
         matched = set()
-        for _, item, _ in members:
-            content = ' '.join((item.item_name or '', item.mes_code or '', operation.actor_name or '',
-                                operation.reason or '', '재고 전수조사', operation.department or '창고')).casefold()
-            if item.item_id in eligible and term in normalize_search_text(content):
+        for _, item, _, snapshot_name, snapshot_code in members:
+            if item.item_id in eligible and matches_item_search(search, name_fields=[item.item_name, snapshot_name],
+                    literal_fields=[item.mes_code, snapshot_code, operation.actor_name, operation.reason,
+                                    '재고 전수조사', operation.department or '창고'],
+                    aliases=[row["alias"] for row in search_config["item_aliases"].get(str(item.item_id), [])],
+                    groups=synonym_groups):
                 matched.add(str(item.item_id))
         if not matched:
             continue

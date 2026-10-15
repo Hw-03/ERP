@@ -1,4 +1,6 @@
 import type { AdjLineTemplate } from "@/lib/api/types/dept-adjustment";
+import type { ItemSearchConfig } from "@/lib/api/types/item-search";
+import { matchesItemSearchFields } from "@/lib/itemSearch";
 import type { ChildDecision } from "../../_defect_hub/DisassembleTree";
 
 /** 표시 정보는 모바일에만 보관한다. 서버 변환은 기존 ChildDecision 계약을 사용한다. */
@@ -100,12 +102,14 @@ export function activeRows(nodes: MobileReworkDecision[], path: ReworkPath = [],
 }
 
 /** 필터는 일치 행과 조상을 표시하며 사용자의 접힘 기록을 변경하지 않는다. */
-export function visibleRows(rows: ReworkRow[], expanded: Record<string, boolean>, search: string, changedOnly: boolean, focusedPath?: string): ReworkRow[] {
+export function visibleRows(rows: ReworkRow[], expanded: Record<string, boolean>, search: string, changedOnly: boolean, focusedPath?: string, config?: ItemSearchConfig): ReworkRow[] {
   const query = search.trim().toLocaleLowerCase();
   if (!query && !changedOnly) return rows.filter(({ path }) => path.slice(0, -1).every((_, index) => expanded[path.slice(0, index + 1).join("/")] !== false));
   const visible = new Set<string>();
   for (const { node, path } of rows) {
-    if (path.join("/") !== focusedPath && !((!changedOnly || hasChanges(node)) && `${node.item_name} ${node.mes_code} ${node.department ?? ""}`.toLocaleLowerCase().includes(query))) continue;
+    if (path.join("/") !== focusedPath && !((!changedOnly || hasChanges(node)) && matchesItemSearchFields({
+      itemId: node.item_id, nameFields: [node.item_name], literalFields: [node.mes_code, node.department],
+    }, query, config))) continue;
     path.forEach((_, index) => visible.add(path.slice(0, index + 1).join("/")));
   }
   return rows.filter(({ path }) => visible.has(path.join("/")));

@@ -68,13 +68,13 @@ describe("DesktopWarehouseMapView fullscreen", () => {
       return <button onClick={() => requestHome()}>지도 첫 화면</button>;
     }
     renderWithClient(<DirtyGuardProvider><DesktopTabHomeProvider><HomeButton /><DesktopWarehouseMapView /></DesktopTabHomeProvider></DirtyGuardProvider>);
-    fireEvent.change(screen.getByPlaceholderText(/품목명.*코드 검색/), { target: { value: "전극" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "품목명·코드 검색" }), { target: { value: "전극" } });
     fireEvent.click(await screen.findByRole("button", { name: "앵글 1 1 x 1" }));
     const card = screen.getByTestId("warehouse-map-card");
     expect(screen.getByRole("button", { name: "뒤로" })).toBeInTheDocument();
     fireEvent.click(screen.getByText("지도 첫 화면"));
     expect(screen.getByRole("button", { name: "앵글 1 1 x 1" })).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/품목명.*코드 검색/)).toHaveValue("전극");
+    expect(screen.getByRole("textbox", { name: "품목명·코드 검색" })).toHaveValue("전극");
     expect(screen.getByTestId("warehouse-map-card")).toBe(card);
   });
   it("최초 조회 중에도 검색 도구줄과 지도 캔버스 자리를 유지한다", () => {
@@ -82,7 +82,7 @@ describe("DesktopWarehouseMapView fullscreen", () => {
 
     renderWithClient(<DesktopWarehouseMapView />);
 
-    expect(screen.getByPlaceholderText(/품목명.*코드 검색/)).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "품목명·코드 검색" })).toBeInTheDocument();
     expect(screen.getByRole("status", { name: "창고 지도 불러오는 중" })).toBeInTheDocument();
     expect(screen.getByTestId("warehouse-map-canvas-skeleton")).toBeInTheDocument();
   });
@@ -110,7 +110,7 @@ describe("DesktopWarehouseMapView fullscreen", () => {
     renderWithClient(<DesktopWarehouseMapView />);
 
     expect(await screen.findByText("앵글 1")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/품목명.*코드 검색/)).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "품목명·코드 검색" })).toBeInTheDocument();
   });
 
   it("uses a rounded flat surface in regular mode", async () => {
@@ -208,7 +208,7 @@ describe("DesktopWarehouseMapView fullscreen", () => {
     const { client } = renderWithClient(<DesktopWarehouseMapView />);
 
     await screen.findByText("앵글 1");
-    const search = await screen.findByPlaceholderText(/품목명.*코드 검색/);
+    const search = await screen.findByRole("textbox", { name: "품목명·코드 검색" });
     fireEvent.change(search, { target: { value: "검색 품목" } });
     expect(await screen.findByRole("button", { name: /앵글 1.*×2/ })).toBeInTheDocument();
     expect(screen.getAllByText("A열", { exact: true }).length).toBeGreaterThan(0);

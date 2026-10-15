@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDesktopTabHome } from "../DesktopTabHome";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
-import { Check, ChevronLeft, Search } from "lucide-react";
+import { Check, ChevronLeft } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { QuantityInput } from "../common/QuantityInput";
 import { EmptyState } from "../common/EmptyState";
 import type { Item } from "@/lib/api";
 import { Button } from "@/lib/ui/Button";
-import { matchesSearchText } from "@/lib/searchText";
+import { useItemSearch } from "@/lib/queries/useItemSearch";
+import { SearchInput } from "../common/SearchInput";
 import { rowLabel, SIZE_LABEL, SIZE_UNIT } from "./helpers";
 import {
   warehouseMapApi,
@@ -53,6 +54,7 @@ export function AddBoxScreen({
   onCancel: () => void;
 }) {
   const isEdit = !!editBox;
+  const { matchesItem } = useItemSearch();
   const [size, setSize] = useState<BoxSize>(editBox ? editBox.size : remaining >= 2 ? "MEDIUM" : "SMALL");
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<Map<string, number>>(
@@ -82,8 +84,8 @@ export function AddBoxScreen({
   const overflow = isEdit ? false : (SIZE_UNIT[size] ?? 1) > remaining;
 
   const filtered = useMemo(() => {
-    return items.filter((it) => matchesSearchText(it.item_name, search) || matchesSearchText(it.mes_code, search));
-  }, [items, search]);
+    return items.filter((it) => matchesItem(it, search));
+  }, [items, search, matchesItem]);
 
   function toggleItem(it: Item) {
     const willAdd = !cart.has(it.item_id);
@@ -263,24 +265,13 @@ export function AddBoxScreen({
 
       {/* 검색 */}
       <div style={{ flexShrink: 0, padding: "10px 16px", borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
-        <div
-          style={{
-            ...inputBase,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "6px 10px",
-            borderRadius: 10,
-          }}
-        >
-          <Search size={14} style={{ color: LEGACY_COLORS.muted2, flexShrink: 0 }} />
-          <input
-            style={{ flex: 1, minWidth: 0, background: "transparent", outline: "none", fontSize: 13, color: LEGACY_COLORS.text }}
-            placeholder="품목명 또는 코드로 검색"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+        <SearchInput
+          ariaLabel="박스에 넣을 품목 검색"
+          placeholder="품목명·코드·검색용 이름으로 검색"
+          value={search}
+          onChange={setSearch}
+          style={{ borderRadius: 10 }}
+        />
       </div>
 
       {/* 품목 리스트 */}

@@ -47,6 +47,18 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("EmployeeCombobox 한글 조립", () => {
+  it("IME 조합 Enter는 직원을 선택하지 않고 완료 후 Enter로 선택한다", () => {
+    const { input, onChange } = renderCombobox();
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: "김" } });
+    fireEvent.keyDown(input, { key: "Enter", keyCode: 229 });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    fireEvent.compositionEnd(input, { data: "김" });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onChange).toHaveBeenCalledOnce();
+  });
+
   it.each([
     ["P", "ㅖ", "ㅔ"],
     ["O", "ㅒ", "ㅐ"],
@@ -74,6 +86,14 @@ describe("EmployeeCombobox 한글 조립", () => {
     enterKey(input, "P", false, "P");
 
     expect(input).toHaveValue("ㅔ");
+  });
+
+  it("같은 문자로 다시 교체해도 한글 변환 표시를 보존한다", () => {
+    const { input } = renderCombobox();
+    enterKey(input, "P", true);
+    input.setSelectionRange(0, 1);
+    enterKey(input, "P", true, "P");
+    expect(input).toHaveValue("ㅖ");
   });
 
   it("Backspace 뒤 Shift 모음을 다시 조립", () => {
@@ -115,6 +135,22 @@ describe("EmployeeCombobox 한글 조립", () => {
     ]);
     fireEvent.change(codeInput, { target: { value: "김E100" } });
 
+    expect(screen.getByRole("option", { name: /김예진/ })).toBeInTheDocument();
+  });
+
+  it("직원명과 부서를 띄어 쓰면 두 조건 모두 포함한 직원을 찾는다", () => {
+    const { input } = renderCombobox([
+      makeEmployee({ name: "김예진", department: "조립" }),
+      makeEmployee({ employee_id: "emp-2", name: "김민수", department: "생산" }),
+    ]);
+    fireEvent.change(input, { target: { value: "김 조립" } });
+    expect(screen.getByRole("option", { name: /김예진/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /김민수/ })).not.toBeInTheDocument();
+  });
+
+  it("이름과 직원 코드도 한영 변환 후 원문 조건으로 함께 찾는다", () => {
+    const { input } = renderCombobox([makeEmployee({ employee_code: "E100" })]);
+    fireEvent.change(input, { target: { value: "김 E100" } });
     expect(screen.getByRole("option", { name: /김예진/ })).toBeInTheDocument();
   });
 

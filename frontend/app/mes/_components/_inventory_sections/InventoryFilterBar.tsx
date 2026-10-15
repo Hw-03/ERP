@@ -1,10 +1,11 @@
 "use client";
 
-import { Layers, RotateCcw, Search, Sparkles, TrendingUp } from "lucide-react";
+import { Layers, RotateCcw, Sparkles, TrendingUp } from "lucide-react";
 import type { ProductModel } from "@/lib/api";
 import type { ReactNode, Ref } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { FilterChip } from "../common";
+import { SearchInput } from "../common/SearchInput";
 import type { DepartmentFilterBasis } from "./inventoryFilter";
 
 const DEPT_CHIPS = ["튜브", "고압", "진공", "튜닝", "조립", "출하"] as const;
@@ -188,6 +189,7 @@ export function InventoryFilters({
 }
 
 type StickyHeaderProps = {
+  onManageSearch?: () => void;
   searchValue: string;
   onSearchChange: (v: string) => void;
   count: number;
@@ -210,6 +212,7 @@ export function InventoryTableStickyHeader({
   searchLabel = "자재 검색",
   searchPlaceholder = "품명 · 품목 코드 · 위치 · 공급처 검색",
   headerRef,
+  onManageSearch,
 }: StickyHeaderProps) {
   return (
     <div
@@ -220,22 +223,9 @@ export function InventoryTableStickyHeader({
       }}
     >
       <div className={compact ? "flex items-center px-3 pb-3 pt-3" : "flex flex-wrap items-center gap-2.5 px-5 pb-[15px] pt-[14px]"}>
-        <div
-          className={`flex w-full min-w-0 items-center gap-2 rounded-[14px] border px-3 py-2 ${compact ? "min-h-11" : ""}`}
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-        >
-          <Search className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-          <input
-            value={searchValue}
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder={searchPlaceholder}
-            disabled={disabled}
-            className="min-w-0 flex-1 bg-transparent text-base outline-none"
-            inputMode="search"
-            style={{ color: LEGACY_COLORS.text }}
-            aria-label={searchLabel}
-          />
-        </div>
+        <SearchInput value={searchValue} onChange={onSearchChange} placeholder={searchPlaceholder} disabled={disabled} ariaLabel={searchLabel} className="min-w-0 flex-1" />
+        {onManageSearch && <button type="button" onClick={onManageSearch} disabled={disabled} className="min-h-11 shrink-0 rounded-[14px] border px-3 text-sm font-semibold active:scale-95 disabled:opacity-50"
+          style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.blue, borderColor: LEGACY_COLORS.border }}>검색어 연결</button>}
       </div>
       <div
         aria-hidden

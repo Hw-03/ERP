@@ -12,7 +12,8 @@ import {
 import { ChevronDown, User as UserIcon } from "lucide-react";
 import type { Employee } from "@/lib/api";
 import { toChosung, toHangul, toQwerty } from "@/lib/hangul";
-import { matchesSearchText, normalizeSearchText } from "@/lib/searchText";
+import { matchesSearchFields, normalizeSearchText } from "@/lib/searchText";
+import { SearchInput } from "../common/SearchInput";
 
 const isHangulChar = (c: string) => /[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(c);
 
@@ -42,6 +43,7 @@ export function EmployeeCombobox({
   // 영타 조립 전 원본 키 버퍼 (직원코드 등 라틴 검색 폴백용)
   const rawRef = useRef("");
   const pendingLatinKeyRef = useRef<{ character: string; position: number } | null>(null);
+  const composingRef = useRef(false);
 
   const sortedEmployees = useMemo(
     () => [...employees].sort((a, b) => a.name.localeCompare(b.name, "ko-KR")),
@@ -54,12 +56,9 @@ export function EmployeeCombobox({
     if (!q) return sortedEmployees;
     return sortedEmployees.filter(
       (e) =>
-        matchesSearchText(e.name, query) ||
-        matchesSearchText(e.department, query) ||
-        matchesSearchText(e.employee_code, query) ||
-        matchesSearchText(e.employee_code, raw) ||
-        // 초성검색: q 가 초성 자모열("ㄱㄱㅎ")일 때만 이름 초성("김건호"→"ㄱㄱㅎ")에 매칭.
-        toChosung(e.name).includes(q),
+        matchesSearchFields([e.name, e.department, e.employee_code, toChosung(e.name)], query) ||
+        // 자동 한영 조립 전 원문도 같은 AND 규칙으로 비교해 직원 코드를 보존한다.
+        matchesSearchFields([toQwerty(e.name), toQwerty(e.department), e.employee_code], raw),
     );
   }, [sortedEmployees, query]);
 
@@ -138,6 +137,10 @@ export function EmployeeCombobox({
   };
 
   const handleInputKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (composingRef.current || e.nativeEvent.isComposing || e.keyCode === 229) {
+      pendingLatinKeyRef.current = null;
+      return;
+    }
     if (!e.ctrlKey && !e.metaKey && !e.altKey && /^[a-z]$/i.test(e.key)) {
       pendingLatinKeyRef.current = {
         character: e.shiftKey ? e.key.toUpperCase() : e.key.toLowerCase(),
@@ -160,37 +163,36 @@ export function EmployeeCombobox({
       >
         직원 선택
       </label>
-      <div
-        className="flex items-center gap-3 rounded-[14px] border px-4 py-3.5 transition-colors focus-within:border-[var(--c-blue)]"
-        style={{
-          background: "var(--c-s2)",
-          borderColor: "var(--c-border)",
-          opacity: disabled ? 0.6 : 1,
-        }}
-      >
-        <UserIcon size={18} style={{ color: "var(--c-blue)", flexShrink: 0 }} />
-        <input
-          ref={inputRef}
-          id={inputId}
-          type="text"
-          role="combobox"
-          aria-controls={listId}
-          aria-expanded={open}
-          aria-autocomplete="list"
-          aria-activedescendant={
-            open && filtered[active] ? `${listId}-opt-${active}` : undefined
-          }
-          autoComplete="off"
+        <SearchInput
+          inputRef={inputRef}
+          inputProps={{
+            id: inputId,
+            type: "text",
+            role: "combobox",
+            "aria-controls": listId,
+            "aria-expanded": open,
+            "aria-autocomplete": "list",
+            "aria-activedescendant": open && filtered[active] ? `${listId}-opt-${active}` : undefined,
+            autoComplete: "off",
+            className: "!h-auto !text-base placeholder:text-[var(--c-muted)]",
+            onCompositionStart: () => { composingRef.current = true; pendingLatinKeyRef.current = null; },
+            onCompositionEnd: () => { composingRef.current = false; },
+          }}
           autoFocus={autoFocus}
           disabled={disabled}
+          clearable={open && Boolean(query)}
+          clearAriaLabel="직원 검색 지우기"
+          leading={<UserIcon size={18} style={{ color: "var(--c-blue)", flexShrink: 0 }} />}
+          className="gap-3 px-4 py-1 transition-colors focus-within:border-[var(--c-blue)]"
+          style={{ opacity: disabled ? 0.6 : 1 }}
           placeholder="직원 이름 또는 부서 검색"
           value={displayValue}
           onClick={() => setOpen(true)}
-          onChange={(e) => {
+          onChange={(next) => {
             // 이미 표시된 한글은 키로 되돌리고, 새로 입력된 라틴 문자는 그대로 이어붙여
             // 전체를 다시 한글로 조립한다. 실제 Shift 키 입력만 Shift 자모로 보존한다.
             const pendingLatinKey = pendingLatinKeyRef.current;
-            let inputValue = e.target.value;
+            let inputValue = next;
             if (pendingLatinKey) {
               const { character, position } = pendingLatinKey;
               if (inputValue.slice(position, position + 1).toLowerCase() === character.toLowerCase()) {
@@ -206,10 +208,7 @@ export function EmployeeCombobox({
             setOpen(true);
           }}
           onKeyDown={handleInputKeyDown}
-          className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-[var(--c-muted)]"
-          style={{ color: "var(--c-text)" }}
-        />
-        <button
+          trailing={<button
           type="button"
           tabIndex={-1}
           aria-label={open ? "직원 목록 닫기" : "직원 목록 열기"}
@@ -219,7 +218,7 @@ export function EmployeeCombobox({
             setOpen((prev) => !prev);
             inputRef.current?.focus();
           }}
-          className="no-btn-inset flex shrink-0 items-center justify-center bg-transparent p-0"
+          className="no-btn-inset -mr-3.5 flex min-h-11 min-w-11 shrink-0 items-center justify-center bg-transparent p-0"
           style={{ color: "var(--c-muted)", cursor: disabled ? "default" : "pointer" }}
         >
           <ChevronDown
@@ -229,8 +228,8 @@ export function EmployeeCombobox({
               transform: open ? "rotate(180deg)" : "rotate(0deg)",
             }}
           />
-        </button>
-      </div>
+        </button>}
+        />
 
       {open && (
         <ul

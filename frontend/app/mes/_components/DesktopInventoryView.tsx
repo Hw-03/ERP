@@ -18,13 +18,15 @@ import { useDesktopInventoryDerivations } from "./_hooks/useDesktopInventoryDeri
 import { useItemImageManifest } from "./_hooks/useItemImageManifest";
 import { useToggleSet } from "./_hooks/useToggleSet";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
+import { useItemSearch } from "@/lib/queries/useItemSearch";
+import { SearchConfigStatus } from "./common/SearchConfigStatus";
+import { ItemSearchManagementPanel } from "./common/ItemSearchManagementPanel";
 // R9-2: helper 4개 (getMinStock / safeQty / matchesSearch / matchesKpi) 분리
 import {
   DEFAULT_INVENTORY_FILTER_LOGIC,
   DEFAULT_DEPARTMENT_FILTER_BASIS,
   matchesInventoryCategoryFilters,
   matchesKpi,
-  matchesSearch,
   type InventoryFilterLogic,
   type DepartmentFilterBasis,
 } from "./_inventory_sections/inventoryFilter";
@@ -65,6 +67,12 @@ export function DesktopInventoryView({
     actionsDisabled, selectItem, closeDetail, retryDetail } = useInventoryViewState(items);
   useDesktopTabHome("inventory", { isHome: !detailOpen, returnHome: closeDetail });
   const imageManifest = useItemImageManifest();
+  const { matchesItem } = useItemSearch();
+  const [searchManagementOpen, setSearchManagementOpen] = useState(false);
+  const selectInventoryItem = useCallback((item: Item | null): void => {
+    setSearchManagementOpen(false);
+    selectItem(item);
+  }, [selectItem]);
   const productModels = useModelsQuery().data ?? EMPTY_MODELS;
   const [kpi, setKpi] = useState<KpiFilter>("ALL");
   const [displayLimit, setDisplayLimit] = useState(DESKTOP_PAGE_SIZE);
@@ -102,7 +110,7 @@ export function DesktopInventoryView({
       items.filter((item) => {
         // 김건호 피드백 1 — 삭제(소프트삭제) 품목은 대시보드 재고 목록에 노출하지 않음.
         if (item.deleted_at) return false;
-        if (!matchesSearch(item, deferredLocalSearch)) return false;
+        if (!matchesItem(item, deferredLocalSearch)) return false;
         if (
           !matchesInventoryCategoryFilters(item, {
             selectedDepts,
@@ -116,7 +124,7 @@ export function DesktopInventoryView({
         ) return false;
         return true;
       }),
-    [items, deferredLocalSearch, selectedDepts, departmentFilterBasis, selectedSlots, showUnclassified, showDisused, selectedProcessSteps, filterLogic],
+    [items, deferredLocalSearch, matchesItem, selectedDepts, departmentFilterBasis, selectedSlots, showUnclassified, showDisused, selectedProcessSteps, filterLogic],
   );
   const filteredItems = useMemo(() => scopedItems.filter((item) => matchesKpi(item, kpi)), [scopedItems, kpi]);
 
@@ -215,11 +223,14 @@ export function DesktopInventoryView({
           <section data-testid="inventory-list-card" aria-label="자재 목록" className="card desktop-flat-surface flex flex-1 flex-col">
             <InventoryTableStickyHeader
               searchValue={localSearch}
+              searchPlaceholder="품명 · 품목 코드 · 검색용 이름"
               onSearchChange={setLocalSearch}
+              onManageSearch={() => setSearchManagementOpen(true)}
               count={filteredItems.length}
               isFiltered={isFiltered}
               onResetAllFilters={resetAllFilters}
             />
+            <SearchConfigStatus active={!!localSearch.trim()} />
             <InventoryItemsTable
               error={error}
               refreshError={refreshError}
@@ -228,8 +239,8 @@ export function DesktopInventoryView({
               displayLimit={displayLimit}
               setDisplayLimit={setDisplayLimit}
               selectedItem={selectedItem}
-              detailOpen={detailOpen}
-              onSelectItem={selectItem}
+              detailOpen={detailOpen && !searchManagementOpen}
+              onSelectItem={selectInventoryItem}
               activeFilterCount={activeFilterCount}
               hasKpiFilter={kpi !== "ALL"}
               hasSearch={!!localSearch.trim()}
@@ -258,7 +269,7 @@ export function DesktopInventoryView({
       </div>
 
       <DesktopInventoryRightPanel
-        open={detailOpen}
+        open={detailOpen && !searchManagementOpen}
         selectedItem={selectedItem}
         displayItem={displayItem}
         headerBadge={headerBadge}
@@ -271,6 +282,7 @@ export function DesktopInventoryView({
         actionsDisabled={actionsDisabled}
         imageFilename={displayItem?.mes_code ? imageManifest[displayItem.mes_code] : undefined}
       />
+      <ItemSearchManagementPanel open={searchManagementOpen} onClose={() => setSearchManagementOpen(false)} />
     </div>
   );
 }

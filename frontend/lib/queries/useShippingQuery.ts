@@ -18,10 +18,12 @@
  * 탭 재방문 시 재요청 없이 즉시 렌더.
  */
 
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type ShippingHistoryParams, type ShippingHistoryStatus } from "@/lib/api";
 import { STALE_TIME } from "./client";
 import { queryKeys } from "./keys";
+import { useItemSearch } from "./useItemSearch";
 
 type ShippingRequestsQueryOptions = {
   live?: boolean;
@@ -59,13 +61,24 @@ export function useShippingHistoryQuery(enabled = true) {
 
 export function useShippingHistoryPagesQuery(params: ShippingHistoryParams, enabled = true) {
   const { cursor: _cursor, ...filters } = params;
-  return useInfiniteQuery({
-    queryKey: queryKeys.shipping.historyPages(filters),
+  const { config, retry } = useItemSearch();
+  const queryClient = useQueryClient();
+  const queryKey = [...queryKeys.shipping.historyPages(filters), ...(config.version ? [config.version] : [])];
+  const query = useInfiniteQuery({
+    queryKey,
     queryFn: ({ pageParam, signal }) => api.getShippingHistory({ ...filters, cursor: pageParam ?? undefined, limit: filters.limit ?? 50 }, { signal }),
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.has_more ? page.next_cursor : undefined,
     enabled,
   });
+  useEffect(() => {
+    if ((query.error as { code?: string } | null)?.code !== "SEARCH_CONFIG_STALE") return;
+    retry();
+    void queryClient.resetQueries({ queryKey, exact: true });
+    // Restart only the cursor rejected by the server, without altering the current filters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query.error, queryClient, retry]);
+  return query;
 }
 
 export function useShippingHistoryMonthsQuery(params?: { status?: ShippingHistoryStatus; year?: number }, enabled = true) {

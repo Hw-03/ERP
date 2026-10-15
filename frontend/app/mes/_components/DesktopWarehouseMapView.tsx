@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDesktopQueryState, useDesktopTabHome } from "./DesktopTabHome";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, MapPin, Maximize2, Plus, Save, Search, Trash2, X } from "lucide-react";
+import { ChevronLeft, MapPin, Maximize2, Plus, Save, Trash2, X } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { QuantityInput } from "./common/QuantityInput";
-import { matchesSearchText, normalizeSearchText } from "@/lib/searchText";
+import { normalizeSearchText } from "@/lib/searchText";
+import { useItemSearch } from "@/lib/queries/useItemSearch";
+import { SearchInput } from "./common/SearchInput";
 import { SlidePanel } from "./common/SlidePanel";
 import { LoadFailureCard } from "./common/LoadFailureCard";
 import {
@@ -243,6 +245,7 @@ export function DesktopWarehouseMapView({
   }, [error, onStatusChange]);
 
   const cellIndex = useMemo(() => buildCellIndex(map?.boxes ?? []), [map]);
+  const { matchesItem } = useItemSearch();
   const angles = map?.angles ?? [];
 
   function setAnimatedStage(next: Stage) {
@@ -595,8 +598,7 @@ export function DesktopWarehouseMapView({
     for (const b of map.boxes) {
       for (const it of b.items) {
         if (
-          matchesSearchText(it.item_name, q) ||
-          matchesSearchText(it.mes_code, q)
+          matchesItem(it, q)
         ) {
           let g = byItem.get(it.item_id);
           if (!g) {
@@ -644,6 +646,12 @@ export function DesktopWarehouseMapView({
     for (const m of matches) for (const h of m.hits) hitA.set(h.angle_id, (hitA.get(h.angle_id) ?? 0) + 1);
     setHitAngles(hitA);
   }
+
+  const refreshSearchRef = useRef<() => void>(() => {});
+  refreshSearchRef.current = () => {
+    if (query && !selectedItem) runSearch(query);
+  };
+  useEffect(() => { refreshSearchRef.current(); }, [matchesItem]);
 
   // 품목 후보 하나 선택 — 그 품목 칸만 칩 스트립에 남기고 첫 칸으로 이동.
   function selectItem(m: ItemMatch, opts?: { keepQuery?: boolean }) {
@@ -814,55 +822,19 @@ export function DesktopWarehouseMapView({
 
           {/* Search — 헤더 중앙에 절대 고정 (stage 전환 시 위치 불변) */}
           <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", flexShrink: 0, zIndex: 5 }}>
-            <div
+            <SearchInput
+              inputRef={searchInputRef}
+              value={query}
+              onChange={(next) => { if (next) runSearch(next); else clearSearch(); }}
+              ariaLabel="품목명·코드 검색"
+              placeholder="품목명·코드·검색용 이름  (/)"
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                background: LEGACY_COLORS.s2,
-                border: `1px solid ${query ? LEGACY_COLORS.blue : LEGACY_COLORS.border}`,
-                borderRadius: 10,
-                padding: "8px 14px",
                 width: 440,
+                borderRadius: 10,
+                borderColor: query ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
                 boxShadow: query ? `0 0 0 3px color-mix(in srgb, ${LEGACY_COLORS.blue} 22%, transparent)` : undefined,
               }}
-            >
-              <Search size={18} style={{ color: LEGACY_COLORS.blue, flexShrink: 0 }} />
-              <input
-                ref={searchInputRef}
-                value={query}
-                onChange={(e) => runSearch(e.target.value)}
-                placeholder="품목명·코드 검색  (/)"
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  background: "transparent",
-                  border: "none",
-                  outline: "none",
-                  fontSize: 14,
-                  color: LEGACY_COLORS.text,
-                }}
-              />
-              {query && (
-                <button
-                  onClick={clearSearch}
-                  style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: 9999,
-                    background: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 15%, transparent)`,
-                    color: LEGACY_COLORS.muted2,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                    cursor: "pointer",
-                  }}
-                >
-                  <X size={10} />
-                </button>
-              )}
-            </div>
+            />
 
             {/* 품목 후보 드롭다운 (품목 단위) */}
             {itemMatches && itemMatches.length > 1 && (

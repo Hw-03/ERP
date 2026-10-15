@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
-import { Check, GripVertical, Plus, RotateCcw, Save, Search, Settings2 } from "lucide-react";
+import { Check, GripVertical, Plus, RotateCcw, Save, Settings2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import { EmptyState } from "../common";
 import { SkeletonBlock } from "../common/LoadingSkeleton";
+import { SearchInput } from "../common/SearchInput";
 import { ReadFailure } from "../common/ReadState";
 import { useCurrentOperator } from "../login/useCurrentOperator";
-import { DEPT_OPTIONS, PAGE_SIZE, matchesSearch } from "../_warehouse_steps/_constants";
+import { DEPT_OPTIONS, PAGE_SIZE } from "../_warehouse_steps/_constants";
+import { useItemSearch } from "@/lib/queries/useItemSearch";
 import { LabeledSelect } from "../_warehouse_v2/_atoms";
 import type { Item, ProductModel } from "../_warehouse_v2/types";
 import {
@@ -93,6 +95,7 @@ export function DefectItemPicker({
   const resetMyOrder = useResetMyItemOrderMutation();
 
   const keyword = search.trim().toLowerCase();
+  const { matchesItem: matchesSearch } = useItemSearch();
   const deptPriorityByLetter = useMemo(
     () => buildDeptPriorityByLetter(dept === "ALL" ? mobilePresentation ? undefined : operator?.department : dept),
     [dept, mobilePresentation, operator?.department],
@@ -120,7 +123,7 @@ export function DefectItemPicker({
         matchesSearch(item, keyword),
     );
     return sortItemsForPicker(filtered, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank);
-  }, [items, source, dept, model, stage, keyword, productModels, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank]);
+  }, [items, source, dept, model, stage, keyword, productModels, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank, matchesSearch]);
 
   useEffect(() => {
     if (tableRef.current) tableRef.current.scrollTop = 0;
@@ -193,19 +196,8 @@ export function DefectItemPicker({
               >
                 검색
               </span>
-              <div
-                className="flex items-center gap-1.5 rounded-[10px] border px-2 py-1.5"
-                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-              >
-                <Search className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="품목명 · 품목 코드"
-                  className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-                  style={{ color: LEGACY_COLORS.text }}
-                />
-              </div>
+              <SearchInput value={search} onChange={setSearch} placeholder="품목명 · 품목 코드"
+                ariaLabel="검색" className="rounded-[10px] px-2" />
             </label>
           </div>
           {!mobilePresentation && operator?.employee_id && (

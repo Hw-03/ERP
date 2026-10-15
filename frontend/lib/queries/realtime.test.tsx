@@ -3,6 +3,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryProvider } from "./client";
+import { itemSearchApi } from "../api/item-search";
+import { queryKeys } from "./keys";
+vi.mock("../api/item-search", () => ({ itemSearchApi: { getConfig: vi.fn().mockResolvedValue({ version: "v1", synonym_groups: [], item_aliases: {} }) } }));
 import {
   invalidateOperationalQueries,
   RealtimeSyncProvider,
@@ -89,6 +92,7 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
+  vi.mocked(itemSearchApi.getConfig).mockResolvedValue({ version: "v1", synonym_groups: [], item_aliases: {} });
   FakeEventSource.instances = [];
   vi.stubGlobal("EventSource", FakeEventSource);
   vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(makeResponse(VALID_SNAPSHOT))));
@@ -101,6 +105,19 @@ afterEach(() => {
 });
 
 describe("invalidateOperationalQueries", () => {
+  it("검색 설정을 먼저 갱신한 뒤 운영 결과를 무효화한다", async () => {
+    const client = makeClient();
+    client.setQueryData(queryKeys.itemSearch.config(), { version: "v1", synonym_groups: [], item_aliases: {} });
+    const pending = deferred<{ version: string; synonym_groups: []; item_aliases: {} }>();
+    vi.mocked(itemSearchApi.getConfig).mockReturnValueOnce(pending.promise);
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries").mockResolvedValue();
+    const result = invalidateOperationalQueries(client);
+    expect(invalidateSpy).not.toHaveBeenCalled();
+    pending.resolve({ version: "v2", synonym_groups: [], item_aliases: {} });
+    await result;
+    expect(client.getQueryData(queryKeys.itemSearch.config())).toMatchObject({ version: "v2" });
+    expect(invalidateSpy).toHaveBeenCalledTimes(12);
+  });
   it("무효화하는 operational query root 목록이 정확하다", async () => {
     const client = makeClient();
     const invalidateSpy = vi.spyOn(client, "invalidateQueries").mockResolvedValue();
@@ -125,6 +142,23 @@ describe("invalidateOperationalQueries", () => {
 });
 
 describe("RealtimeSyncProvider", () => {
+  it("검색 설정 조회가 일시적으로 실패하면 같은 revision도 자동 복구한다", async () => {
+    vi.useFakeTimers();
+    const client = makeClient();
+    client.setQueryData(queryKeys.itemSearch.config(), { version: "v1", synonym_groups: [], item_aliases: {} });
+    vi.mocked(itemSearchApi.getConfig).mockRejectedValueOnce(new Error("일시적 조회 실패"))
+      .mockResolvedValue({ version: "v2", synonym_groups: [], item_aliases: {} });
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries").mockResolvedValue();
+    render(<RevisionValue />, { wrapper: makeWrapper(client) });
+    act(() => FakeEventSource.instances[0].emitRevision(JSON.stringify(VALID_SNAPSHOT)));
+    await act(async () => vi.advanceTimersByTimeAsync(250));
+    expect(screen.getByTestId("revision")).toHaveTextContent("null");
+    expect(invalidateSpy).not.toHaveBeenCalled();
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
+    expect(client.getQueryData(queryKeys.itemSearch.config())).toMatchObject({ version: "v2" });
+    expect(screen.getByTestId("revision")).toHaveTextContent("7");
+    expect(invalidateSpy).toHaveBeenCalledTimes(12);
+  });
   it("named revision SSE의 첫 valid snapshot을 context에 반영하고 operational cache를 무효화한다", async () => {
     const client = makeClient();
     const invalidateSpy = vi.spyOn(client, "invalidateQueries").mockResolvedValue();

@@ -3,6 +3,7 @@
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { queryKeys } from "./keys";
+import { itemSearchConfigOptions } from "./useItemSearch";
 
 const STREAM_URL = "/api/realtime/stream";
 const REVISION_URL = "/api/realtime/revision";
@@ -41,10 +42,17 @@ function parseRevisionSnapshot(value: unknown): RevisionSnapshot | null {
   return snapshot as RevisionSnapshot;
 }
 
-export async function invalidateOperationalQueries(queryClient: QueryClient): Promise<void> {
+/** Return false when metadata must recover before publishing new search results. */
+export async function invalidateOperationalQueries(queryClient: QueryClient, onMetadataReady?: () => void): Promise<boolean> {
+  if (queryClient.getQueryState(queryKeys.itemSearch.config())) {
+    try { await queryClient.fetchQuery({ ...itemSearchConfigOptions, staleTime: 0, retry: false }); }
+    catch { return false; }
+  }
+  onMetadataReady?.();
   await Promise.all(
     OPERATIONAL_QUERY_ROOTS.map((queryKey) => queryClient.invalidateQueries({ queryKey })),
   );
+  return true;
 }
 
 export function RealtimeSyncProvider({ children }: { children: ReactNode }) {
@@ -59,8 +67,9 @@ export function RealtimeSyncProvider({ children }: { children: ReactNode }) {
     let fallbackInterval: ReturnType<typeof setInterval> | null = null;
     let flushTimer: ReturnType<typeof setTimeout> | null = null;
     let inFlightRevisionCheck: Promise<void> | null = null;
-    let inFlightInvalidation: Promise<void> | null = null;
+    let inFlightInvalidation: Promise<boolean> | null = null;
     let pendingRevision: number | null = null;
+    let retryDelayMs = FALLBACK_INTERVAL_MS;
     let sseEpoch = 0;
 
     function flushPendingRevision() {
@@ -76,18 +85,30 @@ export function RealtimeSyncProvider({ children }: { children: ReactNode }) {
       pendingRevision = null;
       if (nextRevision === appliedRevision.current) return;
 
-      appliedRevision.current = nextRevision;
-      setRevision(nextRevision);
-      const invalidation = invalidateOperationalQueries(queryClient);
+      const invalidation = invalidateOperationalQueries(queryClient, () => {
+        if (!disposed) setRevision(nextRevision);
+      });
       inFlightInvalidation = invalidation;
-      const finishInvalidation = () => {
+      const finishInvalidation = (delayMs = REVISION_BATCH_WINDOW_MS) => {
         if (inFlightInvalidation === invalidation) inFlightInvalidation = null;
-        if (!disposed) scheduleRevisionFlush();
+        if (!disposed) scheduleRevisionFlush(delayMs);
       };
-      void invalidation.then(finishInvalidation, finishInvalidation);
+      const retryInvalidation = () => {
+        // Keep the latest pending revision and retry without publishing stale search results.
+        pendingRevision ??= nextRevision;
+        const delayMs = retryDelayMs;
+        retryDelayMs = Math.min(retryDelayMs * 2, 30_000);
+        finishInvalidation(delayMs);
+      };
+      void invalidation.then((success) => {
+        if (!success) { retryInvalidation(); return; }
+        appliedRevision.current = nextRevision;
+        retryDelayMs = FALLBACK_INTERVAL_MS;
+        finishInvalidation();
+      }, retryInvalidation);
     }
 
-    function scheduleRevisionFlush() {
+    function scheduleRevisionFlush(delayMs = REVISION_BATCH_WINDOW_MS) {
       if (
         disposed ||
         document.visibilityState === "hidden" ||
@@ -100,7 +121,7 @@ export function RealtimeSyncProvider({ children }: { children: ReactNode }) {
       flushTimer = setTimeout(() => {
         flushTimer = null;
         flushPendingRevision();
-      }, REVISION_BATCH_WINDOW_MS);
+      }, delayMs);
     }
 
     function flushPendingRevisionImmediately() {

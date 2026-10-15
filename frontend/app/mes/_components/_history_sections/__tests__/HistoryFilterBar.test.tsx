@@ -25,6 +25,21 @@ function renderFilterBar(flatSurface?: boolean, mobile?: boolean) {
 }
 
 describe("HistoryFilterBar", () => {
+  it.each([false, true])("commits search only after IME composition ends (mobile: %s)", (mobile) => {
+    const setSearch = vi.fn();
+    render(<HistoryFilterBar search="" setSearch={setSearch} dateFilter="MONTH" setDateFilter={vi.fn()}
+      filterPanelOpen={false} onToggleFilterPanel={vi.fn()} activeFilterCount={0}
+      calendarOpen={false} onToggleCalendar={vi.fn()} selectedDay={null} onClearSelectedDay={vi.fn()}
+      selectedMonth={null} onClearSelectedMonth={vi.fn()} mobile={mobile} />);
+    const input = screen.getByRole("textbox");
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: "작" } });
+    expect(setSearch).not.toHaveBeenCalled();
+    expect(input).toHaveValue("작");
+    fireEvent.compositionEnd(input, { data: "작업", target: { value: "작업" } });
+    expect(setSearch).toHaveBeenLastCalledWith("작업");
+  });
+
   it.each([false, true])("places a pressed mine toggle between period and filter controls (mobile: %s)", (mobile) => {
     const onToggleMine = vi.fn();
     render(<HistoryFilterBar search="" setSearch={vi.fn()} dateFilter="MONTH" setDateFilter={vi.fn()}

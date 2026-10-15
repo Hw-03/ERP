@@ -11,7 +11,8 @@ import { FloorStage, FrontStage } from "../../_warehouse_map_sections/WarehouseS
 import { WarehouseJariPanel } from "../../_warehouse_map_sections/WarehouseJariPanel";
 import { InlineSearch, IconButton } from "../primitives";
 import { TYPO } from "../tokens";
-import { matchesSearchText, normalizeSearchText } from "@/lib/searchText";
+import { normalizeSearchText } from "@/lib/searchText";
+import { useItemSearch } from "@/lib/queries/useItemSearch";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { LoadFailureCard } from "../../common/LoadFailureCard";
 
@@ -116,6 +117,7 @@ export function MobileWarehouseMapScreen({
   }, [reloadNonce, onStatusChange, revision]);
 
   const cellIndex = useMemo(() => buildCellIndex(map?.boxes ?? []), [map]);
+  const { matchesItem } = useItemSearch();
   const angles = useMemo(
     () =>
       (map?.angles ?? [])
@@ -133,7 +135,7 @@ export function MobileWarehouseMapScreen({
     >();
     for (const b of map.boxes) {
       for (const it of b.items) {
-        if (matchesSearchText(it.item_name, search) || matchesSearchText(it.mes_code, search)) {
+        if (matchesItem(it, search)) {
           const k = cellKey(b.angle_id, b.row_no, b.layer_no);
           let e = byCell.get(k);
           if (!e) {
@@ -150,7 +152,7 @@ export function MobileWarehouseMapScreen({
       layer: e.layer,
       names: Array.from(e.names),
     }));
-  }, [search, map]);
+  }, [search, map, matchesItem]);
 
   function openAngle(a: WarehouseAngle) {
     setCurAngleId(a.id);

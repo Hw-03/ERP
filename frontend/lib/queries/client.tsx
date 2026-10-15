@@ -17,6 +17,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { RealtimeSyncProvider } from "./realtime";
+import { SearchConfigProvider } from "./useItemSearch";
+import { SearchConfigStatus } from "@/app/mes/_components/common/SearchConfigStatus";
 
 /**
  * 도메인별 staleTime 티어 (R2-1).
@@ -47,7 +49,7 @@ export function QueryProvider({ children }: { children: ReactNode }) {
   const [client] = useState(() => new QueryClient({ defaultOptions }));
   return (
     <QueryClientProvider client={client}>
-      <RealtimeSyncProvider>{children}</RealtimeSyncProvider>
+      <SearchConfigProvider><SearchConfigStatus floating /><RealtimeSyncProvider>{children}</RealtimeSyncProvider></SearchConfigProvider>
     </QueryClientProvider>
   );
 }

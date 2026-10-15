@@ -6,11 +6,13 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { useShippingHistoryMonthsQuery, useShippingHistoryPagesQuery, useShippingRequestsQuery } from "../useShippingQuery";
 import { queryKeys } from "../keys";
+const searchState = vi.hoisted(() => ({ version: 0, retry: vi.fn() }));
+vi.mock("../useItemSearch", () => ({ useItemSearch: () => ({ config: { version: searchState.version }, retry: searchState.retry }) }));
 
 function makeResponse(body: unknown, ok = true): Response {
   return {
@@ -46,6 +48,8 @@ const sampleRequests = [
 
 const originalFetch = globalThis.fetch;
 afterEach(() => {
+  searchState.version = 0;
+  searchState.retry.mockReset();
   globalThis.fetch = originalFetch;
   vi.restoreAllMocks();
 });
@@ -89,6 +93,43 @@ describe("useShippingRequestsQuery", () => {
 });
 
 describe("paginated shipping history queries", () => {
+  it("restarts at page one after search metadata changes without changing selected filters", async () => {
+    searchState.version = 2;
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse({ requests: [{ request_id: "old" }], next_cursor: "old-cursor", has_more: true }))
+      .mockResolvedValueOnce(makeResponse({ requests: [{ request_id: "tail" }], next_cursor: null, has_more: false }))
+      .mockResolvedValueOnce(makeResponse({ requests: [{ request_id: "fresh" }], next_cursor: null, has_more: false }));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const { result, rerender } = renderHook(() => useShippingHistoryPagesQuery({ status: "PICKED_UP", year: 2026, month: 7, q: "INV" }), { wrapper: makeWrapper(makeClient({ gcTime: 60_000 })) });
+    await waitFor(() => expect(result.current.data?.pages).toHaveLength(1));
+    await act(async () => { await result.current.fetchNextPage(); });
+    await waitFor(() => expect(result.current.data?.pages).toHaveLength(2));
+    searchState.version = 3;
+    rerender();
+    await waitFor(() => expect(result.current.data?.pages[0].requests[0].request_id).toBe("fresh"));
+    expect(result.current.data?.pages).toHaveLength(1);
+    expect(String(fetchSpy.mock.calls[2][0])).not.toContain("cursor=");
+    expect(String(fetchSpy.mock.calls[2][0])).toContain("status=PICKED_UP");
+    expect(String(fetchSpy.mock.calls[2][0])).toContain("q=INV");
+  });
+
+  it("resets a rejected search cursor and keeps the original shipping query", async () => {
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse({ requests: [{ request_id: "old" }], next_cursor: "old-cursor", has_more: true }))
+      .mockResolvedValueOnce({ ...makeResponse({ detail: { code: "SEARCH_CONFIG_STALE", message: "설정 변경" } }, false), status: 409 })
+      .mockResolvedValueOnce(makeResponse({ requests: [{ request_id: "fresh" }], next_cursor: null, has_more: false }));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const { result } = renderHook(() => useShippingHistoryPagesQuery({ status: "PICKED_UP", q: "INV" }), { wrapper: makeWrapper(makeClient({ gcTime: 60_000 })) });
+    await waitFor(() => expect(result.current.data?.pages).toHaveLength(1));
+    await act(async () => { await result.current.fetchNextPage(); });
+    await waitFor(() => expect(result.current.data?.pages[0].requests[0].request_id).toBe("fresh"));
+    expect(result.current.data?.pages).toHaveLength(1);
+    expect(searchState.retry).toHaveBeenCalledOnce();
+    expect(String(fetchSpy.mock.calls[2][0])).not.toContain("cursor=");
+    expect(String(fetchSpy.mock.calls[2][0])).toContain("q=INV");
+    expect(result.current.error).toBeNull();
+  });
+
   it("uses a distinct page cache and passes each cursor to the server", async () => {
     const fetchSpy = vi.fn()
       .mockResolvedValueOnce(makeResponse({ requests: [{ request_id: "first" }], next_cursor: "cursor-2", has_more: true }))

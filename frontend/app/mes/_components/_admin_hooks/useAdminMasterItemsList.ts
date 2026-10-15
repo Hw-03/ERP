@@ -5,7 +5,7 @@
 
 import { useMemo, useState } from "react";
 import type { Item } from "@/lib/api";
-import { matchesItemSearch } from "@/lib/itemSearch";
+import { useItemSearch } from "@/lib/queries/useItemSearch";
 
 export type ItemFilter = {
   itemSearch: string;
@@ -31,14 +31,15 @@ export function useAdminMasterItemsList({
   items,
   globalSearch,
 }: UseAdminMasterItemsListArgs): UseAdminMasterItemsListState {
+  const { matchesItem } = useItemSearch();
   const [itemSearch, setItemSearch] = useState("");
   const hasSearch = Boolean(`${globalSearch} ${itemSearch}`.trim());
 
   const visibleItems = useMemo(() => {
     const keyword = `${globalSearch} ${itemSearch}`.trim().toLowerCase();
     if (!keyword) return items;
-    return items.filter((item) => matchesItemSearch(item, keyword));
-  }, [globalSearch, itemSearch, items]);
+    return items.filter((item) => matchesItem(item, keyword));
+  }, [globalSearch, itemSearch, items, matchesItem]);
 
   return {
     items,

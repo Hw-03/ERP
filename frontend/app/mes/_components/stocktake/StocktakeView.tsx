@@ -36,6 +36,7 @@ import { StocktakeToolbarMenu, type StocktakeSection } from "./StocktakeToolbarM
 import { canManageStocktakeRounds } from "./stocktakeAuthority";
 import { ownedWaitingLocations } from "./stocktakeSelection";
 import { StocktakeIdlePanel } from "./StocktakeIdlePanel";
+import { useItemSearch } from "@/lib/queries/useItemSearch";
 
 type Section = StocktakeSection;
 const STOCKTAKE_DEPARTMENTS = ["튜브", "고압", "진공", "튜닝", "조립", "출하"] as const;
@@ -110,6 +111,7 @@ export function StocktakeView({ operator, variant = "desktop" }: { operator: Ope
 
 function StocktakeWorkspace({ token, operator, enabled, variant }: { token: string; operator: Operator; enabled: boolean; variant: StocktakeVariant }) {
   const queryClient = useQueryClient();
+  const { config: searchConfig } = useItemSearch();
   const navigate = useConfirmNavigation();
   const canManageRounds = canManageStocktakeRounds(operator);
   const [roundId, setRoundId] = useState("");
@@ -171,7 +173,7 @@ function StocktakeWorkspace({ token, operator, enabled, variant }: { token: stri
     queryFn: ({ signal }) => stocktakeApi.read<StocktakeProgress>(`/api/stocktakes/rounds/${round!.round_id}/progress`, token, { signal }), enabled: enabled && !!round, retry: false });
   const filterStatus = status;
   const targetQueryKey = ["stocktake", operator.employee_id, round?.round_id, "targets", section === "waiting" ? "dashboard-v5-owned-waiting" : "dashboard-v4-item-kpi",
-    departments.join(","), filterStatus, search, modelSlots.join(","), processSteps.join(","), filterLogic];
+    departments.join(","), filterStatus, search, modelSlots.join(","), processSteps.join(","), filterLogic, searchConfig.version];
   const targets = useInfiniteQuery({
     queryKey: targetQueryKey,
     initialPageParam: null as string | null,

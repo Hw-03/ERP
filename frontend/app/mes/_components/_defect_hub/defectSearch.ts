@@ -1,7 +1,8 @@
 import type { DefectLocation } from "@/lib/api/types/defects";
+import type { ItemSearchConfig } from "@/lib/api/types/item-search";
+import { matchesItemSearchFields } from "@/lib/itemSearch";
 
 const SEARCH_FIELDS: (keyof DefectLocation)[] = [
-  "item_name",
   "mes_code",
   "department",
   "reason_category",
@@ -9,8 +10,10 @@ const SEARCH_FIELDS: (keyof DefectLocation)[] = [
   "quarantined_by",
 ];
 
-export function matchesDefectSearch(location: DefectLocation, query: string): boolean {
-  const keyword = query.trim().toLowerCase();
-  if (!keyword) return true;
-  return SEARCH_FIELDS.some((field) => String(location[field] ?? "").toLowerCase().includes(keyword));
+export function matchesDefectSearch(location: DefectLocation, query: string, config?: ItemSearchConfig): boolean {
+  return matchesItemSearchFields({
+    itemId: location.item_id,
+    nameFields: [location.item_name],
+    literalFields: SEARCH_FIELDS.map((field) => String(location[field] ?? "")),
+  }, query, config);
 }
