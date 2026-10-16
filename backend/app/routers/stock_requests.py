@@ -304,9 +304,8 @@ def list_department_queue(
 ):
     """부서 결재 정/부 승인 대기 목록.
 
-    노출 부서 범위는 독립 역할에 따른다:
-      - 부서 정/부: 창고를 제외한 모든 부서
-      - 창고 정/부: 창고를 포함한 모든 부서
+    생산부 정/부는 소속 공정과 관계없이 전체 공정 요청을 조회한다.
+    창고 역할만 가진 직원에게는 노출하지 않는다.
     """
     actor = (
         db.query(Employee).filter(Employee.employee_id == actor_employee_id).first()
@@ -696,7 +695,7 @@ def department_approve_stock_request(
     http_request: Request,
     db: Session = Depends(get_db),
 ):
-    """부서 결재 승인 — department_role in (primary/deputy) 또는 admin."""
+    """생산부 결재 정/부의 전체 공정 승인 — 창고 역할·이전 관리자 등급과 독립."""
     request = _load_request_for_action(db, request_id)
     approver = _load_actor(db, payload.actor_employee_id)
 

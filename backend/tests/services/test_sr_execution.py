@@ -1231,12 +1231,14 @@ def test_finalize_warehouse_deputy_self_approves(db_session, make_item):
     assert _wh_qty(db_session, item.item_id) == D("3")
 
 
-def test_finalize_warehouse_primary_self_approves_dual_request(db_session, make_item):
+@pytest.mark.parametrize("department_role", ["none", "primary", "deputy"])
+def test_finalize_dual_request_requires_both_roles(db_session, make_item, department_role):
     item = make_item(name="dual-self-approval", warehouse_qty=D("5"))
     requester = _make_employee(
         db_session,
         code="DUAL-WH-SELF",
         warehouse_role="primary",
+        department_role=department_role,
     )
     request = _make_request(
         db_session,
@@ -1263,10 +1265,18 @@ def test_finalize_warehouse_primary_self_approves_dual_request(db_session, make_
     )
     db_session.flush()
 
-    assert request.status == StockRequestStatusEnum.COMPLETED
-    assert request.approved_by_employee_id == requester.employee_id
-    assert request.department_approved_by_employee_id == requester.employee_id
-    assert _wh_qty(db_session, item.item_id) == D("3")
+    if department_role == "none":
+        assert request.status == StockRequestStatusEnum.RESERVED
+        assert request.approved_by_employee_id is None
+        assert request.department_approved_by_employee_id is None
+        assert _wh_qty(db_session, item.item_id) == D("5")
+        assert db_session.query(Inventory).one().pending_quantity == D("2")
+        assert db_session.query(TransactionLog).count() == 0
+    else:
+        assert request.status == StockRequestStatusEnum.COMPLETED
+        assert request.approved_by_employee_id == requester.employee_id
+        assert request.department_approved_by_employee_id == requester.employee_id
+        assert _wh_qty(db_session, item.item_id) == D("3")
 
 
 def test_finalize_admin_does_not_self_approve_department_part(db_session, make_item):

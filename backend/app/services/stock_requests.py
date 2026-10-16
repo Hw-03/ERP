@@ -369,7 +369,7 @@ def create_manual_adjustment_request(
     - request_type = MANUAL_ADJUSTMENT (bucket/dept 검증 생략)
     - requires_warehouse_approval=False, requires_department_approval=True
     - 비자가승인 출고 라인은 source별로 점유하고 RESERVED, 입고 전용은 SUBMITTED로 대기.
-    - 자가승인 가능: 생산부·창고 정/부는 전 공정 요청을 점유 없이 승인 표시한다.
+    - 자가승인 가능: 생산부 정/부는 전 공정 요청을 점유 없이 승인 표시한다.
       점유 없이 dept_approved를 기록하고 호출자가 즉시 실재고를 반영한다.
     """
     if not lines_input:

@@ -169,18 +169,14 @@ def approve_request_department(
 ) -> StockRequest:
     """부서 결재 승인.
 
-    - actor: `can_approve_department`가 허용하는 부서 정/부 또는 창고 정/부
+    - actor: `can_approve_department`가 허용하는 생산부 정/부
     - MANUAL_ADJUSTMENT 단독: 승인 즉시 io_dispatch.execute_batch_after_dept_approval 호출
     - 듀얼(창고+부서): 양쪽 모두 충족 시 _execute_all_lines, 아니면 status 유지
     """
     if not request.requires_department_approval:
         raise ValueError("부서 결재가 필요하지 않은 요청입니다.")
 
-    # 결재 권한 (그릴 합의 — docs/defect-handling-redesign.md):
-    #   - 부서 정/부: 창고 외 부서 결재
-    #   - 창고 정/부: 모든 부서 결재
-    #   - admin level 단독: 결재 권한 없음
-    # 사람 이름 박지 않음. 자세한 룰은 `dept_hierarchy.can_approve_department`.
+    # 창고 역할과 독립적으로 생산부 전체 공정의 결재 권한을 검사한다.
     approval_department = request.approval_department or request.requester_department
     from app.services import internal_use_approval
 
@@ -191,7 +187,7 @@ def approve_request_department(
         or (is_internal_use and department_role not in ("primary", "deputy"))
     ):
         raise PermissionError(
-            "결재 권한이 없습니다 (부서 정/부 또는 창고 정/부 필요)."
+            "결재 권한이 없습니다 (생산부 결재 정/부 필요)."
         )
     if not verify_pin(approver.pin_hash, pin):
         raise PermissionError("PIN이 일치하지 않습니다.")
@@ -349,6 +345,8 @@ def reject_request(
         db.flush()
         _settle_internal_use_or_fail(db, batch=batch, requests=requests, actor=approver)
         return request
+    if not request.requires_warehouse_approval:
+        raise ValueError("창고 결재가 필요하지 않은 요청입니다.")
     # 이미 반려된 경우 멱등 반환
     if request.status == StockRequestStatusEnum.REJECTED:
         return request
@@ -395,7 +393,7 @@ def reject_request_department(
         or (is_internal_use and department_role not in ("primary", "deputy"))
     ):
         raise PermissionError(
-            "결재 권한이 없습니다 (부서 정/부 또는 창고 정/부 필요)."
+            "결재 권한이 없습니다 (생산부 결재 정/부 필요)."
         )
     if not verify_pin(approver.pin_hash, pin):
         raise PermissionError("PIN이 일치하지 않습니다.")

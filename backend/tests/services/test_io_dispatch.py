@@ -932,7 +932,7 @@ def test_execute_submission_reports_self_approved_department_request_as_reflecte
     assert result["stock_requests"][0]["approval_outcome"] == "approved"
 
 
-def test_submit_dept_only_warehouse_primary_self_approval_executes_immediately(
+def test_submit_dept_only_warehouse_primary_waits_for_production_approval(
     make_item, make_location, db_session
 ):
     item = make_item(name="창고 담당 부서 자가승인")
@@ -962,10 +962,11 @@ def test_submit_dept_only_warehouse_primary_self_approval_executes_immediately(
     svc._submit_dept_only_approval(db_session, requester=requester, batch=batch)
 
     request = db_session.query(StockRequest).one()
-    assert request.status == StockRequestStatusEnum.COMPLETED
-    assert request.department_approved_by_employee_id == requester.employee_id
-    assert _loc_pending(db_session, item.item_id) == D("0")
-    assert _prod_qty(db_session, item.item_id) == D("3")
+    assert request.status == StockRequestStatusEnum.RESERVED
+    assert request.department_approved_by_employee_id is None
+    assert _loc_pending(db_session, item.item_id) == D("2")
+    assert _prod_qty(db_session, item.item_id) == D("5")
+    assert db_session.query(TransactionLog).count() == 0
 
 
 def test_submit_dept_only_admin_without_role_waits_for_approval(
