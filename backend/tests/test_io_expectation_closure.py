@@ -545,17 +545,20 @@ def test_department_request_notifies_each_current_approver_once_and_only_one_que
     request = db_session.query(StockRequest).one()
     notes = db_session.query(Notification).filter_by(related_request_id=request.request_id, type="approval_request").all()
     assert sorted(str(note.recipient_employee_id) for note in notes) == sorted(
-        str(actor.employee_id) for actor in (primary, deputy, warehouse)
+        str(actor.employee_id) for actor in (primary, deputy)
     )
     assert all(note.target_section == "dept-queue" for note in notes)
     assert all(requester.name in note.body and item.item_name in note.body and "1" in note.body for note in notes)
-    assert not {requester.employee_id, inactive.employee_id, bystander.employee_id}.intersection(
+    assert not {requester.employee_id, inactive.employee_id, bystander.employee_id, warehouse.employee_id}.intersection(
         note.recipient_employee_id for note in notes
     )
-    for actor in (primary, deputy, warehouse):
+    for actor in (primary, deputy):
         queue = client.get("/api/stock-requests/department-queue", params={"actor_employee_id": str(actor.employee_id)})
         assert queue.status_code == 200, queue.text
         assert [row["request_id"] for row in queue.json()].count(str(request.request_id)) == 1
+    warehouse_queue = client.get("/api/stock-requests/department-queue", params={"actor_employee_id": str(warehouse.employee_id)})
+    assert warehouse_queue.status_code == 200, warehouse_queue.text
+    assert warehouse_queue.json() == []
 
 
 @pytest.mark.parametrize("sub_type,delta", [("warehouse_adjust_in", 1), ("warehouse_adjust_out", -1)])
