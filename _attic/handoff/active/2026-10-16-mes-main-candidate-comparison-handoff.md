@@ -1,6 +1,16 @@
 # main·후보 비교 재개 지점
 
-**최신 재개 지점 — 2026-10-16 18:42:** 알림 시험·원장 후속을 `5a77fbf1308105bdc2597565f9dd4ceea6b1809c`에 커밋했다. pytest선택자1·원장생성/check exit0, 적용JSON=보존가드제안JSON 확인. `6f9a6aff` CI38881026887의 프론트 단위/커버리지 단계는 통과했고 빌드 진행중이었다. 다음은 이3문서 명시stage·문서검사/커밋→후보만push→새HEAD 전체CI 확인이다. 이전CI backend/일반E2E는 새푸시로 취소될 수 있으며 최종통과로 세지 않는다. 제품소스는 동일하고 이번후속시험변경은 frontend2+backend1파일뿐이다. DB·서버 식별값은 아래표 그대로, 제품967표현은 시험도 포함한 당시소스입력집합이므로 현재전체불변으로 확대하지 않는다. 상세·첫표·TODO를 함께갱신했다.
+**최신 재개 지점 — 2026-10-16 19:20:** 로컬 HEAD `7143b5c863ca82ccf8c60dc178c2926123ba24b2`, origin후보 `395cab9c`. CI38882322838의 backend는 pytest/PostgreSQL 단계까지 성공하고 OpenAPI 기준 description2곳 차이만 실패했다. baseline2줄만 실제 코드 설명으로 정렬하고 메모리DB 환경 생성 명세와 정확 일치 확인 후7143b5c8커밋. PostgreSQL88조건skip/error/fail0 근거는 `T/ci-395cab9c-postgres/postgres-required-contracts.json`. 제품·테스트·업무DB 변경 없음.
+
+**즉시 다음 행동:** 보고서/첫표·TODO·이 인계3문서 명시 검사/커밋 후 후보만 푸시→새 정확한 HEAD CI 확인. 진행 중 일반E2E는 후속push로취소되면 미완료로 보존. 원문은 `T/ci-395cab9c-backend-failed.log`, job단계 `ci-395cab9c-backend-job.json`, 국소 재현/해결 `ci-openapi-red.json/.log`, `ci-openapi-green.json/.log`. smart캐시부재 전체backend제안은 설명2줄뿐이므로 이미성공한pytest/PG와 직접명세비교로검증했다. 기존업무·전체로컬검사반복금지. 아래19:12/18시 기록은 과거 경과다.
+
+**최신 재개 지점 — 2026-10-16 19:12:** 후보 HEAD=origin `395cab9ca9aa4ba3e9a59377c3b2df64e511d725`까지7커밋 푸시 완료. [CI38882322838](https://github.com/Hw-03/ERP/actions/runs/38882322838)는6/8 job 성공, backend pytest와 general E2E 진행 중이다. 프론트374파일4,601테스트·커버리지·정적 검사·빌드·번들 성공은 `T/ci-395cab9c-frontend-success.log`에 보존했다. 부모 shell session37486이 `gh run watch`를 실행해 `T/ci-395cab9c-watch.log`에 기록한다. 세션이 사라지면 같은 run을 조회하고 재실행하지 않는다.
+
+**다음 행동:** 남은 CI 실패가 있으면 해당 원인·검사만 보완한다. 전부 성공하면 정확한 HEAD/job 결과를 ignored JSON에 보존하고 상세 첫 표·TODO·이 인계에 종료 판정을 반영한다. 종료 문서만 명시 검사·후보 커밋/푸시하고 최종 문서 HEAD CI도 확인한다. 코드가 그대로인 업무 검증·빌드·성능·전체 기대값 로컬 반복 금지. main `29583972`와 직원 환경은 변경 금지. 현재 미커밋은 CI 상태를 정리 중인 이3문서뿐이다.
+
+아래18시 경과는 당시 기록이며 현재 지시가 아니다. 업무·시험 소스는 `5a77fbf1`, 그 뒤 `395cab9c`는 기록뿐이다. 기존967입력에는 시험파일도 포함되므로 후속 시험3파일 변경 뒤 전체가 같다고 주장하지 않는다. 실제 제품 코드·DB 계산식은 변하지 않았다.
+
+**18:42 경과:** 알림 시험·원장 후속을 `5a77fbf1308105bdc2597565f9dd4ceea6b1809c`에 커밋했다. pytest선택자1·원장생성/check exit0, 적용JSON=보존가드제안JSON 확인. `6f9a6aff` CI38881026887의 프론트 단위/커버리지 단계는 통과했고 빌드 진행중이었다. 다음은 이3문서 명시stage·문서검사/커밋→후보만push→새HEAD 전체CI 확인이었다. 이전CI backend/일반E2E는 새푸시로 취소되어 최종통과로 세지 않는다.
 
 **우선 읽기 — 2026-10-16 18:36:** `6f9a6aff` 후보푸시 완료, CI38881026887진행중. 첫CI backend는취소직전실제1FAIL: closure생산부알림시험에창고수신자옛기대남음. 부모가실제서비스·queue·정책읽고 `backend/tests/test_io_expectation_closure.py`531시험만수정(정·부수신,창고제외,창고queue200[]). 국소선택자PASS `T/ci-fix-department-notification.log`. 이수정은아직미커밋. comparison_b가읽기전용원장패치 `R/ci-notification-ledger-proposal.patch`준비중. 다음: 패치검토/적용→원장생성/check→해당수정·기록명시커밋→후보push→최종HEAD CI. 첫일반E2E는취소/미완료 `T/ci-38877549662-general-cancelled.log`; 중간proxyECONNRESET은원인미확정. 새업무검사반복/제품·DB변경불필요. 아래18:18~기록은이전단계로보존한다.
 
@@ -19,7 +29,7 @@
 | 활성 DB | C:/ERP/backend/mes.db | C:/ERP/_attic/runtime/main-candidate-20261016/B/qa.db |
 | DB revision | 20261014_0046 | 20261015_0047 |
 
-**후보4커밋을 푸시했고 후속6f9a6aff를 커밋했다.** `e9560587` 병합/기존 복귀시험 계약, `c7c4628f` 기타 사유 RO 수정/검사, `5f660a90` 현재 원장연결, `fb2558d2` 정제4문서, `6f9a6aff` WorkChoice/Stocktake 시험2파일·현재binding4개/과거보존. 현재 미커밋은 보고/표·TODO·인계3문서다. 제품 SHA는 `documentation-checkpoint.json`, 첫 푸시 직후 동일성은 `final-source-fb2558d2.json`이다. A의 기존 untracked 계획 문서는 건드리지 않았다. 후속 푸시/CI 상태는 마지막 기록을 따른다.
+**후보7커밋을 푸시했다.** `e9560587` 병합/기존 복귀시험 계약, `c7c4628f` 기타 사유 RO 수정/검사, `5f660a90` 현재 원장연결, `fb2558d2` 정제4문서, `6f9a6aff` WorkChoice/Stocktake 시험2파일·현재binding4개/과거보존, `5a77fbf1` 알림시험/원장, `395cab9c` CI 진행 기록. 제품 SHA는 `documentation-checkpoint.json`, 첫 푸시 직후 동일성은 `final-source-fb2558d2.json`이다. A의 기존 untracked 계획 문서는 건드리지 않았다. 최신 상태는 이 문서 맨 위를 따른다.
 
 로컬 R=`C:/ERP/_attic/runtime/main-candidate-20261016`, T=`C:/Users/user/.codex/worktrees/mes-main-candidate-comparison/ERP/_attic/runtime/comparison-checks`.
 
@@ -39,11 +49,11 @@ B 현재 소유권 영수증 `R/B/session.json`은17:25 production세션이며 b
 - 사용자의 추가 지시에 따라 새 업무를 잠시 멈추고 문서 복원: 상세·첫 표·33단계 짝지은 화면·파일해시 색인·TODO·이 인계 작성. 기록 때문에 유효한 검사를 다시 실행하지 않았다.
 - 16:35 국소 보충 완료: IO5조건5/5, 상세wrapper2파일24/24, EOF 관련 Node12/12가 첫 실행에서 통과했고247입력 전후 해시가 같았다. `R/supplemental-checks-record.md`, `T/supplemental-20261016-01-summary.json` 및 해당 원문. 이전 재사용 초안의 이 세 미확인은 해소됐으며 입력이 바뀌지 않으면 반복하지 않는다.
 
-## 현재 상태와 단일 재개 지점 — CI 실패만 국소 보완
+## 현재 사용자 검토 환경과 이전 CI 경과
 
 **현재:** AS02·CONV01·ADJ01·SET01·DETAIL01·REPORT01/02와 B PROD-AP01/DF01 기록 완료. `3-AR-0004` 총440·창고439·조립1·예약0, RW01입고1은 남는다. QA-W만 dark/collapsed 저장, QA-N light/expanded. A tab2는 QA-N 주간PF, B tab4는 QA-B 출하 요청 목록이다. 원래 tab1은 건드리지 않는다. 압축 후 `cua.rewriteDocumentation`부터 호출하고 실제 UI·계정을 읽는다.
 
-**다음:** CI38877549662의 backend 결과 확인 → 후보6f9a6aff push → 새 정확한 HEAD 전체CI 확인. 프론트는8실패(RO대역누락7+실사회차목록1)였고 두 시험파일만 수정하여19/92건·ESLint·원장 `--check` exit0, cached check/smart PlanOnly 후6f9a6aff커밋했다. 일반E2E 과거소요는58분이므로 옛HEAD를 끝까지 기다린 뒤 다시 전체CI를 시작하지 않는다. 새 푸시에 취소되는 옛E2E는 미완료로 남긴다. 새 업무·빌드·성능·전체기대값 로컬 반복 금지.
+**이전 CI 경과:** CI38877549662의 프론트는8실패(RO대역누락7+실사회차목록1)였고 두 시험파일만 수정하여19/92건·ESLint·원장 `--check` exit0, cached check/smart PlanOnly 후6f9a6aff커밋했다. 이후 알림시험1실패도5a77fbf1에서 보완했다. 옛6f CI의 프론트4,601건은 성공했지만 backend/general E2E는 후속 푸시로 취소되어 미완료다. 최신395 CI만 최종 결과 대상으로 확인한다. 새 업무·빌드·성능·전체기대값 로컬 반복 금지.
 
 WorkChoice 원장은 `R/ci-workchoice-ledger-proposal.patch` 적용 후 현재4binding sourceHash·line243만 갱신하고 이전25binding snapshot을 history에 추가했다. Stocktake는 기존 main과 같은 시험·제품이었으며 `await act`와 선택지 표시 대기/펼침 단언만 추가했다. 정확한 CI effect 순서는 미확정(`R/ci-stocktake-review.md`). 실직원 DB 접근·제품수정 없음. 관련 원문은 `T/ci-38877549662-frontend.log`, `ci-fix-workchoice.log`, `ci-fix-stocktake.log`, `ci-fix-eslint.log`.
 
