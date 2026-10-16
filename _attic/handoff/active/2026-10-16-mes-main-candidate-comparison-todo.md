@@ -2,11 +2,11 @@
 
 기준: [승인 실행 계획](../../../docs/superpowers/plans/2026-10-16-mes-main-candidate-comparison.md).
 
-현황: 완료 4 / 전체 5, 남음 1(CP4 최종 HEAD CI·기록 확정). `395cab9c`까지7커밋을 푸시했고 후속 OpenAPI 설명2줄 수정은 `7143b5c8`에 커밋했다. CI38882322838은 프론트4,601건·빌드 등6job성공, backend는 pytest/PostgreSQL성공 후 명세 비교만 실패, general E2E 진행 중이었다. 설명 수정 후 전체 명세 동일 확인. 후속 푸시·정확HEAD CI가 남았다. CP2 지정 대표 업무와 CP3 상세 기록은 완료했다. 모든 업무 조건 신규 UI PASS가 아니며 한계를 유지한다. main 병합·직원 배포 금지.
+현황: 완료 4 / 전체 5, 남음 1(CP4의 병합 판단 보류 사유 2건). `eddd0811`까지9커밋을 후보에 푸시했고 CI38886739485는8/8 job 성공이다. 일반 E2E는299건 첫 통과·2건 재시도 통과이며 실패 원문 읽기 조사를 마쳤다. 연결 reset 원인과 BOM2→1 입력 처리 순서는 미확정이다. 프론트4,601·빌드와 backend pytest/PostgreSQL/OpenAPI는 성공했다. CP2 지정 대표 업무와 CP3 상세 기록은 완료했다. 종료 문서 후속 커밋/CI는 로컬 최종 영수증과 최종 응답에 기록하며 이 문서 자체 해시를 미리 단정하지 않는다. main 병합·직원 배포 금지.
 
 사용자용 기준 문서: [첫 페이지 비교표·업무별 8항목 상세](../../../docs/superpowers/plans/2026-10-16-mes-main-candidate-comparison-report.md). 재개용 기준: [현재 단계와 다음 행동](2026-10-16-mes-main-candidate-comparison-handoff.md). 실제 직원 원문은 ignored runtime에만 둔다.
 
-- [x] CP0 환경 고정 (2026-10-16): main 29583972, 대기 5927e532. 새 후보 codex/mes-main-candidate-comparison-20261016에 자동 병합 충돌 없음(미커밋). 개발/직원 online backup 및 schema/SQLite/FK 검증 완료. 직원 원형에서 A/B 분기, 기존 업무 86개 테이블 보존 및 후보 신규 nullable 필드 백필 없음 확인. QA 직원 6명은 사본에만 추가. 실행자료 C:/ERP/_attic/runtime/main-candidate-20261016/pair-preparation.json.
+- [x] CP0 환경 고정 (2026-10-16): main 29583972, 대기 5927e532. 새 후보 codex/mes-main-candidate-comparison-20261016에 자동 병합 충돌 없음, 후속 e9560587에 커밋. 개발/직원 online backup 및 schema/SQLite/FK 검증 완료. 직원 원형에서 A/B 분기, 기존 업무 86개 테이블 보존 및 후보 신규 nullable 필드 백필 없음 확인. QA 직원 6명은 사본에만 추가. 실행자료 C:/ERP/_attic/runtime/main-candidate-20261016/pair-preparation.json.
 - [x] CP1 공통 시나리오·1920×1080·근거 재사용 확정 (2026-10-16). A/B 별도 호스트와 탭, 부모만 조작. 실제 DOM 크기를 확인하고 로그인 뒤 크기가 풀린 경우 재적용하며 사진 저장 시 크기를 검사한다. 이전 CI는 당시 근거로 구분하고 새 승인 정책 소비자는 국소 재실행.
 - [x] CP2 지정 AP/IO/DF/BOM/SH/HI 대표 브라우저·위치 수량·취소 비교, 관련 자동/유효 과거 근거 연결 (2026-10-16). 전 조건 신규 UI PASS 아님. 각 업무의 미실행 범위를 유지한다.
 - [x] CP3 첫 페이지 판단표·업무별 상세 재현/수량/화면/한계·인계 기록 (2026-10-16). 기존 자료 복원 뒤 묶음별 갱신. `final-completion-audit.md/json` 읽기 감사 및 로컬 갤러리 추가 완료.
@@ -15,6 +15,8 @@
 실행 중 기존 보고서를 새 조합 PASS로 승격하지 않는다. 직원 QA 준비는 A/B 사본에만 적용하고 기존 품목/BOM/재고는 보존한다.
 
 ## CP2 진행 근거 (2026-10-16)
+
+아래는 수행 당시의 경과다. 당시 남았던 production 실화면은 후속 PROD-AP01/DF01/SH01에서 완료했고, CONV 대표 품목 차이의 원인은 `R/observed-display-differences-review.md`에서 대상 제품 우선 표시로 확인했다. 현재 미확인 조건은 상세 보고서의 각 업무 마지막 항목을 따른다.
 
 - AP01: 창고 전담의 조립 낱개 입고는 생산부 결재 대기. 고압 소속 생산부 정 승인 후 조립 1→2/창고 438 불변, 취소 후 초기 수량 복원. A/B 동일. `AP01-*-comparison.json`.
 - AP02/IO02: 생산부 전담의 창고→조립 이동은 창고 결재 대기 및 예약 1. 창고 정 승인 뒤 창고 438→437/조립 1→2, 생산부 정이 조립 2개를 실제 출고. 출고→이동 역순 취소 후 모든 재고·예약 초기 복원. `AP02-IO02-final-comparison.json`.
@@ -59,6 +61,12 @@
 
 ## CP4 현재 결과와 남은 조건
 
+- 20:35 읽기 조사 완료: CI-IO는 실패 구간에도 조립7/7/7·창고 각10을 보존했고 원요청 취소 응답은 정상이나 취소 후 예약 전체 대조는 없음. CI-SHIP은 fill2 이후 표시와 매칭 POST 모두1. 기본BOM 응답은 입력 전에 끝나 지연응답 덮어쓰기 가설은 배제했지만 실제 입력 처리 순서는 미확정. 보고서에 각각8항목과 직원 영향·한계를 추가했다. 새 검사/추측패치 없이 두 건을 병합 보류 사유로 남긴다. 원문과 읽기 조사 `R/ci-flaky-io-review.md`, `ci-flaky-shipping-review.md`는 ignored에 보존한다.
+
+- 20:28: eddd0811 CI 8개 job 성공. 일반 E2E의 IO-RESEARCH-RETURNS(요청 조회500/동시 proxy ECONNRESET), SHIP-VARIANT(BOM2 입력 후1)은 최초 실패 후 재시도 통과. 원본 `T/ci-eddd0811-general-success.log`, `ci-eddd0811-playwright-general/parsed/31c072176dbc914ff430.json`, `parsed/e3fcbb0aa0d6604ef331.json` 및 같은 report의 data/trace를 보존했다. 새 업무/전체 검사 없이 실패 자료 읽기 조사부터 진행한다. 원인·직원 영향은 미확인.
+
+- 19:58: `eddd0811` 후보 푸시와 CI38886739485의7job 성공. backend는 pytest·PG·OpenAPI 전부 성공, 일반 E2E만 남음. `T/ci-eddd0811-{frontend,backend}-success.log`, `ci-eddd0811-postgres/`에 원문 보존. 새검사 없이 문서감사의 현재/과거 혼동을 정리 중이며, 아래 시각별 문장은 과거 경과다.
+
 - 19:20: backend의 실제 실패는 OpenAPI 기준 설명2곳 차이뿐. 현재 코드와 기준의2description만 다름을 메모리DB 설정으로 재현→2줄수정→생성명세SHA동일확인→`7143b5c8`커밋. pytest/PostgreSQL 단계는 성공했으며 PG88조건 skip/error/fail0 실행자료 보존. 상세8항목·첫표·인계 갱신. 다음은 기록 포함 후보 push와 새 HEAD CI. 기존 일반 E2E 진행 중 상태를 완료로 세지 않는다.
 
 - 19:12: `395cab9c`까지 후보 푸시 완료. CI38882322838은6개 성공·backend/general E2E 진행 중. `T/ci-395cab9c-frontend-success.log`에 현재 HEAD의4,601단위·coverage·lint/type/build/bundle 성공을 보존했다. 아래 시각별 문장은 과거 경과이며, 현재 단일 잔여는 나머지 CI 결과와 종료 기록이다.
@@ -74,5 +82,5 @@
 - 일반 품목 목록/검색/상세 p95 A70.0/57.7/22.4ms, B63.6/49.3/23.9ms, 내용 동일. 각30회 교대·오류0·소스/DB가드 통과. 내역 p95 A2572.1ms/B868.4ms; AS 승인자·시각32필드는 원형과 B 일치, A 표시 누락 정정. 원측정 파일은 그대로 보존. 새 필드 전체 의미·고부하까지 통과로 세지 않음.
 - 과거 입력103파일 중93개는 줄바꿈만 정규화한 내용 동일. 권한5·상세wrapper4·안내1 변경은 별도. 실제 실행에서 빠진 IO5조건과 새 상세wrapper 검사는 미확인으로 남김. 정확 명령과 근거는 reuse-scope-final-draft.md.
 - 16:35 국소 보충 완료: IO5조건5/5, 상세wrapper2파일24/24, EOF 관련 Node12/12. 기존 검사 반복 없이 미확인 소비자만 실행했고247입력 해시 불변. `supplemental-checks-record.md`, T/supplemental-20261016-01-summary.json. 이전 재사용 초안의 미확인은 당시 상태로 보존한다.
-- 남음: OpenAPI 기준 설명·후속 기록 후보 푸시, 새 정확한 HEAD 전체 CI·종료 기록. 일보/주간·production 핵심과 당시 소스967/재사용입력103/원장입력190해시불변·불변원문/과거실행해시보존·정제문서 읽기 감사 기록은 유지한다. 후속 시험3파일 변경 후 해당 binding만 정렬하며 이전 전체 입력이 여전히 같다고 주장하지 않는다. 유효 근거는 반복하지 않는다.
+- 남음: 연결 reset과 BOM 입력 유실의 원인·영향 판정, 종료 문서 후속 HEAD CI 확인. CI38886739485는 이미8job 성공했지만2flaky를 해결 완료로 세지 않는다. 일보/주간·production 핵심과 당시 소스967/재사용입력103/원장입력190해시불변·불변원문/과거실행해시보존·정제문서 읽기 감사 기록은 유지한다. 후속 시험3파일 변경 후 해당 binding만 정렬하며 이전 전체 입력이 여전히 같다고 주장하지 않는다. 유효 근거는 반복하지 않는다.
 - 이미 유효한 권한/IO/복귀/출하/RO/성능/빌드는 입력이 바뀌지 않으면 반복하지 않는다. 전체 기대값·전체 로컬 게이트는 재시작하지 않는다.

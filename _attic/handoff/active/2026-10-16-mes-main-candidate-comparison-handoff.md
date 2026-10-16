@@ -1,90 +1,64 @@
-# main·후보 비교 재개 지점
+# main·후보 비교 — 현재 재개 지점
 
-**최신 재개 지점 — 2026-10-16 19:20:** 로컬 HEAD `7143b5c863ca82ccf8c60dc178c2926123ba24b2`, origin후보 `395cab9c`. CI38882322838의 backend는 pytest/PostgreSQL 단계까지 성공하고 OpenAPI 기준 description2곳 차이만 실패했다. baseline2줄만 실제 코드 설명으로 정렬하고 메모리DB 환경 생성 명세와 정확 일치 확인 후7143b5c8커밋. PostgreSQL88조건skip/error/fail0 근거는 `T/ci-395cab9c-postgres/postgres-required-contracts.json`. 제품·테스트·업무DB 변경 없음.
+**2026-10-16 20:35 KST:** 후보 `eddd08118fb8c0e02bb794ffdc19adceacf63c72`까지9커밋 푸시, [CI38886739485](https://github.com/Hw-03/ERP/actions/runs/38886739485)는8/8 job 성공이다. 일반 E2E는299건 첫 통과·2건 재시도 통과다. 원본 읽기 조사 결과 연결 reset 원인과 BOM 입력2→1 처리 순서가 미확정이어서 병합 판단은 보류한다. 업무 비교·production 핵심·상세 기록은 완료했고 종료 문서3개를 별도 커밋/푸시할 단계다. main 반영·직원 배포는 하지 않는다.
 
-**즉시 다음 행동:** 보고서/첫표·TODO·이 인계3문서 명시 검사/커밋 후 후보만 푸시→새 정확한 HEAD CI 확인. 진행 중 일반E2E는 후속push로취소되면 미완료로 보존. 원문은 `T/ci-395cab9c-backend-failed.log`, job단계 `ci-395cab9c-backend-job.json`, 국소 재현/해결 `ci-openapi-red.json/.log`, `ci-openapi-green.json/.log`. smart캐시부재 전체backend제안은 설명2줄뿐이므로 이미성공한pytest/PG와 직접명세비교로검증했다. 기존업무·전체로컬검사반복금지. 아래19:12/18시 기록은 과거 경과다.
+먼저 [첫 비교표·업무별8항목 상세](../../../docs/superpowers/plans/2026-10-16-mes-main-candidate-comparison-report.md), [활성 TODO](2026-10-16-mes-main-candidate-comparison-todo.md), [승인 계획](../../../docs/superpowers/plans/2026-10-16-mes-main-candidate-comparison.md)를 읽는다. 과거 중간 인계는 Git의 `eddd0811` 이전 판과 로컬 `R/resume-20261016-1845.md`, `resume-20261016-1925.md`에 보존돼 있다. 과거의 ‘다음 행동’을 현재 지시로 실행하지 않는다.
 
-**최신 재개 지점 — 2026-10-16 19:12:** 후보 HEAD=origin `395cab9ca9aa4ba3e9a59377c3b2df64e511d725`까지7커밋 푸시 완료. [CI38882322838](https://github.com/Hw-03/ERP/actions/runs/38882322838)는6/8 job 성공, backend pytest와 general E2E 진행 중이다. 프론트374파일4,601테스트·커버리지·정적 검사·빌드·번들 성공은 `T/ci-395cab9c-frontend-success.log`에 보존했다. 부모 shell session37486이 `gh run watch`를 실행해 `T/ci-395cab9c-watch.log`에 기록한다. 세션이 사라지면 같은 run을 조회하고 재실행하지 않는다.
+## 코드·DB·서버 식별값
 
-**다음 행동:** 남은 CI 실패가 있으면 해당 원인·검사만 보완한다. 전부 성공하면 정확한 HEAD/job 결과를 ignored JSON에 보존하고 상세 첫 표·TODO·이 인계에 종료 판정을 반영한다. 종료 문서만 명시 검사·후보 커밋/푸시하고 최종 문서 HEAD CI도 확인한다. 코드가 그대로인 업무 검증·빌드·성능·전체 기대값 로컬 반복 금지. main `29583972`와 직원 환경은 변경 금지. 현재 미커밋은 CI 상태를 정리 중인 이3문서뿐이다.
-
-아래18시 경과는 당시 기록이며 현재 지시가 아니다. 업무·시험 소스는 `5a77fbf1`, 그 뒤 `395cab9c`는 기록뿐이다. 기존967입력에는 시험파일도 포함되므로 후속 시험3파일 변경 뒤 전체가 같다고 주장하지 않는다. 실제 제품 코드·DB 계산식은 변하지 않았다.
-
-**18:42 경과:** 알림 시험·원장 후속을 `5a77fbf1308105bdc2597565f9dd4ceea6b1809c`에 커밋했다. pytest선택자1·원장생성/check exit0, 적용JSON=보존가드제안JSON 확인. `6f9a6aff` CI38881026887의 프론트 단위/커버리지 단계는 통과했고 빌드 진행중이었다. 다음은 이3문서 명시stage·문서검사/커밋→후보만push→새HEAD 전체CI 확인이었다. 이전CI backend/일반E2E는 새푸시로 취소되어 최종통과로 세지 않는다.
-
-**우선 읽기 — 2026-10-16 18:36:** `6f9a6aff` 후보푸시 완료, CI38881026887진행중. 첫CI backend는취소직전실제1FAIL: closure생산부알림시험에창고수신자옛기대남음. 부모가실제서비스·queue·정책읽고 `backend/tests/test_io_expectation_closure.py`531시험만수정(정·부수신,창고제외,창고queue200[]). 국소선택자PASS `T/ci-fix-department-notification.log`. 이수정은아직미커밋. comparison_b가읽기전용원장패치 `R/ci-notification-ledger-proposal.patch`준비중. 다음: 패치검토/적용→원장생성/check→해당수정·기록명시커밋→후보push→최종HEAD CI. 첫일반E2E는취소/미완료 `T/ci-38877549662-general-cancelled.log`; 중간proxyECONNRESET은원인미확정. 새업무검사반복/제품·DB변경불필요. 아래18:18~기록은이전단계로보존한다.
-
-2026-10-16 18:18 기록 기준. **업무·production 상세를 완료하고4커밋을 후보만 푸시했다. 첫 CI 프론트8실패의 테스트2파일을 국소 보완 중이다.** WorkChoice19/Stocktake92·ESLint 통과, 제품 수정 없음. 새 HEAD CI는 아직이다. [상세 설명·첫 비교표](../../../docs/superpowers/plans/2026-10-16-mes-main-candidate-comparison-report.md), [활성 TODO](2026-10-16-mes-main-candidate-comparison-todo.md), [승인 계획](../../../docs/superpowers/plans/2026-10-16-mes-main-candidate-comparison.md)를 함께 읽는다. 완료업무는 다시 실행하지 않는다.
-
-## 현재 식별값
-
-| 구분 | A | B |
+| 구분 | A 현재 main | B 병합 후보 |
 |---|---|---|
-| 작업 폴더 | C:/ERP | C:/Users/user/.codex/worktrees/mes-main-candidate-comparison/ERP |
+| 폴더 | C:/ERP | C:/Users/user/.codex/worktrees/mes-main-candidate-comparison/ERP |
 | 브랜치 | main | codex/mes-main-candidate-comparison-20261016 |
-| 업무·시험 소스 기준 HEAD | 29583972129c8340aa19416e6c554ea60db3c490 | 5a77fbf1308105bdc2597565f9dd4ceea6b1809c (후속 기록 커밋은 뒤에 추가) |
-| 병합 | 없음 | e9560587에서 대기5927e532 결합 완료, MERGE_HEAD 없음 |
-| 주소 | http://127.0.0.1:3001 / backend8011 | http://localhost:3038 / backend8038 |
-| 현재 모드 | dev | production, .next-prod 최종 빌드 사용 |
-| 활성 DB | C:/ERP/backend/mes.db | C:/ERP/_attic/runtime/main-candidate-20261016/B/qa.db |
-| DB revision | 20261014_0046 | 20261015_0047 |
+| HEAD | 29583972129c8340aa19416e6c554ea60db3c490 | eddd08118fb8c0e02bb794ffdc19adceacf63c72 |
+| 코드 구성 | 기존 main 유지 | e9560587에서 대기5927e532 전체 결합, c7c4628f에서 기타 입력 수정 |
+| 주소·모드 | http://127.0.0.1:3001/mes · backend8011 · dev | http://localhost:3038/mes · backend8038 · production |
+| 활성 검증 DB | C:/ERP/backend/mes.db | C:/ERP/_attic/runtime/main-candidate-20261016/B/qa.db |
+| revision | 20261014_0046 | 20261015_0047 |
 
-**후보7커밋을 푸시했다.** `e9560587` 병합/기존 복귀시험 계약, `c7c4628f` 기타 사유 RO 수정/검사, `5f660a90` 현재 원장연결, `fb2558d2` 정제4문서, `6f9a6aff` WorkChoice/Stocktake 시험2파일·현재binding4개/과거보존, `5a77fbf1` 알림시험/원장, `395cab9c` CI 진행 기록. 제품 SHA는 `documentation-checkpoint.json`, 첫 푸시 직후 동일성은 `final-source-fb2558d2.json`이다. A의 기존 untracked 계획 문서는 건드리지 않았다. 최신 상태는 이 문서 맨 위를 따른다.
+- R=`C:/ERP/_attic/runtime/main-candidate-20261016`, T=`C:/Users/user/.codex/worktrees/mes-main-candidate-comparison/ERP/_attic/runtime/comparison-checks`.
+- 직원 원형 온라인 스냅샷: `R/backups/sqlite/mes-before-comparison-employee-source-20261016-143800-4492139c.db`, SHA256 `5b9b7211ffbe7a5a1cc9218f336d6e05dca02ade1748a000e5236391219d5bb8`. 19:33 재확인도 동일. `R/environment-check-1933.json`.
+- 기존 개발 DB 보존: `R/A/development-before-switch.db`. 초기 분기·revision·행 보존: `R/pair-preparation.json`, `A/cutover.json`, `A/original-tables.json`, `B/original-tables.json`.
+- B 소유 세션 `R/B/session.json`, boot_id=`782416342c5c4949892993d845a9d3a4`, build_id=`K4aEq29ysft3gVQjFIjku`, `.next-prod`. Node20.20.2는 `C:/ERP/_attic/runtime/tools/node-v20.20.2-win-x64/node.exe`.
+- B 상태 확인: `py -3.12 C:/ERP/_attic/runtime/main-candidate-20261016/candidate_server.py status`. 서버 조작이 필요할 때만 이 소유권 도우미를 사용한다. 기존 개발 venv에는 psutil이 없으므로 이 도우미 실행에 사용하지 않는다.
+- A/B는 사용자 검토용으로 계속 실행한다. IAB browser2/tabA2/tabB4, 1920×1080 확인. 원래 tab1은 건드리지 않았다. 압축 후 브라우저가 필요하면 `cua.rewriteDocumentation()`부터 호출한다.
 
-로컬 R=`C:/ERP/_attic/runtime/main-candidate-20261016`, T=`C:/Users/user/.codex/worktrees/mes-main-candidate-comparison/ERP/_attic/runtime/comparison-checks`.
+## 완료 작업과 정확한 근거
 
-원형 온라인 스냅샷 `R/backups/sqlite/mes-before-comparison-employee-source-20261016-143800-4492139c.db`, SHA256 `5b9b7211ffbe7a5a1cc9218f336d6e05dca02ade1748a000e5236391219d5bb8`.
-A 최초 개발 DB 보존 `R/A/development-before-switch.db`. A/B seed hash·revision은 `R/pair-preparation.json`에 있다. live DB raw hash는 업무 중 변하므로 초기값과 같다고 주장하지 않는다. A/B `documentation-checkpoint.json`은 AS02 완료 전 문서 복원 당시의 읽기 전용 논리 스냅샷이다. 최신 AS02 완료 수량·상태는 각 `AS02-cancelled.json`과 `AS02-comparison.json`을 따른다.
+- 같은 직원 원형에서 A/B 사본 분기, QA 계정 준비, 후보 명시 migration. 기존 업무86테이블과 승인 밖 값 보존·SQLite/FK·신규 nullable 백필 없음 확인. 직원 DB·서비스·예약 변경 없음.
+- AP01/AP02/IO02/DF01/PR01/DF02/PR02/RW01/AS01/AS02/CONV01/ADJ01/SH01 지정 흐름의 UI 처리·위치 수량·예약·취소 대조 완료. 상세 보고서의 각 `*-comparison.json` 및 실제 화면 경로를 따른다. 숫자 복원과 DB 전체 원복을 혼동하지 않는다.
+- SET01 설정 저장/취소/직원 격리, DETAIL01 검색·열린/닫힌 상세 복원·실제 품명 복사, REPORT01 취소 전환 일보와 REPORT02 현재 주 대표 수량 완료. 미실행 조건은 각 상세에 있다.
+- B 최종 production의 `PROD-AP01-comparison.json`, `PROD-DF01-comparison.json`, `PROD-SH01-comparison.json` 완료. 부 담당자의 다른 공정 승인, 기타 메모 입력58px, 창고 복귀·한 작업 취소, 기본 BOM 출하·역순 취소까지 확인했다.
+- BOM2·3은 입력 직후 다음/뒤로에서 유지 확인 후 실제 제출은 기본1·1로 복원했다. 변경 BOM을 실제 출하한 검사가 아니다.
+- 일반 조회240회 오류0, 목록/검색/상세 응답 동일·지연 회귀 기준 내. 내역의 AS 승인자/시각 차이는 원형과 B 일치. `R/performance-run-02/summary.json`, `history-approval-display-review.json`. 원래 INCONCLUSIVE를 덮어쓰지 않고 별도 판정했다.
+- 보고서 복원 때문에 기존 업무를 재실행하지 않았다. 이후 묶음마다 상세8항목·첫 표·TODO를 갱신했다. 로컬 갤러리 `R/documentation-paired-screens.md`, 원문 색인 `documentation-evidence-index.json`은 실제 직원 정보가 있어 ignored에만 보관한다.
+- 읽기 감사: `R/final-local-review.md`, `final-completion-audit.md/json`, `final-doc-readonly-audit-1927.md`. 마지막 감사의 현재/과거 재개 지점 혼동은 이 문서의 단일 현재 블록으로 정리한다. 근거 경로 누락·과장·직원 개인정보 노출은 발견되지 않았다.
 
-B 현재 소유권 영수증 `R/B/session.json`은17:25 production세션이며 boot_id `782416342c5c4949892993d845a9d3a4`, build_id `K4aEq29ysft3gVQjFIjku`다. 기존 dev영수증/로그는 `R/B/dev-before-production/`에 보존. `R/PROD00-start-receipt.json`은 제품967파일이 문서체크포인트와 동일하고 기동시업무행불변임을 확인했다. PID는 현재session의 생성시각·명령/포트를 다시 대조한다. Node20.20.2 `C:/ERP/_attic/runtime/tools/node-v20.20.2-win-x64/node.exe`. 기존 직원 서비스·예약은 변경 금지. B 전용 `R/candidate_server.py`만 사용하고 기존 직원/다른 소유 PID를 종료하지 않는다.
+## CI 경과와 재사용할 검사
 
-## 완료 작업과 근거
+- 첫 CI38877549662: 프론트8실패(WorkChoice 관찰자 대역7·실사 회차 순서1), backend 알림의 옛 권한 기대1실패. `6f9a6aff`와 `5a77fbf1`에서 시험3파일만 보완했다. WorkChoice19·Stocktake92·ESLint·알림선택자1 및 원장check 통과. 제품 변경 없음. 실패·취소 원문은 `T/ci-38877549662-*`에 보존.
+- 395cab9c/CI38882322838: 프론트4,601과 pytest/PostgreSQL 단계 성공, 마지막 OpenAPI description2곳만 실패. `7143b5c8`에서 기준 설명2줄만 갱신했고 전체 생성 명세와 SHA256 동일. `T/ci-openapi-red.json/.log`, `ci-openapi-green.json/.log`. 일반 E2E는 후속 푸시로 취소/미완료.
+- 현재 eddd0811/CI38886739485: 프론트374파일4,601·커버리지·lint/type/build/bundle 성공. backend pytest·복구 readiness·PostgreSQL·OpenAPI까지 성공. `T/ci-eddd0811-frontend-success.log`, `ci-eddd0811-backend-success.log`, `ci-eddd0811-postgres/`. 번들3,379,878bytes≤3,407,872bytes(3.25MiB). 일반 E2E job도 성공했으나299첫통과·2재시도통과·0skip을 구분한다.
+- 기존 유효 국소 근거: 권한72, IO126, 복귀확장34·출하4, 일괄복귀 계약 수정 후18, 정책소비자16, 보충IO5·상세24·Node12, RO단위80·E2E7(재시도0)·정적 검사·production 빌드. 정확 경로와 범위는 보고서 재사용 부록 및 `R/supplemental-checks-record.md`.
+- 과거592cc5c6/CI38728379582의 선정9파일95조건은 당시 근거다. `R/reuse-scope-final-inputs.json`, `reuse-scope-final-draft.md`의 입력/조건 범위만 재사용. LF 정규화 동일과 raw SHA 동일을 구분한다.
+- 소스입력967에는 시험도 포함됐다. 후속 시험3파일이 바뀐 뒤 전체967동일이라 주장하지 않는다. 제품 소스는 c7 이후 그대로이며 후기 변경은 시험·원장·API 설명·기록뿐이다.
+- 원장 현재1,058조건 NOT_RUN과 과거 bindings/execution/원문을 보존했다. 이번 대표 UI·CI 성공을 전체 기대값의 새로운 PASS로 승격하지 않는다.
 
-- CP0/1: 동일 원형 분기·QA 직원 준비·B 명시 migration·기존 업무86테이블 보존·SQLite/FK·신규 nullable 백필 없음. `pair-preparation.json`, `A/original-tables.json`, `B/original-tables.json`, `B/migration.log`, `A/cutover.json`.
-- AP01/AP02/IO02/DF01/PR01/DF02/PR02/RW01/AS01/SH01의 지정 조건 완료. 전/후/역순 취소·무관 수량은 상세 문서와 업무별 comparison.json을 읽는다. 공통31단계 수량·예약 일치 `all-workflow-stock-parity.json`. 전체 업무 PASS는 아니다.
-- AS02 완료: QA-B의 조립1 AS 사용 요청 → QA-AS 전용 승인 → 같은 QA-AS 취소. 총/창고/조립/조립예약은 440/439/1/1 → 439/439/0/0 → 440/439/1/0. 요청·라인·묶음 최종 취소, 원작업/역작업·원거래/역거래 유일 연결 및 SH01 종료 수량·예약 복원. `R/AS02-comparison.json`, `R/AS02-record.md`, A/B `AS02-pending.json`, `AS02-approved.json`, `AS02-cancelled.json`. A 승인 화면은 `AS02-approved-stable.png/.txt`, B는 `AS02-approved-detail.png/.txt`가 최종 근거다. 상세·첫 표·TODO 반영까지 끝났으며 다시 요청·승인·취소하지 않는다.
-- 기타 사유 live 입력창 붕괴: A/B 공통 기존 결함. B ReasonFormFields의 container query를 content width ResizeObserver로 최소 대체. 실패 실험 보존, 7E2E/80단위/ESLint 통과. `DF02-layout-investigation.md`, T의 `defect-other-observed-width.log`, `DF02-RO-corrected-summary.json`.
-- 4조회 각30회 A/B 교대 측정 완료. 목록/검색/상세 내용 동일·회귀 기준 내. 내역 AS 표시32차이의 원형 일치 읽기 전용 판정 완료. `performance-run-02/summary.json`, `history-approval-display-review.json`. 원INCONCLUSIVE 덮어쓰지 않음.
-- production 빌드·타입·번들 3,379,878bytes(한도3,407,872) 통과. T/production-build.log, production-bundle.log. PROD-AP01은 QA-D(진공 소속 생산부 부)가 조립 요청 승인·취소, PROD-DF01은 기타 live입력·창고격리2/복귀/한작업취소·전품목복원까지 완료. 각각 comparison.json과 상세 문서를 재사용한다.
-- 사용자의 추가 지시에 따라 새 업무를 잠시 멈추고 문서 복원: 상세·첫 표·33단계 짝지은 화면·파일해시 색인·TODO·이 인계 작성. 기록 때문에 유효한 검사를 다시 실행하지 않았다.
-- 16:35 국소 보충 완료: IO5조건5/5, 상세wrapper2파일24/24, EOF 관련 Node12/12가 첫 실행에서 통과했고247입력 전후 해시가 같았다. `R/supplemental-checks-record.md`, `T/supplemental-20261016-01-summary.json` 및 해당 원문. 이전 재사용 초안의 이 세 미확인은 해소됐으며 입력이 바뀌지 않으면 반복하지 않는다.
+## 진행 중인 단계와 바로 다음 행동
 
-## 현재 사용자 검토 환경과 이전 CI 경과
+1. CI watch6561은 완료됐다. `T/ci-eddd0811-result.json`에8job 성공을, `ci-eddd0811-general-success.log`와 `ci-eddd0811-playwright-general/`에301조건 중299첫통과·2flaky·0skip을 보존했다. CI 상태만 보고301첫통과라 쓰지 않는다.
+2. 읽기 전용 조사 완료: R/ci-flaky-io-review.md 및 ci-flaky-shipping-review.md. IO 최초 실패 구간의 조립/창고 보존과 취소 응답은 확인했으나 reset 원인·취소 후 예약 전체 복원은 미확인. BOM은 실제 매칭 본문도1이고 기본BOM 응답은 입력 전 완료돼 지연 응답 덮어쓰기 가설은 배제했다. 실제 이벤트/state 순서와 재현 원인이 없어 추측패치하지 않는다. 둘 다 직원 영향0이라고 단정하지 않는다.
+3. 결과에 맞춰 상세 첫 표·활성 TODO·이 인계의 종료 판정을 확정한다. main 원격이 여전히29583972인지 읽기 확인한다. 다른 세션 파일을 자동 포함하지 않는다.
+4. 종료 문서만 명시 stage·cached check·smart PlanOnly·링크 검사, 기존 검사 도구의 유효 통과 근거 재사용 후 실제 날짜의 한국어 제목으로 후보에 커밋/푸시한다. 문서 후속 HEAD CI도 확인해 최종 응답에 정확히 구분한다. 종료 문서 자체 해시를 그 문서 안에 미리 단정하지 않는다.
+5. A/B 검토 환경과 근거는 남긴다. 복원 절차는 보고서 ‘개발 DB 복원’ 절을 따른다. 이번에 복원·main 병합·직원 배포는 실행하지 않는다.
 
-**현재:** AS02·CONV01·ADJ01·SET01·DETAIL01·REPORT01/02와 B PROD-AP01/DF01 기록 완료. `3-AR-0004` 총440·창고439·조립1·예약0, RW01입고1은 남는다. QA-W만 dark/collapsed 저장, QA-N light/expanded. A tab2는 QA-N 주간PF, B tab4는 QA-B 출하 요청 목록이다. 원래 tab1은 건드리지 않는다. 압축 후 `cua.rewriteDocumentation`부터 호출하고 실제 UI·계정을 읽는다.
+## 남은 한계·주의
 
-**이전 CI 경과:** CI38877549662의 프론트는8실패(RO대역누락7+실사회차목록1)였고 두 시험파일만 수정하여19/92건·ESLint·원장 `--check` exit0, cached check/smart PlanOnly 후6f9a6aff커밋했다. 이후 알림시험1실패도5a77fbf1에서 보완했다. 옛6f CI의 프론트4,601건은 성공했지만 backend/general E2E는 후속 푸시로 취소되어 미완료다. 최신395 CI만 최종 결과 대상으로 확인한다. 새 업무·빌드·성능·전체기대값 로컬 반복 금지.
-
-WorkChoice 원장은 `R/ci-workchoice-ledger-proposal.patch` 적용 후 현재4binding sourceHash·line243만 갱신하고 이전25binding snapshot을 history에 추가했다. Stocktake는 기존 main과 같은 시험·제품이었으며 `await act`와 선택지 표시 대기/펼침 단언만 추가했다. 정확한 CI effect 순서는 미확정(`R/ci-stocktake-review.md`). 실직원 DB 접근·제품수정 없음. 관련 원문은 `T/ci-38877549662-frontend.log`, `ci-fix-workchoice.log`, `ci-fix-stocktake.log`, `ci-fix-eslint.log`.
-
-CONV01은 조립55/143/20/0→54/144/19/1→55/143/20/0, 창고0/0/480/420·예약불변. 원작업1/거래4와 역연결 유일. `CONV01-comparison.json`, `CONV01-record.md` 및 A/B각단계자료를 재사용. 후속사용미실행. 대표품목은 B 대상제품 우선 선택 코드로 원인 확인(`observed-display-differences-review.md`); 원comparison의 미확정은 당시기록으로보존. 재실행하지 않는다.
-
-과거 경과: 문서 복원 당시에는 A만 AS02 RESERVED·조립예약1이고 B는 미실행이었다. 이후 양쪽 전용 승인·취소와16:44 문서 반영을 마쳤다. 과거 상태는 `documentation-checkpoint.json`으로 보존하며 현재 작업 지시로 사용하지 않는다.
-
-## 재개 이후 순서
-
-1. PROD-SH01 대조·8항목·정제4문서 커밋/푸시 완료. 현재 CI 실패만 위 순서로 보완하고 새 최종 HEAD CI를 확인한다. 완료업무는 재실행 금지.
-2. 수량·예약·원장 대조 → 상세8항목·첫 표·TODO·이 인계를 갱신한 뒤 다음 묶음으로 이동한다.
-3. `reuse-scope-final-draft.md`, `supplemental-checks-record.md`, 최종 읽기 감사의 재사용 범위를 확인한다. IO5·상세24·Node12와 보정/설정/상세/보고는 완료했으므로 다시 검사하지 않는다.
-4. B production 핵심 입력·업무는 수행 완료했다. 최종 문서의 과거 pending 문구를 현재 결과와 연결하고 아직 하지 않은 조건은 그대로 표시한다.
-5. 명시 stage·실제 날짜·cached diff check·smart PlanOnly와 실제 영향으로 부족 검사만 선택. 병합/국소수정/정제기록을 검토 가능한 커밋으로 분리. 후보만 push, 최종 HEAD 전체CI 확인. main 전진 여부는 후보에만 정상 통합.
-6. A/B 사용자 검토 서버와 원형/실패 자료 보존, 개발 환경 복원법 안내. main 반영·직원 배포·운영 DB 덮어쓰기 금지.
-
-## 실패·미확인·주의
-
-- 원장17:06 국소 정렬은5f660a90에 커밋했다. 당시 두 권한문구·4파일85현재binding/6선언줄·과거binding/execution/원문보존·`--check` exit0. `ledger-check-20261016-02` 및 `ledger-check-20261016-01/post-apply-preservation.json`. 이번CI WorkChoice4binding 갱신은 별도 후속이다. 현재1058NOT_RUN은그대로이며 이번업무PASS와분리, 제품/도구변경없음.
-
-- AP02 내부 io_batch completed 잔존은 A/B 기존 문제. 요청·라인/관측 UI취소 정상. 전체 소비자 영향 없음으로 확대 금지.
-- AS02 실제 전용 승인·취소는 양쪽 완료. A 제출 전은 부서 결재, B는 AS 전용 결재로 표시됐고 완료 모달은 양쪽 창고 결재 문구인 기존 안내 문제다. 실제 승인 경로와 문구 차이는 `AS02-record.md`에 분리했다. 안내 문구 수정을 완료했다고 주장하지 않는다.
-- DF02 기타 입력 자동검사 통과와 최종 production 실화면을 구분. 초기 RED 선택0/fixture422는 원인 재현FAIL이 아니다. 실제 결함 재현은 red-03.
-- SH01 BOM2/3은 입력/미리보기 유지까지, 실제 출하는 표준1/1. 변경 BOM 출하 성공이라 기록 금지.
-- RW01 입고1 잔존. PR02 후 최초 수량 복원 결과를 현재 전체 DB로 확대 금지. AS02 취소 후 양쪽 예약0이며, A만 예약1이던 상태는 과거 체크포인트다.
-- 소스/로그/화면 원문에는 실제 직원 정보가 있으므로 ignored runtime에만 보관. Git에는 QA 역할·품목코드·정제한 수량/판정/경로만.
-- 업무 DB 초기화 금지. 기존 E2E global setup은 3100/8021 합성 DB 전용이며 A/B 실자료 DB에 사용 금지.
-- main C:/ERP에는 후보코드 checkout 금지. 정기 동기화 시간과 겹치면 중지/자료 보존, 직원 예약 변경 금지. 운영의 새 거래를 옛 백업으로 덮지 않음.
-
-## 유효한 검사 재사용
-
-T/approval-core.xml 72, io-approval-selected.xml126, restore-shipping-core.xml 중 복귀계약34·출하4, 수정 후 restore-main-adapted.txt18, policy-notifications.xml12·policy-admin-history.xml4, RO80·관련E2E7·ESLint. 각 해시 입력이 그대로면 재실행하지 않는다. 최초 복귀 묶음6FAIL은 단언 계약 수정 전 원문 보존; 전체 묶음을 PASS로 고치지 않는다.
-
-과거592cc5c6/CI38728379582의 설정·삭제·전환·보고 근거는 `reuse-scope-final-inputs.json`/`reuse-scope-final-draft.md`의 정확 범위만 재사용. 103중93파일 LF 내용 같음은 raw byte 동일이 아니다. 과거조건95는 이번95 재실행이 아니다. 현재 전체 기대값 PASS로 승격 금지. 당시 미확인이던 IO5 제외조건·상세wrapper24·Node12는16:35 후속 국소 실행으로 해소했으며 위 보충 영수증을 우선한다. 상세 컴포넌트24통과를 실제 브라우저 clipboard·삭제/복원 업무까지 통과한 것으로 확대하지 않는다. 현재 빌드는 새 근거이므로 과거 초안의 빌드 미실행 문구보다 우선하되 파일 변경 시 영향을 재판정한다.
+- A/B 공통: 취소된 이동의 내부 io_batch가 completed로 남음. 요청/라인·관측 UI·재고는 취소 정상이나 전체 소비자 영향까지 확인하지 않았다.
+- A/B 공통: AS 전용 완료 모달의 ‘창고 결재’ 문구. 실제 AS 담당 승인·취소는 정상이며 문구 수정은 하지 않았다.
+- 실사 CI 내부 effect 순서는 미확정. 취소된 general 로그의 proxy ECONNRESET도 원인 미확정이다. 발생시각이 job 취소 전이므로 전부 취소 탓으로 돌리지 않는다.
+- 현재 일반 E2E의 연결 reset·BOM2→1도 원인 미확정이며 별도8항목 기록을 보고서에 추가했다. 원인 조사를 이어갈 경우 새 업무가 아니라 이2조건의 서버/입력 이벤트 관측부터 시작한다. 전체 반복·무조건 재시도·원인 미확정 패치는 하지 않는다.
+- 역할 회수/중복/동시 처리 등은 관련 자동·과거 근거와 신규 UI 조건을 구분한다. 모든 조합을 새 화면에서 반복한 것이 아니다. 실제 자료 부재·미실행은 상세에 남겼다.
+- RW01 원자재 입고1과 QA-W dark/collapsed 설정은 검토 DB에 남는다. 현재3-AR-0004는 총440/창고439/조립1/예약0. B 추가 production의 정상·취소 이력도 남는다.
+- A/B 업무 DB에 기존 E2E global setup·seed/reset을 실행하지 않는다. 합성 E2E의3100/8021 환경과 혼용 금지. PIN·직원 원문·DB·화면은 커밋하지 않는다.
+- main의 C:/ERP에 후보 코드를 체크아웃하지 않는다. 정기 동기화와 겹치면 비교를 중지하고 자료를 보존한다. 직원 예약·서비스를 바꾸거나 새 운영 거래를 옛 백업으로 덮어쓰지 않는다.
