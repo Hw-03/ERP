@@ -66,12 +66,15 @@ vi.mock("../IoConfirmStep", () => ({
     onSaveDraft,
     onSubmit,
     onValidationError,
+    autoApprove,
   }: {
     onSaveDraft: () => void;
     onSubmit: () => void;
     onValidationError?: (message: string) => void;
+    autoApprove?: boolean;
   }) => (
     <>
+      <span data-testid="approval-mode">{autoApprove ? "자동 승인" : "결재 요청"}</span>
       <button type="button" data-testid="draft-save" onClick={onSaveDraft}>save</button>
       <button type="button" data-testid="confirm-submit" onClick={onSubmit}>submit</button>
       <button type="button" data-testid="confirm-memo-error" onClick={() => onValidationError?.("메모가 없어 부서 결재 요청을 진행할 수 없습니다.")}>memo error</button>
@@ -270,6 +273,24 @@ beforeEach(() => {
 });
 
 describe("IoComposeView navigation chrome", () => {
+  it.each([
+    ["primary", "none", "결재 요청"],
+    ["deputy", "none", "결재 요청"],
+    ["none", "primary", "자동 승인"],
+    ["none", "deputy", "자동 승인"],
+    ["primary", "deputy", "자동 승인"],
+  ])("생산부 요청의 최종 안내는 독립 부서 역할을 따른다: %s/%s", async (warehouse_role, department_role, expected) => {
+    render(<IoComposeView globalSearch="" operator={{ ...operator, warehouse_role, department_role }}
+      employees={[]} items={[]} setItems={vi.fn()} onStatusChange={vi.fn()} restoreStep={5}
+      restoreDraft={{ batch_id: "approval-role-draft", work_type: "process", sub_type: "adjust_in", notes: "생산부 요청",
+        bundles: [{ bundle_id: "approval-bundle", source_kind: "manual", title: "튜브 품목", quantity: 1,
+          source_item_id: "tube-item", expanded_level: 0,
+          lines: [{ line_id: "approval-line", item_id: "tube-item", item_name: "튜브 품목", unit: "EA",
+            direction: "adjust", from_bucket: "none", to_bucket: "production", to_department: "튜브",
+            quantity: 1, included: true, origin: "manual", shortage: 0 }] }] } as never} />);
+    expect(await screen.findByTestId("approval-mode")).toHaveTextContent(expected);
+  });
+
   it("반환 방식 진입 후 하위 선택·동일 방식 재클릭·수량 변경은 선택을 보존해 미리보기를 요청한다", async () => {
     const initial: IoBundle = {
       bundle_id: "returns-bundle", source_kind: "bom_parent", source_item_id: "parent", source_mes_code: null,

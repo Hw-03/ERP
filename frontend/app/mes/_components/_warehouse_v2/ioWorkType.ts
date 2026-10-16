@@ -225,8 +225,7 @@ export function canAutoApprove(
   if (kind === "warehouse") {
     return warehouseApprover;
   }
-  return warehouseApprover ||
-    operator.department_role === "primary" ||
+  return operator.department_role === "primary" ||
     operator.department_role === "deputy";
 }
 
