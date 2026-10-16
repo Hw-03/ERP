@@ -373,25 +373,25 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert forbidden_preview.status_code == 403, forbidden_preview.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert drafted.status_code == 403, drafted.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert submitted.status_code == 403, submitted.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert db_session.query(TransactionLog).count() == 0",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             }
           ],
           "execution": {
@@ -493,6 +493,32 @@
                 "assertion": "assert db_session.query(TransactionLog).count() == 0",
                 "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
               }
+            ],
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert forbidden_preview.status_code == 403, forbidden_preview.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert drafted.status_code == 403, drafted.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert submitted.status_code == 403, submitted.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert db_session.query(TransactionLog).count() == 0",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              }
             ]
           ]
         },
@@ -510,25 +536,25 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert response.status_code == expected_status, response.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert inventory.warehouse_qty == Decimal(\"0\")",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert db_session.query(IoBatch).count() == 0",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert db_session.query(TransactionLog).count() == 0",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             }
           ],
           "execution": {
@@ -630,6 +656,32 @@
                 "assertion": "assert db_session.query(TransactionLog).count() == 0",
                 "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
               }
+            ],
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert response.status_code == expected_status, response.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert inventory.warehouse_qty == Decimal(\"0\")",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert db_session.query(IoBatch).count() == 0",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert db_session.query(TransactionLog).count() == 0",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              }
             ]
           ]
         },
@@ -647,7 +699,7 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_internal_use_unauthorized_write_rejected_without_preview",
               "assertion": "assert response.status_code == 403, response.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             }
           ],
           "execution": {
@@ -730,6 +782,14 @@
                 "selector": "test_internal_use_unauthorized_write_rejected_without_preview",
                 "assertion": "assert response.status_code == 403, response.text",
                 "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ],
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_internal_use_unauthorized_write_rejected_without_preview",
+                "assertion": "assert response.status_code == 403, response.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
               }
             ]
           ]
@@ -923,31 +983,31 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_draft_reads_recalculate_shortage_from_current_inventory",
               "assertion": "assert preview_component[\"shortage\"] == 2",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_draft_reads_recalculate_shortage_from_current_inventory",
               "assertion": "assert listed_line[\"shortage\"] == 0",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_draft_reads_recalculate_shortage_from_current_inventory",
               "assertion": "assert fetched_line[\"shortage\"] == 0",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_draft_reads_recalculate_shortage_from_current_inventory",
               "assertion": "assert persisted_line.shortage == Decimal(\"2\")",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_draft_reads_recalculate_shortage_from_current_inventory",
               "assertion": "assert depleted_line[\"shortage\"] == 2",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             }
           ],
           "execution": {
@@ -1055,6 +1115,38 @@
                 "assertion": "assert depleted_line[\"shortage\"] == 2",
                 "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
               }
+            ],
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_draft_reads_recalculate_shortage_from_current_inventory",
+                "assertion": "assert preview_component[\"shortage\"] == 2",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_draft_reads_recalculate_shortage_from_current_inventory",
+                "assertion": "assert listed_line[\"shortage\"] == 0",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_draft_reads_recalculate_shortage_from_current_inventory",
+                "assertion": "assert fetched_line[\"shortage\"] == 0",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_draft_reads_recalculate_shortage_from_current_inventory",
+                "assertion": "assert persisted_line.shortage == Decimal(\"2\")",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_draft_reads_recalculate_shortage_from_current_inventory",
+                "assertion": "assert depleted_line[\"shortage\"] == 2",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              }
             ]
           ]
         },
@@ -1072,25 +1164,25 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
               "assertion": "assert result.status_code == 422, result.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
               "assertion": "assert db_session.query(TransactionLog).count() == 0",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
               "assertion": "assert db_session.query(StockRequest).count() == 0",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
               "assertion": "assert batch.status == \"draft\"",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             }
           ],
           "execution": {
@@ -1191,6 +1283,32 @@
                 "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
                 "assertion": "assert batch.status == \"draft\"",
                 "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ],
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
+                "assertion": "assert result.status_code == 422, result.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
+                "assertion": "assert db_session.query(TransactionLog).count() == 0",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
+                "assertion": "assert db_session.query(StockRequest).count() == 0",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
+                "assertion": "assert batch.status == \"draft\"",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
               }
             ]
           ]
@@ -4481,13 +4599,13 @@
               "file": "backend/tests/test_dept_hierarchy.py",
               "selector": "test_admin_레벨_단독은_결재_불가",
               "assertion": "assert can_approve_department(actor, dept) is False",
-              "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              "sourceHash": "27de3026ccca5cbe54aa565c391885dd6197651e520cb9255cd2d904bd437eb4"
             },
             {
               "file": "backend/tests/test_dept_hierarchy.py",
               "selector": "test_admin_레벨_단독은_빈_frozenset",
               "assertion": "assert approvable_departments(actor) == frozenset()",
-              "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              "sourceHash": "27de3026ccca5cbe54aa565c391885dd6197651e520cb9255cd2d904bd437eb4"
             },
             {
               "file": "backend/tests/test_io_expectation_closure.py",
@@ -4592,6 +4710,52 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_dept_hierarchy.py",
+                "selector": "test_admin_레벨_단독은_결재_불가",
+                "assertion": "assert can_approve_department(actor, dept) is False",
+                "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              },
+              {
+                "file": "backend/tests/test_dept_hierarchy.py",
+                "selector": "test_admin_레벨_단독은_빈_frozenset",
+                "assertion": "assert approvable_departments(actor) == frozenset()",
+                "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              },
+              {
+                "file": "backend/tests/test_io_expectation_closure.py",
+                "selector": "test_legacy_admin_level_without_warehouse_role_cannot_self_approve",
+                "assertion": "assert result[\"status\"] == \"reserved\"",
+                "sourceHash": "63ac37b7597bed267365464058b51a430b33fe8feaa45e94fb9d3caace5e2da0"
+              },
+              {
+                "file": "backend/tests/test_io_expectation_closure.py",
+                "selector": "test_legacy_admin_level_without_warehouse_role_cannot_self_approve",
+                "assertion": "assert approved.status_code == 403, approved.text",
+                "sourceHash": "63ac37b7597bed267365464058b51a430b33fe8feaa45e94fb9d3caace5e2da0"
+              },
+              {
+                "file": "backend/tests/test_io_expectation_closure.py",
+                "selector": "test_legacy_admin_level_without_warehouse_role_cannot_self_approve",
+                "assertion": "assert request.approved_by_employee_id is None",
+                "sourceHash": "63ac37b7597bed267365464058b51a430b33fe8feaa45e94fb9d3caace5e2da0"
+              },
+              {
+                "file": "backend/tests/test_io_expectation_closure.py",
+                "selector": "test_legacy_admin_level_without_warehouse_role_cannot_self_approve",
+                "assertion": "assert _cells(db_session) == expected_pending",
+                "sourceHash": "63ac37b7597bed267365464058b51a430b33fe8feaa45e94fb9d3caace5e2da0"
+              },
+              {
+                "file": "backend/tests/test_io_expectation_closure.py",
+                "selector": "test_legacy_admin_level_without_warehouse_role_cannot_self_approve",
+                "assertion": "assert db_session.query(TransactionLog).count() == 0",
+                "sourceHash": "63ac37b7597bed267365464058b51a430b33fe8feaa45e94fb9d3caace5e2da0"
+              }
+            ]
           ]
         },
         {
@@ -57013,25 +57177,25 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert forbidden_preview.status_code == 403, forbidden_preview.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert drafted.status_code == 403, drafted.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert submitted.status_code == 403, submitted.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert db_session.query(TransactionLog).count() == 0",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             }
           ],
           "execution": {
@@ -57132,6 +57296,32 @@
                 "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
                 "assertion": "assert db_session.query(TransactionLog).count() == 0",
                 "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ],
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert forbidden_preview.status_code == 403, forbidden_preview.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert drafted.status_code == 403, drafted.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert submitted.status_code == 403, submitted.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert db_session.query(TransactionLog).count() == 0",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
               }
             ]
           ]
@@ -57322,25 +57512,25 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert forbidden_preview.status_code == 403, forbidden_preview.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert drafted.status_code == 403, drafted.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert submitted.status_code == 403, submitted.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert db_session.query(TransactionLog).count() == 0",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             }
           ],
           "execution": {
@@ -57442,6 +57632,32 @@
                 "assertion": "assert db_session.query(TransactionLog).count() == 0",
                 "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
               }
+            ],
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert forbidden_preview.status_code == 403, forbidden_preview.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert drafted.status_code == 403, drafted.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert submitted.status_code == 403, submitted.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert db_session.query(TransactionLog).count() == 0",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              }
             ]
           ]
         },
@@ -57459,25 +57675,25 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert response.status_code == expected_status, response.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert inventory.warehouse_qty == Decimal(\"0\")",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert db_session.query(IoBatch).count() == 0",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert db_session.query(TransactionLog).count() == 0",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             }
           ],
           "execution": {
@@ -57579,6 +57795,32 @@
                 "assertion": "assert db_session.query(TransactionLog).count() == 0",
                 "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
               }
+            ],
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert response.status_code == expected_status, response.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert inventory.warehouse_qty == Decimal(\"0\")",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert db_session.query(IoBatch).count() == 0",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert db_session.query(TransactionLog).count() == 0",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              }
             ]
           ]
         }
@@ -57675,7 +57917,7 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_internal_use_unauthorized_write_rejected_without_preview",
               "assertion": "assert response.status_code == 403, response.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             }
           ],
           "execution": {
@@ -57758,6 +58000,14 @@
                 "selector": "test_internal_use_unauthorized_write_rejected_without_preview",
                 "assertion": "assert response.status_code == 403, response.text",
                 "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ],
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_internal_use_unauthorized_write_rejected_without_preview",
+                "assertion": "assert response.status_code == 403, response.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
               }
             ]
           ]
@@ -58965,7 +59215,7 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_internal_use_fresh_submit_rejects_invalid_destination",
               "assertion": "assert response.status_code == 422, response.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             }
           ],
           "execution": {
@@ -59048,6 +59298,14 @@
                 "selector": "test_internal_use_fresh_submit_rejects_invalid_destination",
                 "assertion": "assert response.status_code == 422, response.text",
                 "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ],
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_internal_use_fresh_submit_rejects_invalid_destination",
+                "assertion": "assert response.status_code == 422, response.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
               }
             ]
           ]
@@ -59507,13 +59765,13 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_internal_use_children_only_consumes_selected_children_without_parent_change",
               "assertion": "assert [line.item_id for line in request.lines] == [selected_child.item_id]",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_internal_use_children_only_consumes_selected_children_without_parent_change",
               "assertion": "assert quantities == {\n        parent.item_id: Decimal(\"5\"),\n        selected_child.item_id: Decimal(\"4\"),\n        unselected_child.item_id: Decimal(\"5\"),\n    }",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             }
           ],
           "execution": {
@@ -59602,6 +59860,20 @@
                 "selector": "test_internal_use_children_only_consumes_selected_children_without_parent_change",
                 "assertion": "assert quantities == {\n        parent.item_id: Decimal(\"5\"),\n        selected_child.item_id: Decimal(\"4\"),\n        unselected_child.item_id: Decimal(\"5\"),\n    }",
                 "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ],
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_internal_use_children_only_consumes_selected_children_without_parent_change",
+                "assertion": "assert [line.item_id for line in request.lines] == [selected_child.item_id]",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_internal_use_children_only_consumes_selected_children_without_parent_change",
+                "assertion": "assert quantities == {\n        parent.item_id: Decimal(\"5\"),\n        selected_child.item_id: Decimal(\"4\"),\n        unselected_child.item_id: Decimal(\"5\"),\n    }",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
               }
             ]
           ]
@@ -60025,8 +60297,8 @@
       "decisionIds": [
         "WORDING-ROLE-SCOPE"
       ],
-      "finalExpected": "승인자의 소속 부서로 결재 범위를 제한하지 않는다. 부서 정·부는 비창고 요청, 창고 정·부는 창고 포함 요청을 처리한다. AR·AA와 일반 공정의 승인함 경로는 유지한다.",
-      "finalStaffExpected": "승인자의 소속 부서로 결재 범위를 제한하지 않는다. 부서 정·부는 비창고 요청, 창고 정·부는 창고 포함 요청을 처리한다. AR·AA와 일반 공정의 승인함 경로는 유지한다.",
+      "finalExpected": "승인자의 소속 공정으로 생산부 결재 범위를 제한하지 않는다. 창고 역할은 창고 결재 권한을, 생산부 역할은 생산부 결재 권한을 각각 부여하며 서로 대신하지 않는다. 겸임자는 각 역할을 독립적으로 사용한다. AR·AA와 일반 공정의 승인함 경로 구분은 유지한다.",
+      "finalStaffExpected": "승인자의 소속 공정으로 생산부 결재 범위를 제한하지 않는다. 창고 역할은 창고 결재 권한을, 생산부 역할은 생산부 결재 권한을 각각 부여하며 서로 대신하지 않는다. 겸임자는 각 역할을 독립적으로 사용한다. AR·AA와 일반 공정의 승인함 경로 구분은 유지한다.",
       "action": "결재 라우팅",
       "scope": "current-decisions",
       "verificationTags": [
@@ -60170,13 +60442,13 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_internal_use_bom_child_uses_actual_child_process_for_special_approval",
               "assertion": "assert request.requires_as_research_approval is True",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_internal_use_bom_child_uses_actual_child_process_for_special_approval",
               "assertion": "assert request.requires_department_approval is False",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             }
           ],
           "execution": {
@@ -60266,6 +60538,20 @@
                 "assertion": "assert request.requires_department_approval is False",
                 "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
               }
+            ],
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_internal_use_bom_child_uses_actual_child_process_for_special_approval",
+                "assertion": "assert request.requires_as_research_approval is True",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_internal_use_bom_child_uses_actual_child_process_for_special_approval",
+                "assertion": "assert request.requires_department_approval is False",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              }
             ]
           ]
         },
@@ -60283,19 +60569,19 @@
               "file": "backend/tests/test_dept_hierarchy.py",
               "selector": "test_부서_정은_생산_6공정_OK",
               "assertion": "assert can_approve_department(actor, line) is True",
-              "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              "sourceHash": "27de3026ccca5cbe54aa565c391885dd6197651e520cb9255cd2d904bd437eb4"
             },
             {
               "file": "backend/tests/test_dept_hierarchy.py",
               "selector": "test_부서_부도_생산_6공정_OK",
               "assertion": "assert can_approve_department(actor, line) is True",
-              "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              "sourceHash": "27de3026ccca5cbe54aa565c391885dd6197651e520cb9255cd2d904bd437eb4"
             },
             {
               "file": "backend/tests/test_dept_hierarchy.py",
               "selector": "test_부서_정부는_창고_부서는_거부",
               "assertion": "assert can_approve_department(actor, \"창고\") is False",
-              "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              "sourceHash": "27de3026ccca5cbe54aa565c391885dd6197651e520cb9255cd2d904bd437eb4"
             }
           ],
           "execution": {
@@ -60370,12 +60656,34 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_dept_hierarchy.py",
+                "selector": "test_부서_정은_생산_6공정_OK",
+                "assertion": "assert can_approve_department(actor, line) is True",
+                "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              },
+              {
+                "file": "backend/tests/test_dept_hierarchy.py",
+                "selector": "test_부서_부도_생산_6공정_OK",
+                "assertion": "assert can_approve_department(actor, line) is True",
+                "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              },
+              {
+                "file": "backend/tests/test_dept_hierarchy.py",
+                "selector": "test_부서_정부는_창고_부서는_거부",
+                "assertion": "assert can_approve_department(actor, \"창고\") is False",
+                "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              }
+            ]
           ]
         },
         {
           "id": "warehouse-role-scope",
           "origin": "technical+staff",
-          "expected": "창고 정·부의 결재 범위에는 창고 요청도 포함한다.",
+          "expected": "창고 정·부는 창고 결재를 처리하고 생산부 정·부는 소속 공정과 관계없이 생산부 결재를 처리한다. 창고 역할만으로 생산부 결재를, 생산부 역할만으로 창고 결재를 처리할 수 없으며 겸임자는 각 역할을 독립적으로 사용한다.",
           "requiredEvidence": [
             "test"
           ],
@@ -60383,16 +60691,34 @@
           "reason": null,
           "bindings": [
             {
-              "file": "backend/tests/test_dept_hierarchy.py",
-              "selector": "test_창고_정은_모든_부서_OK",
-              "assertion": "assert can_approve_department(actor, dept) is True",
-              "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              "file": "backend/tests/services/test_sr_approval.py",
+              "selector": "test_approve_transitions_reserved_to_completed_and_moves_stock",
+              "assertion": "assert out.status == StockRequestStatusEnum.COMPLETED",
+              "sourceHash": "cac7ed63bbb77bdd9ef851eb2f45ec2091b1cd69ddd697bc0a7b074479494414"
+            },
+            {
+              "file": "backend/tests/services/test_sr_approval.py",
+              "selector": "test_department_api_rejects_warehouse_only_without_changing_reservations",
+              "assertion": "assert response.status_code == 403, response.json()",
+              "sourceHash": "cac7ed63bbb77bdd9ef851eb2f45ec2091b1cd69ddd697bc0a7b074479494414"
+            },
+            {
+              "file": "backend/tests/services/test_sr_approval.py",
+              "selector": "test_warehouse_api_rejects_production_only_without_changing_reservations",
+              "assertion": "assert response.status_code == 403, response.json()",
+              "sourceHash": "cac7ed63bbb77bdd9ef851eb2f45ec2091b1cd69ddd697bc0a7b074479494414"
             },
             {
               "file": "backend/tests/test_dept_hierarchy.py",
-              "selector": "test_창고_부도_모든_부서_OK",
+              "selector": "test_겸임자는_부서_역할로_다른_공정도_결재",
               "assertion": "assert can_approve_department(actor, dept) is True",
-              "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              "sourceHash": "27de3026ccca5cbe54aa565c391885dd6197651e520cb9255cd2d904bd437eb4"
+            },
+            {
+              "file": "backend/tests/test_admin_expectation_atoms.py",
+              "selector": "test_warehouse_role_grant_revoke_regrant_preserves_all_cells_and_executes_once",
+              "assertion": "assert approved.status_code == 200, approved.text",
+              "sourceHash": "e9372e8bfb437827b5b5baed99988ee4121937973e4ae88aea1cde586aacf71c"
             }
           ],
           "execution": {
@@ -60467,6 +60793,22 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_dept_hierarchy.py",
+                "selector": "test_창고_정은_모든_부서_OK",
+                "assertion": "assert can_approve_department(actor, dept) is True",
+                "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              },
+              {
+                "file": "backend/tests/test_dept_hierarchy.py",
+                "selector": "test_창고_부도_모든_부서_OK",
+                "assertion": "assert can_approve_department(actor, dept) is True",
+                "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              }
+            ]
           ]
         }
       ],
@@ -60563,13 +60905,13 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_approval_uses_only_included_lines",
               "assertion": "assert db_session.query(StockRequestLine).count() == 1",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_approval_uses_only_included_lines",
               "assertion": "assert inv_b.pending_quantity == Decimal(\"0\")",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             }
           ],
           "execution": {
@@ -60658,6 +61000,20 @@
                 "selector": "test_io_submit_approval_uses_only_included_lines",
                 "assertion": "assert inv_b.pending_quantity == Decimal(\"0\")",
                 "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ],
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_approval_uses_only_included_lines",
+                "assertion": "assert db_session.query(StockRequestLine).count() == 1",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_approval_uses_only_included_lines",
+                "assertion": "assert inv_b.pending_quantity == Decimal(\"0\")",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
               }
             ]
           ]
@@ -62411,25 +62767,25 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert forbidden_preview.status_code == 403, forbidden_preview.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert drafted.status_code == 403, drafted.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert submitted.status_code == 403, submitted.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert db_session.query(TransactionLog).count() == 0",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             }
           ],
           "execution": {
@@ -62530,6 +62886,32 @@
                 "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
                 "assertion": "assert db_session.query(TransactionLog).count() == 0",
                 "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ],
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert forbidden_preview.status_code == 403, forbidden_preview.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert drafted.status_code == 403, drafted.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert submitted.status_code == 403, submitted.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert db_session.query(TransactionLog).count() == 0",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
               }
             ]
           ]
@@ -66788,25 +67170,25 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
               "assertion": "assert result.status_code == 422, result.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
               "assertion": "assert db_session.query(TransactionLog).count() == 0",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
               "assertion": "assert db_session.query(StockRequest).count() == 0",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
               "assertion": "assert batch.status == \"draft\"",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             }
           ],
           "execution": {
@@ -66907,6 +67289,32 @@
                 "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
                 "assertion": "assert batch.status == \"draft\"",
                 "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ],
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
+                "assertion": "assert result.status_code == 422, result.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
+                "assertion": "assert db_session.query(TransactionLog).count() == 0",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
+                "assertion": "assert db_session.query(StockRequest).count() == 0",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_receive_supplier_revalidates_all_items_before_any_write",
+                "assertion": "assert batch.status == \"draft\"",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
               }
             ]
           ]
@@ -106862,19 +107270,19 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_mixed_production_inbound_requires_memo_and_dept_approval",
               "assertion": "assert logs[parent.item_id].transaction_type == TransactionTypeEnum.PRODUCE",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_mixed_production_inbound_requires_memo_and_dept_approval",
               "assertion": "assert logs[component.item_id].transaction_type == TransactionTypeEnum.BACKFLUSH",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_mixed_production_inbound_requires_memo_and_dept_approval",
               "assertion": "assert len({log.operation_id for log in mixed_logs}) == 1",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             }
           ],
           "execution": {
@@ -106969,6 +107377,26 @@
                 "selector": "test_io_submit_mixed_production_inbound_requires_memo_and_dept_approval",
                 "assertion": "assert len({log.operation_id for log in mixed_logs}) == 1",
                 "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ],
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_mixed_production_inbound_requires_memo_and_dept_approval",
+                "assertion": "assert logs[parent.item_id].transaction_type == TransactionTypeEnum.PRODUCE",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_mixed_production_inbound_requires_memo_and_dept_approval",
+                "assertion": "assert logs[component.item_id].transaction_type == TransactionTypeEnum.BACKFLUSH",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_mixed_production_inbound_requires_memo_and_dept_approval",
+                "assertion": "assert len({log.operation_id for log in mixed_logs}) == 1",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
               }
             ]
           ]
@@ -110790,25 +111218,25 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert forbidden_preview.status_code == 403, forbidden_preview.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert drafted.status_code == 403, drafted.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert submitted.status_code == 403, submitted.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
               "assertion": "assert db_session.query(TransactionLog).count() == 0",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             }
           ],
           "execution": {
@@ -110910,6 +111338,32 @@
                 "assertion": "assert db_session.query(TransactionLog).count() == 0",
                 "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
               }
+            ],
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert forbidden_preview.status_code == 403, forbidden_preview.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert drafted.status_code == 403, drafted.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert submitted.status_code == 403, submitted.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths",
+                "assertion": "assert db_session.query(TransactionLog).count() == 0",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              }
             ]
           ]
         },
@@ -110927,25 +111381,25 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert response.status_code == expected_status, response.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert inventory.warehouse_qty == Decimal(\"0\")",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert db_session.query(IoBatch).count() == 0",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
               "assertion": "assert db_session.query(TransactionLog).count() == 0",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             }
           ],
           "execution": {
@@ -111046,6 +111500,32 @@
                 "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
                 "assertion": "assert db_session.query(TransactionLog).count() == 0",
                 "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ],
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert response.status_code == expected_status, response.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert inventory.warehouse_qty == Decimal(\"0\")",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert db_session.query(IoBatch).count() == 0",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_submit_receive_rejects_non_warehouse_requester_without_mutation",
+                "assertion": "assert db_session.query(TransactionLog).count() == 0",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
               }
             ]
           ]
@@ -114774,19 +115254,19 @@
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_write_rejects_fractional_quantity_without_persisting",
               "assertion": "assert response.status_code == 422, response.text",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_write_rejects_fractional_quantity_without_persisting",
               "assertion": "assert db_session.query(IoBatch).count() == 0",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             },
             {
               "file": "backend/tests/test_io_v2.py",
               "selector": "test_io_write_rejects_fractional_quantity_without_persisting",
               "assertion": "assert db_session.query(IoLine).count() == 0",
-              "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              "sourceHash": "1697406337adde6ef8996d5345d0d03c01a804c9a3bd50c58a78d81671c6b82c"
             }
           ],
           "execution": {
@@ -114881,6 +115361,26 @@
                 "selector": "test_io_write_rejects_fractional_quantity_without_persisting",
                 "assertion": "assert db_session.query(IoLine).count() == 0",
                 "sourceHash": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+              }
+            ],
+            [
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_write_rejects_fractional_quantity_without_persisting",
+                "assertion": "assert response.status_code == 422, response.text",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_write_rejects_fractional_quantity_without_persisting",
+                "assertion": "assert db_session.query(IoBatch).count() == 0",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
+              },
+              {
+                "file": "backend/tests/test_io_v2.py",
+                "selector": "test_io_write_rejects_fractional_quantity_without_persisting",
+                "assertion": "assert db_session.query(IoLine).count() == 0",
+                "sourceHash": "4259a58d1d061fc0cfaabcec530ced8018ae47fdea9ff73544f3304a7011fa79"
               }
             ]
           ]
@@ -116602,25 +117102,25 @@
               "file": "backend/tests/test_notifications.py",
               "selector": "test_warehouse_request_notifies_approvers_excluding_requester",
               "assertion": "assert _unread(client, wh_primary) == 1",
-              "sourceHash": "0ad49229ecb0706a5466b1447b6be019eec94a7d9c058d554a0f5745d5a69f30"
+              "sourceHash": "e17524d88e87d0cc1000ce612dfd32cd75961ce17dffc5b78dd1ca7baabb6f1d"
             },
             {
               "file": "backend/tests/test_notifications.py",
               "selector": "test_warehouse_request_notifies_approvers_excluding_requester",
               "assertion": "assert _unread(client, wh_deputy) == 1",
-              "sourceHash": "0ad49229ecb0706a5466b1447b6be019eec94a7d9c058d554a0f5745d5a69f30"
+              "sourceHash": "e17524d88e87d0cc1000ce612dfd32cd75961ce17dffc5b78dd1ca7baabb6f1d"
             },
             {
               "file": "backend/tests/test_notifications.py",
               "selector": "test_warehouse_request_notifies_approvers_excluding_requester",
               "assertion": "assert _unread(client, requester) == 0",
-              "sourceHash": "0ad49229ecb0706a5466b1447b6be019eec94a7d9c058d554a0f5745d5a69f30"
+              "sourceHash": "e17524d88e87d0cc1000ce612dfd32cd75961ce17dffc5b78dd1ca7baabb6f1d"
             },
             {
               "file": "backend/tests/test_notifications.py",
               "selector": "test_warehouse_request_notifies_approvers_excluding_requester",
               "assertion": "assert _unread(client, bystander) == 0",
-              "sourceHash": "0ad49229ecb0706a5466b1447b6be019eec94a7d9c058d554a0f5745d5a69f30"
+              "sourceHash": "e17524d88e87d0cc1000ce612dfd32cd75961ce17dffc5b78dd1ca7baabb6f1d"
             }
           ],
           "execution": {
@@ -116695,6 +117195,34 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_notifications.py",
+                "selector": "test_warehouse_request_notifies_approvers_excluding_requester",
+                "assertion": "assert _unread(client, wh_primary) == 1",
+                "sourceHash": "0ad49229ecb0706a5466b1447b6be019eec94a7d9c058d554a0f5745d5a69f30"
+              },
+              {
+                "file": "backend/tests/test_notifications.py",
+                "selector": "test_warehouse_request_notifies_approvers_excluding_requester",
+                "assertion": "assert _unread(client, wh_deputy) == 1",
+                "sourceHash": "0ad49229ecb0706a5466b1447b6be019eec94a7d9c058d554a0f5745d5a69f30"
+              },
+              {
+                "file": "backend/tests/test_notifications.py",
+                "selector": "test_warehouse_request_notifies_approvers_excluding_requester",
+                "assertion": "assert _unread(client, requester) == 0",
+                "sourceHash": "0ad49229ecb0706a5466b1447b6be019eec94a7d9c058d554a0f5745d5a69f30"
+              },
+              {
+                "file": "backend/tests/test_notifications.py",
+                "selector": "test_warehouse_request_notifies_approvers_excluding_requester",
+                "assertion": "assert _unread(client, bystander) == 0",
+                "sourceHash": "0ad49229ecb0706a5466b1447b6be019eec94a7d9c058d554a0f5745d5a69f30"
+              }
+            ]
           ]
         },
         {
@@ -116711,7 +117239,7 @@
               "file": "backend/tests/test_notifications.py",
               "selector": "test_request_notification_summary_lists_items_quantities_and_total",
               "assertion": "assert notif_svc._summary(request) == (\n        \"김현우 · 창고 → 부서 · ADX4000W LVDS Cable 2개 · COCOON POWER BUTTON 3개 · 총 5개\"\n    )",
-              "sourceHash": "0ad49229ecb0706a5466b1447b6be019eec94a7d9c058d554a0f5745d5a69f30"
+              "sourceHash": "e17524d88e87d0cc1000ce612dfd32cd75961ce17dffc5b78dd1ca7baabb6f1d"
             }
           ],
           "execution": {
@@ -116786,6 +117314,16 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_notifications.py",
+                "selector": "test_request_notification_summary_lists_items_quantities_and_total",
+                "assertion": "assert notif_svc._summary(request) == (\n        \"김현우 · 창고 → 부서 · ADX4000W LVDS Cable 2개 · COCOON POWER BUTTON 3개 · 총 5개\"\n    )",
+                "sourceHash": "0ad49229ecb0706a5466b1447b6be019eec94a7d9c058d554a0f5745d5a69f30"
+              }
+            ]
           ]
         }
       ],
@@ -133752,13 +134290,13 @@
               "file": "backend/tests/test_notifications.py",
               "selector": "test_mark_approval_request_notifications_read_scopes_to_request_and_section",
               "assertion": "assert all(note.is_read is True for note in matching)",
-              "sourceHash": "0ad49229ecb0706a5466b1447b6be019eec94a7d9c058d554a0f5745d5a69f30"
+              "sourceHash": "e17524d88e87d0cc1000ce612dfd32cd75961ce17dffc5b78dd1ca7baabb6f1d"
             },
             {
               "file": "backend/tests/test_notifications.py",
               "selector": "test_mark_approval_request_notifications_read_scopes_to_request_and_section",
               "assertion": "assert all(note.is_read is False for note in untouched)",
-              "sourceHash": "0ad49229ecb0706a5466b1447b6be019eec94a7d9c058d554a0f5745d5a69f30"
+              "sourceHash": "e17524d88e87d0cc1000ce612dfd32cd75961ce17dffc5b78dd1ca7baabb6f1d"
             }
           ],
           "execution": {
@@ -133833,6 +134371,22 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_notifications.py",
+                "selector": "test_mark_approval_request_notifications_read_scopes_to_request_and_section",
+                "assertion": "assert all(note.is_read is True for note in matching)",
+                "sourceHash": "0ad49229ecb0706a5466b1447b6be019eec94a7d9c058d554a0f5745d5a69f30"
+              },
+              {
+                "file": "backend/tests/test_notifications.py",
+                "selector": "test_mark_approval_request_notifications_read_scopes_to_request_and_section",
+                "assertion": "assert all(note.is_read is False for note in untouched)",
+                "sourceHash": "0ad49229ecb0706a5466b1447b6be019eec94a7d9c058d554a0f5745d5a69f30"
+              }
+            ]
           ]
         },
         {
@@ -151871,8 +152425,8 @@
       "decisionIds": [
         "WORDING-ROLE-SCOPE"
       ],
-      "finalExpected": "승인자의 소속 부서로 결재 범위를 제한하지 않는다. 부서 정·부는 비창고 요청, 창고 정·부는 창고 포함 요청을 처리한다. AR·AA와 일반 공정 승인함 경로 구분은 유지한다.",
-      "finalStaffExpected": "승인자의 소속 부서로 결재 범위를 제한하지 않는다. 부서 정·부는 비창고 요청, 창고 정·부는 창고 포함 요청을 처리한다. AR·AA와 일반 공정 승인함 경로 구분은 유지한다.",
+      "finalExpected": "승인자의 소속 공정으로 생산부 결재 범위를 제한하지 않는다. 창고 역할은 창고 결재 권한을, 생산부 역할은 생산부 결재 권한을 각각 부여하며 서로 대신하지 않는다. 겸임자는 각 역할을 독립적으로 사용한다. AR·AA와 일반 공정의 승인함 경로 구분은 유지한다.",
+      "finalStaffExpected": "승인자의 소속 공정으로 생산부 결재 범위를 제한하지 않는다. 창고 역할은 창고 결재 권한을, 생산부 역할은 생산부 결재 권한을 각각 부여하며 서로 대신하지 않는다. 겸임자는 각 역할을 독립적으로 사용한다. AR·AA와 일반 공정의 승인함 경로 구분은 유지한다.",
       "action": "AR·AA 품목과 일반 공정 품목을 한 사용출고 요청에 담아 최종 확인 화면과 제출 후 내 요청을 비교한다.",
       "scope": "current-decisions",
       "verificationTags": [
@@ -151901,19 +152455,19 @@
               "file": "backend/tests/test_dept_hierarchy.py",
               "selector": "test_부서_정은_생산_6공정_OK",
               "assertion": "assert can_approve_department(actor, line) is True",
-              "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              "sourceHash": "27de3026ccca5cbe54aa565c391885dd6197651e520cb9255cd2d904bd437eb4"
             },
             {
               "file": "backend/tests/test_dept_hierarchy.py",
               "selector": "test_부서_부도_생산_6공정_OK",
               "assertion": "assert can_approve_department(actor, line) is True",
-              "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              "sourceHash": "27de3026ccca5cbe54aa565c391885dd6197651e520cb9255cd2d904bd437eb4"
             },
             {
               "file": "backend/tests/test_dept_hierarchy.py",
               "selector": "test_부서_정부는_창고_부서는_거부",
               "assertion": "assert can_approve_department(actor, \"창고\") is False",
-              "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              "sourceHash": "27de3026ccca5cbe54aa565c391885dd6197651e520cb9255cd2d904bd437eb4"
             }
           ],
           "execution": {
@@ -151988,12 +152542,34 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_dept_hierarchy.py",
+                "selector": "test_부서_정은_생산_6공정_OK",
+                "assertion": "assert can_approve_department(actor, line) is True",
+                "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              },
+              {
+                "file": "backend/tests/test_dept_hierarchy.py",
+                "selector": "test_부서_부도_생산_6공정_OK",
+                "assertion": "assert can_approve_department(actor, line) is True",
+                "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              },
+              {
+                "file": "backend/tests/test_dept_hierarchy.py",
+                "selector": "test_부서_정부는_창고_부서는_거부",
+                "assertion": "assert can_approve_department(actor, \"창고\") is False",
+                "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              }
+            ]
           ]
         },
         {
           "id": "warehouse-role-warehouse-scope",
           "origin": "technical+staff",
-          "expected": "창고 정·부는 창고를 포함한 요청을 처리한다.\n기존 확정 조건: 창고 정·부는 창고 포함 요청을 처리한다.",
+          "expected": "창고 정·부는 창고 결재를 처리하고 생산부 정·부는 소속 공정과 관계없이 생산부 결재를 처리한다. 창고 역할만으로 생산부 결재를, 생산부 역할만으로 창고 결재를 처리할 수 없으며 겸임자는 각 역할을 독립적으로 사용한다.",
           "requiredEvidence": [
             "test"
           ],
@@ -152001,16 +152577,34 @@
           "reason": null,
           "bindings": [
             {
-              "file": "backend/tests/test_dept_hierarchy.py",
-              "selector": "test_창고_정은_모든_부서_OK",
-              "assertion": "assert can_approve_department(actor, dept) is True",
-              "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              "file": "backend/tests/services/test_sr_approval.py",
+              "selector": "test_approve_transitions_reserved_to_completed_and_moves_stock",
+              "assertion": "assert out.status == StockRequestStatusEnum.COMPLETED",
+              "sourceHash": "cac7ed63bbb77bdd9ef851eb2f45ec2091b1cd69ddd697bc0a7b074479494414"
+            },
+            {
+              "file": "backend/tests/services/test_sr_approval.py",
+              "selector": "test_department_api_rejects_warehouse_only_without_changing_reservations",
+              "assertion": "assert response.status_code == 403, response.json()",
+              "sourceHash": "cac7ed63bbb77bdd9ef851eb2f45ec2091b1cd69ddd697bc0a7b074479494414"
+            },
+            {
+              "file": "backend/tests/services/test_sr_approval.py",
+              "selector": "test_warehouse_api_rejects_production_only_without_changing_reservations",
+              "assertion": "assert response.status_code == 403, response.json()",
+              "sourceHash": "cac7ed63bbb77bdd9ef851eb2f45ec2091b1cd69ddd697bc0a7b074479494414"
             },
             {
               "file": "backend/tests/test_dept_hierarchy.py",
-              "selector": "test_창고_부도_모든_부서_OK",
+              "selector": "test_겸임자는_부서_역할로_다른_공정도_결재",
               "assertion": "assert can_approve_department(actor, dept) is True",
-              "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              "sourceHash": "27de3026ccca5cbe54aa565c391885dd6197651e520cb9255cd2d904bd437eb4"
+            },
+            {
+              "file": "backend/tests/test_admin_expectation_atoms.py",
+              "selector": "test_warehouse_role_grant_revoke_regrant_preserves_all_cells_and_executes_once",
+              "assertion": "assert approved.status_code == 200, approved.text",
+              "sourceHash": "e9372e8bfb437827b5b5baed99988ee4121937973e4ae88aea1cde586aacf71c"
             }
           ],
           "execution": {
@@ -152085,6 +152679,22 @@
                 }
               ]
             }
+          ],
+          "historicalBindings": [
+            [
+              {
+                "file": "backend/tests/test_dept_hierarchy.py",
+                "selector": "test_창고_정은_모든_부서_OK",
+                "assertion": "assert can_approve_department(actor, dept) is True",
+                "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              },
+              {
+                "file": "backend/tests/test_dept_hierarchy.py",
+                "selector": "test_창고_부도_모든_부서_OK",
+                "assertion": "assert can_approve_department(actor, dept) is True",
+                "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+              }
+            ]
           ]
         },
         {
@@ -172841,22 +173451,22 @@
               "file": "frontend/app/mes/_components/_defect_hub/__tests__/DefectCartFlow.test.tsx",
               "selector": "PC-DELTA-DEFECT-04 최종확인은 모든 하위 배분을 보여주고 확인 뒤 변경은 실행하지 않는다",
               "assertion": "expect(within(dialog).getByRole(\"button\", { name: \"즉시 재작업\", exact: true })).toBeDisabled();",
-              "sourceHash": "a4f66f035a8663e6d1edc2e90b911a5279ef37d6118c2964e2ab1cd49d01183c",
-              "line": 718
+              "sourceHash": "65121641e0763b50fe988a1986345d7f08d271c6954bef55b9312550a5b6e4e8",
+              "line": 727
             },
             {
               "file": "frontend/app/mes/_components/_defect_hub/__tests__/DefectCartFlow.test.tsx",
               "selector": "PC-DELTA-DEFECT-04 최종확인은 모든 하위 배분을 보여주고 확인 뒤 변경은 실행하지 않는다",
               "assertion": "expect(dialog).toHaveTextContent(\"배분이 변경되었습니다. 취소 후 다시 확인하세요.\");",
-              "sourceHash": "a4f66f035a8663e6d1edc2e90b911a5279ef37d6118c2964e2ab1cd49d01183c",
-              "line": 718
+              "sourceHash": "65121641e0763b50fe988a1986345d7f08d271c6954bef55b9312550a5b6e4e8",
+              "line": 727
             },
             {
               "file": "frontend/app/mes/_components/_defect_hub/__tests__/DefectCartFlow.test.tsx",
               "selector": "PC-DELTA-DEFECT-04 최종확인은 모든 하위 배분을 보여주고 확인 뒤 변경은 실행하지 않는다",
               "assertion": "expect(stockRequestsApi.createStockRequest).not.toHaveBeenCalled();",
-              "sourceHash": "a4f66f035a8663e6d1edc2e90b911a5279ef37d6118c2964e2ab1cd49d01183c",
-              "line": 718
+              "sourceHash": "65121641e0763b50fe988a1986345d7f08d271c6954bef55b9312550a5b6e4e8",
+              "line": 727
             }
           ],
           "execution": {
@@ -173060,6 +173670,106 @@
                 "sourceHash": "9178f05d800fe1a6617be1bba38cb6ef6f61967d8fe23977ed4f35ab37b4d801",
                 "line": 136
               }
+            ],
+            [
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "await expect(dialog.getByTestId(\"defect-confirm-line\")).toContainText(parts[1].item_name);",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "await expect(dialog.getByTestId(\"defect-confirm-line\")).toContainText(\"수량 1\");",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "await expect(dialog.getByTestId(\"defect-confirm-line\")).toContainText(\"조립\");",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "await expect(dialog.getByTestId(\"defect-confirm-child\")).toHaveCount(3);",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "await expect(line).toContainText(child.mes_code);",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "await expect(line).toContainText(`정상 ${allocations[index].normal} · 격리 ${allocations[index].defective} · 폐기 ${allocations[index].scrap}`);",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "expect(payload.lines).toHaveLength(1);",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "expect(payload.lines[0]).toMatchObject({ item_id: parts[1].item_id, quantity: 1, from_bucket: \"production\", from_department: \"조립\" });",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "expect(decisions).toHaveLength(3);",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "await expect(line).toContainText(log.item_name);",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "await expect(line).toContainText(log.mes_code);",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/app/mes/_components/_defect_hub/__tests__/DefectCartFlow.test.tsx",
+                "selector": "PC-DELTA-DEFECT-04 최종확인은 모든 하위 배분을 보여주고 확인 뒤 변경은 실행하지 않는다",
+                "assertion": "expect(within(dialog).getByRole(\"button\", { name: \"즉시 재작업\", exact: true })).toBeDisabled();",
+                "sourceHash": "a4f66f035a8663e6d1edc2e90b911a5279ef37d6118c2964e2ab1cd49d01183c",
+                "line": 718
+              },
+              {
+                "file": "frontend/app/mes/_components/_defect_hub/__tests__/DefectCartFlow.test.tsx",
+                "selector": "PC-DELTA-DEFECT-04 최종확인은 모든 하위 배분을 보여주고 확인 뒤 변경은 실행하지 않는다",
+                "assertion": "expect(dialog).toHaveTextContent(\"배분이 변경되었습니다. 취소 후 다시 확인하세요.\");",
+                "sourceHash": "a4f66f035a8663e6d1edc2e90b911a5279ef37d6118c2964e2ab1cd49d01183c",
+                "line": 718
+              },
+              {
+                "file": "frontend/app/mes/_components/_defect_hub/__tests__/DefectCartFlow.test.tsx",
+                "selector": "PC-DELTA-DEFECT-04 최종확인은 모든 하위 배분을 보여주고 확인 뒤 변경은 실행하지 않는다",
+                "assertion": "expect(stockRequestsApi.createStockRequest).not.toHaveBeenCalled();",
+                "sourceHash": "a4f66f035a8663e6d1edc2e90b911a5279ef37d6118c2964e2ab1cd49d01183c",
+                "line": 718
+              }
             ]
           ]
         },
@@ -173154,22 +173864,22 @@
               "file": "frontend/app/mes/_components/_defect_hub/__tests__/DefectCartFlow.test.tsx",
               "selector": "PC-DELTA-DEFECT-04 최종확인은 모든 하위 배분을 보여주고 확인 뒤 변경은 실행하지 않는다",
               "assertion": "expect(within(dialog).getByRole(\"button\", { name: \"즉시 재작업\", exact: true })).toBeDisabled();",
-              "sourceHash": "a4f66f035a8663e6d1edc2e90b911a5279ef37d6118c2964e2ab1cd49d01183c",
-              "line": 718
+              "sourceHash": "65121641e0763b50fe988a1986345d7f08d271c6954bef55b9312550a5b6e4e8",
+              "line": 727
             },
             {
               "file": "frontend/app/mes/_components/_defect_hub/__tests__/DefectCartFlow.test.tsx",
               "selector": "PC-DELTA-DEFECT-04 최종확인은 모든 하위 배분을 보여주고 확인 뒤 변경은 실행하지 않는다",
               "assertion": "expect(dialog).toHaveTextContent(\"배분이 변경되었습니다. 취소 후 다시 확인하세요.\");",
-              "sourceHash": "a4f66f035a8663e6d1edc2e90b911a5279ef37d6118c2964e2ab1cd49d01183c",
-              "line": 718
+              "sourceHash": "65121641e0763b50fe988a1986345d7f08d271c6954bef55b9312550a5b6e4e8",
+              "line": 727
             },
             {
               "file": "frontend/app/mes/_components/_defect_hub/__tests__/DefectCartFlow.test.tsx",
               "selector": "PC-DELTA-DEFECT-04 최종확인은 모든 하위 배분을 보여주고 확인 뒤 변경은 실행하지 않는다",
               "assertion": "expect(stockRequestsApi.createStockRequest).not.toHaveBeenCalled();",
-              "sourceHash": "a4f66f035a8663e6d1edc2e90b911a5279ef37d6118c2964e2ab1cd49d01183c",
-              "line": 718
+              "sourceHash": "65121641e0763b50fe988a1986345d7f08d271c6954bef55b9312550a5b6e4e8",
+              "line": 727
             }
           ],
           "execution": {
@@ -173372,6 +174082,106 @@
                 "assertion": "expect(stockRequestsApi.createStockRequest).not.toHaveBeenCalled();",
                 "sourceHash": "9178f05d800fe1a6617be1bba38cb6ef6f61967d8fe23977ed4f35ab37b4d801",
                 "line": 136
+              }
+            ],
+            [
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "await expect(dialog.getByTestId(\"defect-confirm-line\")).toContainText(parts[1].item_name);",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "await expect(dialog.getByTestId(\"defect-confirm-line\")).toContainText(\"수량 1\");",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "await expect(dialog.getByTestId(\"defect-confirm-line\")).toContainText(\"조립\");",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "await expect(dialog.getByTestId(\"defect-confirm-child\")).toHaveCount(3);",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "await expect(line).toContainText(child.mes_code);",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "await expect(line).toContainText(`정상 ${allocations[index].normal} · 격리 ${allocations[index].defective} · 폐기 ${allocations[index].scrap}`);",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "expect(payload.lines).toHaveLength(1);",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "expect(payload.lines[0]).toMatchObject({ item_id: parts[1].item_id, quantity: 1, from_bucket: \"production\", from_department: \"조립\" });",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "expect(decisions).toHaveLength(3);",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "await expect(line).toContainText(log.item_name);",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/tests/e2e/defect-rework-expectations.spec.ts",
+                "selector": "DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상위·전체 오류·최종 하위 배분과 실행 위치",
+                "assertion": "await expect(line).toContainText(log.mes_code);",
+                "sourceHash": "851bc5336a16460b89d78af37adc352bbaf96015036cf3ad3211b469e3b770c4",
+                "line": 13
+              },
+              {
+                "file": "frontend/app/mes/_components/_defect_hub/__tests__/DefectCartFlow.test.tsx",
+                "selector": "PC-DELTA-DEFECT-04 최종확인은 모든 하위 배분을 보여주고 확인 뒤 변경은 실행하지 않는다",
+                "assertion": "expect(within(dialog).getByRole(\"button\", { name: \"즉시 재작업\", exact: true })).toBeDisabled();",
+                "sourceHash": "a4f66f035a8663e6d1edc2e90b911a5279ef37d6118c2964e2ab1cd49d01183c",
+                "line": 718
+              },
+              {
+                "file": "frontend/app/mes/_components/_defect_hub/__tests__/DefectCartFlow.test.tsx",
+                "selector": "PC-DELTA-DEFECT-04 최종확인은 모든 하위 배분을 보여주고 확인 뒤 변경은 실행하지 않는다",
+                "assertion": "expect(dialog).toHaveTextContent(\"배분이 변경되었습니다. 취소 후 다시 확인하세요.\");",
+                "sourceHash": "a4f66f035a8663e6d1edc2e90b911a5279ef37d6118c2964e2ab1cd49d01183c",
+                "line": 718
+              },
+              {
+                "file": "frontend/app/mes/_components/_defect_hub/__tests__/DefectCartFlow.test.tsx",
+                "selector": "PC-DELTA-DEFECT-04 최종확인은 모든 하위 배분을 보여주고 확인 뒤 변경은 실행하지 않는다",
+                "assertion": "expect(stockRequestsApi.createStockRequest).not.toHaveBeenCalled();",
+                "sourceHash": "a4f66f035a8663e6d1edc2e90b911a5279ef37d6118c2964e2ab1cd49d01183c",
+                "line": 718
               }
             ]
           ]
