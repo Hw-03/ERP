@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { loginAsOperator } from "./_helpers";
+import { loginAsOperator, readSeed } from "./_helpers";
 
 async function chooseReason(page: Page, line: Locator, name: string, quantity: number, memo: string): Promise<void> {
   await line.getByRole("spinbutton").fill(String(quantity));
@@ -7,6 +7,76 @@ async function chooseReason(page: Page, line: Locator, name: string, quantity: n
   await page.getByRole("dialog", { name: "사유 카테고리", exact: true }).getByRole("button", { name, exact: true }).click();
   await line.getByRole("textbox").fill(memo);
 }
+
+test("DEFECT-OTHER-LIVE 1920x1080 둘째 사유를 기타로 바꿔도 입력 높이와 메모 검증을 유지한다", async ({ page, baseURL }) => {
+  // This scenario belongs to the synthetic global-setup pair, never a review server.
+  expect(["http://localhost:3100", "http://127.0.0.1:3100"]).toContain(new URL(baseURL!).origin);
+  expect(readSeed().rawItem.item_name).toBe("E2E원자재튜브");
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await loginAsOperator(page, { role: "warehouse" });
+  const itemName = `E2E기타입력 ${Date.now().toString(36)}`;
+  const created = await page.request.post("/api/items", {
+    headers: { "X-Admin-Pin": "0000" },
+    data: { item_name: itemName, process_type_code: "AA", unit: "EA", model_slots: [1],
+      initial_quantity: 5, initial_locations: [{ department: "조립", quantity: 5 }] },
+  });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  const item = await created.json();
+  const before = await (await page.request.get(`/api/items/${item.item_id}`)).json();
+  const submissions: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && new URL(request.url()).pathname.startsWith("/api/defects/quarantine")) submissions.push(request.url());
+  });
+
+  await page.goto("/mes?tab=defect");
+  await page.getByRole("button").filter({ hasText: "불량 처리", visible: true }).click();
+  await page.getByRole("button").filter({ hasText: "격리 등록", visible: true }).click();
+  await page.getByRole("button", { name: /^부서 재고/ }).filter({ visible: true }).click();
+  await page.getByRole("textbox", { name: "검색", exact: true }).filter({ visible: true }).fill(itemName);
+  await page.getByTestId(`defect-picker-row-${item.item_id}`).filter({ visible: true }).getByRole("button").click();
+  await page.getByRole("button", { name: "수량·처리 정보 →", exact: true }).click();
+  const group = page.getByTestId("defect-quarantine-item-group").filter({ visible: true });
+  const lines = group.getByTestId("defect-quarantine-reason-line");
+  await chooseReason(page, lines.nth(0), "외관 불량", 1, "첫 사유 입력 보존");
+  await lines.nth(0).getByRole("button", { name: "B급", exact: true }).click();
+  await group.getByRole("button", { name: "다른 사유 추가", exact: true }).click();
+  const second = lines.nth(1);
+  await expect(second.getByRole("textbox", { name: "메모", exact: true })).toHaveValue("");
+  // Change a live category: remounting this step first would conceal the collapse.
+  await second.getByRole("button", { name: "사유 카테고리 선택", exact: true }).click();
+  await page.getByRole("dialog", { name: "사유 카테고리", exact: true }).getByRole("button", { name: "기타", exact: true }).click();
+  const submit = page.getByRole("button", { name: "격리하기 (2건) →", exact: true }).filter({ visible: true });
+  await expect(submit).toBeDisabled();
+  await expect(second.getByText("기타를 선택하면 메모를 입력하세요.", { exact: true }).first()).toBeVisible();
+  for (const control of [
+    second.getByRole("spinbutton"),
+    second.getByRole("button", { name: "사유 카테고리 선택", exact: true }),
+    second.getByRole("textbox", { name: "메모", exact: true }),
+    second.getByRole("group", { name: "보관 분류", exact: true }),
+    second.getByRole("button", { name: /사유 2 삭제$/ }),
+  ]) {
+    await expect(control).toBeVisible();
+    const box = await control.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.height).toBeGreaterThan(0);
+    expect(box!.width).toBeGreaterThan(0);
+  }
+  await second.getByRole("textbox", { name: "메모", exact: true }).fill("둘째 기타 상세");
+  await expect(second.getByText("기타를 선택하면 메모를 입력하세요.", { exact: true })).toHaveCount(0);
+  await expect(submit).toBeEnabled();
+  await second.getByRole("button", { name: "구형", exact: true }).click();
+  await second.getByRole("spinbutton").fill("2");
+  await expect(second.getByRole("button", { name: "구형", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(second.getByRole("spinbutton")).toHaveValue("2");
+  await expect(submit).toBeEnabled();
+  await expect(lines.nth(0).getByRole("spinbutton")).toHaveValue("1");
+  await expect(lines.nth(0).getByRole("textbox", { name: "메모", exact: true })).toHaveValue("첫 사유 입력 보존");
+  await expect(lines.nth(0).getByRole("button", { name: "B급", exact: true })).toHaveAttribute("aria-pressed", "true");
+  expect(submissions).toEqual([]);
+  const after = await page.request.get(`/api/items/${item.item_id}`);
+  expect(after.ok(), await after.text()).toBeTruthy();
+  expect(await after.json()).toEqual(before);
+});
 
 async function assertReasonLayout(line: Locator, mobile: boolean): Promise<void> {
   const quantity = line.getByRole("spinbutton");
@@ -18,11 +88,9 @@ async function assertReasonLayout(line: Locator, mobile: boolean): Promise<void>
   expect(boxes.every(Boolean)).toBe(true);
   const [q, c, m, g, r] = boxes.map((box) => box!);
   const stackedDesktop = !mobile && await category.evaluate((element) => {
-    for (let parent = element.parentElement; parent; parent = parent.parentElement) {
-      const style = getComputedStyle(parent);
-      if (style.containerType === "inline-size") return Number.parseFloat(style.width) <= 380;
-    }
-    throw new Error("사유 입력 영역의 크기 컨테이너가 없습니다.");
+    const fields = element.closest("[data-reason-desktop-fields]");
+    if (!fields) throw new Error("사유 입력 영역이 없습니다.");
+    return fields.getBoundingClientRect().width <= 380;
   });
   const overlapsVertically = (first: typeof q, second: typeof q): boolean =>
     first.y < second.y + second.height && second.y < first.y + first.height;

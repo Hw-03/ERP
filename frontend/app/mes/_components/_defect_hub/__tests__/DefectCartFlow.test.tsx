@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render as rtlRender, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, fireEvent, render as rtlRender, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactElement } from "react";
 import { DefectCartFlow } from "../DefectCartFlow";
@@ -97,6 +97,10 @@ async function enterReasonMemos(value = "회귀 테스트 사유") {
 }
 
 beforeEach(() => {
+  vi.stubGlobal("ResizeObserver", class {
+    observe = vi.fn();
+    disconnect = vi.fn();
+  });
   vi.clearAllMocks();
   vi.mocked(defectsApi.listReasonCategories).mockResolvedValue([
     { category_id: "surface-id", name: "외관 불량", is_active: true, is_other: false },
@@ -112,6 +116,11 @@ beforeEach(() => {
       { item_id: "child-1", item_name: "하위 품목", mes_code: "3-AR-0003", process_type_code: "AR", quantity: 2, has_children: false },
     ],
   });
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
 });
 
 describe("DefectCartFlow", () => {

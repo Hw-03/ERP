@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ReasonFormFields } from "../ReasonFormFields";
+import styles from "../ReasonFormFields.module.css";
 
 const api = vi.hoisted(() => ({
   listReasonCategories: vi.fn(), createReasonCategory: vi.fn(), updateReasonCategory: vi.fn(),
@@ -254,5 +255,78 @@ describe("managed defect reasons", () => {
     expect(screen.getByLabelText("선택 사유 번호")).toBeEmptyDOMElement();
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "가".repeat(33) } });
     expect(screen.getByRole("button", { name: "추가하고 선택" })).toBeDisabled();
+  });
+});
+
+describe("desktop reason content width", () => {
+  let observers: TestResizeObserver[];
+
+  class TestResizeObserver {
+    readonly observe = vi.fn();
+    readonly disconnect = vi.fn();
+
+    constructor(readonly callback: ResizeObserverCallback) {
+      observers.push(this);
+    }
+  }
+
+  function ControlsForm({ mobilePresentation = false }: { mobilePresentation?: boolean }) {
+    const [memo, setMemo] = useState("");
+    return <ReasonFormFields employeeId="employee" category="표면 균열" categoryId="surface"
+      memo={memo} onMemoChange={setMemo} onCategoryChange={vi.fn()} mobilePresentation={mobilePresentation}
+      quarantineControls={{ quantity: <input aria-label="수량" value="1" readOnly />,
+        management: <button type="button">B급</button>, remove: <button type="button">삭제</button> }} />;
+  }
+
+  function deliverContentWidth(observer: TestResizeObserver, target: Element, width: number): void {
+    const entry = { target, contentRect: { width, height: 154 },
+      borderBoxSize: [{ inlineSize: width + 24, blockSize: 178 }] } as unknown as ResizeObserverEntry;
+    act(() => observer.callback([entry], observer as unknown as ResizeObserver));
+  }
+
+  beforeEach(() => {
+    observers = [];
+    api.listReasonCategories.mockResolvedValue(reasons);
+    vi.stubGlobal("ResizeObserver", TestResizeObserver);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("uses inclusive 380px content width and retains one observer while editing", () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { container } = render(<QueryClientProvider client={client}><ControlsForm /></QueryClientProvider>);
+    const fields = container.querySelector("[data-reason-desktop-fields]")!;
+    expect(observers).toHaveLength(1);
+    expect(observers[0].observe).toHaveBeenCalledTimes(1);
+    expect(observers[0].observe).toHaveBeenCalledWith(fields);
+    deliverContentWidth(observers[0], fields, 380);
+    expect(fields).toHaveClass(styles.desktopNarrow);
+    deliverContentWidth(observers[0], fields, 380.1);
+    expect(fields).not.toHaveClass(styles.desktopNarrow);
+    deliverContentWidth(observers[0], fields, 379.9);
+    expect(fields).toHaveClass(styles.desktopNarrow);
+    fireEvent.change(screen.getByRole("textbox", { name: "메모", exact: true }), { target: { value: "폭 변경 뒤 입력 보존" } });
+    expect(screen.getByRole("textbox", { name: "메모", exact: true })).toHaveValue("폭 변경 뒤 입력 보존");
+    expect(observers).toHaveLength(1);
+    expect(observers[0].disconnect).not.toHaveBeenCalled();
+  });
+
+  it("disconnects on mobile transition and unmount without observing mobile fields", () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = (mobilePresentation: boolean) => <QueryClientProvider client={client}><ControlsForm mobilePresentation={mobilePresentation} /></QueryClientProvider>;
+    const { rerender, unmount } = render(view(false));
+    expect(observers).toHaveLength(1);
+    rerender(view(true));
+    expect(observers[0].disconnect).toHaveBeenCalledTimes(1);
+    expect(observers).toHaveLength(1);
+    rerender(view(false));
+    expect(observers).toHaveLength(2);
+    expect(observers[1].observe).toHaveBeenCalledTimes(1);
+    unmount();
+    expect(observers[0].disconnect).toHaveBeenCalledTimes(1);
+    expect(observers[1].disconnect).toHaveBeenCalledTimes(1);
   });
 });

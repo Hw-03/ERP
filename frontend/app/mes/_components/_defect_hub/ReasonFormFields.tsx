@@ -61,6 +61,18 @@ export function ReasonFormFields({
   const [editingName, setEditingName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const desktopFieldsRef = useRef<HTMLDivElement>(null);
+  const [narrowDesktop, setNarrowDesktop] = useState(false);
+  const desktopQuarantine = Boolean(quarantineControls && !mobilePresentation);
+  useEffect(() => {
+    const fields = desktopFieldsRef.current;
+    if (!desktopQuarantine || !fields) return;
+    // Inline-size containment can collapse this fieldset on live validation changes.
+    // Observe the same content width without removing its children from sizing.
+    const observer = new ResizeObserver(([entry]) => setNarrowDesktop(entry.contentRect.width <= 380));
+    observer.observe(fields);
+    return () => observer.disconnect();
+  }, [desktopQuarantine]);
   const categories = [...(query.data ?? [])].sort((a, b) =>
     Number(a.is_other) - Number(b.is_other) || a.name.localeCompare(b.name, "ko"));
   const selected = categories.find((entry) => categoryId ? entry.category_id === categoryId : entry.name === category);
@@ -197,7 +209,7 @@ export function ReasonFormFields({
       </div>
       {categoryField}
       {memoField}
-    </div> : <div className={styles.desktopFields}>
+    </div> : <div ref={desktopFieldsRef} data-reason-desktop-fields className={`${styles.desktopFields} ${narrowDesktop ? styles.desktopNarrow : ""}`}>
       <div className={styles.desktopTop}>
         {quarantineControls.quantity}
         {categoryField}
