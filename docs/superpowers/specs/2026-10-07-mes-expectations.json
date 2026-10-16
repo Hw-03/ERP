@@ -172720,29 +172720,29 @@
               "file": "frontend/app/mes/_components/__tests__/DesktopDefectView.workChoice.test.tsx",
               "selector": "다른 탭 Back의 이탈 확인 전에는 선택 품목·수량·메모를 해제하지 않는다",
               "assertion": "expect(cart).toBeInTheDocument();",
-              "sourceHash": "769d8b422bf1004cfdf3cd02337186971b127fd76482d5865ea3559f35669c22",
-              "line": 234
+              "sourceHash": "fa6ff8b917123cd6ba951a120bd5692e93e8da1124d67747a3e47e0f4f0ee2ec",
+              "line": 243
             },
             {
               "file": "frontend/app/mes/_components/__tests__/DesktopDefectView.workChoice.test.tsx",
               "selector": "다른 탭 Back의 이탈 확인 전에는 선택 품목·수량·메모를 해제하지 않는다",
               "assertion": "expect(cart).toHaveTextContent(\"조립 시험 품목\");",
-              "sourceHash": "769d8b422bf1004cfdf3cd02337186971b127fd76482d5865ea3559f35669c22",
-              "line": 234
+              "sourceHash": "fa6ff8b917123cd6ba951a120bd5692e93e8da1124d67747a3e47e0f4f0ee2ec",
+              "line": 243
             },
             {
               "file": "frontend/app/mes/_components/__tests__/DesktopDefectView.workChoice.test.tsx",
               "selector": "다른 탭 Back의 이탈 확인 전에는 선택 품목·수량·메모를 해제하지 않는다",
               "assertion": "expect(screen.getByRole(\"spinbutton\")).toHaveValue(2);",
-              "sourceHash": "769d8b422bf1004cfdf3cd02337186971b127fd76482d5865ea3559f35669c22",
-              "line": 234
+              "sourceHash": "fa6ff8b917123cd6ba951a120bd5692e93e8da1124d67747a3e47e0f4f0ee2ec",
+              "line": 243
             },
             {
               "file": "frontend/app/mes/_components/__tests__/DesktopDefectView.workChoice.test.tsx",
               "selector": "다른 탭 Back의 이탈 확인 전에는 선택 품목·수량·메모를 해제하지 않는다",
               "assertion": "expect(screen.getByPlaceholderText(\"예: 스크래치 다수 / 우측 끝단\")).toHaveValue(\"Back 이전 초안\");",
-              "sourceHash": "769d8b422bf1004cfdf3cd02337186971b127fd76482d5865ea3559f35669c22",
-              "line": 234
+              "sourceHash": "fa6ff8b917123cd6ba951a120bd5692e93e8da1124d67747a3e47e0f4f0ee2ec",
+              "line": 243
             }
           ],
           "execution": {
@@ -173022,6 +173022,183 @@
                 "assertion": "expect(screen.getByPlaceholderText(\"예: 스크래치 다수 / 우측 끝단\")).toHaveValue(\"Back 이전 초안\");",
                 "sourceHash": "d3b598452127443d501c4a400c76a43b32354c1922b47a1c613f462a30a4fed1",
                 "line": 104
+              }
+            ],
+            [
+              {
+                "file": "frontend/tests/e2e/defect-expectations.spec.ts",
+                "selector": "8.7-05 PC-DELTA-DEFECT-03 확인 취소·이탈 머무르기·나가기는 서버 무변경",
+                "assertion": "await expect(confirmation).toContainText(seed.rawItem.item_name);",
+                "sourceHash": "2398dbf7846bfa99895ef12344e567de292ae17d33a0d9ad65d8d281aac5ff2a",
+                "line": 94
+              },
+              {
+                "file": "frontend/tests/e2e/defect-expectations.spec.ts",
+                "selector": "8.7-05 PC-DELTA-DEFECT-03 확인 취소·이탈 머무르기·나가기는 서버 무변경",
+                "assertion": "await expect(confirmation).toContainText(\"창고\");",
+                "sourceHash": "2398dbf7846bfa99895ef12344e567de292ae17d33a0d9ad65d8d281aac5ff2a",
+                "line": 94
+              },
+              {
+                "file": "frontend/tests/e2e/defect-expectations.spec.ts",
+                "selector": "8.7-05 PC-DELTA-DEFECT-03 확인 취소·이탈 머무르기·나가기는 서버 무변경",
+                "assertion": "await expect(confirmation).toContainText(\"수량 1\");",
+                "sourceHash": "2398dbf7846bfa99895ef12344e567de292ae17d33a0d9ad65d8d281aac5ff2a",
+                "line": 94
+              },
+              {
+                "file": "frontend/tests/e2e/defect-expectations.spec.ts",
+                "selector": "8.7-05 PC-DELTA-DEFECT-03 확인 취소·이탈 머무르기·나가기는 서버 무변경",
+                "assertion": "expect(await stockEvidence(page.request, seed.rawItem.item_id)).toEqual(before);",
+                "sourceHash": "2398dbf7846bfa99895ef12344e567de292ae17d33a0d9ad65d8d281aac5ff2a",
+                "line": 94
+              },
+              {
+                "file": "frontend/tests/e2e/defect-expectations.spec.ts",
+                "selector": "8.7-05 PC-DELTA-DEFECT-03 확인 취소·이탈 머무르기·나가기는 서버 무변경",
+                "assertion": "await expect(cart.getByRole(\"spinbutton\")).toHaveValue(\"1\");",
+                "sourceHash": "2398dbf7846bfa99895ef12344e567de292ae17d33a0d9ad65d8d281aac5ff2a",
+                "line": 94
+              },
+              {
+                "file": "frontend/tests/e2e/defect-expectations.spec.ts",
+                "selector": "8.7-05 PC-DELTA-DEFECT-03 확인 취소·이탈 머무르기·나가기는 서버 무변경",
+                "assertion": "await expect(cart.getByPlaceholder(\"예: 스크래치 다수 / 우측 끝단\")).toHaveValue(\"보존할 폐기 입력\");",
+                "sourceHash": "2398dbf7846bfa99895ef12344e567de292ae17d33a0d9ad65d8d281aac5ff2a",
+                "line": 94
+              },
+              {
+                "file": "frontend/tests/e2e/defect-expectations.spec.ts",
+                "selector": "8.7-05 PC-DELTA-DEFECT-03 확인 취소·이탈 머무르기·나가기는 서버 무변경",
+                "assertion": "await expect(page.getByTestId(\"defect-cart-panel\").filter({ visible: true })).toHaveCount(0);",
+                "sourceHash": "2398dbf7846bfa99895ef12344e567de292ae17d33a0d9ad65d8d281aac5ff2a",
+                "line": 94
+              },
+              {
+                "file": "frontend/tests/e2e/defect-draft-navigation.spec.ts",
+                "selector": "PC-DELTA-DEFECT-03 두 행 사유·기타메모는 실제 Back·새로고침·메뉴 머무르기에 보존되고 나가기는 처리 호출 없이 버린다",
+                "assertion": "await expect(cart.getByRole(\"spinbutton\")).toHaveCount(2);",
+                "sourceHash": "920c1e742f7059a517b66de16fe009eccb1fc0e350063581e77288793e2c530a",
+                "line": 35
+              },
+              {
+                "file": "frontend/tests/e2e/defect-draft-navigation.spec.ts",
+                "selector": "PC-DELTA-DEFECT-03 두 행 사유·기타메모는 실제 Back·새로고침·메뉴 머무르기에 보존되고 나가기는 처리 호출 없이 버린다",
+                "assertion": "await expect(cart).toContainText(items[index].item_name);",
+                "sourceHash": "920c1e742f7059a517b66de16fe009eccb1fc0e350063581e77288793e2c530a",
+                "line": 35
+              },
+              {
+                "file": "frontend/tests/e2e/defect-draft-navigation.spec.ts",
+                "selector": "PC-DELTA-DEFECT-03 두 행 사유·기타메모는 실제 Back·새로고침·메뉴 머무르기에 보존되고 나가기는 처리 호출 없이 버린다",
+                "assertion": "await expect(cart.getByRole(\"spinbutton\").nth(index)).toHaveValue(String(index + 2));",
+                "sourceHash": "920c1e742f7059a517b66de16fe009eccb1fc0e350063581e77288793e2c530a",
+                "line": 35
+              },
+              {
+                "file": "frontend/tests/e2e/defect-draft-navigation.spec.ts",
+                "selector": "PC-DELTA-DEFECT-03 두 행 사유·기타메모는 실제 Back·새로고침·메뉴 머무르기에 보존되고 나가기는 처리 호출 없이 버린다",
+                "assertion": "await expect(cart.getByRole(\"button\", { name: \"사유 카테고리 선택\", exact: true }).nth(index)).toHaveText(categories[index]);",
+                "sourceHash": "920c1e742f7059a517b66de16fe009eccb1fc0e350063581e77288793e2c530a",
+                "line": 35
+              },
+              {
+                "file": "frontend/tests/e2e/defect-draft-navigation.spec.ts",
+                "selector": "PC-DELTA-DEFECT-03 두 행 사유·기타메모는 실제 Back·새로고침·메뉴 머무르기에 보존되고 나가기는 처리 호출 없이 버린다",
+                "assertion": "await expect(cart.getByPlaceholder(\"예: 스크래치 다수 / 우측 끝단\").nth(index)).toHaveValue(memos[index]);",
+                "sourceHash": "920c1e742f7059a517b66de16fe009eccb1fc0e350063581e77288793e2c530a",
+                "line": 35
+              },
+              {
+                "file": "frontend/tests/e2e/defect-draft-navigation.spec.ts",
+                "selector": "PC-DELTA-DEFECT-03 두 행 사유·기타메모는 실제 Back·새로고침·메뉴 머무르기에 보존되고 나가기는 처리 호출 없이 버린다",
+                "assertion": "await expect(page.getByText(\"이 화면에서 나갈까요?\", { exact: true })).toBeVisible();",
+                "sourceHash": "920c1e742f7059a517b66de16fe009eccb1fc0e350063581e77288793e2c530a",
+                "line": 35
+              },
+              {
+                "file": "frontend/tests/e2e/defect-draft-navigation.spec.ts",
+                "selector": "PC-DELTA-DEFECT-03 두 행 사유·기타메모는 실제 Back·새로고침·메뉴 머무르기에 보존되고 나가기는 처리 호출 없이 버린다",
+                "assertion": "await expect(page).toHaveURL(draftUrl);",
+                "sourceHash": "920c1e742f7059a517b66de16fe009eccb1fc0e350063581e77288793e2c530a",
+                "line": 35
+              },
+              {
+                "file": "frontend/tests/e2e/defect-draft-navigation.spec.ts",
+                "selector": "PC-DELTA-DEFECT-03 두 행 사유·기타메모는 실제 Back·새로고침·메뉴 머무르기에 보존되고 나가기는 처리 호출 없이 버린다",
+                "assertion": "expect(refreshDialog.type()).toBe(\"beforeunload\");",
+                "sourceHash": "920c1e742f7059a517b66de16fe009eccb1fc0e350063581e77288793e2c530a",
+                "line": 35
+              },
+              {
+                "file": "frontend/tests/e2e/defect-draft-navigation.spec.ts",
+                "selector": "PC-DELTA-DEFECT-03 두 행 사유·기타메모는 실제 Back·새로고침·메뉴 머무르기에 보존되고 나가기는 처리 호출 없이 버린다",
+                "assertion": "await expect(page).toHaveURL(/tab=dashboard/);",
+                "sourceHash": "920c1e742f7059a517b66de16fe009eccb1fc0e350063581e77288793e2c530a",
+                "line": 35
+              },
+              {
+                "file": "frontend/tests/e2e/defect-draft-navigation.spec.ts",
+                "selector": "PC-DELTA-DEFECT-03 두 행 사유·기타메모는 실제 Back·새로고침·메뉴 머무르기에 보존되고 나가기는 처리 호출 없이 버린다",
+                "assertion": "await expect(cart).toHaveCount(0);",
+                "sourceHash": "920c1e742f7059a517b66de16fe009eccb1fc0e350063581e77288793e2c530a",
+                "line": 35
+              },
+              {
+                "file": "frontend/tests/e2e/defect-draft-navigation.spec.ts",
+                "selector": "PC-DELTA-DEFECT-03 두 행 사유·기타메모는 실제 Back·새로고침·메뉴 머무르기에 보존되고 나가기는 처리 호출 없이 버린다",
+                "assertion": "await expect(page.getByRole(\"button\", { name: \"수량·처리 정보 →\", exact: true })).toBeDisabled();",
+                "sourceHash": "920c1e742f7059a517b66de16fe009eccb1fc0e350063581e77288793e2c530a",
+                "line": 35
+              },
+              {
+                "file": "frontend/tests/e2e/defect-draft-navigation.spec.ts",
+                "selector": "PC-DELTA-DEFECT-03 두 행 사유·기타메모는 실제 Back·새로고침·메뉴 머무르기에 보존되고 나가기는 처리 호출 없이 버린다",
+                "assertion": "await expect(page.getByText(\"선택 0품목\", { exact: true })).toBeVisible();",
+                "sourceHash": "920c1e742f7059a517b66de16fe009eccb1fc0e350063581e77288793e2c530a",
+                "line": 35
+              },
+              {
+                "file": "frontend/tests/e2e/defect-draft-navigation.spec.ts",
+                "selector": "PC-DELTA-DEFECT-03 두 행 사유·기타메모는 실제 Back·새로고침·메뉴 머무르기에 보존되고 나가기는 처리 호출 없이 버린다",
+                "assertion": "expect(mutations).toEqual([]);",
+                "sourceHash": "920c1e742f7059a517b66de16fe009eccb1fc0e350063581e77288793e2c530a",
+                "line": 35
+              },
+              {
+                "file": "frontend/tests/e2e/defect-draft-navigation.spec.ts",
+                "selector": "PC-DELTA-DEFECT-03 두 행 사유·기타메모는 실제 Back·새로고침·메뉴 머무르기에 보존되고 나가기는 처리 호출 없이 버린다",
+                "assertion": "expect(await Promise.all(items.map((item) => stock(request, item.item_id)))).toEqual(before);",
+                "sourceHash": "920c1e742f7059a517b66de16fe009eccb1fc0e350063581e77288793e2c530a",
+                "line": 35
+              },
+              {
+                "file": "frontend/app/mes/_components/__tests__/DesktopDefectView.workChoice.test.tsx",
+                "selector": "다른 탭 Back의 이탈 확인 전에는 선택 품목·수량·메모를 해제하지 않는다",
+                "assertion": "expect(cart).toBeInTheDocument();",
+                "sourceHash": "769d8b422bf1004cfdf3cd02337186971b127fd76482d5865ea3559f35669c22",
+                "line": 234
+              },
+              {
+                "file": "frontend/app/mes/_components/__tests__/DesktopDefectView.workChoice.test.tsx",
+                "selector": "다른 탭 Back의 이탈 확인 전에는 선택 품목·수량·메모를 해제하지 않는다",
+                "assertion": "expect(cart).toHaveTextContent(\"조립 시험 품목\");",
+                "sourceHash": "769d8b422bf1004cfdf3cd02337186971b127fd76482d5865ea3559f35669c22",
+                "line": 234
+              },
+              {
+                "file": "frontend/app/mes/_components/__tests__/DesktopDefectView.workChoice.test.tsx",
+                "selector": "다른 탭 Back의 이탈 확인 전에는 선택 품목·수량·메모를 해제하지 않는다",
+                "assertion": "expect(screen.getByRole(\"spinbutton\")).toHaveValue(2);",
+                "sourceHash": "769d8b422bf1004cfdf3cd02337186971b127fd76482d5865ea3559f35669c22",
+                "line": 234
+              },
+              {
+                "file": "frontend/app/mes/_components/__tests__/DesktopDefectView.workChoice.test.tsx",
+                "selector": "다른 탭 Back의 이탈 확인 전에는 선택 품목·수량·메모를 해제하지 않는다",
+                "assertion": "expect(screen.getByPlaceholderText(\"예: 스크래치 다수 / 우측 끝단\")).toHaveValue(\"Back 이전 초안\");",
+                "sourceHash": "769d8b422bf1004cfdf3cd02337186971b127fd76482d5865ea3559f35669c22",
+                "line": 234
               }
             ]
           ]

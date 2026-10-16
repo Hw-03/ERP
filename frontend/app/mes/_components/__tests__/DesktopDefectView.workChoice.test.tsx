@@ -1,6 +1,6 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useCallback, useState } from "react";
 import { DesktopDefectView } from "../DesktopDefectView";
 import type { Operator } from "../login/useCurrentOperator";
@@ -52,8 +52,17 @@ function finishExit(): void {
 }
 
 beforeEach(() => {
+  vi.stubGlobal("ResizeObserver", class {
+    observe = vi.fn();
+    disconnect = vi.fn();
+  });
   window.history.replaceState({ defect: "hub" }, "");
   vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches: false }));
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
 });
 
 describe("데스크톱 불량 작업·출처 통합 선택", async () => {

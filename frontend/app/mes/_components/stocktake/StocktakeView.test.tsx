@@ -1092,9 +1092,11 @@ describe("StocktakeView integration", () => {
     expect(screen.queryByRole("combobox", { name: "조사 회차" })).not.toBeInTheDocument();
     expect(input).toHaveValue("9");
     vi.mocked(stocktakeApi.command).mockResolvedValue(count({ version: 3, quantities: { ...quantities, normal: 9 } }));
-    fireEvent.click(screen.getByRole("button", { name: "회차 이력 관리" }));
-    fireEvent.click(await screen.findByRole("button", { name: "회차 변경" }));
-    fireEvent.click(screen.getByRole("button", { name: /이전 조사/ }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "회차 이력 관리" })); });
+    const changeRound = await screen.findByRole("button", { name: "회차 변경" });
+    await act(async () => { fireEvent.click(changeRound); });
+    expect(changeRound).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(await screen.findByRole("button", { name: /이전 조사/ }));
     await waitFor(() => expect(within(screen.getByRole("region", { name: "선택한 조사 회차" })).getByRole("heading", { name: "이전 조사" })).toBeInTheDocument());
     expect(screen.queryByLabelText("정상 수량")).not.toBeInTheDocument();
   });
