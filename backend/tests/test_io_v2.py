@@ -2783,6 +2783,55 @@ def test_io_submit_idempotent_with_client_request_id(client, db_session, make_it
     assert inv.warehouse_qty == Decimal("4")
 
 
+@pytest.mark.parametrize("sub_type", ["adjust_in", "adjust_out"])
+@pytest.mark.parametrize(
+    ("warehouse_role", "department_role"),
+    [("primary", "none"), ("deputy", "none"), ("none", "primary"),
+     ("none", "deputy"), ("primary", "deputy")],
+)
+def test_production_adjustment_self_approval_uses_independent_department_role(
+    client, db_session, make_item, make_location, sub_type, warehouse_role, department_role
+):
+    """창고 직원의 혼합 공정 요청은 대기하고 생산부 정·부가 전체 공정을 결재한다."""
+    requester = _make_employee(db_session, code="PRODUCTION-REQUESTER", department=DepartmentEnum.WAREHOUSE,
+                               warehouse_role=warehouse_role, department_role=department_role)
+    approver = _make_employee(db_session, code="PRODUCTION-APPROVER", department_role="primary")
+    items = [make_item(name="Role Tube", process_type_code="TR", warehouse_qty=Decimal("10")),
+             make_item(name="Role High Voltage", process_type_code="HR", warehouse_qty=Decimal("10"))]
+    locations = [make_location(item.item_id, department=process, quantity=Decimal("5"))
+                 for item, process in zip(items, (DepartmentEnum.TUBE, DepartmentEnum.HIGH_VOLTAGE))]
+    db_session.commit()
+    preview = client.post("/api/io/preview", json={
+        "requester_employee_id": str(requester.employee_id), "work_type": "process", "sub_type": sub_type,
+        "targets": [{"source_kind": "manual", "item_id": str(item.item_id), "quantity": "1"} for item in items],
+    })
+    assert preview.status_code == 200, preview.json()
+    response = client.post("/api/io/submit", json={
+        "requester_employee_id": str(requester.employee_id), "work_type": "process", "sub_type": sub_type,
+        "notes": "생산부 역할 분리", "bundles": preview.json()["bundles"],
+    })
+    assert response.status_code == 201, response.json()
+    db_session.expire_all()
+    req = db_session.query(StockRequest).one()
+    if department_role == "none":
+        assert req.department_approved_by_employee_id is None
+        assert req.status in (StockRequestStatusEnum.SUBMITTED, StockRequestStatusEnum.RESERVED)
+        assert db_session.query(TransactionLog).count() == 0
+        assert [location.quantity for location in locations] == [Decimal("5"), Decimal("5")]
+        assert [location.pending_quantity for location in locations] == [Decimal("1") if sub_type == "adjust_out" else Decimal("0")] * 2
+        approved = _approve_department_request(client, req.request_id, approver)
+        assert approved.status_code == 200, approved.json()
+    else:
+        assert req.department_approved_by_employee_id == requester.employee_id
+    db_session.expire_all()
+    assert req.status == StockRequestStatusEnum.COMPLETED
+    expected = Decimal("6") if sub_type == "adjust_in" else Decimal("4")
+    assert [location.quantity for location in locations] == [expected, expected]
+    assert all(location.pending_quantity == 0 for location in locations)
+    assert all(db_session.query(Inventory).filter_by(item_id=item.item_id).one().warehouse_qty == Decimal("10") for item in items)
+    assert db_session.query(TransactionLog).count() == 2
+
+
 def test_io_immediate_adjust_in_increases_production_quantity(
     client, db_session, make_item, make_location
 ):

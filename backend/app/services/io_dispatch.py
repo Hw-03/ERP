@@ -649,7 +649,11 @@ def _submit_dept_only_approval(
         submission_id=batch.batch_id,
         reason_category=batch.reason_category,
         reason_memo=batch.notes if batch.reason_category_id else None,
-        approval_department=batch.to_department,
+        # 출고·혼합 공정 요청도 요청자의 창고 소속이 아닌 생산부 결재로 보낸다.
+        approval_department=(
+            batch.to_department or batch.from_department
+            or ("생산부" if requester.department == "창고" else requester.department)
+        ),
     )
     _link_stock_request(db, batch=batch, request=request, lines=request_lines)
 
