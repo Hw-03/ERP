@@ -98,6 +98,30 @@ beforeEach(() => {
 });
 
 describe("MobileIoComposeWizard Step 5 헤더", () => {
+  it.each([
+    ["primary", "none", "결재 요청"],
+    ["deputy", "none", "결재 요청"],
+    ["none", "primary", "자동 승인"],
+    ["none", "deputy", "자동 승인"],
+    ["primary", "deputy", "자동 승인"],
+  ])("생산부 요청은 모바일도 독립 부서 역할로 안내한다: %s/%s", (warehouse_role, department_role, expected) => {
+    const previous = { workType: wizardState.workType, subType: wizardState.subType, bundles: wizardState.bundles };
+    Object.assign(wizardState, { workType: "process", subType: "adjust_in", bundles: [{
+      bundle_id: "approval-bundle", source_kind: "manual", title: "튜브 품목", quantity: 1,
+      source_item_id: "tube-item", expanded_level: 0,
+      lines: [{ line_id: "approval-line", item_id: "tube-item", item_name: "튜브 품목", unit: "EA",
+        direction: "adjust", from_bucket: "none", to_bucket: "production", to_department: "튜브",
+        quantity: 1, included: true, origin: "manual", shortage: 0 }],
+    }] });
+    try {
+      render(<MobileIoComposeWizard globalSearch="" operator={{ employee_id: "production-role", name: "작업자",
+        department: "조립", warehouse_role, department_role }} items={[]} setItems={vi.fn()} onStatusChange={vi.fn()} />);
+      expect(screen.getByText(expected)).toBeInTheDocument();
+    } finally {
+      Object.assign(wizardState, previous);
+    }
+  });
+
   it("모바일 불량격리의 최종 사유 ID·이름을 draft에 저장한 뒤 제출한다", async () => {
     const reasonState = wizardState as typeof wizardState & { reasonCategory?: string; reasonCategoryId?: string };
     const previous = { workType: wizardState.workType, subType: wizardState.subType, bundles: wizardState.bundles, notes: wizardState.notes };

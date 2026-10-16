@@ -244,7 +244,11 @@ describe("결재권자와 실제 재고 효과", () => {
     expect(canAutoApprove("warehouse", legacyOperator)).toBe(false);
     expect(canAutoApprove("warehouse", { warehouse_role: "none" })).toBe(false);
     expect(canAutoApprove("department", { department_role: "deputy" })).toBe(true);
-    expect(canAutoApprove("department", { warehouse_role: "primary" })).toBe(true);
+    expect(canAutoApprove("department", { warehouse_role: "primary" })).toBe(false);
+    expect(canAutoApprove("department", { warehouse_role: "deputy" })).toBe(false);
+    expect(canAutoApprove("department", { department_role: "primary" })).toBe(true);
+    expect(canAutoApprove("department", { warehouse_role: "primary", department_role: "deputy" })).toBe(true);
+    expect(canAutoApprove("warehouse", { department_role: "primary" })).toBe(false);
     expect(canAutoApprove("department", legacyOperator)).toBe(false);
   });
 

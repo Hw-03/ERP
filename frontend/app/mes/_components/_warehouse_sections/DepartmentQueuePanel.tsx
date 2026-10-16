@@ -20,7 +20,7 @@ import { WarehouseEmptyWorkArea } from "./WarehouseEmptyWorkArea";
  * 부서 결재 정/부 전용 결재함 (낱개 IO + 듀얼 결재 케이스).
  *
  * WarehouseQueuePanel 와 동일한 행 UI(WarehouseQueueRow)를 재사용하되 API 만
- * department-* 엔드포인트로 교체. actor 의 부서와 일치하는 요청만 노출 (백엔드 필터).
+ * department-* 엔드포인트로 교체. 생산부 정/부가 소속 공정과 관계없이 전체 공정을 처리한다.
  */
 
 interface Props {
