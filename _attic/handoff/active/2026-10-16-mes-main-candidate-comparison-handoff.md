@@ -1,6 +1,10 @@
 # main·후보 비교 재개 지점
 
-2026-10-16 17:54 기록 기준. **B production 출하의 마지막 스냅샷 대조·상세·표·TODO 완료.** PF5→4→5/가방출하189→188→189,창고101불변·예약복원·원역연결유일. `PROD-SH01-comparison.json`, `PROD-SH01-record.md`. AP/DF production도 대조·문서 완료. A QA-N 주간PF, B QA-B 출하 요청 목록. 다음은 후보 커밋·푸시·최종 HEAD CI다. [상세 설명·첫 비교표](../../../docs/superpowers/plans/2026-10-16-mes-main-candidate-comparison-report.md), [활성 TODO](2026-10-16-mes-main-candidate-comparison-todo.md), [승인 계획](../../../docs/superpowers/plans/2026-10-16-mes-main-candidate-comparison.md)를 함께 읽는다.
+**최신 재개 지점 — 2026-10-16 18:42:** 알림 시험·원장 후속을 `5a77fbf1308105bdc2597565f9dd4ceea6b1809c`에 커밋했다. pytest선택자1·원장생성/check exit0, 적용JSON=보존가드제안JSON 확인. `6f9a6aff` CI38881026887의 프론트 단위/커버리지 단계는 통과했고 빌드 진행중이었다. 다음은 이3문서 명시stage·문서검사/커밋→후보만push→새HEAD 전체CI 확인이다. 이전CI backend/일반E2E는 새푸시로 취소될 수 있으며 최종통과로 세지 않는다. 제품소스는 동일하고 이번후속시험변경은 frontend2+backend1파일뿐이다. DB·서버 식별값은 아래표 그대로, 제품967표현은 시험도 포함한 당시소스입력집합이므로 현재전체불변으로 확대하지 않는다. 상세·첫표·TODO를 함께갱신했다.
+
+**우선 읽기 — 2026-10-16 18:36:** `6f9a6aff` 후보푸시 완료, CI38881026887진행중. 첫CI backend는취소직전실제1FAIL: closure생산부알림시험에창고수신자옛기대남음. 부모가실제서비스·queue·정책읽고 `backend/tests/test_io_expectation_closure.py`531시험만수정(정·부수신,창고제외,창고queue200[]). 국소선택자PASS `T/ci-fix-department-notification.log`. 이수정은아직미커밋. comparison_b가읽기전용원장패치 `R/ci-notification-ledger-proposal.patch`준비중. 다음: 패치검토/적용→원장생성/check→해당수정·기록명시커밋→후보push→최종HEAD CI. 첫일반E2E는취소/미완료 `T/ci-38877549662-general-cancelled.log`; 중간proxyECONNRESET은원인미확정. 새업무검사반복/제품·DB변경불필요. 아래18:18~기록은이전단계로보존한다.
+
+2026-10-16 18:18 기록 기준. **업무·production 상세를 완료하고4커밋을 후보만 푸시했다. 첫 CI 프론트8실패의 테스트2파일을 국소 보완 중이다.** WorkChoice19/Stocktake92·ESLint 통과, 제품 수정 없음. 새 HEAD CI는 아직이다. [상세 설명·첫 비교표](../../../docs/superpowers/plans/2026-10-16-mes-main-candidate-comparison-report.md), [활성 TODO](2026-10-16-mes-main-candidate-comparison-todo.md), [승인 계획](../../../docs/superpowers/plans/2026-10-16-mes-main-candidate-comparison.md)를 함께 읽는다. 완료업무는 다시 실행하지 않는다.
 
 ## 현재 식별값
 
@@ -8,14 +12,14 @@
 |---|---|---|
 | 작업 폴더 | C:/ERP | C:/Users/user/.codex/worktrees/mes-main-candidate-comparison/ERP |
 | 브랜치 | main | codex/mes-main-candidate-comparison-20261016 |
-| 제품·원장 기준 HEAD | 29583972129c8340aa19416e6c554ea60db3c490 | 5f660a90761cde5071ac0224e3dd6d991c078342 (문서 커밋 전) |
+| 업무·시험 소스 기준 HEAD | 29583972129c8340aa19416e6c554ea60db3c490 | 5a77fbf1308105bdc2597565f9dd4ceea6b1809c (후속 기록 커밋은 뒤에 추가) |
 | 병합 | 없음 | e9560587에서 대기5927e532 결합 완료, MERGE_HEAD 없음 |
 | 주소 | http://127.0.0.1:3001 / backend8011 | http://localhost:3038 / backend8038 |
 | 현재 모드 | dev | production, .next-prod 최종 빌드 사용 |
 | 활성 DB | C:/ERP/backend/mes.db | C:/ERP/_attic/runtime/main-candidate-20261016/B/qa.db |
 | DB revision | 20261014_0046 | 20261015_0047 |
 
-**후보 병합·국소 수정·원장은 커밋했다.** `e9560587` 병합/기존 복귀시험 계약, `c7c4628f` 기타 사유 RO 수정/검사, `5f660a90` 현재 원장연결. 남은 untracked는 이번 정제4문서뿐이며 명시 stage할 대상이다. 문서 커밋 후 HEAD는 Git에서 다시 읽는다. 당시 제품 SHA는 `documentation-checkpoint.json`, 최종 동일성은 `final-completion-audit.json`에 있다. A의 기존 untracked 계획 문서는 건드리지 않았다.
+**후보4커밋을 푸시했고 후속6f9a6aff를 커밋했다.** `e9560587` 병합/기존 복귀시험 계약, `c7c4628f` 기타 사유 RO 수정/검사, `5f660a90` 현재 원장연결, `fb2558d2` 정제4문서, `6f9a6aff` WorkChoice/Stocktake 시험2파일·현재binding4개/과거보존. 현재 미커밋은 보고/표·TODO·인계3문서다. 제품 SHA는 `documentation-checkpoint.json`, 첫 푸시 직후 동일성은 `final-source-fb2558d2.json`이다. A의 기존 untracked 계획 문서는 건드리지 않았다. 후속 푸시/CI 상태는 마지막 기록을 따른다.
 
 로컬 R=`C:/ERP/_attic/runtime/main-candidate-20261016`, T=`C:/Users/user/.codex/worktrees/mes-main-candidate-comparison/ERP/_attic/runtime/comparison-checks`.
 
@@ -35,11 +39,13 @@ B 현재 소유권 영수증 `R/B/session.json`은17:25 production세션이며 b
 - 사용자의 추가 지시에 따라 새 업무를 잠시 멈추고 문서 복원: 상세·첫 표·33단계 짝지은 화면·파일해시 색인·TODO·이 인계 작성. 기록 때문에 유효한 검사를 다시 실행하지 않았다.
 - 16:35 국소 보충 완료: IO5조건5/5, 상세wrapper2파일24/24, EOF 관련 Node12/12가 첫 실행에서 통과했고247입력 전후 해시가 같았다. `R/supplemental-checks-record.md`, `T/supplemental-20261016-01-summary.json` 및 해당 원문. 이전 재사용 초안의 이 세 미확인은 해소됐으며 입력이 바뀌지 않으면 반복하지 않는다.
 
-## 현재 상태와 단일 재개 지점 — 마지막 기록·커밋 준비
+## 현재 상태와 단일 재개 지점 — CI 실패만 국소 보완
 
 **현재:** AS02·CONV01·ADJ01·SET01·DETAIL01·REPORT01/02와 B PROD-AP01/DF01 기록 완료. `3-AR-0004` 총440·창고439·조립1·예약0, RW01입고1은 남는다. QA-W만 dark/collapsed 저장, QA-N light/expanded. A tab2는 QA-N 주간PF, B tab4는 QA-B 출하 요청 목록이다. 원래 tab1은 건드리지 않는다. 압축 후 `cua.rewriteDocumentation`부터 호출하고 실제 UI·계정을 읽는다.
 
-**다음:** 마지막 PROD-SH01 기록·읽기 감사 완료. `final-completion-audit.md/json`은 새 제품 차단지적 없음, 제품967·재사용입력103·원장입력190 hash 불변·역사근거보존을 확인했다. 명시 stage·cached check·smart PlanOnly 후 후보만 기능별 커밋·푸시하고 최종 HEAD CI를 확인한다. 새 거래나 통과 검사 반복은 필요 없다.
+**다음:** CI38877549662의 backend 결과 확인 → 후보6f9a6aff push → 새 정확한 HEAD 전체CI 확인. 프론트는8실패(RO대역누락7+실사회차목록1)였고 두 시험파일만 수정하여19/92건·ESLint·원장 `--check` exit0, cached check/smart PlanOnly 후6f9a6aff커밋했다. 일반E2E 과거소요는58분이므로 옛HEAD를 끝까지 기다린 뒤 다시 전체CI를 시작하지 않는다. 새 푸시에 취소되는 옛E2E는 미완료로 남긴다. 새 업무·빌드·성능·전체기대값 로컬 반복 금지.
+
+WorkChoice 원장은 `R/ci-workchoice-ledger-proposal.patch` 적용 후 현재4binding sourceHash·line243만 갱신하고 이전25binding snapshot을 history에 추가했다. Stocktake는 기존 main과 같은 시험·제품이었으며 `await act`와 선택지 표시 대기/펼침 단언만 추가했다. 정확한 CI effect 순서는 미확정(`R/ci-stocktake-review.md`). 실직원 DB 접근·제품수정 없음. 관련 원문은 `T/ci-38877549662-frontend.log`, `ci-fix-workchoice.log`, `ci-fix-stocktake.log`, `ci-fix-eslint.log`.
 
 CONV01은 조립55/143/20/0→54/144/19/1→55/143/20/0, 창고0/0/480/420·예약불변. 원작업1/거래4와 역연결 유일. `CONV01-comparison.json`, `CONV01-record.md` 및 A/B각단계자료를 재사용. 후속사용미실행. 대표품목은 B 대상제품 우선 선택 코드로 원인 확인(`observed-display-differences-review.md`); 원comparison의 미확정은 당시기록으로보존. 재실행하지 않는다.
 
@@ -47,7 +53,7 @@ CONV01은 조립55/143/20/0→54/144/19/1→55/143/20/0, 창고0/0/480/420·예�
 
 ## 재개 이후 순서
 
-1. PROD-SH01 대조·8항목 기록 완료. 정제4문서 커밋 후 후보만 push하고 정확한 최종 HEAD CI를 확인한다. 완료업무는 재실행 금지.
+1. PROD-SH01 대조·8항목·정제4문서 커밋/푸시 완료. 현재 CI 실패만 위 순서로 보완하고 새 최종 HEAD CI를 확인한다. 완료업무는 재실행 금지.
 2. 수량·예약·원장 대조 → 상세8항목·첫 표·TODO·이 인계를 갱신한 뒤 다음 묶음으로 이동한다.
 3. `reuse-scope-final-draft.md`, `supplemental-checks-record.md`, 최종 읽기 감사의 재사용 범위를 확인한다. IO5·상세24·Node12와 보정/설정/상세/보고는 완료했으므로 다시 검사하지 않는다.
 4. B production 핵심 입력·업무는 수행 완료했다. 최종 문서의 과거 pending 문구를 현재 결과와 연결하고 아직 하지 않은 조건은 그대로 표시한다.
@@ -56,7 +62,7 @@ CONV01은 조립55/143/20/0→54/144/19/1→55/143/20/0, 창고0/0/480/420·예�
 
 ## 실패·미확인·주의
 
-- 원장 국소 정렬 완료: 현재decisions의 두 권한문구와4파일의85현재binding·6선언줄만 정렬, 과거binding/execution/원문보존. generated JSON재생성 후 `--check`17:06 exit0. `ledger-check-20261016-02` 및 `ledger-check-20261016-01/post-apply-preservation.json`. 현재1058NOT_RUN은그대로이며 이번업무PASS와분리. 관련3JSON은unstaged, 제품/도구변경없음.
+- 원장17:06 국소 정렬은5f660a90에 커밋했다. 당시 두 권한문구·4파일85현재binding/6선언줄·과거binding/execution/원문보존·`--check` exit0. `ledger-check-20261016-02` 및 `ledger-check-20261016-01/post-apply-preservation.json`. 이번CI WorkChoice4binding 갱신은 별도 후속이다. 현재1058NOT_RUN은그대로이며 이번업무PASS와분리, 제품/도구변경없음.
 
 - AP02 내부 io_batch completed 잔존은 A/B 기존 문제. 요청·라인/관측 UI취소 정상. 전체 소비자 영향 없음으로 확대 금지.
 - AS02 실제 전용 승인·취소는 양쪽 완료. A 제출 전은 부서 결재, B는 AS 전용 결재로 표시됐고 완료 모달은 양쪽 창고 결재 문구인 기존 안내 문제다. 실제 승인 경로와 문구 차이는 `AS02-record.md`에 분리했다. 안내 문구 수정을 완료했다고 주장하지 않는다.
