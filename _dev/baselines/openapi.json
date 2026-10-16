@@ -28392,7 +28392,7 @@
     },
     "/api/stock-requests/department-queue": {
       "get": {
-        "description": "부서 결재 정/부 승인 대기 목록.\n\n노출 부서 범위는 독립 역할에 따른다:\n  - 부서 정/부: 창고를 제외한 모든 부서\n  - 창고 정/부: 창고를 포함한 모든 부서",
+        "description": "부서 결재 정/부 승인 대기 목록.\n\n생산부 정/부는 소속 공정과 관계없이 전체 공정 요청을 조회한다.\n창고 역할만 가진 직원에게는 노출하지 않는다.",
         "operationId": "list_department_queue_api_stock_requests_department_queue_get",
         "parameters": [
           {
@@ -29072,7 +29072,7 @@
     },
     "/api/stock-requests/{request_id}/department-approve": {
       "post": {
-        "description": "부서 결재 승인 — department_role in (primary/deputy) 또는 admin.",
+        "description": "생산부 결재 정/부의 전체 공정 승인 — 창고 역할·이전 관리자 등급과 독립.",
         "operationId": "department_approve_stock_request_api_stock_requests__request_id__department_approve_post",
         "parameters": [
           {
