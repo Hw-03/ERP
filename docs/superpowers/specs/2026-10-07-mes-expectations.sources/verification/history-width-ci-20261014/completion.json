@@ -1,0 +1,49 @@
+{
+  "kind": "mes-baseline-local-followup",
+  "head": "8dc622fca4db0e4dda7003321d0d9fafc941f9a9",
+  "status": "BASELINE_PRESERVED_WITH_LOCAL_PASS",
+  "baselineConditions": 1058,
+  "currentFullPass": false,
+  "unitTests": 82,
+  "eslintExitCode": 0,
+  "wrappers": 9,
+  "immutableArtifacts": 1379,
+  "review": {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/history-width-ci-20261014/review.json",
+    "sha256": "7cdd95aea2e985414c1f1c35c0389f31feedaa629e61fd508a666cbc6ef6c2c6"
+  },
+  "unit": {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/history-width-ci-20261014/unit.log",
+    "sha256": "7e02d9462bf1efeb380e22c045d5e76f550c7bf271ed671442ac4e647a59b3da"
+  },
+  "previousCompletion": {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/history-width-20261014/completion.json",
+    "sha256": "13306d51d633d22b575ffc875dfcac7c0034b2bff8677219d4e6b0f81aa60dbf"
+  },
+  "metrics": {
+    "CONTRACT": {
+      "total": 270,
+      "eligibleCases": 270,
+      "deferredCases": 0,
+      "reviewedCases": 270,
+      "eligibleConditions": 666,
+      "linkedCases": 270,
+      "linkedConditions": 666,
+      "totalConditions": 666,
+      "executedCases": 0,
+      "baselineCases": 270
+    },
+    "DELTA": {
+      "total": 81,
+      "eligibleCases": 75,
+      "deferredCases": 6,
+      "reviewedCases": 75,
+      "eligibleConditions": 392,
+      "linkedCases": 75,
+      "linkedConditions": 392,
+      "totalConditions": 398,
+      "executedCases": 0,
+      "baselineCases": 75
+    }
+  }
+}

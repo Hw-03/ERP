@@ -21,6 +21,7 @@ import { BomWhereUsedPanel } from "./BomWhereUsedPanel";
 import { BomUnmatchedRawsDrawer } from "./BomUnmatchedRawsDrawer";
 import { bomStatusOf, DEPT_LETTERS, deptOf, stageOf, type BomDeptFilter } from "./bomDept";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
+import { useLocalDirtyGuard, useRegisterDirty } from "@/lib/ui/dirty-guard";
 
 interface Props {
   items: Item[];
@@ -34,6 +35,7 @@ interface Props {
 
 type Mode = "edit" | "whereused";
 type DeleteRequest = { bomId: string; childName: string };
+type CompositionDraft = { parentId: string; base: BOMEntry[]; rows: BOMEntry[] };
 type BomWorkbenchHistoryState = { dept: BomDeptFilter; mode: Mode; parentId: string };
 
 const BOM_WORKBENCH_HISTORY_KEY = "bomWorkbench";
@@ -87,13 +89,29 @@ export function BomWorkbench({
   const [parentId, setParentId] = useState("");
   const [mode, setMode] = useState<Mode>("edit");
   const [bomRows, setBomRows] = useState<BOMEntry[]>([]);
+  const [compositionDraft, setCompositionDraft] = useState<CompositionDraft | null>(null);
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const activeDraft = compositionDraft?.parentId === parentId ? compositionDraft : null;
+  const activeDraftRef = useRef(activeDraft);
+  activeDraftRef.current = activeDraft;
+  const displayedRows = activeDraft?.rows ?? bomRows;
+  const draftDirty = !!activeDraft && JSON.stringify(activeDraft.base) !== JSON.stringify(activeDraft.rows);
+  const draftErrors = displayedRows.filter(row => !Number.isInteger(row.quantity) || row.quantity <= 0)
+    .map(row => `${items.find(item => item.item_id === row.child_item_id)?.item_name ?? row.child_item_id}: 수량은 양의 정수여야 합니다.`);
+  const { confirmNavigation } = useLocalDirtyGuard(draftDirty, saveComposition);
+  useRegisterDirty("bom", draftDirty, saveComposition, () => setCompositionDraft(null));
+  const navigationRef = useRef(confirmNavigation);
+  navigationRef.current = confirmNavigation;
+  const savePromiseRef = useRef<Promise<void> | null>(null);
+  const parentIdRef = useRef(parentId);
+  parentIdRef.current = parentId;
   const [whereUsedRows, setWhereUsedRows] = useState<BOMDetailEntry[]>([]);
   const bomRowsParentRef = useRef<string | null>(null);
   const whereUsedParentRef = useRef<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [reviewOpen, setReviewOpen] = useState(false);
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
-  const [deleteBusy, setDeleteBusy] = useState(false);
   const [unmatchedStatusBusyItemIds, setUnmatchedStatusBusyItemIds] = useState<Set<string>>(new Set());
   const [historyReady, setHistoryReady] = useState(false);
   const [historyValidationDeferred, setHistoryValidationDeferred] = useState(false);
@@ -104,10 +122,13 @@ export function BomWorkbench({
     const restore = (state: unknown): void => {
       const restored = readBomWorkbenchHistoryState(state);
       if (!restored) return;
-      setDept(restored.dept);
-      setMode(restored.mode);
-      setParentId(restored.parentId);
-      setHistoryValidationDeferred(itemsRef.current.length === 0 && restored.parentId !== "");
+      navigationRef.current(() => {
+        setCompositionDraft(null);
+        setDept(restored.dept);
+        setMode(restored.mode);
+        setParentId(restored.parentId);
+        setHistoryValidationDeferred(itemsRef.current.length === 0 && restored.parentId !== "");
+      });
     };
     restore(window.history.state);
     setHistoryReady(true);
@@ -122,6 +143,17 @@ export function BomWorkbench({
     () => new Set(activeItems.filter((i) => i.bom_completed_at).map((i) => i.item_id)),
     [activeItems],
   );
+  const parent = useMemo(
+    () => activeItems.find((i) => i.item_id === parentId) ?? null,
+    [activeItems, parentId],
+  );
+  const isCompleted = parent ? completedSet.has(parent.item_id) : false;
+
+  useEffect(() => {
+    if (!isCompleted || compositionDraft?.parentId !== parentId) return;
+    setCompositionDraft(null);
+    setSaveError("다른 작업에서 BOM을 완료했습니다. 완료된 구성을 확인해 주세요.");
+  }, [isCompleted, compositionDraft, parentId]);
   const childCountMap = useMemo(() => {
     const m = new Map<string, number>();
     for (const r of allBomRows) m.set(r.parent_item_id, (m.get(r.parent_item_id) ?? 0) + 1);
@@ -185,7 +217,7 @@ export function BomWorkbench({
     return () => {
       alive = false;
     };
-  }, [parentId, realtimeRevision]);
+  }, [parentId, parent?.bom_completed_at, realtimeRevision]);
 
   // 선택된 품목의 역참조 (사용처 모드)
   useEffect(() => {
@@ -212,9 +244,12 @@ export function BomWorkbench({
   function handleDeptChange(next: BomDeptFilter): void {
     if (next === dept) return;
     const nextParentId = candidatesFor(activeItems, next, mode)[0]?.item_id ?? "";
-    writeBomWorkbenchHistoryState("push", { dept: next, mode, parentId: nextParentId });
-    setDept(next);
-    setParentId(nextParentId);
+    confirmNavigation(() => {
+      setCompositionDraft(null); setSaveError(null);
+      writeBomWorkbenchHistoryState("push", { dept: next, mode, parentId: nextParentId });
+      setDept(next);
+      setParentId(nextParentId);
+    });
   }
 
   function handleModeChange(next: Mode): void {
@@ -223,15 +258,21 @@ export function BomWorkbench({
     const nextParentId = nextCandidates.some((candidate) => candidate.item_id === parentId)
       ? parentId
       : nextCandidates[0]?.item_id ?? "";
-    writeBomWorkbenchHistoryState("push", { dept, mode: next, parentId: nextParentId });
-    setMode(next);
-    setParentId(nextParentId);
+    confirmNavigation(() => {
+      setCompositionDraft(null); setSaveError(null);
+      writeBomWorkbenchHistoryState("push", { dept, mode: next, parentId: nextParentId });
+      setMode(next);
+      setParentId(nextParentId);
+    });
   }
 
   function handleParentSelect(nextParentId: string): void {
     if (nextParentId === parentId) return;
-    writeBomWorkbenchHistoryState("push", { dept, mode, parentId: nextParentId });
-    setParentId(nextParentId);
+    confirmNavigation(() => {
+      setCompositionDraft(null); setSaveError(null);
+      writeBomWorkbenchHistoryState("push", { dept, mode, parentId: nextParentId });
+      setParentId(nextParentId);
+    });
   }
 
   function handleWhereUsedParentSelect(nextParentId: string): void {
@@ -253,12 +294,6 @@ export function BomWorkbench({
     setParentId(nextParentId);
   }
 
-  const parent = useMemo(
-    () => activeItems.find((i) => i.item_id === parentId) ?? null,
-    [activeItems, parentId],
-  );
-  const isCompleted = parent ? completedSet.has(parent.item_id) : false;
-
   const rawItems = useMemo(
     () =>
       activeItems.filter((i) => {
@@ -272,81 +307,90 @@ export function BomWorkbench({
     [allBomRows],
   );
 
-  // 선택된 부모의 BOM 을 서버 기준으로 재동기화 (낙관적 갱신 desync·stale bom_id 차단)
-  async function reloadBom() {
-    if (!parentId) {
-      setBomRows([]);
-      return;
-    }
-    try {
-      setBomRows(await api.getBOM(parentId));
-    } catch {
-      setBomRows([]);
-    }
+  function changeComposition(update: (rows: BOMEntry[]) => BOMEntry[]): void {
+    setSaveError(null);
+    setCompositionDraft(current => {
+      const draft = current?.parentId === parentId ? current : { parentId, base: bomRows, rows: bomRows };
+      return { ...draft, rows: update(draft.rows) };
+    });
   }
 
   async function handleAdd(childId: string, childName: string, qty: number): Promise<boolean> {
-    if (!parent) return false;
+    if (!parent || isCompleted || saveBusy) return false;
     if (!Number.isFinite(qty) || qty <= 0) {
       onError("수량은 0보다 커야 합니다.");
       return false;
     }
+    changeComposition(rows => [...rows, { bom_id: `draft-${crypto.randomUUID()}`, parent_item_id: parent.item_id,
+      child_item_id: childId, quantity: qty, unit: "EA", notes: null }]);
+    onStatusChange(`"${childName}" 을(를) 변경 내용에 추가했습니다. 구성 저장을 눌러 반영하세요.`);
+    return true;
+  }
+
+  function handleSaveQty(bomId: string, qty: number): void {
+    if (isCompleted || saveBusy) return;
+    changeComposition(rows => rows.map(row => row.bom_id === bomId ? { ...row, quantity: qty } : row));
+  }
+
+  function handleDeleteConfirm(): void {
+    if (!deleteRequest || isCompleted || saveBusy) return;
+    changeComposition(rows => rows.filter(row => row.bom_id !== deleteRequest.bomId));
+    setDeleteRequest(null);
+  }
+
+  async function saveComposition(): Promise<void> {
+    if (savePromiseRef.current) return savePromiseRef.current;
+    if (!activeDraft || !draftDirty) return;
+    if (draftErrors.length) throw new Error(draftErrors.join("\n"));
+    const draft = activeDraft;
+    setSaveBusy(true); setSaveError(null);
+    const operation = (async () => {
+      try {
+        const saved = await api.replaceBOM(draft.parentId, { expected_rows: draft.base,
+          rows: draft.rows.map(({ child_item_id, quantity, unit, notes }) => ({ child_item_id, quantity, unit, notes })) });
+        if (parentIdRef.current === draft.parentId) setBomRows(saved);
+        setCompositionDraft(current => current === draft ? null : current);
+        refreshAllBom();
+        onStatusChange("BOM 전체 구성을 저장했습니다.");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "BOM 구성 저장 실패";
+        setSaveError(message); onError(message);
+        throw error;
+      } finally {
+        setSaveBusy(false); savePromiseRef.current = null;
+      }
+    })();
+    savePromiseRef.current = operation;
+    return operation;
+  }
+
+  async function discardComposition(): Promise<void> {
+    const draft = activeDraft;
+    if (!draft) return;
     try {
-      await api.createBOM({
-        parent_item_id: parent.item_id,
-        child_item_id: childId,
-        quantity: qty,
-        unit: "EA",
-      });
-      await reloadBom();
-      refreshAllBom();
-      onStatusChange(`"${childName}" 을(를) 추가했습니다.`);
-      return true;
-    } catch (err) {
-      onError(err instanceof Error ? err.message : "추가 실패");
-      return false;
+      const rows = await api.getBOM(draft.parentId);
+      if (parentIdRef.current !== draft.parentId || activeDraftRef.current !== draft) return;
+      setBomRows(rows); setCompositionDraft(null); setSaveError(null);
+    } catch (error) {
+      if (parentIdRef.current !== draft.parentId || activeDraftRef.current !== draft) return;
+      setSaveError(error instanceof Error ? error.message : "최신 구성을 읽지 못했습니다.");
     }
   }
 
-  async function handleSaveQty(bomId: string, qty: number) {
-    try {
-      await api.updateBOM(bomId, { quantity: qty });
-      await reloadBom();
-      refreshAllBom();
-      onStatusChange("수량을 변경했습니다.");
-    } catch (err) {
-      await reloadBom();
-      onError(err instanceof Error ? err.message : "수량 변경 실패 — 목록을 새로고침했습니다.");
-    }
-  }
-
-  async function handleDeleteConfirm() {
-    if (!deleteRequest) return;
-    setDeleteBusy(true);
-    try {
-      await api.deleteBOM(deleteRequest.bomId);
-      await reloadBom();
-      refreshAllBom();
-      onStatusChange(`"${deleteRequest.childName}" 을(를) 삭제했습니다.`);
-    } catch (err) {
-      await reloadBom();
-      onError(err instanceof Error ? err.message : "삭제 실패 — 목록을 새로고침했습니다.");
-    } finally {
-      setDeleteBusy(false);
-      setDeleteRequest(null);
-    }
-  }
-
-  async function handleToggleCompletion(completed: boolean) {
-    if (!parent) return;
+  async function handleToggleCompletion(completed: boolean): Promise<string | null> {
+    if (!parent) return "품목을 선택해 주세요.";
+    if (draftDirty) return "변경한 구성을 먼저 저장해 주세요.";
     try {
       await api.updateBomCompletion(parent.item_id, completed);
       await refreshItems();
       onStatusChange(
         `"${parent.item_name}" ${completed ? "완료 처리됨" : "완료 해제됨"}`,
       );
+      return null;
     } catch (err) {
-      onError(err instanceof Error ? err.message : "완료 상태 변경 실패");
+      const message = err instanceof Error ? err.message : "완료 상태 변경 실패";
+      onError(message);
+      return message;
     }
   }
 
@@ -442,11 +486,20 @@ export function BomWorkbench({
         <BomParentHeader
           parent={parent}
           mode={mode}
-          childCount={mode === "edit" ? bomRows.length : whereUsedRows.length}
+          childCount={mode === "edit" ? displayedRows.length : whereUsedRows.length}
           isCompleted={isCompleted}
           onOpenReview={() => setReviewOpen(true)}
         />
       </div>
+
+      {mode === "edit" && parent && !isCompleted && (
+        <div className="mb-3 flex flex-wrap items-center gap-3" aria-label="BOM 구성 저장">
+          <span className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>추가·수정·삭제 후 구성 저장을 누르면 함께 반영됩니다.</span>
+          <Button disabled={!draftDirty || saveBusy || draftErrors.length > 0} onClick={() => void saveComposition().catch(() => undefined)}>구성 저장</Button>
+          <Button disabled={!activeDraft || saveBusy} onClick={() => void discardComposition()}>변경 취소</Button>
+        </div>
+      )}
+      {(draftErrors.length > 0 || saveError) && <p role="alert" className="mb-3 whitespace-pre-line text-sm" style={{ color: LEGACY_COLORS.red }}>{draftErrors.length ? draftErrors.join("\n") : saveError}</p>}
 
       {/* 메인: 좌(상위) | 중(자식추가) | 우(현재구성) */}
       <div
@@ -476,10 +529,10 @@ export function BomWorkbench({
               {parent ? (
                 <BomChildAddBox
                   parent={parent}
-                  bomRows={bomRows}
+                  bomRows={displayedRows}
                   items={items}
                   onAdd={handleAdd}
-                  isLocked={isCompleted}
+                  isLocked={isCompleted || saveBusy}
                 />
               ) : (
                 <div
@@ -498,13 +551,14 @@ export function BomWorkbench({
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               <BomEditPanel
                 parent={parent}
-                bomRows={bomRows}
+                bomRows={displayedRows}
                 items={items}
                 onSaveQty={handleSaveQty}
+                onBeginEdit={() => changeComposition(rows => rows)}
                 onRequestDelete={(row, childName) =>
                   setDeleteRequest({ bomId: row.bom_id, childName })
                 }
-                isLocked={isCompleted}
+                isLocked={isCompleted || saveBusy}
               />
             </div>
           </>
@@ -534,7 +588,7 @@ export function BomWorkbench({
       {reviewOpen && parent && (
         <BomReviewModal
           parent={parent}
-          rows={bomRows}
+          rows={displayedRows}
           items={items}
           isCompleted={isCompleted}
           onClose={() => setReviewOpen(false)}
@@ -549,7 +603,6 @@ export function BomWorkbench({
         tone="danger"
         onClose={() => setDeleteRequest(null)}
         onConfirm={handleDeleteConfirm}
-        busy={deleteBusy}
         confirmLabel="삭제"
       >
         {deleteRequest && (

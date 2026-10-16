@@ -85,8 +85,8 @@ async function seed() {
   // e2e 전제(원자재 입고=창고역할 전용, 결재 승인자 필요)를 위해 역할을 부여한다.
   const emps: any[] = await getJson(`${BACKEND_URL}/api/employees?active_only=true`);
   const byCode = (code: string) => emps.find((e) => e.employee_code === code);
-  const whBase = byCode("E22") ?? emps[0]; // 이필욱 — 창고 결재자 + 원자재 입고 작업자
-  const deptBase = byCode("E04") ?? emps[1] ?? emps[0]; // 김건호 — 부서 결재자
+  const whBase = byCode("E22") ?? emps[0]; // 창고 결재자 + 원자재 입고 작업자
+  const deptBase = byCode("E04") ?? emps[1] ?? emps[0]; // 부서 결재자
   const plainBase = byCode("E01") ?? emps.find((e) => e.employee_id !== whBase.employee_id); // 일반 작업자(제출자)
 
   const warehouseEmployee = await putJson(`${BACKEND_URL}/api/employees/${whBase.employee_id}`, {
@@ -127,15 +127,18 @@ async function seed() {
   // produce 는 자식 자재를 부서(조립) PRODUCTION 재고에서 소비한다(창고 아님).
   // 창고 재고만으로는 "재고 부족" → 제출 불가 → 자식 일부를 조립 부서 생산재고로 이동.
   // API 가 없어 서비스(transfer_to_production)를 직접 호출. 코드는 ASCII 만(argv 인코딩 회피).
+  // 현행 작업·역작업 계약은 원장 활성 이후 경로다. 합성 시드 이후부터 명시 활성화한다.
+  const inventoryOperationCutoverAt = new Date().toISOString();
   const seedPy = [
     "from decimal import Decimal",
     "from app.database import SessionLocal",
-    "from app.models import Item, DepartmentEnum",
+    "from app.models import Item, DepartmentEnum, SystemSetting",
     "from app.services.inv_transfer import transfer_to_production",
     "db = SessionLocal()",
     "try:",
     "    child = db.query(Item).filter(Item.process_type_code=='TR').first()",
     "    transfer_to_production(db, child.item_id, Decimal('50'), DepartmentEnum.TUBE)",
+    `    db.add(SystemSetting(setting_key='inventory_operation_cutover_at', setting_value=${JSON.stringify(inventoryOperationCutoverAt)}))`,
     "    db.commit()",
     "finally:",
     "    db.close()",
@@ -152,7 +155,7 @@ async function seed() {
   fs.writeFileSync(
     SEED_FILE,
     JSON.stringify(
-      { rawItem, parentItem, warehouseEmployee, departmentEmployee, plainEmployee },
+      { rawItem, parentItem, warehouseEmployee, departmentEmployee, plainEmployee, inventoryOperationCutoverAt },
       null,
       2,
     ),
@@ -186,6 +189,18 @@ export default async function globalSetup() {
     throw new Error(`bootstrap 실패(code ${boot.status})\n${boot.stdout}\n${boot.stderr}`);
   }
 
+  // Bootstrap reference names must never enter committed QA screenshots.
+  const anonymized = spawnSync("python", [path.join(HERE, "_qa_employee_names.py")], {
+    cwd: BACKEND_DIR,
+    env: { ...process.env, DATABASE_URL },
+    encoding: "utf-8",
+    windowsHide: true,
+  });
+  if (anonymized.status !== 0) {
+    throw new Error(`QA 직원 이름 변환 실패(code ${anonymized.status})\n${anonymized.stdout}\n${anonymized.stderr}`);
+  }
+  console.log(`[e2e:setup] QA 직원 표시 이름 변환: ${anonymized.stdout.trim()}`);
+
   // 3) 전용 백엔드 기동(포트 8021, --reload 없음 → 단일 프로세스)
   const backend = spawn(
     "python",
@@ -205,5 +220,20 @@ export default async function globalSetup() {
 
   // 4) 시드
   await seed();
+  if (process.env.MES_EXPECTATION_ENVIRONMENT) {
+    const session = await getJson(`${BACKEND_URL}/api/app-session`);
+    const metadata = spawnSync(process.execPath, [
+      path.join(REPO_ROOT, "scripts/dev/run-mes-expectations.mjs"),
+      "--record-browser-environment",
+      JSON.stringify({
+      root: REPO_ROOT,
+      database: E2E_DB,
+      seedFile: SEED_FILE,
+      bootId: session.boot_id,
+      output: process.env.MES_EXPECTATION_ENVIRONMENT,
+      }),
+    ], { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true });
+    if (metadata.status !== 0) throw new Error(`E2E evidence environment failed: ${metadata.stderr || metadata.stdout}`);
+  }
   console.log("[e2e:setup] 완료");
 }

@@ -5,6 +5,14 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { DesktopPanelCloseButton, DesktopRightPanel, DesktopRightPanelFooter } from "../DesktopRightPanel";
 
 describe("DesktopRightPanel", () => {
+  it("places an optional action at the right edge of the metadata row", () => {
+    render(<DesktopRightPanel title="품목" subtitle="CODE" subtitleBadge={<span>정상</span>} subtitleAction={<button>복사</button>}>내용</DesktopRightPanel>);
+    const button = screen.getByRole("button", { name: "복사" });
+    expect(button.parentElement).toHaveClass("ml-auto", "shrink-0");
+    expect(screen.getByText("CODE").parentElement?.parentElement).toContainElement(button);
+    expect(screen.getByText("CODE").parentElement).toContainElement(screen.getByText("정상"));
+  });
+
   it("forwards its button ref and uses the default panel-close label", () => {
     const ref = createRef<HTMLButtonElement>();
     const onClick = vi.fn();

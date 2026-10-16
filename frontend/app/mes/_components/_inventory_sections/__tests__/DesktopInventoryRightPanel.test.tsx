@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 
@@ -31,6 +31,95 @@ function makeItem(): Item {
 }
 
 describe("DesktopInventoryRightPanel", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+    Reflect.deleteProperty(document, "execCommand");
+  });
+
+  it("전체 품목명만 복사하고 완료 표시를 2초 후 초기화한다", async () => {
+    vi.useFakeTimers();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const item = { ...makeItem(), item_name: "DX3000_60kV, 2mA_러시아_IP Tsizinia S. A [White] 전체 이름" };
+    render(<DesktopInventoryRightPanel selectedItem={item} displayItem={item} headerBadge={<span>정상</span>} onClose={vi.fn()} onGoToWarehouse={vi.fn()} />);
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "품목명 복사" })));
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(writeText).toHaveBeenCalledWith(item.item_name);
+    expect(screen.getByRole("button", { name: "품목명 복사" })).toHaveTextContent("완료");
+    act(() => vi.advanceTimersByTime(2000));
+    expect(screen.getByRole("button", { name: "품목명 복사" })).toHaveTextContent("복사");
+  });
+
+  it.each([false, true])("클립보드 API 부재 또는 거부 시 대체 복사한다: %s", async (rejectApi) => {
+    vi.stubGlobal("navigator", rejectApi ? { clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) } } : {});
+    const execCommand = vi.fn(() => {
+      expect((document.activeElement as HTMLTextAreaElement).value).toBe("테스트 품목");
+      return true;
+    });
+    Object.defineProperty(document, "execCommand", { configurable: true, value: execCommand });
+    const item = makeItem();
+    render(<DesktopInventoryRightPanel selectedItem={item} displayItem={item} headerBadge={null} onClose={vi.fn()} onGoToWarehouse={vi.fn()} />);
+    const button = screen.getByRole("button", { name: "품목명 복사" });
+    button.focus();
+    await act(async () => fireEvent.click(button));
+    expect(execCommand).toHaveBeenCalledWith("copy");
+    expect(button).toHaveFocus();
+    expect(document.querySelector("textarea")).toBeNull();
+    expect(button).toHaveTextContent("완료");
+  });
+
+  it("복사 실패를 알리고 같은 버튼으로 재시도할 수 있다", async () => {
+    vi.stubGlobal("navigator", {});
+    const execCommand = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true);
+    Object.defineProperty(document, "execCommand", { configurable: true, value: execCommand });
+    const item = makeItem();
+    render(<DesktopInventoryRightPanel selectedItem={item} displayItem={item} headerBadge={null} onClose={vi.fn()} onGoToWarehouse={vi.fn()} />);
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "품목명 복사" })));
+    expect(screen.getByRole("alert")).toHaveTextContent("다시 시도");
+    expect(screen.getByRole("button", { name: "품목명 복사" })).toHaveTextContent("복사");
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "품목명 복사" })));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "품목명 복사" })).toHaveTextContent("완료");
+  });
+
+  it("품목 전환으로 완료 표시를 지우고 세 탭에서 현재 품목을 복사한다", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const item = makeItem();
+    const props = { headerBadge: null, onClose: vi.fn(), onGoToWarehouse: vi.fn() };
+    const { rerender } = render(<DesktopInventoryRightPanel {...props} selectedItem={item} displayItem={item} />);
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "품목명 복사" })));
+    const nextItem = { ...item, item_id: "item-2", item_name: "다른 품목" };
+    rerender(<DesktopInventoryRightPanel {...props} selectedItem={nextItem} displayItem={nextItem} />);
+    expect(screen.getByRole("button", { name: "품목명 복사" })).toHaveTextContent("복사");
+    for (const tab of ["상세 정보", "최근 내역", "검색용 이름"]) {
+      fireEvent.click(screen.getByRole("tab", { name: tab }));
+      await act(async () => fireEvent.click(screen.getByRole("button", { name: "품목명 복사" })));
+      expect(writeText).toHaveBeenLastCalledWith(nextItem.item_name);
+    }
+  });
+
+  it("품목 정보가 없으면 복사 버튼을 표시하지 않는다", () => {
+    render(<DesktopInventoryRightPanel open selectedItem={null} displayItem={null} headerBadge={null} onClose={vi.fn()} onGoToWarehouse={vi.fn()} detailLoading />);
+    expect(screen.queryByRole("button", { name: "품목명 복사" })).not.toBeInTheDocument();
+  });
+
+  it("이전 품목의 늦은 복사 결과를 새 품목에 표시하지 않는다", async () => {
+    let finishCopy: () => void = () => {};
+    const writeText = vi.fn(() => new Promise<void>((resolve) => { finishCopy = resolve; }));
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const item = makeItem();
+    const props = { headerBadge: null, onClose: vi.fn(), onGoToWarehouse: vi.fn() };
+    const { rerender } = render(<DesktopInventoryRightPanel {...props} selectedItem={item} displayItem={item} />);
+    fireEvent.click(screen.getByRole("button", { name: "품목명 복사" }));
+    const nextItem = { ...item, item_id: "item-2", item_name: "다른 품목" };
+    rerender(<DesktopInventoryRightPanel {...props} selectedItem={nextItem} displayItem={nextItem} />);
+    await act(async () => finishCopy());
+    expect(screen.getByRole("button", { name: "품목명 복사" })).toHaveTextContent("복사");
+  });
+
   it("검색용 이름은 전용 탭에서 관리하며 탭 전환 후 입력을 유지한다", () => {
     const item = makeItem();
     render(<DesktopInventoryRightPanel selectedItem={item} displayItem={item} headerBadge={null} onClose={vi.fn()} onGoToWarehouse={vi.fn()} />);

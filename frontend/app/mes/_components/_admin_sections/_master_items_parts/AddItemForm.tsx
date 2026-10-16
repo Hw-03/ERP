@@ -12,6 +12,7 @@ export function AddItemForm() {
     setAddForm,
     addItem: onAddItem,
     productModels,
+    addCodePreview,
   } = useAdminMasterItemsContext();
 
   return (
@@ -20,6 +21,8 @@ export function AddItemForm() {
         form={addForm as ItemFormData & { initial_quantity: string }}
         setForm={setAddForm as (u: (f: ItemFormData) => ItemFormData) => void}
         showInitialLocations
+        showMesCode
+        codePreview={addCodePreview}
         enableAfSalesReviewDefault
         productModels={productModels}
       />
@@ -31,6 +34,7 @@ export function AddItemForm() {
 
       <button
         onClick={onAddItem}
+        disabled={addCodePreview?.status !== "ready"}
         className="w-full rounded-[18px] py-3 text-base font-bold text-white"
         style={{ background: LEGACY_COLORS.greenSolid }}
       >

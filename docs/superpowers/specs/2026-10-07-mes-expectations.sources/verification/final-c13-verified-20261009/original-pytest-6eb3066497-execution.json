@@ -1,0 +1,2812 @@
+{
+  "schemaVersion": 2,
+  "runId": "final-c13-verified-20261009",
+  "runner": "pytest",
+  "head": "2d79cd2848900fb66f99443af411fcec347877cd",
+  "root": "C:/Users/user/.codex/worktrees/mes-expectation-closure/ERP",
+  "startedAt": "2026-10-09T19:21:59.896+09:00",
+  "endedAt": "2026-10-09T19:22:21.192+09:00",
+  "argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-p",
+    "mes_expectation_pytest",
+    "tests/ops/test_inventory_operation_admin_real_backup.py",
+    "tests/ops/test_inventory_operation_admin.py",
+    "-q",
+    "--junitxml=C:\\Users\\user\\.codex\\worktrees\\mes-expectation-closure\\ERP\\_attic\\runtime\\mes-expectations\\final-c13-verified-20261009\\pytest-6eb3066497.xml",
+    "--confcutdir=tests/ops"
+  ],
+  "cwd": "backend",
+  "exitCode": 0,
+  "snapshot": {
+    "selectors": [
+      ".nvmrc",
+      "backend/",
+      "backend/tests/ops/test_inventory_operation_admin.py",
+      "backend/tests/ops/test_inventory_operation_admin_real_backup.py",
+      "scripts/",
+      "scripts/dev/mes-expectation-evidence.mjs",
+      "scripts/dev/normalize-mes-expectations.mjs",
+      "scripts/dev/run-mes-expectations.mjs"
+    ],
+    "files": [
+      {
+        "path": ".nvmrc",
+        "sha256": "5378796307535df3ec8d8b15a2e2dc5641419c3d3060cfe32238c0fa973f7aa3"
+      },
+      {
+        "path": "backend/.dockerignore",
+        "sha256": "493525598604f24ca3c5d3a1e276424404242b57ea7f987b6ae8f4d823ab84bf"
+      },
+      {
+        "path": "backend/.env.example",
+        "sha256": "42df3b738d068cbb67721aefe7e48e2d804ceedb37e8a99d97a96577d995f7cb"
+      },
+      {
+        "path": "backend/.gitignore",
+        "sha256": "e815076f15a027bce7900d54f366bc85922826021cd3889a3f50d74d398545a5"
+      },
+      {
+        "path": "backend/Dockerfile",
+        "sha256": "ef21f6e0508c636ac1d0eabfc329806a2b114bff181d33bc9b7b1965c7c00aad"
+      },
+      {
+        "path": "backend/alembic.ini",
+        "sha256": "ae8eeb175febea082d3806054daa6292cb4d3ef78d9ebffcb8b91c4666f72411"
+      },
+      {
+        "path": "backend/alembic/env.py",
+        "sha256": "bbf9983ad61223efd088436b607186cb858fedceaadcc0083810c7bed49386d9"
+      },
+      {
+        "path": "backend/alembic/script.py.mako",
+        "sha256": "c20f6ab92d4ed36d77fbccb82bc410cd2ced42f2c162eebb43ddd45ae93dd90e"
+      },
+      {
+        "path": "backend/alembic/versions/20260715_0001_current_schema_baseline.py",
+        "sha256": "870c11727389a3048a8294a17ab95cc3d38ab8294fa9630d0eb511064bb4c4f5"
+      },
+      {
+        "path": "backend/alembic/versions/20260720_0002_schema_state.py",
+        "sha256": "df278b1d4d030c768aeb6cef7daf3127e8889daa4ddbb3113eb86bc3c877c8d7"
+      },
+      {
+        "path": "backend/alembic/versions/20260720_0003_backfill_transaction_departments.py",
+        "sha256": "b2d2dd51f49d5edd065bdab73ff1d84eb335505a72147f657430bdd75b54b773"
+      },
+      {
+        "path": "backend/alembic/versions/20260724_0004_assembly_checklists.py",
+        "sha256": "747e04785099cc42ca86294897742cda758d12cee003d119823aec2cc566637b"
+      },
+      {
+        "path": "backend/alembic/versions/20260724_0005_shipping_sales_workflow.py",
+        "sha256": "5051b523da0b981b900bc105ec44de7bbb10fe1951429d0198fcb26009e223b0"
+      },
+      {
+        "path": "backend/alembic/versions/20260727_0006_shipping_io_context.py",
+        "sha256": "ebc8da9edb3c86ee33f5b07c86060ff36ec0524f08a38b9326d836d0203cfda5"
+      },
+      {
+        "path": "backend/alembic/versions/20260727_0007_shipping_serial_numbers.py",
+        "sha256": "77c12dc57b7f1f64bc34d9435420e17a7f97fea90eebd04757fda9cd7293adbd"
+      },
+      {
+        "path": "backend/alembic/versions/20260727_0008_af_sales_review_defaults.py",
+        "sha256": "c3e7266aa388ee10ef12928dedef3844da89a32cab1212d17883d4cc86701f87"
+      },
+      {
+        "path": "backend/alembic/versions/20260728_0009_shipping_prepared_actor.py",
+        "sha256": "96901f86eda5bf7de5f4c1e50d477fc31e9bc58e4fd7906ae16b87d55c60232f"
+      },
+      {
+        "path": "backend/alembic/versions/20260728_0010_daily_work_reports.py",
+        "sha256": "8f7fbba9cf1fcd3d0d90d764bf40fe42b8ff346037d50dceb1d2fff47ced97c1"
+      },
+      {
+        "path": "backend/alembic/versions/20260728_0011_shipping_prepared_actor_repair.py",
+        "sha256": "e6c68201a8e825eac6497bb6e8bc4bcd159935ea943e8bdcc4de92af9f8030f6"
+      },
+      {
+        "path": "backend/alembic/versions/20260804_0012_employee_sidebar_mode.py",
+        "sha256": "910d650b3ea42e463e8e49616611db45db2e99079df0f8ac4d5cc0634b1e7403"
+      },
+      {
+        "path": "backend/alembic/versions/20260804_0013_data_revision.py",
+        "sha256": "20a927a573e6bf14f4698baad63b7cfe04342b5211de4582c33395761c792dd1"
+      },
+      {
+        "path": "backend/alembic/versions/20260807_0014_shipping_bom_candidate_selection.py",
+        "sha256": "6dc5a71bb2e35bf9e691ba311631b3fd3881b3e08f52a790a441e0ab8d6137dc"
+      },
+      {
+        "path": "backend/alembic/versions/20260807_0015_backfill_shipping_finalization_choice.py",
+        "sha256": "1f79baa51b9a995187cb4e35c16c1d9ae03e53e52b6798aca230537906f4d1ae"
+      },
+      {
+        "path": "backend/alembic/versions/20260807_0016_repair_shipping_bom_candidate_schema.py",
+        "sha256": "c85282128380b025341227aeea72363a39b6899647244596f7c47651b6db636c"
+      },
+      {
+        "path": "backend/alembic/versions/20260812_0017_sync_assembly_checklist_content.py",
+        "sha256": "8f8876575355790bebc9444df0b5b7745fd24c81fdc82320e3cf148de4226013"
+      },
+      {
+        "path": "backend/alembic/versions/20260812_0018_drop_model_pf_pins.py",
+        "sha256": "cbd6ba6e6d3456648147d2aa5d601582f41ff50a64cb10127f0c2244da48df41"
+      },
+      {
+        "path": "backend/alembic/versions/20260812_0019_add_inventory_location_pending.py",
+        "sha256": "cdfa49d6c9dd8413dd15fd263ae748a6c89c77a13c7aadde87ac08c45f1220be"
+      },
+      {
+        "path": "backend/alembic/versions/20260813_0020_add_activity_audit.py",
+        "sha256": "350d7fcd6f851cfa3f90ec23a979e12debae5e62e8096674fd2d4e65e2a58d18"
+      },
+      {
+        "path": "backend/alembic/versions/20260818_0021_add_bom_stock_exempt.py",
+        "sha256": "7eef2250f09bf3817eddb6503b5e33dd376a4ed80c4f85475d123cb396bd569c"
+      },
+      {
+        "path": "backend/alembic/versions/20260818_0022_add_io_bom_auto_tokens.py",
+        "sha256": "db8e545739b77e2e2d3bb880c5768ae2b030acb3e664858f865de375d9d63b49"
+      },
+      {
+        "path": "backend/alembic/versions/20260820_0023_add_internal_use_bom_modes.py",
+        "sha256": "9cd9db950f803aa30ed99f6c56d47322cbd6f7e7a91eb2dd3bd031f295eec677"
+      },
+      {
+        "path": "backend/alembic/versions/20260821_0024_remove_shipping_requested_status.py",
+        "sha256": "6504f4335402b56fa868798b1f2fc04991cf78c8f696a4c39f1fdab0e64d9914"
+      },
+      {
+        "path": "backend/alembic/versions/20260824_0024_weekly_inventory_snapshots.py",
+        "sha256": "cc4f6d791d45a839fd85cb007dea020c73793217702692ef7da7d3165f743341"
+      },
+      {
+        "path": "backend/alembic/versions/20260824_0025_add_transaction_stock_snapshots.py",
+        "sha256": "9055db36e8e833be562a2b705c72c3a4c176c8f0233e204552c598f8c0956e95"
+      },
+      {
+        "path": "backend/alembic/versions/20260824_0026_add_transaction_operation_line_link.py",
+        "sha256": "d5e1e6db9ee7e6214f696c1806c6c04d82b93c297f2819da1321787b41e21883"
+      },
+      {
+        "path": "backend/alembic/versions/20260824_0027_defect_quarantine_records.py",
+        "sha256": "145c57e05fbd8a845024dcff303535af82f5cfd8a625a2c3c42927aef65762c0"
+      },
+      {
+        "path": "backend/alembic/versions/20260825_0028_reconstruct_legacy_defect_records.py",
+        "sha256": "ee47066abc272ce5e511ac058eed85875625757405f356519553907db0e1849a"
+      },
+      {
+        "path": "backend/alembic/versions/20260826_0029_inventory_operations.py",
+        "sha256": "395961bf978db0bb686e3722dcd8336b885cf198ddc97857e46c5e29bcfd66f8"
+      },
+      {
+        "path": "backend/alembic/versions/20260903_0030_defect_movement_baselines.py",
+        "sha256": "7d17e578d644da34b439bdedc1ce07848485bf722850e307deca4962f927e89c"
+      },
+      {
+        "path": "backend/alembic/versions/20260903_0031_add_item_procurement_fields.py",
+        "sha256": "c35d0b11f5cdf1fae6a5740daca15269bf5702d0184483633acb06360ba06eea"
+      },
+      {
+        "path": "backend/alembic/versions/20260903_0032_add_item_purchase_memo.py",
+        "sha256": "8303e91952cc671c80b0af5c8088fdb20faac10061b1e79c0e1bf5a21f31c30f"
+      },
+      {
+        "path": "backend/alembic/versions/20260910_0033_defect_management_categories.py",
+        "sha256": "1ace7a4441e7ea5e68d7a069d375e07820cdbf9df0335ac12aa01971d5c4972c"
+      },
+      {
+        "path": "backend/alembic/versions/20260915_0034_as_research_approval.py",
+        "sha256": "2d309d33bf7b00c52476a44bf1404088652a214556add87df5403b778f5bcd73"
+      },
+      {
+        "path": "backend/alembic/versions/20260917_0035_add_bom_unmatched_status.py",
+        "sha256": "b2fb295f698ca836a87e8a2872d62c2083f9c09519ad00008ab419979d778dc9"
+      },
+      {
+        "path": "backend/alembic/versions/20260921_0036_add_suppliers.py",
+        "sha256": "2bda09d12a0aecf219878012732edb85ebd060a89f23df2272294a783aa9218d"
+      },
+      {
+        "path": "backend/alembic/versions/20260922_0037_add_defect_return_suppliers.py",
+        "sha256": "f73916d63dce0e35bb965c4d9da527379fdbe813de9fae7085319d883e8a1858"
+      },
+      {
+        "path": "backend/alembic/versions/20260928_0038_material_out_transaction_type.py",
+        "sha256": "94aca908fa10e77969732a40db8615e28a48b358708275a3d6352e677d70916d"
+      },
+      {
+        "path": "backend/alembic/versions/20261007_0039_remove_employee_level.py",
+        "sha256": "127d07a9439e6aabb43d2e969a15f7faf03b0aa9763f03a0bdd73dbdaf10ee4f"
+      },
+      {
+        "path": "backend/alembic/versions/20261007_0040_history_submissions_defect_reasons.py",
+        "sha256": "20d146e87ecdc3186043b8d5e3ce7b7e8e92e0be412ffb0f2f85e522dcab471c"
+      },
+      {
+        "path": "backend/alembic/versions/20261007_0041_shipping_submission_hash.py",
+        "sha256": "86aafd23005fdb4a80834bbd6f32c770525d3fececd5cb630d300bfb46d889cf"
+      },
+      {
+        "path": "backend/alembic/versions/20261007_0042_department_display_name.py",
+        "sha256": "cc8d0681bd2525200a693025fd9b9bf08f732269780b64c00ae8a117d0a70092"
+      },
+      {
+        "path": "backend/alembic/versions/20261007_0043_transaction_item_snapshot.py",
+        "sha256": "07076d131785b8d522e55511be4aee088e64dbc25362122fde9a6ad232d93ccb"
+      },
+      {
+        "path": "backend/alembic/versions/20261008_0041_supplier_scopes.py",
+        "sha256": "6177e0ceebdeea14e4c1a27067667527527bb2e484f6a7e7283bb4090403aeb5"
+      },
+      {
+        "path": "backend/alembic/versions/20261008_0044_merge_closure_supplier_scopes.py",
+        "sha256": "dcb124867614de08009a51e30524a964b676f368f25b900866b5a644985dc2de"
+      },
+      {
+        "path": "backend/app/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "backend/app/_access_log.py",
+        "sha256": "23aef11c5867313f520449257aa3fb2a61ec0ef0947d46d0bca1021ab21ce352"
+      },
+      {
+        "path": "backend/app/_actor.py",
+        "sha256": "79a00ed012659721bc5b4ca360d5eddc14105660356dbb4c9c7d72f09dbcd19e"
+      },
+      {
+        "path": "backend/app/_evt.py",
+        "sha256": "30517876b38024da61d8825d9426402ed90f8ed44619b3819634da99c8cd334c"
+      },
+      {
+        "path": "backend/app/_logging.py",
+        "sha256": "2a1a4dcb9dcafff26d0594b0a165cc6540874b49a64afa25c9899f58be67e721"
+      },
+      {
+        "path": "backend/app/_slow_query.py",
+        "sha256": "8a1fc21d58584ef9d87e2445c49cb10691e506c5e676b3e1ebe4d7eb3176e864"
+      },
+      {
+        "path": "backend/app/assets/f704_02_template.xlsx",
+        "sha256": "50a90fc50054faab816b5b34d50e102279260f00d1c910a14f2034c192348ee3"
+      },
+      {
+        "path": "backend/app/assets/f705_02_template.xlsx",
+        "sha256": "e4ad9df4428a044a91d501142e17043a48f06449ddf1deee403e25846db70c8c"
+      },
+      {
+        "path": "backend/app/database.py",
+        "sha256": "bbf8cdf79fb90981087bae188244a3a6c5548c94210745eb4e8bf35182e6ea99"
+      },
+      {
+        "path": "backend/app/dependencies/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "backend/app/dependencies/admin.py",
+        "sha256": "047df5318b5dcb1113594e8d72d4ae6b80064c450b1d314ce4ecfa08939a3a48"
+      },
+      {
+        "path": "backend/app/dependencies/employee_actor.py",
+        "sha256": "3fca886370cf44a0cb974257573c85603a52e1dc40dc962a84de0f3531c3c96c"
+      },
+      {
+        "path": "backend/app/dependencies/warehouse_manager.py",
+        "sha256": "9737d4c8f7a3a2acc2a9620b4fd5b636d008e5eea15ee4cb0979901c6f0ce057"
+      },
+      {
+        "path": "backend/app/main.py",
+        "sha256": "655b6a1125befaca9bece3cd5940e667ff93c7125f5a669ef83e7b56e7627f94"
+      },
+      {
+        "path": "backend/app/models/__init__.py",
+        "sha256": "195172c3ec68c895cbcd0f9deefcf83234bb814ed24ce71db0fcbed010f8f28a"
+      },
+      {
+        "path": "backend/app/models/activity_audit.py",
+        "sha256": "2d1827375e4b200ded9b99014761859ece5b4e838434f9d838e8ee977815687a"
+      },
+      {
+        "path": "backend/app/models/assembly_checklist.py",
+        "sha256": "c70315536120387017fad6812a8719c6b6d72ccbcc03d3460bc4571105068840"
+      },
+      {
+        "path": "backend/app/models/audit.py",
+        "sha256": "5b27fcc8be4b26dc6586e33057a33523f51820c63c92382945978cee64b5f2ed"
+      },
+      {
+        "path": "backend/app/models/base.py",
+        "sha256": "ef8b276764c3caa654158013814cc7ff118b86c6a21b82a51f5c979ae73d413f"
+      },
+      {
+        "path": "backend/app/models/code.py",
+        "sha256": "89c7e7af663583e52002da07b3862697bba5c359891681384592d4c8b73e907a"
+      },
+      {
+        "path": "backend/app/models/daily_work_report.py",
+        "sha256": "a65dd21219852169d3f885b85762d81b3d93746ffd160a977904f233e86f771b"
+      },
+      {
+        "path": "backend/app/models/defect.py",
+        "sha256": "576246b110af9e10140e7f84c1cf050fcfb750824e58afd21d7bb271df593eea"
+      },
+      {
+        "path": "backend/app/models/defect_reason_category.py",
+        "sha256": "519babd3af401af9f2d4ac73038400018e0598fa0cc046da708c23ca8771373d"
+      },
+      {
+        "path": "backend/app/models/employee.py",
+        "sha256": "3ef118a007226c80337087d9e38b5e6ce8cb0942178922d6f2e62b2fc7090f45"
+      },
+      {
+        "path": "backend/app/models/employee_item_order.py",
+        "sha256": "dfd5067ee4d79dbafd75dd4be395f62c0393a62639c23018fe33b7834ffe1e36"
+      },
+      {
+        "path": "backend/app/models/handover.py",
+        "sha256": "877c98c1b78cefb62743a70c4398f29ec603eece00a7b5f1e259aa7dae7e6d87"
+      },
+      {
+        "path": "backend/app/models/inventory.py",
+        "sha256": "726c6c0c454d36384de3b826bdc986c411a3cef9ec61c9a479a35ab3fb512393"
+      },
+      {
+        "path": "backend/app/models/inventory_operation.py",
+        "sha256": "82f9f060fa0375842f9182cf766611c9c4e478ae0486c771266b89cab869eb0e"
+      },
+      {
+        "path": "backend/app/models/io_batch.py",
+        "sha256": "6eeb0b4ffe07e0ca18903df2e1d3fea7a51cc22432ac9fcaa7da8cf57ecbac4a"
+      },
+      {
+        "path": "backend/app/models/item.py",
+        "sha256": "9c58cab931971d4505852cf71959512c3322f3f621072be704c52a3af6565164"
+      },
+      {
+        "path": "backend/app/models/notification.py",
+        "sha256": "3c229fc0682dd88ce4e2178613042508ae0016c7129f72490e222a2d03c8e994"
+      },
+      {
+        "path": "backend/app/models/shipping.py",
+        "sha256": "cce274b307cfc71d77986a5825004c4ea69f7f20c37688fc2e22c3e209ad7854"
+      },
+      {
+        "path": "backend/app/models/stock_request.py",
+        "sha256": "2220ee0a5f83809c5548e2f3fafabb1e2de66a3bbc112f328ab3bdf30f7a0dce"
+      },
+      {
+        "path": "backend/app/models/supplier.py",
+        "sha256": "3ba73aa23462c86c1c19915a21eb589ecab72ee9c2a13997b0a8270b6f45b12d"
+      },
+      {
+        "path": "backend/app/models/system.py",
+        "sha256": "b0001218c06d2ef695009f02bf3dc249b85bacc37e4cabbadcab1befa6d7b1d0"
+      },
+      {
+        "path": "backend/app/models/transaction.py",
+        "sha256": "a4d47e7d6da9415c5f634d251e89956a19dd283dae108137314416231654c7d7"
+      },
+      {
+        "path": "backend/app/models/warehouse.py",
+        "sha256": "854cf264980f6ae849cf2de309e30aa96704e63e5aca9c1a4cecc89da0e4c5bb"
+      },
+      {
+        "path": "backend/app/models/weekly_inventory_snapshot.py",
+        "sha256": "9993bf1bd527c0f4625e4af10a56529e329b0d2386c990b1daa9d34d23a3c06c"
+      },
+      {
+        "path": "backend/app/repositories/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "backend/app/repositories/inventory_repository.py",
+        "sha256": "714879e1f41fe41911ae0395973961f4c33e16f0b0fde350fa7d961916732e64"
+      },
+      {
+        "path": "backend/app/repositories/item_repository.py",
+        "sha256": "d7cfcdead6cb9f86c84b8d2ac51f7f494766694165941d94f148f28f1b133573"
+      },
+      {
+        "path": "backend/app/routers/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "backend/app/routers/_errors.py",
+        "sha256": "22b39a2e378a3cb52ad8a6a7c73531fde4ce31482913d4163a9996381c713a0d"
+      },
+      {
+        "path": "backend/app/routers/admin_activity_audit.py",
+        "sha256": "491fcabded783339761734bbe91ead4aac12774693139c5284caf7e61ab4f7f5"
+      },
+      {
+        "path": "backend/app/routers/admin_audit.py",
+        "sha256": "82945607ddcd4d07e2572187a75ae79dacc1a5ac749c5c3c2c7a692359148179"
+      },
+      {
+        "path": "backend/app/routers/admin_audit_csv.py",
+        "sha256": "9809d2227a059ae44b7691a458e2f9cfa3e94ec5117a21b211a93808224787b8"
+      },
+      {
+        "path": "backend/app/routers/admin_audit_ledger.py",
+        "sha256": "97b2fea782dd4848f038a3d71b55f7373e0fcc5d320bdf3047b52b63ae92eac1"
+      },
+      {
+        "path": "backend/app/routers/admin_inventory_integrity.py",
+        "sha256": "15d0f5ac4aecca7b4fc8c8f90cb1ed53344ce959e39181ecee59d11a572d5947"
+      },
+      {
+        "path": "backend/app/routers/admin_production_log.py",
+        "sha256": "967fa48e9b337dc87fc612ee55089965dd9e3309d98224835c1ca3e6c9f2779e"
+      },
+      {
+        "path": "backend/app/routers/assembly_checklists.py",
+        "sha256": "1641b1e96ce4f9cecc940dcf9fc7e32cd87334226a083150f6d8de14e75adbe8"
+      },
+      {
+        "path": "backend/app/routers/bom.py",
+        "sha256": "233b5efa87e5a2d7db2508542e28b6b7f8d2fcd637e65bbb312f8162d903982d"
+      },
+      {
+        "path": "backend/app/routers/client_events.py",
+        "sha256": "8230a472443fb8d4a5a00caa721dc466604dd611bec24b845d3f39ed3d802859"
+      },
+      {
+        "path": "backend/app/routers/codes.py",
+        "sha256": "4b92727a7a552fbf792f2a5f124eb86e969aaae6e2efcf99dab4afb2a881492c"
+      },
+      {
+        "path": "backend/app/routers/daily_work_reports.py",
+        "sha256": "1cb439e2d04ab860a123f6723f528c7e6ce460537b1a8f6d1c85cf6ef7a00283"
+      },
+      {
+        "path": "backend/app/routers/defects.py",
+        "sha256": "7b5c8b9bf3fcb1085365a9ddc5e77970008f4176c422312c59188577b2169dbb"
+      },
+      {
+        "path": "backend/app/routers/departments.py",
+        "sha256": "4a380492c6fb3657b1d3872367962c8bb578ac79d30b8d3e76a3e140f60f1040"
+      },
+      {
+        "path": "backend/app/routers/dept_adjustment.py",
+        "sha256": "9ef305087acfbad49f117781786812889fbdfa76e6659e81eb77623161971c39"
+      },
+      {
+        "path": "backend/app/routers/employee_item_order.py",
+        "sha256": "5c169efeac549a5cbe0ebf269be8fe761a21159c066f03e97c49d1139d3f306e"
+      },
+      {
+        "path": "backend/app/routers/employees.py",
+        "sha256": "603e76a492c0cfe065ad83bd70281d2f2e71777d9965246e7fab58c420215e59"
+      },
+      {
+        "path": "backend/app/routers/handover.py",
+        "sha256": "647ce618e8e909f3bdf32339b00f4f3e3d503c468ffdcb3e9009fb70be3356c6"
+      },
+      {
+        "path": "backend/app/routers/inventory/__init__.py",
+        "sha256": "e6b5504e67269e17315945d3a1d68ef4f39fe297ef27dbc6b0c4f6cabc92d7c0"
+      },
+      {
+        "path": "backend/app/routers/inventory/_shared.py",
+        "sha256": "2dd714bdb9d970ccd60468ba7f1a4c98f5f834b23ee5073c686697cb563e50b4"
+      },
+      {
+        "path": "backend/app/routers/inventory/_tx_filters.py",
+        "sha256": "e0b6d6038440e02c5b5020d1fc93e8b4eef569e715940a6ed574dcb0ab9489ae"
+      },
+      {
+        "path": "backend/app/routers/inventory/_tx_helper.py",
+        "sha256": "bb558e1363fdacf70b636310f977c28bd8a11c6da99e92d7454cb8acf898dd49"
+      },
+      {
+        "path": "backend/app/routers/inventory/operations.py",
+        "sha256": "3e012a5d8bcb50747b722caea9354ddad80059882d18a89556cd8d88978402c7"
+      },
+      {
+        "path": "backend/app/routers/inventory/query.py",
+        "sha256": "8bf180f5fb1bcbba2b342fb1ce99df423738eb393ce0a94cd4ef516a82d94a3d"
+      },
+      {
+        "path": "backend/app/routers/inventory/transactions.py",
+        "sha256": "20f380b343efa35c2711cc3cd49421941e8505d82e0db685134634e40ac49ea2"
+      },
+      {
+        "path": "backend/app/routers/inventory/weekly_report.py",
+        "sha256": "5b5f002d0223a3ac078581ac83df2f32531775dfa6e3664a6b4936ee1bab4aad"
+      },
+      {
+        "path": "backend/app/routers/io.py",
+        "sha256": "8516429dcb9535d79723a2359ff01a066537dd3d064fc80195012e8340f187fe"
+      },
+      {
+        "path": "backend/app/routers/items.py",
+        "sha256": "d5a16582a69f3907adc77bd89bc657cf01ecbedced06843ddf52c427d66bfe5b"
+      },
+      {
+        "path": "backend/app/routers/models.py",
+        "sha256": "b7e775b910e690e526e19581f667d65c285d44f3590de1d996032c4fd6e3bf95"
+      },
+      {
+        "path": "backend/app/routers/notifications.py",
+        "sha256": "899391919c55bd1c549c77da9e436d2cbf0d02b089a7e27448a1fb3d955cb5b3"
+      },
+      {
+        "path": "backend/app/routers/production.py",
+        "sha256": "c6aa49e9b4e017e08ef96ccf7b333644d66bb5b6b75f1cba88c90d1abf768961"
+      },
+      {
+        "path": "backend/app/routers/realtime.py",
+        "sha256": "8be5b069cc0a15df71338333b041c5ec4ddc09b7fd5adbc1a228c0ff842e4959"
+      },
+      {
+        "path": "backend/app/routers/reason_categories.py",
+        "sha256": "c196dcbeedf496cb82f6e0eacc32d0e4b4062889cf68f977838dc83dc9351b45"
+      },
+      {
+        "path": "backend/app/routers/settings.py",
+        "sha256": "23f1f764f1ef9e2d6d169962afe41e2c408550341c76615556252043bae0d60e"
+      },
+      {
+        "path": "backend/app/routers/shipping.py",
+        "sha256": "7f2c65318005ed845b98a5aa2468c16d02bbeeca3e4042115741f41ba908ac4d"
+      },
+      {
+        "path": "backend/app/routers/stock_requests.py",
+        "sha256": "a5c97547e8adac4153f755f7a248f48ec0f69001dedc9a252dbcff7d8971ea74"
+      },
+      {
+        "path": "backend/app/routers/suppliers.py",
+        "sha256": "223c55d0ab59d9e867080613a0c43da59e2a8c83355935bbf899e10d53cb98ed"
+      },
+      {
+        "path": "backend/app/routers/warehouse_map/__init__.py",
+        "sha256": "b3cc438f4f567e017da432b85a7272d4edcaf74975e530c23edc9e4de9a4f9a6"
+      },
+      {
+        "path": "backend/app/routers/warehouse_map/angles.py",
+        "sha256": "68e0c4f91eacfb73c4b46b61fa1c4bec853e5b535d1e827f23be36e08e0463f2"
+      },
+      {
+        "path": "backend/app/routers/warehouse_map/boxes.py",
+        "sha256": "86dbdcb5c3a434813bf8dcbf3218a8104128c230ee39646a40aa61d5107f6602"
+      },
+      {
+        "path": "backend/app/routers/warehouse_map/query.py",
+        "sha256": "12450c95fd7d0a2cb6512d03ae48cfc7957fe5d30fd17dce3878cb5e026987d9"
+      },
+      {
+        "path": "backend/app/routers/warehouse_map/zones.py",
+        "sha256": "bf7ee784d10c45dda7897c244540b161bf66043590831e5d765128debb642238"
+      },
+      {
+        "path": "backend/app/schemas/__init__.py",
+        "sha256": "10386709a037e490b36074127d2391836b239bbaaec815f178bf88643a864067"
+      },
+      {
+        "path": "backend/app/schemas/activity_audit.py",
+        "sha256": "bc330d9b818baf1ffe4f2040f74acfb8befa3dd4877c7b2b0ae288663f4c4968"
+      },
+      {
+        "path": "backend/app/schemas/assembly_checklist.py",
+        "sha256": "7788f014ca6b373cd401e4b23fdd59f2bdc277cdbe42a0be6bb98c4c2fec21c5"
+      },
+      {
+        "path": "backend/app/schemas/common.py",
+        "sha256": "56f693afcdb03b8b84c4d7815c3ae791ea106f87b8145c5761f7851557bf6851"
+      },
+      {
+        "path": "backend/app/schemas/daily_work_report.py",
+        "sha256": "b34c718e97cfee643d6db6ea4edb70a0719f57042cb6c3114377de27735c104c"
+      },
+      {
+        "path": "backend/app/schemas/defect_statistics.py",
+        "sha256": "de9b38f7eb97e7076d0b3403630e0acf9234c729a3ef16ba8388497d093a383d"
+      },
+      {
+        "path": "backend/app/schemas/department.py",
+        "sha256": "bc2db68c52825709b6fde840a3691918edc5e93e8bd2580545588baa38a11a06"
+      },
+      {
+        "path": "backend/app/schemas/employee.py",
+        "sha256": "799d37c3a46a7a9ed3840232d7a4b07caccb03f4253be6ec9fb161511d0af722"
+      },
+      {
+        "path": "backend/app/schemas/inventory.py",
+        "sha256": "e24d217c3ff58bec83f5f43a7ec6595f6bad34a0dabfffc249c6bc4acf0ef649"
+      },
+      {
+        "path": "backend/app/schemas/inventory_integrity.py",
+        "sha256": "fc7b86bcf9a9b4cdabf16d230def00d4db65b59994481b71f8bd72549d18ef77"
+      },
+      {
+        "path": "backend/app/schemas/io.py",
+        "sha256": "001db43cd6fd7d445a13dfd944b8d477dbf07a603a01137ae71dbd63bb54f0e7"
+      },
+      {
+        "path": "backend/app/schemas/item.py",
+        "sha256": "093381acc4d79ceaf3ae2891c39e863f03ad91a8f32be1b432db39238e22b335"
+      },
+      {
+        "path": "backend/app/schemas/notification.py",
+        "sha256": "9546c2c48e1c57d4b2ddce98b3e69d62ce485abcbf7655d49e321dc6f3ee7992"
+      },
+      {
+        "path": "backend/app/schemas/reason_categories.py",
+        "sha256": "c8746521d98fdf311d6a46daf2fdc7cd49fa2745bbab73de0d4ddc484b869016"
+      },
+      {
+        "path": "backend/app/schemas/shipping.py",
+        "sha256": "acb1eeb289309ab7e3542dee3c80ba8ba2c79ad41d0f2d8a5c7e729d8b4d026f"
+      },
+      {
+        "path": "backend/app/schemas/stock_request.py",
+        "sha256": "28071c342228fc90716717cde4e6e6c73d6fea8ed3ea4d3430795cd2f7e18aa6"
+      },
+      {
+        "path": "backend/app/schemas/supplier.py",
+        "sha256": "251ebec203d044bb6db11cfa7e758545df6bfb954de20d2a2c7fc533a8160e5b"
+      },
+      {
+        "path": "backend/app/schemas/transaction.py",
+        "sha256": "70c7f8a9404b7f3dd9db677fb272478debc34ce8cda814e16cbff827f82732c4"
+      },
+      {
+        "path": "backend/app/schemas/warehouse.py",
+        "sha256": "12c1af8d04a10e92c130ae82c7c52e899f320c53ebc76c80d2695deb18a83770"
+      },
+      {
+        "path": "backend/app/schemas/weekly.py",
+        "sha256": "a3222624558b7bdc27093d3179ef86b0abe200120c464c41139a2eb654a7b5b6"
+      },
+      {
+        "path": "backend/app/services/__init__.py",
+        "sha256": "63b305a3dfd83df73ef545eac294ff7d0ff229c053eb66c19e5d2b2dccd3cf60"
+      },
+      {
+        "path": "backend/app/services/_tx.py",
+        "sha256": "e6e947a3e0b6f80c4fc2a71b429adaeaab0effc8fc97389273aa193829d61ad8"
+      },
+      {
+        "path": "backend/app/services/activity_audit.py",
+        "sha256": "b7152784b264a0b77dd6c4c10b583437839c622cd0bce3b21c875f1a070889b0"
+      },
+      {
+        "path": "backend/app/services/activity_audit_export.py",
+        "sha256": "c170f57e1426b94111713b841039267a366a9080061b2de6e7375c1e182adb4b"
+      },
+      {
+        "path": "backend/app/services/approval_rules.py",
+        "sha256": "11144aa13466e43e5760918b48d1eb5dd04aa761857dc9aca4b1f3a1e1c751e9"
+      },
+      {
+        "path": "backend/app/services/audit.py",
+        "sha256": "d47560f8c10c6a9a83462ce3e6b396f5b18702ca73d7764c08a6865ab94af8d3"
+      },
+      {
+        "path": "backend/app/services/audit_actor_session.py",
+        "sha256": "50048d5b5b9c4a70b7df21162c332876bcb4393428bfb91feb459c0fb5fde4e9"
+      },
+      {
+        "path": "backend/app/services/audit_csv.py",
+        "sha256": "25a9c1e5275173d98a2b8fea0df68fcd22e4612375f3a8beab7ee166825f4a9b"
+      },
+      {
+        "path": "backend/app/services/bom.py",
+        "sha256": "77edf809ede9c6a457060791f34f6ed2ab110cd041145867066efdb59b2ecb48"
+      },
+      {
+        "path": "backend/app/services/bom_configuration.py",
+        "sha256": "80ef120d6f8d1fab30f2e4fb82dad7c7d3a1bcb5bd3066783023a1fe2f9be43c"
+      },
+      {
+        "path": "backend/app/services/bom_stock_policy.py",
+        "sha256": "72556d22a882c6079e699cd9211001086f6460c4066c9c20524e4da09c0bfaa4"
+      },
+      {
+        "path": "backend/app/services/codes.py",
+        "sha256": "54bf152d241d8b481b8ed0848ff1ca647124dbbe53fa39c8255423f5b081643d"
+      },
+      {
+        "path": "backend/app/services/defect_actions.py",
+        "sha256": "4d7ca5bad8b009cf548297a6bd7f0b1b49cc2f46acd61112d75dccad16e9b466"
+      },
+      {
+        "path": "backend/app/services/defect_reason_categories.py",
+        "sha256": "21d895e64278ae3727eba2ff2e3359f9fcc84439408a6c014ffab6f7dd188670"
+      },
+      {
+        "path": "backend/app/services/defect_records.py",
+        "sha256": "663688c3bc12728fc42db50a844040dd533c454505eafb753275919d036fb521"
+      },
+      {
+        "path": "backend/app/services/defect_statistics.py",
+        "sha256": "2cd390c5a7052960c776029d311d89c2762232b04d7d0ba7d8230796c193ea5e"
+      },
+      {
+        "path": "backend/app/services/department_work_policy.py",
+        "sha256": "eee8ee8896216cc441a29a4a248340615b7bb393b1ee2d4bb221a573323d8e1f"
+      },
+      {
+        "path": "backend/app/services/dept_adjustment.py",
+        "sha256": "ae29b889a24748d735450b260f5a3c4945182e4aa68e90df703c3ed73cee0b45"
+      },
+      {
+        "path": "backend/app/services/dept_hierarchy.py",
+        "sha256": "53d3bb0d7728891e11e3552b727c55a60e519b8f501d6cef43561f56066323f0"
+      },
+      {
+        "path": "backend/app/services/export_helpers.py",
+        "sha256": "1ccc72d88ca4e84495108d007e7d1ed901eebf363a9104301a5474450957678a"
+      },
+      {
+        "path": "backend/app/services/f704_02_ledger.py",
+        "sha256": "a9e9fddd17a01de16514c25f47f27dab4f0c93ff858a32c01f411f59ab9756a3"
+      },
+      {
+        "path": "backend/app/services/f705_02_production_log.py",
+        "sha256": "95f2729f4922f516ff3c9c950248422d29d9c31b978f8adbca599486aac13efe"
+      },
+      {
+        "path": "backend/app/services/handover.py",
+        "sha256": "dc27364d7a114b91f06e2a6876f70471c288e35bf2a94c38399907ef2765588d"
+      },
+      {
+        "path": "backend/app/services/handover_actions.py",
+        "sha256": "674f1aa761db8b7c7f191bf09e0d60f2b51a967964002bb3faffaba122fec177"
+      },
+      {
+        "path": "backend/app/services/integrity.py",
+        "sha256": "6dc2fdbd74486429104704a99c9ab84b7e8ab1e262bb7e11eda598666917e7bb"
+      },
+      {
+        "path": "backend/app/services/internal_use_approval.py",
+        "sha256": "034b01ff4839e9a4292420540fe549595997bd4e84ac6be3b47db04db29ed15e"
+      },
+      {
+        "path": "backend/app/services/inv_base.py",
+        "sha256": "b5cda7e612fd6c5e93651372a184e7a69644b8b77eb53fc57447483643223da0"
+      },
+      {
+        "path": "backend/app/services/inv_calc.py",
+        "sha256": "79bbcf0ed83d56420f2691c019c2799c7dc6b3b2b81eb9212ca0604f15aed310"
+      },
+      {
+        "path": "backend/app/services/inv_defective.py",
+        "sha256": "cbb5a0f77438f3c3e57d9ee05cac8d71bc9cd0001558e5e66a6acebd3d51bfcc"
+      },
+      {
+        "path": "backend/app/services/inv_effect.py",
+        "sha256": "64c57a0e92c7aecfa34f946f3bf1d9279ca462a79da2f338e95744759c8b445c"
+      },
+      {
+        "path": "backend/app/services/inv_transfer.py",
+        "sha256": "b1e99181b9ab6945c69527d82ff4daf075139de9494248b1c6b24ead89d56f73"
+      },
+      {
+        "path": "backend/app/services/inventory.py",
+        "sha256": "ea4f001e48ce4000d5049756f5c88dc1f81f52df4f3b2151b866201639473973"
+      },
+      {
+        "path": "backend/app/services/inventory_effect_history.py",
+        "sha256": "73f6df55873de71d7afd2233c73f6ae85db5a4c328e2b9bdb30950e2facf8864"
+      },
+      {
+        "path": "backend/app/services/inventory_integrity.py",
+        "sha256": "4488dfa3d0b9989635e5aef171bc609b96e4871ed3c52725ce9835fd30f4d53b"
+      },
+      {
+        "path": "backend/app/services/inventory_integrity_engine.py",
+        "sha256": "d045c774afad8f0ec298cd5ff987897446103edd15a23e937060be2e4acde110"
+      },
+      {
+        "path": "backend/app/services/inventory_integrity_repair.py",
+        "sha256": "180f8b67ba04081e3735fd2bb205501a8c1e270307ea0663df0934f39a7b3265"
+      },
+      {
+        "path": "backend/app/services/inventory_operation_activation.py",
+        "sha256": "90f0a3ebd7abf6dc1b27d4fe8a85bebd467c01105bc105e0c97382af56ecf0c3"
+      },
+      {
+        "path": "backend/app/services/inventory_operation_cancellation.py",
+        "sha256": "136f1dd7c8dd3ab72740ffdc34a59073b0b055f692e3e3b918f8f318952a871e"
+      },
+      {
+        "path": "backend/app/services/inventory_operation_ownership.py",
+        "sha256": "224aa15b99382af6518736327cf610ec03a7a0c5d883b279e48751c6d76f4b01"
+      },
+      {
+        "path": "backend/app/services/inventory_operations.py",
+        "sha256": "613dbe771af288a15c246a76b5a1b29b9032f4ff729c392a49cfce3263a13a98"
+      },
+      {
+        "path": "backend/app/services/io.py",
+        "sha256": "a03d67406c6b55d9283c374da8323ffde95cca31a45f9bb6eca858598252defd"
+      },
+      {
+        "path": "backend/app/services/io_actions.py",
+        "sha256": "27a0a8e4b6b66b796edc6b68ea9d4275d9b745525aebea126df9e003855fc84b"
+      },
+      {
+        "path": "backend/app/services/io_dispatch.py",
+        "sha256": "bc48ee5ee1ac0ab12e2b0a81b2255af8abcc0dbb58294e2ee18bd4340735490a"
+      },
+      {
+        "path": "backend/app/services/io_draft.py",
+        "sha256": "01698d851643fae070edeed9abdf33e51f7c265602ab26f4d88ed3c344774d27"
+      },
+      {
+        "path": "backend/app/services/io_persist.py",
+        "sha256": "cf23869e145d4a4757bfdc3be92afdbc06d5c9a0c488370472946a6f5f524637"
+      },
+      {
+        "path": "backend/app/services/io_preview.py",
+        "sha256": "f42bf2d9149188574cf4adeae42f5e6a0d65cbc3cd109cf2057cc8cab23913e6"
+      },
+      {
+        "path": "backend/app/services/item_display_order.py",
+        "sha256": "cbe7388a169cbbb16105128a2dfe9f4de51980bf4f6b684ddcbd569566a3451c"
+      },
+      {
+        "path": "backend/app/services/item_write_validation.py",
+        "sha256": "328486a37dffd7491629e1c052c13ea511d384e7ff92931a4a82c52b0b90fb82"
+      },
+      {
+        "path": "backend/app/services/legacy_inventory_operation_adoption.py",
+        "sha256": "680684061c275f959480429ea65faf15493a3cc5a79a10c2de55a4339b757b9a"
+      },
+      {
+        "path": "backend/app/services/notifications.py",
+        "sha256": "62e0091b125cf418e3306d4199f9c580bcbfe8661cf0b98c85b552c47516fd2e"
+      },
+      {
+        "path": "backend/app/services/pf_shipping_completion.py",
+        "sha256": "8ddd79fc709d64103cf5138b8c971d1a5947cc523db6638a8659658627a0d1c6"
+      },
+      {
+        "path": "backend/app/services/pin_auth.py",
+        "sha256": "05a55872aef59b6b6cddeb2c85826575f0b0ee625b6bd9195d498ea916eae95f"
+      },
+      {
+        "path": "backend/app/services/production_capacity.py",
+        "sha256": "749a175d7d185d962ffe387a3327c71afdcea5ae767e9ab20c27a584fe9df36d"
+      },
+      {
+        "path": "backend/app/services/production_receipt.py",
+        "sha256": "3ec0d84c524c7beb906837d335fb165cefd88ca935205bb23d10e3bb77e36fc2"
+      },
+      {
+        "path": "backend/app/services/rate_limit.py",
+        "sha256": "81136d18d0fbd9c2b52e66796c6caf1367b5314b2a02664ccddc10c80cf39fe9"
+      },
+      {
+        "path": "backend/app/services/realtime.py",
+        "sha256": "b9ba734c17b72a51897d086a068ddf28a84e86c445c43d04a052d3eba2f08b44"
+      },
+      {
+        "path": "backend/app/services/reorder.py",
+        "sha256": "fb315d6ff3c67f74631fd50d99c6644789eb069ee8ebaddaf6a1e53341c65b32"
+      },
+      {
+        "path": "backend/app/services/request_order_stock.py",
+        "sha256": "54c047944b8a43d57fec3e0b12f426e5a65aa94b214e7a6589f770972141dc62"
+      },
+      {
+        "path": "backend/app/services/seed_cleanup.py",
+        "sha256": "1d1994776ff63f967168373ad1c56b9a0b9e95a806305909d2d738a7310217c3"
+      },
+      {
+        "path": "backend/app/services/shipping.py",
+        "sha256": "9abdbb0961a13bc2aa9736ed2aab7e9b474d48f4be793c8906ae29667e83813c"
+      },
+      {
+        "path": "backend/app/services/shipping_actions.py",
+        "sha256": "18d442beb7ac15f3bf168dd6ca32065029ea1fc866922390c9940ea770226b62"
+      },
+      {
+        "path": "backend/app/services/shipping_workflow_operations.py",
+        "sha256": "1fe485d25891b533988f05177f6540c4c1acfdf5ddb0631876ec210b33194053"
+      },
+      {
+        "path": "backend/app/services/sqlite_datetime_contract.py",
+        "sha256": "36e4531491cef7157825e5de750dd482c2d208313d96e6a8b352248950de9ab7"
+      },
+      {
+        "path": "backend/app/services/sr_approval.py",
+        "sha256": "1e4e527e345dfe1de0f0f20d7154e5f84d95052dd53f94436096225fbd37719c"
+      },
+      {
+        "path": "backend/app/services/sr_draft.py",
+        "sha256": "42493c7c8c0bb12fa9a354ec5d4dec165b56664ef5726ffbd7b726f3f0d14b82"
+      },
+      {
+        "path": "backend/app/services/sr_execution.py",
+        "sha256": "fb16ed82c05e9a143beb6504367c722fa48ae913b24b524cbd3e90d2d2b8f078"
+      },
+      {
+        "path": "backend/app/services/sr_reservation.py",
+        "sha256": "58b99aa291a68b70be0669975f90fe3872e28865d63af7ecbb7486596b2f1876"
+      },
+      {
+        "path": "backend/app/services/sr_validation.py",
+        "sha256": "2b922570b11b3cf4a4ee863e324f3ab2e85323f69397e980f0fd26c0c6b409ea"
+      },
+      {
+        "path": "backend/app/services/stock_availability.py",
+        "sha256": "84d144539c61ecd9e3acaf29b9eb083bd56c5bc1452a6b4ae62a8265182b1e23"
+      },
+      {
+        "path": "backend/app/services/stock_math.py",
+        "sha256": "be0a94338a40ab0d7ba2177edae99fc7a0c4a910bf3cbd8bf0ccc8fb441dd2d9"
+      },
+      {
+        "path": "backend/app/services/stock_request_actions.py",
+        "sha256": "a3f3eaf5e68c818f5322d3caa9ed38c99d9fd53551b03130cfe730ccd221f973"
+      },
+      {
+        "path": "backend/app/services/stock_requests.py",
+        "sha256": "5b5e66a3910247285b3c6e4d9d39cf0c25261bf010e2e5c25cd215773dd2778a"
+      },
+      {
+        "path": "backend/app/services/supplier.py",
+        "sha256": "f216182420149d5a6fa80cb3b3b9949ed8dd4ee3d40190bb9130586eb6668aaf"
+      },
+      {
+        "path": "backend/app/services/transaction_actions.py",
+        "sha256": "63836ff6448e8ba135d303c125ed3e49bf2f7cdf4814492afdabeb9c88358a91"
+      },
+      {
+        "path": "backend/app/services/transaction_display_groups.py",
+        "sha256": "442835591ae435464262e90b2c40157588742c8f738258952e8e2649b95ffb5c"
+      },
+      {
+        "path": "backend/app/services/transaction_item_identity.py",
+        "sha256": "768e1209d60e708f532cb6c97aefa5fd0bc8e737a2f2c518d04cd694ea03cfcd"
+      },
+      {
+        "path": "backend/app/services/warehouse_map.py",
+        "sha256": "d1b91586042ca0b026399d417ba602432039e8da461bb082b19b890cafb11a18"
+      },
+      {
+        "path": "backend/app/services/weekly_inventory_snapshot.py",
+        "sha256": "ecc6e710aba91ccf6785f888856c6007a80a0d80b86d8afeb6bb291cb39e30f9"
+      },
+      {
+        "path": "backend/app/services/weekly_report_contract.py",
+        "sha256": "c568fe4f6ac291fba1743b9bf1c2909f4c61fdb35ea569b75313bbc264a255f7"
+      },
+      {
+        "path": "backend/app/services/weekly_report_scope.py",
+        "sha256": "ac6b3e0753611e4faaa6534971033fc2b79483a4038c75556bf09fc290705d4e"
+      },
+      {
+        "path": "backend/app/utils/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "backend/app/utils/excel.py",
+        "sha256": "9d18629e05de2cb2035926484fbb2b152f50cba2c28cc1e20cfd1f3f867a03f3"
+      },
+      {
+        "path": "backend/app/utils/mes_code.py",
+        "sha256": "7b85df0ce5e908b0b235d3d4faca43688ba8a0049471f064d68dac97e2d5d696"
+      },
+      {
+        "path": "backend/app/utils/search.py",
+        "sha256": "abd97f2ec65954224d7848fee4a5271ab1ab0c464b9a5a3a7df277b8aa44058a"
+      },
+      {
+        "path": "backend/bootstrap/__init__.py",
+        "sha256": "830094f9790c3690f5c8bc79e2d47b3ba7b7fbb0f90d15fa32447584335aa99c"
+      },
+      {
+        "path": "backend/bootstrap/init.py",
+        "sha256": "4e21daba4ba88558dc38ae5d38751145bbe8357c18846729d1b0e79bb06da26d"
+      },
+      {
+        "path": "backend/bootstrap/legacy_profiles.py",
+        "sha256": "e19894f3fbd953d7de8410c66c1ff07bdda383a7c8b35588d0a1d18866340b78"
+      },
+      {
+        "path": "backend/bootstrap/migrate.py",
+        "sha256": "3354f6489a50d8a17ef1e590376542c99dee7421e869df0aeb6ddbb93a4bf290"
+      },
+      {
+        "path": "backend/bootstrap/schema.py",
+        "sha256": "26e8ab40d01c0dafcf853c9bcaa164abbecdb9cb5d66d5c79612d14af13402f7"
+      },
+      {
+        "path": "backend/bootstrap/seed.py",
+        "sha256": "a120c9aac2630dbae0cffca8be5518b027b9666a297513208e36c667d3756b04"
+      },
+      {
+        "path": "backend/bootstrap_db.py",
+        "sha256": "1729204442cccc431bcca763e84ee0837edbca4032121703b9f3b24b414ab2c8"
+      },
+      {
+        "path": "backend/data/audit_csv/inout_2026-05.csv",
+        "sha256": "443f0f7c7ea298bb01ab3deedbfcf1396f28f927d7463bc6fb98057b912a5e63"
+      },
+      {
+        "path": "backend/migration_type_compare.py",
+        "sha256": "c331f817bac598435a83c0b9e866dc516928b23aabb2443b41c2940588c160b4"
+      },
+      {
+        "path": "backend/pytest.ini",
+        "sha256": "6eec3be45fc88ad2910efec42bd24a2c8c5b509e53dd6b86297887769ce0aa84"
+      },
+      {
+        "path": "backend/requirements.txt",
+        "sha256": "108eaadda0b13953fb03ed3a1cf9759f69a9aeac0181c422f3d58707d9cbd539"
+      },
+      {
+        "path": "backend/schema.sql",
+        "sha256": "2cd626272d9862d169421266a71ca3c04802016b1faa30a3ea574ee2fa79149b"
+      },
+      {
+        "path": "backend/scripts/apply_item_display_order.py",
+        "sha256": "4eccf696bff6a8201bce19bcc9923f0d821c5c9cbef1b25b76083985a08686da"
+      },
+      {
+        "path": "backend/scripts/bom_graph_data.py",
+        "sha256": "840f6e30128d225a5b6888e639927244c80074b16dc8edb5e085fe2cce0976b5"
+      },
+      {
+        "path": "backend/scripts/build_bom_graph_html.py",
+        "sha256": "b1746c8a8e90c474769907fb8eeb47d02626513c973ee832ea0d3ca500d83273"
+      },
+      {
+        "path": "backend/scripts/capture_weekly_inventory_snapshot.py",
+        "sha256": "ed369845de41c67c60b22a3d55cb69079e25decaca2ae3cda609a1c9eca2c83a"
+      },
+      {
+        "path": "backend/scripts/clear_orphan_reservations.py",
+        "sha256": "8cf709cabdda463fa4bf7cdd84f755e76733068f20f06f3f880381acdbc29ede"
+      },
+      {
+        "path": "backend/scripts/clear_pending_batches.py",
+        "sha256": "1f7417811f7f50323da12edae49be5a57bc7e2241ef27e714b97702d1d0227cf"
+      },
+      {
+        "path": "backend/scripts/inspect_bom_depth.py",
+        "sha256": "b2d682d62b984c61da23cfb15a7e77286079f660481fff5039a6b9a9ce0d0708"
+      },
+      {
+        "path": "backend/scripts/inspect_pf_models.py",
+        "sha256": "2a4980054feea552d60b982e25d82b2654e59cd948bab7e6a5686c725cf42c21"
+      },
+      {
+        "path": "backend/scripts/rebalance_test_stock.py",
+        "sha256": "6e201e44a5b94dd18da27dfc5a2720170ebef227be0e82436f05bf0654fde830"
+      },
+      {
+        "path": "backend/scripts/repair_item_codes.py",
+        "sha256": "93603d983bccea125067f06624a2e4c60ed4ae0bec3215b61c13d838d400ec46"
+      },
+      {
+        "path": "backend/scripts/reset_test_stock.py",
+        "sha256": "2a36a8cb07d56dc56210cd19c3c08f62eb2a635d2fde07364189aab2d129ae92"
+      },
+      {
+        "path": "backend/scripts/safety_stock_apply.py",
+        "sha256": "e116d4018463fbe46316b775111e78c4056c8877918fb0f5ccf80b1224f1d7ca"
+      },
+      {
+        "path": "backend/scripts/safety_stock_preview.py",
+        "sha256": "a24748b0b989c15c6085a859f15287660152ea3bd1dcbef5e0eebce25cd500e2"
+      },
+      {
+        "path": "backend/scripts/vendor/d3.v7.min.js",
+        "sha256": "f2094bbf6141b359722c4fe454eb6c4b0f0e42cc10cc7af921fc158fceb86539"
+      },
+      {
+        "path": "backend/tests/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "backend/tests/concurrency/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "backend/tests/concurrency/conftest.py",
+        "sha256": "78b90ea04c90b8fa7699d6e7b33e0b8d6a81bd8a7a919f09cd2ac5755cbb30a3"
+      },
+      {
+        "path": "backend/tests/concurrency/test_approve_concurrent.py",
+        "sha256": "35f585d35a4a342c3c90fd56826e8d741fb6d4e52ac273b8fb1175ddf34f8224"
+      },
+      {
+        "path": "backend/tests/concurrency/test_approve_reject_conflict.py",
+        "sha256": "99305396fb44ea7ddfbd339574634a7bdd6a5bcc04ae2e0954d239e9edb52b53"
+      },
+      {
+        "path": "backend/tests/concurrency/test_cancel_approve_conflict.py",
+        "sha256": "01cc7a326000c7afc1774aa6b0f9f2aec453ac6929b5df7c829dd8795e2b2c5d"
+      },
+      {
+        "path": "backend/tests/concurrency/test_consume_warehouse_concurrent.py",
+        "sha256": "03a2c5e24d09476f75e15acee43fcd5a75b0b6a9bd002fb48fde6f02185a3f41"
+      },
+      {
+        "path": "backend/tests/concurrency/test_defective_concurrent.py",
+        "sha256": "88cd5f7fcde7c3fa092c17fadaa6c9760132d89251e5777550894b1ef427694b"
+      },
+      {
+        "path": "backend/tests/concurrency/test_dept_adjustment_concurrent.py",
+        "sha256": "32af8050f5db9b1de9c6eb130486765118a58158316b81fbd547141dadc04111"
+      },
+      {
+        "path": "backend/tests/concurrency/test_display_group_snapshot_postgres.py",
+        "sha256": "ff579370f112bc0557f5d19a97e616802aaacdf5377d339bddfef214a33cc06b"
+      },
+      {
+        "path": "backend/tests/concurrency/test_internal_use_batch_decision_concurrent.py",
+        "sha256": "c37200ee593654e79c0cabdd45f38445c2ef5cc6c03990d221daccd9a5f3ddd7"
+      },
+      {
+        "path": "backend/tests/concurrency/test_inventory_invariant.py",
+        "sha256": "8692db38712237794f5708ea62793e43647a0ffa49b58a20320fa9e42442958c"
+      },
+      {
+        "path": "backend/tests/concurrency/test_inventory_operation_cancel_concurrent.py",
+        "sha256": "659444fb2114b4c0b62ff6cc3d2394913a18651842092ce373ff10ca1d9b9de9"
+      },
+      {
+        "path": "backend/tests/concurrency/test_io_draft_submit_concurrent.py",
+        "sha256": "7e835609b220e0b6bcbe5e8f358ecbe489cf2fb0725c9ec9aeb5fd308eb3bb0c"
+      },
+      {
+        "path": "backend/tests/concurrency/test_production_receipt_concurrent_same_item.py",
+        "sha256": "b818ed8a2d4f176ffbe513afbed28265ad9a937abdf97580c2bb59b76afa38a1"
+      },
+      {
+        "path": "backend/tests/concurrency/test_request_code_unique.py",
+        "sha256": "922faa065cfefdb5edbd8ae10ce30b38fc7f398da4c98ae509b796542b6a461b"
+      },
+      {
+        "path": "backend/tests/concurrency/test_request_order_stock_postgres.py",
+        "sha256": "186261c308f64ebc57cec4325a2062458ded4f3764bdcf5a1ef5848a39633b12"
+      },
+      {
+        "path": "backend/tests/concurrency/test_reserve_concurrent.py",
+        "sha256": "f3f7de7fa39fafd58975d61d5097845ff7e964e72b2440289da3a072386db807"
+      },
+      {
+        "path": "backend/tests/concurrency/test_return_to_supplier_concurrent.py",
+        "sha256": "08bb9544c923fb50eddc2d0022fa8d6f4878123d9a33174a8c9181659dff9686"
+      },
+      {
+        "path": "backend/tests/concurrency/test_shipping_cancel_retry_concurrent.py",
+        "sha256": "bbd458ecc9479f670e0cb2e5fd7b78143fdcb84d636542c68bd2eb87bd11ff6a"
+      },
+      {
+        "path": "backend/tests/concurrency/test_sqlite_lock_timeout.py",
+        "sha256": "597c419008ddd3d651a126ad349a33b2b2293161efad66cb7e20c367a87e0ba1"
+      },
+      {
+        "path": "backend/tests/concurrency/test_stock_request_location_reservation.py",
+        "sha256": "528df622df3fc87a7b68ba2eef3118a3aef56d66528ef965faaff136521d2012"
+      },
+      {
+        "path": "backend/tests/concurrency/test_submit_concurrent.py",
+        "sha256": "b66485d621af9ec4bd0e20106c7937b430d753a8a0527589d4ff0c6381f4b524"
+      },
+      {
+        "path": "backend/tests/concurrency/test_transaction_cancel_concurrent.py",
+        "sha256": "3597c15df048b322bd1b6a37fa632ff72eb5c5776c06836c22e5ec05500409cc"
+      },
+      {
+        "path": "backend/tests/concurrency/test_transfer_concurrent.py",
+        "sha256": "3528d8e081a99f0996bd016d043962fc61b6bb36202a2a903ef90759f74404e2"
+      },
+      {
+        "path": "backend/tests/concurrency/test_transfer_concurrent_atomic.py",
+        "sha256": "7b7a807a634cbd2eb30a08333293f0c082fb8ff55c37ef12937a57160b9ccc81"
+      },
+      {
+        "path": "backend/tests/conftest.py",
+        "sha256": "7aff042a6d0d3401a70b6a605ec387ff09da158a6ac17b679ede6327079980fb"
+      },
+      {
+        "path": "backend/tests/dependencies/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "backend/tests/dependencies/test_admin.py",
+        "sha256": "3debd4cbf1e73729ae192757faf1ebaf82f9f63bd4ef82a842548a34dc580cec"
+      },
+      {
+        "path": "backend/tests/migrations/conftest.py",
+        "sha256": "cc66a4e630680cc8d2f48aa09a47690eb34d66256999bdaf8bda1d4101576412"
+      },
+      {
+        "path": "backend/tests/migrations/test_activity_audit.py",
+        "sha256": "66a55b6929252a727da2d9b59ff3b4064bc8282729cecd306029faadb775a29e"
+      },
+      {
+        "path": "backend/tests/migrations/test_af_sales_review_backfill.py",
+        "sha256": "c8b242d427a75e5b59e972a1e4ac8212f263f4fedc29f85395a6effa5d440b54"
+      },
+      {
+        "path": "backend/tests/migrations/test_alembic_foundation.py",
+        "sha256": "84d48dccaf7318303655f1998a3f423a35a1c64c94ff7bc3d8d84835d78016d0"
+      },
+      {
+        "path": "backend/tests/migrations/test_as_research_approval.py",
+        "sha256": "405f4fc40b171f31ec9dddae8e433136233389814d0c7538f1fdca36063ab0e0"
+      },
+      {
+        "path": "backend/tests/migrations/test_assembly_checklist_employee_sync.py",
+        "sha256": "5e760285968ac0573df62b92ef8b8f2437babd8bb3ccf4f62fe72177a913d4f7"
+      },
+      {
+        "path": "backend/tests/migrations/test_bom_stock_exempt.py",
+        "sha256": "463f56ce3a798dc69ddbf8c849e1abad537c62e9e2ed647d5fdd4ff84bfbecb8"
+      },
+      {
+        "path": "backend/tests/migrations/test_bom_unmatched_status.py",
+        "sha256": "b1b349f251b9ec44837f9d8a0b1857d5985800377d44f7b1ffb8a449ce4591e7"
+      },
+      {
+        "path": "backend/tests/migrations/test_bootstrap_alembic_cli.py",
+        "sha256": "7a65dd493b5df23c5febbbdb3a3536442f75f31e3da50677c8b5fd31a2fc413c"
+      },
+      {
+        "path": "backend/tests/migrations/test_bootstrap_read_only_check.py",
+        "sha256": "be8d36abaaca39614d88b546d3285a45742ca70ca63b0033c12bdbd86fe52c10"
+      },
+      {
+        "path": "backend/tests/migrations/test_closure_postgresql_preservation.py",
+        "sha256": "26be510615c993c46a1979c57891151cafb141dc86cf5809a4bd3b017950fa5b"
+      },
+      {
+        "path": "backend/tests/migrations/test_closure_supplier_merge.py",
+        "sha256": "72c4a13e84d2c8bd4e5f1f243daa8c1a2134baed8ff1687f03ca7ac3de067a5b"
+      },
+      {
+        "path": "backend/tests/migrations/test_daily_work_reports.py",
+        "sha256": "c654aaaa33e54244136cc2e266e3b9934dd3f5cdc16891f8507f99f63a58baf3"
+      },
+      {
+        "path": "backend/tests/migrations/test_data_revision.py",
+        "sha256": "5980bbe5b7978b6dab3f7855e9d26064eaeda77f80190fe3a8910588fe8302a9"
+      },
+      {
+        "path": "backend/tests/migrations/test_defect_management_category.py",
+        "sha256": "239a22cbaba7b9ace0c1e2a34d35247769281209c6f30143e27dd65400dfd087"
+      },
+      {
+        "path": "backend/tests/migrations/test_defect_movement_baselines.py",
+        "sha256": "60faab4c5983e6e02153a00724a7280d32d61b42d2f88312d67d6c471b936024"
+      },
+      {
+        "path": "backend/tests/migrations/test_defect_quarantine_records.py",
+        "sha256": "58b0d9a1c09aef246acd8312fcf166c0c41cc57fe475ac208ccb907d00dbe627"
+      },
+      {
+        "path": "backend/tests/migrations/test_defect_return_suppliers.py",
+        "sha256": "2f12e86355a685cdfe1086c1a369a67be9204544c4e6c12a4110be2d78bc0d17"
+      },
+      {
+        "path": "backend/tests/migrations/test_department_display_name.py",
+        "sha256": "4a06bf54214df79dae97e39bec2a98c725701c46e112213effa29b7e713815b2"
+      },
+      {
+        "path": "backend/tests/migrations/test_employee_sidebar_mode.py",
+        "sha256": "3a21a3d165c63dc146c91213fcd09ee17c9238e44643008eec494210b2b79bd1"
+      },
+      {
+        "path": "backend/tests/migrations/test_history_submissions_defect_reasons.py",
+        "sha256": "95c4eac97dd64eb98f72ac34eb80e3dd35c11ac70a7630b92e17d202346d3ad8"
+      },
+      {
+        "path": "backend/tests/migrations/test_internal_use_bom_mode.py",
+        "sha256": "c2268e34b442a9a820bd1258b7294f7091d7a00a178739187e5c2711c2b63b1e"
+      },
+      {
+        "path": "backend/tests/migrations/test_inventory_operations.py",
+        "sha256": "db2c491762bedfaf9b0429ea5e169c5cf838ee8bc96ee35393703742f0fd6f25"
+      },
+      {
+        "path": "backend/tests/migrations/test_item_procurement_fields.py",
+        "sha256": "485779b03b4dfa626fa9c4ba8cc55609a4f2862ccfcf3f66adb6412fe6ad6cfa"
+      },
+      {
+        "path": "backend/tests/migrations/test_legacy_profiles.py",
+        "sha256": "de96485c07085d033fac96d304b6bcf67f6d31f0fb9497176793cdc9fb49b0c3"
+      },
+      {
+        "path": "backend/tests/migrations/test_postgresql_schema_equivalence.py",
+        "sha256": "baaddcc48b6a1d325f3e17154684ae3a63e853a2eb7b3f37435314f85e8a4961"
+      },
+      {
+        "path": "backend/tests/migrations/test_reconstruct_legacy_defect_records.py",
+        "sha256": "90f497ebdda5367de6f5722f22d27c6bf87f8f04f4b63a776065852330fe8770"
+      },
+      {
+        "path": "backend/tests/migrations/test_remove_employee_level.py",
+        "sha256": "a1b96b0f521858a35d3769d52aa6310a9c8248986f60c0d5da9ad55753a4deaf"
+      },
+      {
+        "path": "backend/tests/migrations/test_remove_shipping_requested_status.py",
+        "sha256": "de3bfd13d575bb8e44addb85a1a816e19b1eaf5cef4940875c3bcf3b64e8158e"
+      },
+      {
+        "path": "backend/tests/migrations/test_schema_state_machine.py",
+        "sha256": "694c9b1b4ee025204e37dd28ff6445d3b60268c8d796869f67cf5b73ff15d0bf"
+      },
+      {
+        "path": "backend/tests/migrations/test_shipping_prepared_actor.py",
+        "sha256": "3eda1f142f95d5351fdbe07eb9c4cd8a2f4ee771513f3f5a603cc045055dbf56"
+      },
+      {
+        "path": "backend/tests/migrations/test_shipping_prepared_actor_repair.py",
+        "sha256": "af5dbc3e66db92e5daca71d719e55ced56ed8e373fd205ad7a13e10dd5dc46ff"
+      },
+      {
+        "path": "backend/tests/migrations/test_shipping_submission_hash.py",
+        "sha256": "6b25989331c41caf4dd13beedb90688a1ab22de52961d61eebe69a081b3d07a6"
+      },
+      {
+        "path": "backend/tests/migrations/test_supplier_scopes.py",
+        "sha256": "ba565f01046024a58fb729a14a62b915c01dd8e0f3944daecb555636df7b214f"
+      },
+      {
+        "path": "backend/tests/migrations/test_suppliers.py",
+        "sha256": "24e5cf87f4594ad08f955cd10f91028a4b8038da126f5df9122a99ccf4d48cfc"
+      },
+      {
+        "path": "backend/tests/migrations/test_transaction_department_backfill.py",
+        "sha256": "35c45db59ef04b593950ccc1745541f117e5da357afe70a05018e75bf8b60997"
+      },
+      {
+        "path": "backend/tests/migrations/test_transaction_item_snapshot.py",
+        "sha256": "b18fcece1df5d9210653d49ab1e3dd30d56a45f5730f343135cb7873edc60805"
+      },
+      {
+        "path": "backend/tests/migrations/test_transaction_operation_line_link.py",
+        "sha256": "ee3c7886519c75081883b97af81d0b8406d64d54fc9a0964d0ed163b147695ed"
+      },
+      {
+        "path": "backend/tests/migrations/test_transaction_stock_snapshots.py",
+        "sha256": "95beae5eefbf656b51c0b2a65b64783868897243b274e37e04960511317e9c79"
+      },
+      {
+        "path": "backend/tests/migrations/test_weekly_inventory_snapshots.py",
+        "sha256": "3389826f764d29a33db0c966ca78ca65edfdb79b2ec5b03369a40a3de3a0c888"
+      },
+      {
+        "path": "backend/tests/ops/recovery_rehearsal.py",
+        "sha256": "bcd6ae85e2ab3b813850fc1f126d267fc42db1f15e47e19a7e29b1f63f2cbcf0"
+      },
+      {
+        "path": "backend/tests/ops/test_backup_manifest_contract.py",
+        "sha256": "ad4fcc54b3d34c24eb846b458b3906258559ce908ced57d7a13ca6ed1708ac6a"
+      },
+      {
+        "path": "backend/tests/ops/test_backup_manifest_postgres.py",
+        "sha256": "39d9eb4ff6c2e2c66429cb7dc4956971464ba24603efc989aea4f81ae5d3f339"
+      },
+      {
+        "path": "backend/tests/ops/test_backup_to_nas.py",
+        "sha256": "349c8ea6420921386ff1e33811b6b343c89c39ef9e406c230e6ac5108351b9b9"
+      },
+      {
+        "path": "backend/tests/ops/test_benchmark_mes_reads.py",
+        "sha256": "51cfe1bff2f3f9d04c2e018d523a753f835c40d74ad73cf20528c363f9d1503d"
+      },
+      {
+        "path": "backend/tests/ops/test_development_schema_prepare.py",
+        "sha256": "f9c5d8ce7fea628d2c0b6ae0696317a24b1d398d7c6c9bba0c2f823e2b11b401"
+      },
+      {
+        "path": "backend/tests/ops/test_development_sync_failure_guards.py",
+        "sha256": "a220498b8a03eece693cde2606da22c7ffea04fc818b607916aac4f09a4bd985"
+      },
+      {
+        "path": "backend/tests/ops/test_employee_code_release.py",
+        "sha256": "ef752c5d7051f7cb3b6f79fdf40e80615eb73cf0978c8526ae19630841cad11d"
+      },
+      {
+        "path": "backend/tests/ops/test_employee_code_release_long_paths.py",
+        "sha256": "62d447ab56ca83c0b893ab3492ca7c0bb3c49f28fdd8332840eb80efba71fa9e"
+      },
+      {
+        "path": "backend/tests/ops/test_employee_frontend_release.py",
+        "sha256": "151be4ac8c7c311cf4af684e16d538e6fe50f9874cbb658913bd697d6bd98062"
+      },
+      {
+        "path": "backend/tests/ops/test_employee_frontend_release_long_paths.py",
+        "sha256": "50c63cfe299ad25529de4576e8152fe5b00d98e26d0fce5c372961ab6786d7cc"
+      },
+      {
+        "path": "backend/tests/ops/test_employee_release_activation.py",
+        "sha256": "15bac06937f5f767a98ae63f09ba896eef91d9e479ac753d61ad14f4811ee430"
+      },
+      {
+        "path": "backend/tests/ops/test_employee_release_recovery.py",
+        "sha256": "d90f77c13d2e7e00d9e937d942e1edc8fe4895eb1cc2ae501a6a874437ce4406"
+      },
+      {
+        "path": "backend/tests/ops/test_employee_schema_preflight.py",
+        "sha256": "047c666d1a48622697678e28f49dddde4d980947f098be090d431ee0ed244c13"
+      },
+      {
+        "path": "backend/tests/ops/test_employee_sync_safety.py",
+        "sha256": "1bac2f0331308a6facd0995bf73492517415715a25d213de40d334b9ebe558aa"
+      },
+      {
+        "path": "backend/tests/ops/test_finalize_inventory_master.py",
+        "sha256": "0a0dcd0730a35970cc2f64b08bb3e153f1a4869ae6c5d992be9bde4799fff21c"
+      },
+      {
+        "path": "backend/tests/ops/test_friday_profile_cutover.py",
+        "sha256": "ce40c189dc9f25301636468ffe9d37a4c5a74bcbbb47b2054ef7dc954627f170"
+      },
+      {
+        "path": "backend/tests/ops/test_friday_profile_cutover_long_paths.py",
+        "sha256": "0026b2c1515a4592274a15905dd6dd82599be9332649416d5b0193538afe3dfc"
+      },
+      {
+        "path": "backend/tests/ops/test_frontend_node_runtime.py",
+        "sha256": "7c37f1c1712f97e6865b3a2f48bc35656b1aa2756ade72b7015e38e8b000bd44"
+      },
+      {
+        "path": "backend/tests/ops/test_inventory_cutover.py",
+        "sha256": "5a6926f3a252370e3db33f51960c6c729372b399b1b14a7fbd271253b0da3129"
+      },
+      {
+        "path": "backend/tests/ops/test_inventory_cutover_postgres_locking.py",
+        "sha256": "6ef70c5107a7038ea12546ff58db7de447c3c55a3e53438a972a59247f28e66b"
+      },
+      {
+        "path": "backend/tests/ops/test_inventory_integrity_cli.py",
+        "sha256": "1140737dcce8815e1872ad9cb999b4a7f1d07c0b0a6634d1d5112b7cab7a6a0f"
+      },
+      {
+        "path": "backend/tests/ops/test_inventory_integrity_postgres.py",
+        "sha256": "cb8d41ef0e1aacd9e85da8336cfaa880608bb7e7fb27424394fa1b6817c4cf73"
+      },
+      {
+        "path": "backend/tests/ops/test_inventory_operation_admin.py",
+        "sha256": "30ea7132de972f33e7185f5a8d413c614435c813be087a0112d3bd4b3ef34294"
+      },
+      {
+        "path": "backend/tests/ops/test_inventory_operation_admin_real_backup.py",
+        "sha256": "aabc77c2749c96551fdb3d403094061063f3518c8e54dd8dd5f1f3fbf3ef8a28"
+      },
+      {
+        "path": "backend/tests/ops/test_item_display_order_backup.py",
+        "sha256": "f45cd1a39b239bbb3624344005504434835471bf3a7ab13d9d77182bd6b607be"
+      },
+      {
+        "path": "backend/tests/ops/test_operational_readiness.py",
+        "sha256": "19e89d80fb99361685eaa274b554096934c08c5841f8423297600c2e3191a950"
+      },
+      {
+        "path": "backend/tests/ops/test_ops_backup_integrity.py",
+        "sha256": "84ee4aa3a21632075d65da052a926e89490d032a78330d67471a212fd69ff3d7"
+      },
+      {
+        "path": "backend/tests/ops/test_profile_warehouse_r1.py",
+        "sha256": "14724613ff133ba71a7c3a4611ccf23842a42ea7d2d2ceac44eb65dc67abc3e0"
+      },
+      {
+        "path": "backend/tests/ops/test_recovery_rehearsal_lifecycle.py",
+        "sha256": "ba2b84e35405b8c6ec52583f8326875c1d65d7608692fc4c02cede9def77401f"
+      },
+      {
+        "path": "backend/tests/ops/test_repair_shipping_pickup_actor_attribution.py",
+        "sha256": "81572c5841a2030398a4db81a813f2bd22813b863107880a6a1b88c2f4489a51"
+      },
+      {
+        "path": "backend/tests/ops/test_runtime_backup_consumers.py",
+        "sha256": "717587ff3baae67693ddfd4719bf4df33cff8843a21f5752e5b475eb67ee0d36"
+      },
+      {
+        "path": "backend/tests/ops/test_runtime_paths.py",
+        "sha256": "517dddd0ad1e71d90fac4929e6fd4397ffd9aafa9de634df57c38e35d3b522ba"
+      },
+      {
+        "path": "backend/tests/ops/test_runtime_task_control.py",
+        "sha256": "cb785da3fcaec3fc99f0f24aa539c04fdbdb71f14a83c8b7b86082b6cd8b2af9"
+      },
+      {
+        "path": "backend/tests/ops/test_scheduled_employee_sync.py",
+        "sha256": "4bb2854aa9bfa784b51c1ca76981482f8629e129a71a7c5f21e2f3ef307dd747"
+      },
+      {
+        "path": "backend/tests/ops/test_schema_readiness_adapter.py",
+        "sha256": "2fd7d3a83a1f343e509a9c20587699dfaf228a2fe271e69f81d7009d859ab48c"
+      },
+      {
+        "path": "backend/tests/ops/test_setup_node20_contract.py",
+        "sha256": "29cfccfd2e31ba5117fa20bb24390913eb7a29d4a811f55eac7029242a8ea504"
+      },
+      {
+        "path": "backend/tests/ops/test_sync_department_inventory.py",
+        "sha256": "b4600a5a515e3e359a592d607dcbb327c50476802c4fa6d2cbd2fcf6c8b75bca"
+      },
+      {
+        "path": "backend/tests/ops/test_sync_warehouse_inventory.py",
+        "sha256": "274e77221a9b45cf072102730bb79a92b065e50727e5e4f7e0ee24376d51ffa2"
+      },
+      {
+        "path": "backend/tests/ops/test_verification_policy.py",
+        "sha256": "1f9f560a5e4bfeff7af3becccd7d5ece43ea363f6f6a68e4a94066faf1398f7d"
+      },
+      {
+        "path": "backend/tests/ops/test_verify_e2e_runtime.py",
+        "sha256": "60fe002bad0e5f8930f318daefdd12435b6b83759f580271d4e04aea311639b3"
+      },
+      {
+        "path": "backend/tests/ops/test_verify_inventory_snapshot.py",
+        "sha256": "304104b29ec2e79f44cdc480e355435d46436237e8868fb05294f2dfe628d9d5"
+      },
+      {
+        "path": "backend/tests/ops/test_verify_local_parallel_contract.py",
+        "sha256": "dde1992d17b67e4a71d4f3fa6a84092a07fb21e1438524f404e4ed0da8027c58"
+      },
+      {
+        "path": "backend/tests/ops/test_verify_local_runtime.py",
+        "sha256": "c639c25339fc09fa3ca57bde4a782bddb36ede587a4f2be489be2e99a033d5e9"
+      },
+      {
+        "path": "backend/tests/routers/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "backend/tests/routers/test_admin_audit.py",
+        "sha256": "8ce726b7bbfa098e157017b3fa152e0667d2d91eb301efa6d119e4710f2c3921"
+      },
+      {
+        "path": "backend/tests/routers/test_admin_audit_csv.py",
+        "sha256": "ba4f494bbc418977543df8aca03fc815db3950f72a38e2dc30d11736900fd05a"
+      },
+      {
+        "path": "backend/tests/routers/test_admin_audit_ledger.py",
+        "sha256": "9db5147d4b5efec57e9b2f1151c451e13e5ff65b94422a5804c63e5b7912eb76"
+      },
+      {
+        "path": "backend/tests/routers/test_admin_export_expectations.py",
+        "sha256": "2ce839d8e2e537880dc19ab68cd16c62a6aa9406973d801f1b93eb595ad862e5"
+      },
+      {
+        "path": "backend/tests/routers/test_admin_inventory_integrity.py",
+        "sha256": "72bdb5528c4562f151720dc03b6be2bce381dce53e70b47dc531fe7e68cf346b"
+      },
+      {
+        "path": "backend/tests/routers/test_admin_pin_guards.py",
+        "sha256": "8e041f84246e41d959d88de51e6b4da69e3c7338e2f0c7db5419125b9870b0e2"
+      },
+      {
+        "path": "backend/tests/routers/test_admin_production_log.py",
+        "sha256": "b299b3d177bb6e17a7f10b48446ac705069189b59927ee5fa292aadedfd7718a"
+      },
+      {
+        "path": "backend/tests/routers/test_assembly_checklists.py",
+        "sha256": "2ff3afb32844f4ae9137060ac4eef863b7717d95252b08124e95e0718d77c4da"
+      },
+      {
+        "path": "backend/tests/routers/test_bom_expectation_closure.py",
+        "sha256": "4946f10ae683b1dd4c73f1d67b5d2afb8fb5bba6f74939f1900f98df111c18da"
+      },
+      {
+        "path": "backend/tests/routers/test_bom_smoke.py",
+        "sha256": "303c3c8b095bde39d15395165c0858bf97774b1a6e928e321c6524dc4546d87c"
+      },
+      {
+        "path": "backend/tests/routers/test_capacity.py",
+        "sha256": "ecdb054ca1a699a899d4f0b6f764b3c3bb814d6d8b77fac1262fc9974dbbe5fa"
+      },
+      {
+        "path": "backend/tests/routers/test_capacity_pins.py",
+        "sha256": "60aa7be6d6bd87c118a1833c626319ca319e60f0c3f87ad61f0270cb2543fb61"
+      },
+      {
+        "path": "backend/tests/routers/test_daily_work_activity_batch_details.py",
+        "sha256": "d286627830cc307108d53220000a2176fba61081784de90dc34f1ed2604ca015"
+      },
+      {
+        "path": "backend/tests/routers/test_daily_work_activity_performance.py",
+        "sha256": "794e22d40daecc980bef404e431378a0555fda2ee39de43fcee09aec4d934746"
+      },
+      {
+        "path": "backend/tests/routers/test_daily_work_reports.py",
+        "sha256": "6d51051305cf995b2d920b78a482bee23b5148117e39284f8bdb4aa433550c45"
+      },
+      {
+        "path": "backend/tests/routers/test_defect_statistics_route.py",
+        "sha256": "b22c879561b7fc38a8445bb0925ac02b229977a66dbe94d428e352f5a4dc37aa"
+      },
+      {
+        "path": "backend/tests/routers/test_department_io_enabled.py",
+        "sha256": "2fd93022fcfd9bf9ecaafb7ff9c4d74045ff511fbf2b56f890383f7f675592e2"
+      },
+      {
+        "path": "backend/tests/routers/test_dept_adjustment.py",
+        "sha256": "2d9e9c85bfcf3a4db65b9ef1bb10a7b309b900299a113d0dec57f2ea70291ad6"
+      },
+      {
+        "path": "backend/tests/routers/test_employee_appearance.py",
+        "sha256": "1d01d8fa9d41578efd6dd2889f04084abed9fd94f3d3ea422ee101d158a42010"
+      },
+      {
+        "path": "backend/tests/routers/test_employee_io_enabled.py",
+        "sha256": "f9ae635bf58ba637bd0dd44446be1e7ac67c26ff35f25a1ce276bb6de2da6d83"
+      },
+      {
+        "path": "backend/tests/routers/test_employee_menu_policy.py",
+        "sha256": "3293dde5a9eee2866e3da1dcc89deb2cdeb1db876c7c4d16b801f2f86670d71c"
+      },
+      {
+        "path": "backend/tests/routers/test_employee_pin.py",
+        "sha256": "9f90b79dee7cfbcdc385bc52d73500bf2d72dfa661bcd5886a52c10c23c20e93"
+      },
+      {
+        "path": "backend/tests/routers/test_employee_sidebar_mode.py",
+        "sha256": "005338ad3e22402567b86b92d18c18a6744100a0e5f429858bc8f56ab734585f"
+      },
+      {
+        "path": "backend/tests/routers/test_health_smoke.py",
+        "sha256": "08384da9b38276fae4b1e62e6b762eddbe155a1238d4086ec46ca79f850c64de"
+      },
+      {
+        "path": "backend/tests/routers/test_history_cancellation_policy.py",
+        "sha256": "e35eca0766d10c33ae8d21dff2b1e3d1da9774111375192c649b5199dad2495d"
+      },
+      {
+        "path": "backend/tests/routers/test_history_date_boundaries.py",
+        "sha256": "0ac65f2718feea48550cce98a2668970cff0fd1727df9722eaa0b9c78c2565c3"
+      },
+      {
+        "path": "backend/tests/routers/test_history_expectation_closure.py",
+        "sha256": "b1ec7bf031c69ab6b35ceed5d46bb7b071bed5297aef1bc0c9055441113ac407"
+      },
+      {
+        "path": "backend/tests/routers/test_history_search_performance.py",
+        "sha256": "4ae5fe3b356f821211fae3d66c73fed187b21937c6bf1126e21cc0fbf4f13159"
+      },
+      {
+        "path": "backend/tests/routers/test_inventory_operational_scenarios.py",
+        "sha256": "750d0f57bd39a7205aec3e28e1143ae4a995832bc77cfe04344d535db65acf7e"
+      },
+      {
+        "path": "backend/tests/routers/test_inventory_operations.py",
+        "sha256": "9b32233628f65b1c0c91975473a5da78f5683afb09acf63ad0e5189af4b1cc6a"
+      },
+      {
+        "path": "backend/tests/routers/test_inventory_smoke.py",
+        "sha256": "2180496c02c2ec7d13bf92cc850ec4b9c56f1d4f989d5291b67be370d31d01af"
+      },
+      {
+        "path": "backend/tests/routers/test_io_approval_preview.py",
+        "sha256": "249ee7d3b3bfaa1103ca72f9c30c2d7c9212da7ee4ab5c492682eb2d36ff5032"
+      },
+      {
+        "path": "backend/tests/routers/test_item_code_preview.py",
+        "sha256": "3f0fc414feb1586dfb3e913802df715da931168e7c8bf96158532e928b95e71d"
+      },
+      {
+        "path": "backend/tests/routers/test_item_history_identity.py",
+        "sha256": "03bb5a57baf2721a8beab25306f03ddb5aef9b7b9964fdd8fbee5f999a28dd60"
+      },
+      {
+        "path": "backend/tests/routers/test_items_create.py",
+        "sha256": "6d83abbc20371b81e2c563f05711c86efe10d7c741f0d48802ffb54ef240fdb7"
+      },
+      {
+        "path": "backend/tests/routers/test_items_defective_breakdown.py",
+        "sha256": "26b2dcae2f45cf05881b6153b915d3d5edde89098b75b9376a32470262e5b56b"
+      },
+      {
+        "path": "backend/tests/routers/test_items_reorder.py",
+        "sha256": "eab7f39bf44126f0fbc36f0a966b947e2dc53c7c99a404fc0a4508e891d23900"
+      },
+      {
+        "path": "backend/tests/routers/test_items_update.py",
+        "sha256": "a97f81e7a9195b7feb5b9202c8103c9c05262610dfc344ab30eaf40ddbeed6a9"
+      },
+      {
+        "path": "backend/tests/routers/test_legacy_readiness.py",
+        "sha256": "df4175e8abcf55b8337f40bbb2f572c4420a035f548b8c3be68d61470dcf11ba"
+      },
+      {
+        "path": "backend/tests/routers/test_models.py",
+        "sha256": "1344e4a2071944fe0741c04ce2310678524e0817f8230934caeaaf86c62fb236"
+      },
+      {
+        "path": "backend/tests/routers/test_openapi_contract.py",
+        "sha256": "4e16328813a0bdedbe56792eec14630a4c1b418c03bb1296e83c2b43db9d6277"
+      },
+      {
+        "path": "backend/tests/routers/test_pin_hardening.py",
+        "sha256": "8a308a0fa8f88322801a1ded6b9f34de34eac8ca951a1d8f37d447ac71bbd7d4"
+      },
+      {
+        "path": "backend/tests/routers/test_production.py",
+        "sha256": "3187db91ea9a3a563cdb0a7d1e9b90223c2b2a783c5b528bdf1e8b9d3ef4a112"
+      },
+      {
+        "path": "backend/tests/routers/test_realtime.py",
+        "sha256": "d4a6aa55df4613809ef4e9c20ba973f24bd52f8e5c0c5b0a24d40450d7d1d4d7"
+      },
+      {
+        "path": "backend/tests/routers/test_reason_categories.py",
+        "sha256": "fc685a144e6148e9c8a69342be8db743b62773ed4e0075bdcd39aeec46071c73"
+      },
+      {
+        "path": "backend/tests/routers/test_request_order_stock.py",
+        "sha256": "e33fa0ee7d4ef33c9ba0e564f642680f5b68daa4995b1b2f6dc431b507f35f26"
+      },
+      {
+        "path": "backend/tests/routers/test_settings_integrity.py",
+        "sha256": "a02985070c94357c647330335a246622ac11be6c17b5ba582aa572df0070b1a1"
+      },
+      {
+        "path": "backend/tests/routers/test_shipping.py",
+        "sha256": "5cc9788badf259b9d5ea1e81b9498f98a3439e2a318860dd0d73a59d354c4464"
+      },
+      {
+        "path": "backend/tests/routers/test_shipping_bom_snapshot.py",
+        "sha256": "00edb3bf801c24404132d2ba9b463195b00aa07f21ab9f75b87363444f86ab45"
+      },
+      {
+        "path": "backend/tests/routers/test_shipping_weekly_atoms.py",
+        "sha256": "0da6aa1be3f1037a62594fb54ccaa9c50aa17120011958d37fb34da5ac3fcad7"
+      },
+      {
+        "path": "backend/tests/routers/test_suppliers.py",
+        "sha256": "17e2cb5e852eb2d53355bf4c8ef56f3d933d708e2d774ca026339f539664762c"
+      },
+      {
+        "path": "backend/tests/routers/test_transaction_display_groups.py",
+        "sha256": "4fb3cc7ed52041e153156c4c89372e3549a917586cabfc2f86fa5a55026ef03c"
+      },
+      {
+        "path": "backend/tests/routers/test_transaction_display_groups_kind_evaluation.py",
+        "sha256": "764d7ae3f36b33da65f1623618573fcef161fcf40cb9ba368a1324519db800a0"
+      },
+      {
+        "path": "backend/tests/routers/test_transaction_display_groups_performance.py",
+        "sha256": "e5bc09e5a86b841e325fd2594c5767c48f4c6b992fffc91d7a5040b2d6eb990c"
+      },
+      {
+        "path": "backend/tests/routers/test_transaction_edit.py",
+        "sha256": "96e0c6c6fe170c180a4ee14ea92645e8314c7558291e026a0cda67b7cf650e12"
+      },
+      {
+        "path": "backend/tests/routers/test_transactions_batch_filter.py",
+        "sha256": "53c104e48450f762eaef4de8f800fbcbf5526634057385fc573e03155e2640c1"
+      },
+      {
+        "path": "backend/tests/routers/test_transactions_monthly_counts.py",
+        "sha256": "e3cb4855ddf362c41f7188acefa5192eee6b0a558657bac80c987ce9e1149e0f"
+      },
+      {
+        "path": "backend/tests/routers/test_transactions_operational_audit.py",
+        "sha256": "1d2d6aaa58a2536caf6b60889d5f9e6ddf68fe1d14eec1b487715235c2691fa2"
+      },
+      {
+        "path": "backend/tests/routers/test_transactions_summary.py",
+        "sha256": "9f15e3a32af5dba3cab32b5e7ded24b3087b250d76307c019b41311c24fedd98"
+      },
+      {
+        "path": "backend/tests/routers/test_weekly_policy_closure.py",
+        "sha256": "a7ad299c4c3853552be1e789be859860ff81414ac6d4813baa65789db6a7981f"
+      },
+      {
+        "path": "backend/tests/routers/test_weekly_report.py",
+        "sha256": "16d7f303814621fcb56f3286881c9655c3d1f9ae57775a21553453e8950fba46"
+      },
+      {
+        "path": "backend/tests/scripts/test_apply_item_display_order.py",
+        "sha256": "60faae394c5a5785dbcf0c639d9b420f34e780d062ddeff44528b52fbf83bdc0"
+      },
+      {
+        "path": "backend/tests/scripts/test_backfill_weekly_high_voltage_tube_housing_snapshot.py",
+        "sha256": "6af3ca5aa82d90be70fac34dfe187af235cf100b2dac65efff2491eacc607e90"
+      },
+      {
+        "path": "backend/tests/scripts/test_backfill_weekly_vacuum_generator_snapshot.py",
+        "sha256": "a48f850f7cdad81c07f08c2c478f3b92f8f5d0d9eb4b21ecd8eabc121ec2d6d9"
+      },
+      {
+        "path": "backend/tests/scripts/test_bom_graph_data.py",
+        "sha256": "8aa804cdff37ccf60bb118a70d42df75297a2af97389defce75a07880818b60b"
+      },
+      {
+        "path": "backend/tests/scripts/test_capture_weekly_inventory_snapshot.py",
+        "sha256": "5df07b8f87c48d3ac13eac1ef6ac5d43eeaefa55a9ecb8d5eae229994e3838ae"
+      },
+      {
+        "path": "backend/tests/scripts/test_renumber_gap_item_codes.py",
+        "sha256": "afb85846ffc2fbdc873763ce971fdbe435133bd9a531a963ba4fd11d4ebeac29"
+      },
+      {
+        "path": "backend/tests/scripts/test_replenish_department_safety_stock.py",
+        "sha256": "2dc7ab6316e5543390abe5d19c81eeb185e306373b1546e9388a60988c536afd"
+      },
+      {
+        "path": "backend/tests/scripts/test_report_output_paths.py",
+        "sha256": "3f493ef670e5c7e6ebb5aae59661999ddb7c184b90c151348ba05c145e74a709"
+      },
+      {
+        "path": "backend/tests/services/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "backend/tests/services/test_audit_csv.py",
+        "sha256": "d86cdb4e23fe163f4aae320d6ad4e222f672ed768258c0aa23d743b48f36cc23"
+      },
+      {
+        "path": "backend/tests/services/test_bom.py",
+        "sha256": "e23b3fba937fc8198e77f0b2fa182297cca8439eaa07e13c76bb2075c7a2898b"
+      },
+      {
+        "path": "backend/tests/services/test_bom_stock_policy.py",
+        "sha256": "6e539e474200fbfc04571a3cc0e30c0d2ebe15166cc6b0d5f67f8811c2c07a43"
+      },
+      {
+        "path": "backend/tests/services/test_defect_actions.py",
+        "sha256": "60678f89ed9ffe7be05df8421ecd21a615838d0602a1c193d43258219c8b0f8e"
+      },
+      {
+        "path": "backend/tests/services/test_defect_lifecycle_search_window.py",
+        "sha256": "a5b4d19ace1a6efeaf636a7879033c643fab0789b58720f921be1d9d79fd8aab"
+      },
+      {
+        "path": "backend/tests/services/test_defect_statistics.py",
+        "sha256": "3e5433f406d9a35fa8503d320c178dc097cd0e1124e2d2a74d0528ddc68d7069"
+      },
+      {
+        "path": "backend/tests/services/test_dept_adjustment.py",
+        "sha256": "61c9f28b9e24cedd471b594b64fec15529faa597b47ab7fc325e912f6e1376ef"
+      },
+      {
+        "path": "backend/tests/services/test_f704_02_ledger.py",
+        "sha256": "f5e2d759d618f222c177a1e179e8d3398182e05c3c4d0eee019796ddaba90fc7"
+      },
+      {
+        "path": "backend/tests/services/test_f705_02_production_log.py",
+        "sha256": "c7c9b91d3237a55a472f6e2076e198d2701ba4d12aef9ba182b37ce29693267a"
+      },
+      {
+        "path": "backend/tests/services/test_handover_actions.py",
+        "sha256": "df4a2125c8bea707d6505112aa99818dcf8b27d6a8374e1f5a9c06d09522b5ea"
+      },
+      {
+        "path": "backend/tests/services/test_history_submission_groups.py",
+        "sha256": "2fd129391112af3ac3510bee0327e6ec7a3d505e9a775f73d986ee0e557fc5f2"
+      },
+      {
+        "path": "backend/tests/services/test_integrity.py",
+        "sha256": "5a65f0e4f58cd2d9a2d544837f2e6a58aa404123c2a386492c0219254b3a5cff"
+      },
+      {
+        "path": "backend/tests/services/test_inv_calc.py",
+        "sha256": "8b9c643ebd528426ba0e123f16381b0d5ffa5988db688dbb865b969f79ece964"
+      },
+      {
+        "path": "backend/tests/services/test_inv_defective.py",
+        "sha256": "9b261a6dd20803bdc64c5961ce612333048483512362ba46446aadd8a6475824"
+      },
+      {
+        "path": "backend/tests/services/test_inv_effect_stock_snapshot.py",
+        "sha256": "3b5893cdb322324ddf48a12990d7400b334fe8110f5d02608cb06383260d56c9"
+      },
+      {
+        "path": "backend/tests/services/test_inv_transfer.py",
+        "sha256": "576da21865ba2e268cf0170f67151208b278f552be55a7bb10b16057168a48ae"
+      },
+      {
+        "path": "backend/tests/services/test_inventory_effect_history.py",
+        "sha256": "3a0aaa57f4fe888d5e16b59de8caf92a7b0b768766ed899e6ee92253441ac5b3"
+      },
+      {
+        "path": "backend/tests/services/test_inventory_effect_history_performance.py",
+        "sha256": "7ec1133e87abac97d51f09089bafdfce0f27fb43b6a7cc79a1073a7551e0c17e"
+      },
+      {
+        "path": "backend/tests/services/test_inventory_integrity_friday_contract.py",
+        "sha256": "9257a5a84085df1dc5e6f4538e993c95cb118f66ce1ce1417d1a8d820a2ca32f"
+      },
+      {
+        "path": "backend/tests/services/test_inventory_integrity_performance.py",
+        "sha256": "e31d71f91b37fdcd2aa9a38103940994cf66e0f48854b69a9ea5b2d5d2c17982"
+      },
+      {
+        "path": "backend/tests/services/test_inventory_integrity_pk_lookup.py",
+        "sha256": "0d3d8a816a2cf5044dca1dbf94c85c8832a9fe789f7387ac02d38c87e8136e40"
+      },
+      {
+        "path": "backend/tests/services/test_inventory_integrity_repair.py",
+        "sha256": "e7f02ca906bcb0ea42f19f7f1601655aa198b9b6118667ebab6de2008e9c744d"
+      },
+      {
+        "path": "backend/tests/services/test_inventory_integrity_snapshot_width.py",
+        "sha256": "214e8efe3d97b6b8777291c421df1d3654d064bdab6323900f480f7ff9c0b00e"
+      },
+      {
+        "path": "backend/tests/services/test_inventory_operation_cancellation.py",
+        "sha256": "1ad351c7bbcb042d439eb2c4c8090fba500a46665a457ff4f2fe7a388f496859"
+      },
+      {
+        "path": "backend/tests/services/test_inventory_operations.py",
+        "sha256": "c86b3d7200009cb20136f462e3c563953a2e373dfb89b9bbe922210c449128c4"
+      },
+      {
+        "path": "backend/tests/services/test_io_actions.py",
+        "sha256": "9ee56d240c610c09c9116b2a1f92e2d746a34a3a8830c65316c5f34d59f38669"
+      },
+      {
+        "path": "backend/tests/services/test_io_dispatch.py",
+        "sha256": "3d51096b4707217a9cdaae3ab260b413e262dabaa53644d8753bce4613783eb5"
+      },
+      {
+        "path": "backend/tests/services/test_io_dispatch_custom_bom_routes.py",
+        "sha256": "1b461f4e0f29bc7e6d979432f1a5d42124aee0be90303e4014f4d3dc181deb1c"
+      },
+      {
+        "path": "backend/tests/services/test_io_workflow_integrity.py",
+        "sha256": "1d4e540adb438756c21307c783d46b5a16dfc6a501171483958e656121cd122d"
+      },
+      {
+        "path": "backend/tests/services/test_item_display_order.py",
+        "sha256": "aee86c07015346e338ca0a22d6cdf29f15a204a410005c284c75f760eb2e5ecb"
+      },
+      {
+        "path": "backend/tests/services/test_item_write_guards.py",
+        "sha256": "a507c3f167eeb060b21afdc760de77f5fc15a134fe1e5467194917896b5f4d4a"
+      },
+      {
+        "path": "backend/tests/services/test_legacy_pin_compat.py",
+        "sha256": "96fa0f377cab47cc53ffc4fa7e5c84534c4708320dd10075c92c61f2221c6245"
+      },
+      {
+        "path": "backend/tests/services/test_mes_code_partial_unique.py",
+        "sha256": "1fe8faf10673eca043a7ae4917aebaadc91a6f6800a6241e8dd06cd8fbb183b8"
+      },
+      {
+        "path": "backend/tests/services/test_pf_shipping_completion.py",
+        "sha256": "12a8033648e3525004b2e6a9e188f78634716d9be5d3b4c2509cef36c9b8fe79"
+      },
+      {
+        "path": "backend/tests/services/test_production_capacity.py",
+        "sha256": "44e01f1689ad0e7861b6825fcd752ec6ec2aefb2b88c2905884d26be84989c16"
+      },
+      {
+        "path": "backend/tests/services/test_production_receipt.py",
+        "sha256": "f941a89e8079c7ca8caeda68228a296e23d2c2eb7d31c095c8dcdb371b50be17"
+      },
+      {
+        "path": "backend/tests/services/test_realtime_revision.py",
+        "sha256": "1cd14704ad862349bb2ea6022c952db1d57388308af39c2c6c5942bb769f6f9b"
+      },
+      {
+        "path": "backend/tests/services/test_reason_name_storage.py",
+        "sha256": "37c0fdc6e8d6cca91706e10f863561a8c63c34c6476d80507f7aa188e2659331"
+      },
+      {
+        "path": "backend/tests/services/test_reason_selection.py",
+        "sha256": "1df8eb5cf7a026508bc80ac3e6041e2ae614d8a636564d771982e90fc9f99353"
+      },
+      {
+        "path": "backend/tests/services/test_reorder.py",
+        "sha256": "5b778f25abace3aa6da13105ef43ce08ee98ba34a1061e07ec57789efe1b7b95"
+      },
+      {
+        "path": "backend/tests/services/test_request_order_stock.py",
+        "sha256": "13101f0f93e113a24e6bd09052efbd9542174913564ec83973662646ebad0d84"
+      },
+      {
+        "path": "backend/tests/services/test_request_order_stock_lifecycle.py",
+        "sha256": "200d471d4c664566fd08f8da4890ccc2f02af05b41b65112b13930340e551345"
+      },
+      {
+        "path": "backend/tests/services/test_request_order_stock_performance.py",
+        "sha256": "df796f99ec2c62288e28fc5d99faa1582f1cad501c469066f73d8c8a881ccdbe"
+      },
+      {
+        "path": "backend/tests/services/test_shipping.py",
+        "sha256": "0dab2093a3fbd348f1786d43d1d6ac2f295610bfa1a6f6aaf8bdcdf03c4fa858"
+      },
+      {
+        "path": "backend/tests/services/test_shipping_actions.py",
+        "sha256": "7e8786a545fd0afe26666edad18ab872d369f58230590e3cc9520c2dd83122ae"
+      },
+      {
+        "path": "backend/tests/services/test_shipping_candidate_units.py",
+        "sha256": "c6899b6bdd1096ca0567c6022528cc391095c569c81e25705bb06c5301266422"
+      },
+      {
+        "path": "backend/tests/services/test_shipping_deleted_items.py",
+        "sha256": "63bc75bb9bd84ca141cbba87056b357815e874cee70be3b5825d99c4ebc59536"
+      },
+      {
+        "path": "backend/tests/services/test_shipping_expectation_atoms.py",
+        "sha256": "0da171fb48268ae483330b315b14ef07a3107932f4b6a2206957c6885767c805"
+      },
+      {
+        "path": "backend/tests/services/test_shipping_reservation_guard.py",
+        "sha256": "7856795ffc503ebadcf6473fe163d0bd413f4bc522429df15a0a82c9a12f6d6d"
+      },
+      {
+        "path": "backend/tests/services/test_shipping_submission_retry.py",
+        "sha256": "31c3166e787bc8f0342535b225be8eb7e1f283b30767f725f8c1f2082d27a5a1"
+      },
+      {
+        "path": "backend/tests/services/test_shipping_workflow_integrity.py",
+        "sha256": "99158ea43cbf1313ba07a9d4e241da8a9dcbd74cb641448c10b8de50991a1270"
+      },
+      {
+        "path": "backend/tests/services/test_sr_approval.py",
+        "sha256": "1d94fc1a84aa9da7d1bcac063a194b92091cf45e7839a87ee18fa7c49ccf10cd"
+      },
+      {
+        "path": "backend/tests/services/test_sr_execution.py",
+        "sha256": "b4d89de563768a21e9a9c0aab141005a0c0f33bd3c190596192647ed87b69ec4"
+      },
+      {
+        "path": "backend/tests/services/test_sr_reservation.py",
+        "sha256": "be89608f7b300c15473b8e358317f22e3492baa222a0be57e24b3f975e4d2ec7"
+      },
+      {
+        "path": "backend/tests/services/test_sr_validation.py",
+        "sha256": "71d49ec7a08b727a926558f95b9fa9612c692273e31687af7282b50758c3261b"
+      },
+      {
+        "path": "backend/tests/services/test_stock_math.py",
+        "sha256": "f46a6f10f8c37534b4bd840e0388c026f9b456a8120bf97ae83d78d7b48e456a"
+      },
+      {
+        "path": "backend/tests/services/test_stock_request_actions.py",
+        "sha256": "21969242d648c5643f220a226cfa532fdcb8d56d4cbc395f8b7e8c3152279527"
+      },
+      {
+        "path": "backend/tests/services/test_supplier_receipts.py",
+        "sha256": "80f7c10765e47ae2a345d8e8adae50f2db1480ad84176dfff1812b8d1e1e74ad"
+      },
+      {
+        "path": "backend/tests/services/test_transaction_actions.py",
+        "sha256": "d66b6b47067dfac72b2d6f80fa04cb4fe78ad14475bac27ede5fc6dc4accee2b"
+      },
+      {
+        "path": "backend/tests/services/test_transaction_operation_line_link.py",
+        "sha256": "56b9ba597aea5a93cf3a4e7d61e990253bfd8bf136f920a423b0c2f520b4c4ea"
+      },
+      {
+        "path": "backend/tests/services/test_tube_material.py",
+        "sha256": "b7a1c0a51c77ee8775366995c48eae084c5ce62cc3e482aca9b391edee966a8a"
+      },
+      {
+        "path": "backend/tests/services/test_tx.py",
+        "sha256": "7341697cbf338acc79db74e8b616db2d5381436670b9f32f2518e322524da673"
+      },
+      {
+        "path": "backend/tests/services/test_warehouse_map_postgres_locking.py",
+        "sha256": "00632b4554462a9d23acb86ce8cac26313db9cb52f54384107a0f444341e9f9f"
+      },
+      {
+        "path": "backend/tests/services/test_weekly_inventory_snapshot.py",
+        "sha256": "b5064647e0e2e2774f0e3dfe7c73306a3bca56f6f1498912fce0c6c9ecd7fb3d"
+      },
+      {
+        "path": "backend/tests/services/test_weekly_report_contract.py",
+        "sha256": "5629c99b7419cf26a73318edad51fe9c9004552dbe356b4b923def7a44a8aa66"
+      },
+      {
+        "path": "backend/tests/services/test_weekly_report_scope.py",
+        "sha256": "aa6ca660467c35a50432d6788ec4309a71af9c38a1466b3e85f82713fec385bf"
+      },
+      {
+        "path": "backend/tests/test_activity_audit.py",
+        "sha256": "ed09da398d210269b80bbaa8fc3f983eb39dfbfc8b247b657778024674a95d5e"
+      },
+      {
+        "path": "backend/tests/test_admin_delta_closure.py",
+        "sha256": "0103e4c0f614b04130083ceba1ddc8eaecd3a736d7a9b8bdffcd1963112449ef"
+      },
+      {
+        "path": "backend/tests/test_admin_expectation_atoms.py",
+        "sha256": "e9372e8bfb437827b5b5baed99988ee4121937973e4ae88aea1cde586aacf71c"
+      },
+      {
+        "path": "backend/tests/test_approval_rules_drift.py",
+        "sha256": "bdbf7a0b95756a1ef54a5beb95ff88688f4cacbabc8bf4df3b61af4f76f9d4d1"
+      },
+      {
+        "path": "backend/tests/test_auto_department_routing.py",
+        "sha256": "5ac52a717962f3a8e0d48cba2b18e0579ed68cac018251cd5e49fa66f3b41e9c"
+      },
+      {
+        "path": "backend/tests/test_client_events.py",
+        "sha256": "48149e39ef5d56b37497882d17e704e34590e800821d1945e3ef159dd00dd5a3"
+      },
+      {
+        "path": "backend/tests/test_database_read_sessions.py",
+        "sha256": "96f87271deba5dfea9bba660511a67a4b363aa2cd191bc5cb9ea26b4365433fa"
+      },
+      {
+        "path": "backend/tests/test_db_fixture_contract.py",
+        "sha256": "56381036af4aae4555fbd8357314831f962cf4ba8234cb4ca1302b9693ac4abb"
+      },
+      {
+        "path": "backend/tests/test_defect_closure_contracts.py",
+        "sha256": "f7328128599eeb6a74b5a6abe5f6b7a236de70d39f50b1b9cc32b8da4f31b10e"
+      },
+      {
+        "path": "backend/tests/test_defect_flow.py",
+        "sha256": "0dd3ffed7c7b86fc737513a697447b8c6a61cdbd9d86dbea81ac76ddfaa81317"
+      },
+      {
+        "path": "backend/tests/test_defect_reconstruction_models.py",
+        "sha256": "617ad7ce0b83aae348aa192f9138454382fcf6cf944944c66191ea5ec7b8bf56"
+      },
+      {
+        "path": "backend/tests/test_defect_restore_location_contract.py",
+        "sha256": "c156e41b6f066b2f22a370507483e02ada6832f24a9b4a9141c944e8cdf0080f"
+      },
+      {
+        "path": "backend/tests/test_defect_return_supplier.py",
+        "sha256": "624db0f4243563051d53d7ea853a0c340cbcce840aab492adc2315828f394ede"
+      },
+      {
+        "path": "backend/tests/test_dept_hierarchy.py",
+        "sha256": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+      },
+      {
+        "path": "backend/tests/test_employee_item_order.py",
+        "sha256": "7ec1bc61cb0fa1adf4b294c2e3fc1382b961fd884c820eafa43ca58db2bc777e"
+      },
+      {
+        "path": "backend/tests/test_employee_notification_contracts.py",
+        "sha256": "b7c28a10af81b7ca6b9e12851800ae3031bc1c966ed08420cb56be9fe3f5ee07"
+      },
+      {
+        "path": "backend/tests/test_expectation_cancellation_reservations.py",
+        "sha256": "2a574b0579b2536cfded62f0613be780c486a5fa3b1c0b535224e8b83d881d70"
+      },
+      {
+        "path": "backend/tests/test_generated_mes_code.py",
+        "sha256": "4502006d57138b98594a33383b23e72072b56b45d079b57bfe46c19df93f5955"
+      },
+      {
+        "path": "backend/tests/test_get_db_rollback.py",
+        "sha256": "86465096aa7e8b1bbe5d30b904bc4d682abde12e5f98900c238acfa624dc5392"
+      },
+      {
+        "path": "backend/tests/test_handover.py",
+        "sha256": "78d42ab69e987849bb59e42267e57c1d95ea8319ec6019df66977980a8eb7984"
+      },
+      {
+        "path": "backend/tests/test_history_showcase_seed.py",
+        "sha256": "774e27081342728b4e1469b99b843fd0506dc61a3ab3c63ec6087c6c3123e920"
+      },
+      {
+        "path": "backend/tests/test_inventory_operation_models.py",
+        "sha256": "d7ca7b639baaf1aec7319f83c27157c0e8ad5da7460bf7c4a997a32bf0cbeb41"
+      },
+      {
+        "path": "backend/tests/test_io_expectation_closure.py",
+        "sha256": "63ac37b7597bed267365464058b51a430b33fe8feaa45e94fb9d3caace5e2da0"
+      },
+      {
+        "path": "backend/tests/test_io_preview.py",
+        "sha256": "1f0a8b83d8aa4663c6843ee9672bb9b9b10b765265ac037ea8b5d265b8fbd019"
+      },
+      {
+        "path": "backend/tests/test_io_v2.py",
+        "sha256": "7fc8ea8ca10eee2718ed2765ed6fc727b71368d1fc1891fca46e10637279afd6"
+      },
+      {
+        "path": "backend/tests/test_item_deletion_dependencies.py",
+        "sha256": "f589be42355f4f780feb9fcda55f71c92f3404a573bc5b8d219cf67ab1f6f977"
+      },
+      {
+        "path": "backend/tests/test_logging.py",
+        "sha256": "d8879890baf004b8a2f404bebf9eb43b77a9fae5c2f4634eac7cbd1f35d289d2"
+      },
+      {
+        "path": "backend/tests/test_migration_diagnostics.py",
+        "sha256": "3a3a1791afe473d2643dd8501be5f433b6d87cdc0a32beafe6e54aa583a28dac"
+      },
+      {
+        "path": "backend/tests/test_model_symbol_sync.py",
+        "sha256": "b2bfbc0b5e54f651d759a26a7e4d31be97ca609b81e343c4c9cd3f460061bf02"
+      },
+      {
+        "path": "backend/tests/test_notifications.py",
+        "sha256": "0ad49229ecb0706a5466b1447b6be019eec94a7d9c058d554a0f5745d5a69f30"
+      },
+      {
+        "path": "backend/tests/test_report_expectation_atoms.py",
+        "sha256": "f1cc76d69f1dff1101fd841ee5dd6f4b04be00866670cbdde0119afeb7bff373"
+      },
+      {
+        "path": "backend/tests/test_restore_production_shipping_chain.py",
+        "sha256": "7284040298c97ef85a270e3b2eedfb9994537abd27fb7d6475da9d02be4c34c1"
+      },
+      {
+        "path": "backend/tests/test_search_utils.py",
+        "sha256": "b061a3bc29087bb249ace4631eea80982105193b7615e091b7e7cbf316602086"
+      },
+      {
+        "path": "backend/tests/test_stock_requests.py",
+        "sha256": "f8593b52c9a0b595d2e1fb5b2723fdf29b07daf23e43f8583a3d63cd29203c9b"
+      },
+      {
+        "path": "backend/tests/test_transaction_cancel.py",
+        "sha256": "d41a5f8e00ddc722aaed85dab0709af379019a0a3e9b10dde96116249a414168"
+      },
+      {
+        "path": "backend/tests/test_transactions_export.py",
+        "sha256": "8caa2663ce726f6266990ae7ff514ba4ea49f1c82ce00eb63898712c5c51b44e"
+      },
+      {
+        "path": "backend/tests/test_warehouse_box_depletion.py",
+        "sha256": "5d4dd2da472a83d1ced63251356ea58b4d174e568a414b0ce8f5ebaf519fdfd7"
+      },
+      {
+        "path": "backend/tests/test_warehouse_map.py",
+        "sha256": "a1d6dc518c550c638d222b2fe2225d39e605f5c193e0577ee9db93d86c5725da"
+      },
+      {
+        "path": "scripts/dev/analyze-frontend-crash-dump.ps1",
+        "sha256": "523008ebfb714d43fa26e5d601afaf6c17955b2a3dcbdcb9b058ffd38b772a3a"
+      },
+      {
+        "path": "scripts/dev/auto-sync-to-employee.ps1",
+        "sha256": "f24dd28e612e213d8556c810afde79495d6e105c0e09e20a700f66605d5652b5"
+      },
+      {
+        "path": "scripts/dev/backfill_audit_csv.py",
+        "sha256": "5d88eced271e17aa266edebe83c3928420e89142f80770a0e7897ad08a78a3de"
+      },
+      {
+        "path": "scripts/dev/check-frontend-runtime.ps1",
+        "sha256": "eec9e18dbd454e01439ba0d69c45bb54fd155989f97d09277ff4b333aba07ade"
+      },
+      {
+        "path": "scripts/dev/check-mes-regression-contract-mapping.mjs",
+        "sha256": "5fd9820c18d1184a5ae094388eb24e6e5b92a3f2d255913d34e42e8fecb807d3"
+      },
+      {
+        "path": "scripts/dev/check-mes-regression-contract-mapping.test.mjs",
+        "sha256": "21242af3b42fe399009ab6e192a8cc820288f73a970b9a2ade9343934a6bb015"
+      },
+      {
+        "path": "scripts/dev/check_markdown_links.py",
+        "sha256": "7f65bfbb6ac688757fc20ca9633033b9b3be2d094cffe6090e643391045a4765"
+      },
+      {
+        "path": "scripts/dev/checked-command.ps1",
+        "sha256": "abe88ea4e4107b38a580572b86ec9a2b28e9e00af3c7fe00fbd8611dd47b0b53"
+      },
+      {
+        "path": "scripts/dev/disable-frontend-crash-dumps.ps1",
+        "sha256": "36ddc44052432263eb5b2fa52c64b2ddf01182bed765941f4d7eaa2a56df600d"
+      },
+      {
+        "path": "scripts/dev/e2e-exclusive-bind-probe.ps1",
+        "sha256": "e765e275287119a35c83d526d16e835a0ad0259df7a58c8d1773260b929e936d"
+      },
+      {
+        "path": "scripts/dev/enable-frontend-crash-dumps.ps1",
+        "sha256": "1ee82392a7d00084d090993f81db563e21b80c1ea66e2866116cfd4481d1e8ec"
+      },
+      {
+        "path": "scripts/dev/ensure-schema-ready.ps1",
+        "sha256": "0e4df3cd30e0a8d73eecb45d2b26a1310b282984895ded6b3e9f83f8c02e672c"
+      },
+      {
+        "path": "scripts/dev/fix_serial_conflicts.py",
+        "sha256": "b6c3281ae4abb346ff2c0aece8795d910e5a7862b10f098ea2ac1fbd8cf3f620"
+      },
+      {
+        "path": "scripts/dev/generate-mes-pc-audit.mjs",
+        "sha256": "bb1815f6e260a036b6879681e679e0820cf0c74d94ffd07be69dcc3c96c99d34"
+      },
+      {
+        "path": "scripts/dev/generate-mes-pc-audit.test.mjs",
+        "sha256": "3a66411f662d7fa65bc9e7355ef565db4f034dfb9d3a0c39d0652bd5d491dae9"
+      },
+      {
+        "path": "scripts/dev/generate-mes-pc-review.mjs",
+        "sha256": "aacf1829c28a38a1e05754618fd6796bd817cfd642f8d7991de6b61948a2d42f"
+      },
+      {
+        "path": "scripts/dev/generate-mes-pc-review.test.mjs",
+        "sha256": "781e8fecc489f5b8c134fb4fb97df602d87bea3e7d090b9e44d927733ef0bc73"
+      },
+      {
+        "path": "scripts/dev/generate-mes-regression-review.mjs",
+        "sha256": "9fd3f8357a2c47c2d201f7039faf20285bd129a05b1c16ac6b43bf98ba071fc6"
+      },
+      {
+        "path": "scripts/dev/generate-mes-regression-review.test.mjs",
+        "sha256": "bf1397ae364b4fc1f1d615dfa2adb1d422e48eb023b4196b275b58c3af992df8"
+      },
+      {
+        "path": "scripts/dev/get-frontend-stop-attribution.ps1",
+        "sha256": "de268748dba5232862bb4501a50af4d56d08310abf6743b196f103416cdae0f1"
+      },
+      {
+        "path": "scripts/dev/install-sysmon-dev-frontend-monitor.ps1",
+        "sha256": "ebda9f111384556639ebff6cd3d938cbbb74ea9f32de4b031d21e4e165f0efe0"
+      },
+      {
+        "path": "scripts/dev/kwon_match_apply.py",
+        "sha256": "7c03d894b6fa72d57a3355b4c800e3ccf8694ff72a582ebcedee5e9aae8c11cd"
+      },
+      {
+        "path": "scripts/dev/mes-expectation-evidence.mjs",
+        "sha256": "979b9d06c61f160bfc84e2e156cbba14c6f7fd3d7380e324b1ba2dd79b9ce66c"
+      },
+      {
+        "path": "scripts/dev/mes-expectation-evidence.test.mjs",
+        "sha256": "f56c8ba54e1d6e087fbcded47952dad00c6d7a809f89edb32e172fc1ec59ea01"
+      },
+      {
+        "path": "scripts/dev/mes-expectation-vitest-reporter.mjs",
+        "sha256": "5ef5b5d079838ca68df7141e8b8831ecd7a4c04a04ff188e6a53925d6b834b4c"
+      },
+      {
+        "path": "scripts/dev/mes_expectation_junit.py",
+        "sha256": "a6051f22656a50d593423f92146bd5d0ddf23ea6d77db1202d8d9b73405b1d5f"
+      },
+      {
+        "path": "scripts/dev/mes_expectation_pytest.py",
+        "sha256": "5388b1076e7e225fe04855de32d869873b246d8052100112cc5f8309d194d4f1"
+      },
+      {
+        "path": "scripts/dev/normalize-mes-expectations.mjs",
+        "sha256": "e05fa10e7011356c90e9dc1f7776557e7b352746356e8ad41a6b14509f2f7459"
+      },
+      {
+        "path": "scripts/dev/normalize-mes-expectations.test.mjs",
+        "sha256": "4afb6e3ff992c4961d46f8e4302571ff6fb9eea1b311631f08a34bd90402d0e4"
+      },
+      {
+        "path": "scripts/dev/open-watch.ps1",
+        "sha256": "8d399f213725db73559248dfc68e1a1b55598cf1a30c7dd433e12620dcb74379"
+      },
+      {
+        "path": "scripts/dev/register-runtime-tasks.ps1",
+        "sha256": "161785f4d997e5e656158a1fb8a2a3bdd6927b139842e876d1a1e04234f655b3"
+      },
+      {
+        "path": "scripts/dev/register_blue_items.py",
+        "sha256": "7352dcce236e69d35eb9a89c31d60292cd98a9f994e493a077766b43d1e1b3bf"
+      },
+      {
+        "path": "scripts/dev/renumber_gap_item_codes.py",
+        "sha256": "34284f96ed9ac9ffb37502baff966fbd70f039edc8b494ad1d8734ac45a7ac90"
+      },
+      {
+        "path": "scripts/dev/replenish_department_safety_stock.py",
+        "sha256": "1a4d23cf22da3405fc1645fccc323f9ab6b5f4b2938d6843c096bb1fc37065ff"
+      },
+      {
+        "path": "scripts/dev/resolve-server-profile.ps1",
+        "sha256": "ca94defa166393c82e5675de1c8515eee8f88b379149afdd6b815579000f9dad"
+      },
+      {
+        "path": "scripts/dev/restore_item_codes_from_backup.py",
+        "sha256": "a7fab670a50862278d69ee7511ae4eb7c108a0aead8ab3f3b85be1f550a3ea8c"
+      },
+      {
+        "path": "scripts/dev/run-mes-expectations.mjs",
+        "sha256": "7add97135bbf09ed5f5a420317d2a789f0bb9645d27a72654795f077843315ec"
+      },
+      {
+        "path": "scripts/dev/run-mes-expectations.test.mjs",
+        "sha256": "7204fc5d5d57ce761bc78530f9ea07549e327797cd1c7ffa12c4f8f126d60d34"
+      },
+      {
+        "path": "scripts/dev/runtime-control.ps1",
+        "sha256": "9b9695d2a5bb277e21d883380392180d3c9481ea24f0d9439df09dde2a0f0394"
+      },
+      {
+        "path": "scripts/dev/runtime-paths.ps1",
+        "sha256": "4c220f80e06fe11efbacb02c2b8d3c27ba5d9d097d6181eecb2a2d0d9c95b465"
+      },
+      {
+        "path": "scripts/dev/runtime-task-control.ps1",
+        "sha256": "0e1be8a180e2f0aa04b67dceaeeeaec2c872e9d3275adf7f8b6e1836efa26ee2"
+      },
+      {
+        "path": "scripts/dev/runtime-task-host.vbs",
+        "sha256": "3ff1fb8ab354864f1d7b53f64f7dd858ae7db0b7482a702d2eb805654626b6c3"
+      },
+      {
+        "path": "scripts/dev/seed_history_showcase.py",
+        "sha256": "e2a593cc89b0de242079d0f379221c9abe475abc361d3306f3b4480f33f39238"
+      },
+      {
+        "path": "scripts/dev/service_supervisor.py",
+        "sha256": "77747587cca2c9dbcf7eb2b4c9dd20c1b47218675296f38cdfb1e5719a26e427"
+      },
+      {
+        "path": "scripts/dev/setup-node20.ps1",
+        "sha256": "5355f6e0d13b3b283ff1ac4cab45d7ec3e6b54054cf9ae12c907a7ec5376ac35"
+      },
+      {
+        "path": "scripts/dev/start-backend.ps1",
+        "sha256": "a74e7323a8053a5b0205382cc2987aa20de2712ac4f191e90189f4bb8fc0abc5"
+      },
+      {
+        "path": "scripts/dev/start-frontend.ps1",
+        "sha256": "a63cbd7dc1b241eb676d7ae1058b87f19d260b3b38d3055d709a424519639faa"
+      },
+      {
+        "path": "scripts/dev/status-servers.ps1",
+        "sha256": "bfa4f60ac81e5a82cfffe92f0e19fb0cd502b52ac33cdf0acabced0cb64e6ab2"
+      },
+      {
+        "path": "scripts/dev/stop-backend.ps1",
+        "sha256": "a8b8c7e48627c5dd6e8691a052e40f193966888bfba3629b9ba14b5d79b2edf7"
+      },
+      {
+        "path": "scripts/dev/stop-frontend.ps1",
+        "sha256": "645fa3fe9d0390f69bb27be512665eb8aae5eb9ee5c166af3944c279d2545c72"
+      },
+      {
+        "path": "scripts/dev/stop-servers.ps1",
+        "sha256": "a3ca2eb4436c5b4d15131a374a405ed003660f9bfafc8283517ba7a3fe0bbcce"
+      },
+      {
+        "path": "scripts/dev/sync-employee-environments.ps1",
+        "sha256": "d3c4ae1c4ca2663883a86217cc8476518d44898021ec789809dcbe30383ddfba"
+      },
+      {
+        "path": "scripts/dev/sync-from-employee-data.ps1",
+        "sha256": "f5207d4f6af34ad4db5ca1b79f0d0b44d81d464cc091c2f0ad83c6e6d581cf92"
+      },
+      {
+        "path": "scripts/dev/sync-to-employee.ps1",
+        "sha256": "15767f925345b7bc9808b2bfca69eee868cd322e66260ad5136c4f0d99a21cd1"
+      },
+      {
+        "path": "scripts/dev/sysmon-dev-frontend.xml",
+        "sha256": "54114fb5289224dc86e0df25916e00690a018d60d253302845439571193b80b7"
+      },
+      {
+        "path": "scripts/dev/tests/checked-command.ps1",
+        "sha256": "0476eb5ba79413d9f3cee1887f465ea7b36902eaaed85d7e2f6df3f2f7a55968"
+      },
+      {
+        "path": "scripts/dev/tests/frontend-node-runtime.ps1",
+        "sha256": "1bc2165198b3e86b9abda246ba7d9b2aef5d59de624028adb62ff4954787d87d"
+      },
+      {
+        "path": "scripts/dev/tests/runtime-control-batch-files.ps1",
+        "sha256": "53f0e90e5b7a9a8b7df7edcbb651bac3d60889cc69024a1498cec61f83a7e7e0"
+      },
+      {
+        "path": "scripts/dev/tests/runtime-control-crash-loop.ps1",
+        "sha256": "b2ef8fe7a7f8456e512368ed8ebe17d12603a2c4f3a9ab01d058cfab80be299c"
+      },
+      {
+        "path": "scripts/dev/tests/runtime-paths.ps1",
+        "sha256": "ab08111737bd3980653fad08fb6521006f7d5647c03c065d2d3fb5cbbda60d27"
+      },
+      {
+        "path": "scripts/dev/tests/runtime-state-timestamps.ps1",
+        "sha256": "1c220c1c72e65d9e5a18d8dda1dacacfa272c2f1084d1339adeb642ce3e94892"
+      },
+      {
+        "path": "scripts/dev/tests/runtime-task-control.ps1",
+        "sha256": "efcdc06bf518aadd1ee348547262909d8bbc852d0bf161e651bb4603dce76e52"
+      },
+      {
+        "path": "scripts/dev/tests/schema-readiness-adapter.ps1",
+        "sha256": "a6e4e236dae5bfae810099be415a2ec5757373753d5add5872c3441893d6bb2c"
+      },
+      {
+        "path": "scripts/dev/tests/start-backend-no-powershell-wrapper.ps1",
+        "sha256": "18539bafef7c51cc7eea782030799de5b5c29e0001b17cf9c611dca7e7afad26"
+      },
+      {
+        "path": "scripts/dev/tests/test_check_markdown_links.py",
+        "sha256": "e1ec4a8d7ab2df87555f373fabd4ae1971c276de3598dbef5a50cda967c22d30"
+      },
+      {
+        "path": "scripts/dev/tests/test_frontend_crash_dumps.py",
+        "sha256": "e1d80dce1445044343426e45e3d88045fbec9105260a048bff080b7ec6d79898"
+      },
+      {
+        "path": "scripts/dev/tests/test_service_supervisor.py",
+        "sha256": "778c0ef1db74d008bcd3679a2437d270eca0e2020330ac8cd7c62c157b177d31"
+      },
+      {
+        "path": "scripts/dev/tests/test_sysmon_dev_frontend_monitor.py",
+        "sha256": "134e5f59098f5bafd487b92a453839c1262593be4dc18b160523a83eaddef80b"
+      },
+      {
+        "path": "scripts/dev/tests/test_verify_local_docs_scope.py",
+        "sha256": "17eb913691f88621ba29714331cf8b7bfa83d994bfb8aa265486374d7f25049b"
+      },
+      {
+        "path": "scripts/dev/tests/test_watch_service_signal_monitor.py",
+        "sha256": "0fd009cf78deb861278da1871bbcf9dee07cd93338ad751ca267057a6f5380d4"
+      },
+      {
+        "path": "scripts/dev/uninstall-sysmon-dev-frontend-monitor.ps1",
+        "sha256": "f1ebd3c34a0cf444d3d54abab0842744ddffd12404ccbe5229b85140c5414c8c"
+      },
+      {
+        "path": "scripts/dev/update_excel_blue_after_db.py",
+        "sha256": "396e3d7a2e111b79eb992d111af2eba1f0b168dd8bac0274e3d240bae0052c8d"
+      },
+      {
+        "path": "scripts/dev/verification_policy.py",
+        "sha256": "0deadf8b17d735d80b984f95382471746e027ee76dd29682c460b708d69c65df"
+      },
+      {
+        "path": "scripts/dev/verify-runtime-tasks.ps1",
+        "sha256": "d83d572fd345c1d392a6d1eb61730db467dbcb3b126507a3cd4fa0fbb0524621"
+      },
+      {
+        "path": "scripts/dev/verify_e2e.ps1",
+        "sha256": "2fe089b1630348f84f1d89692dba995e170ae4dd5ebbf5240175db754692c767"
+      },
+      {
+        "path": "scripts/dev/verify_local.ps1",
+        "sha256": "13cbd078f9273fc4f36194b53e4c613159c6385c1a94a148b2f328ef317f649f"
+      },
+      {
+        "path": "scripts/dev/watch-servers.ps1",
+        "sha256": "33b2bdaaf14145971949a18bc5d3552196f0e191ead67229f4fd7fc633106088"
+      },
+      {
+        "path": "scripts/dev/watch-service.ps1",
+        "sha256": "77e62d10ebeaac1fd50de143f3c8f4e6445b8677ed9d4b90e7772766c624aa14"
+      },
+      {
+        "path": "scripts/ops/_verify_backup.py",
+        "sha256": "a0e87166d10c2d48d490672a8371daba379778b67a02108eef7b617805253683"
+      },
+      {
+        "path": "scripts/ops/backup_db.bat",
+        "sha256": "e077580b4a453425146571ae99e3cea511169f0274bba638ff4784cf08e0ab98"
+      },
+      {
+        "path": "scripts/ops/backup_db.py",
+        "sha256": "6ade796d46475deb71c4c79ce897ed9dba0bf0425d20e91a14ae81dbaa038c79"
+      },
+      {
+        "path": "scripts/ops/backup_manifest.py",
+        "sha256": "988be08e448e10c489959b1cf484af92012852b94da0230e21d0d9b21e00fdc2"
+      },
+      {
+        "path": "scripts/ops/backup_retention.py",
+        "sha256": "c1c0eee9534de400ba929079388365006dff6589652b1aa1f564510be00334c0"
+      },
+      {
+        "path": "scripts/ops/backup_to_nas.bat",
+        "sha256": "42afdb9bfbceda3e14339b31cbd9696f2749328f5d8b7dda2cc96e6d96fe3e33"
+      },
+      {
+        "path": "scripts/ops/backup_to_nas.py",
+        "sha256": "357e65cc4fb306f362591de45c9b76e6b38f727e86cfa1900c2c129c095682c4"
+      },
+      {
+        "path": "scripts/ops/benchmark_mes_reads.py",
+        "sha256": "b3378b0de08f5eab7f8ee5a9f96ea014c6664b766810d6eaa4b47c2ee8c1f9f4"
+      },
+      {
+        "path": "scripts/ops/build_legacy_db_candidate.py",
+        "sha256": "f7bf20f0b58eea2e20d3dcf306b2ac3794a8801b6d09fce47fa4f3310955e5b2"
+      },
+      {
+        "path": "scripts/ops/check_inventory_integrity.py",
+        "sha256": "b388985aa52b24ea4a61f95ecfa6d39ff0355ddd06ce3439ca05e8d24643c61f"
+      },
+      {
+        "path": "scripts/ops/cleanup_backups.bat",
+        "sha256": "3d4f85ebd3095c791d9849fff469464f37e0a98b85de9c34f7ab41ea2bd1ecd2"
+      },
+      {
+        "path": "scripts/ops/cleanup_backups.py",
+        "sha256": "373b55dfe77d9d6711d8b34cc0b5a1c4a106df8786ba5c8b6cf244e3badb8251"
+      },
+      {
+        "path": "scripts/ops/development_schema_prepare.py",
+        "sha256": "16f9ac1bf744159ef92a9ab333976f04c0e09165b524420d8f92f6d4d192f7a6"
+      },
+      {
+        "path": "scripts/ops/durable_file.py",
+        "sha256": "3dd83601732a944551cb472401a8076a8587d2d612c967e15b8d5663f1a7620c"
+      },
+      {
+        "path": "scripts/ops/employee_frontend_release.py",
+        "sha256": "45601daa8c5787941ed018c72592019235f7a6e82fa2191383c5602a74fd30c4"
+      },
+      {
+        "path": "scripts/ops/employee_release_recovery.py",
+        "sha256": "4be25050467d58fbfd7b808efea7ab33d8d8b898e39fdba058ccbb991775283a"
+      },
+      {
+        "path": "scripts/ops/employee_schema_preflight.py",
+        "sha256": "f22b777ad05216a5722ce35ad37af9845ed93482acfccd332d51159451e15993"
+      },
+      {
+        "path": "scripts/ops/finalize_inventory_master.py",
+        "sha256": "38e3cfef0fa7ba4d2ea57ce1f30b9f404c105897d9c67c60953ac692ba50ae1f"
+      },
+      {
+        "path": "scripts/ops/friday_profile_cutover.py",
+        "sha256": "6eaf755122f4a7a88f82c81ebe5ddb7a10f1ed50ca36ac35ec3e71f9cd8b3273"
+      },
+      {
+        "path": "scripts/ops/healthcheck.bat",
+        "sha256": "858643b8abc0bfc48f002a757ad6e3cbdfaa6e6c41a7e9026431574ada8061c3"
+      },
+      {
+        "path": "scripts/ops/inventory_cutover.py",
+        "sha256": "2c714bc0dd660be68bbdb60b6e15223d0504bff0bcde7d1596f2721adf922093"
+      },
+      {
+        "path": "scripts/ops/inventory_operation_admin.py",
+        "sha256": "a7bebd530872346c249d052576fb08135c22b8f89a83c77a78b3935764e1e26e"
+      },
+      {
+        "path": "scripts/ops/load_test_30_users.py",
+        "sha256": "eec4e256208883929899519a90b7c1fab8b9c3eb33f1605883f3ba71c6bb2911"
+      },
+      {
+        "path": "scripts/ops/maintenance_backup.py",
+        "sha256": "4e0662f91ec04c85891ade26c2c33d7b644c8425dc0d4fe65a54f4d23e9a7b17"
+      },
+      {
+        "path": "scripts/ops/operational_readiness.bat",
+        "sha256": "fe0a8b95385015f86637a4292fb55f597cd8e44c2a27a1a24fcd0161fa75a938"
+      },
+      {
+        "path": "scripts/ops/operational_readiness.py",
+        "sha256": "076da0b4332c8c86a82aecf3a0794851064b5c1e59e15914cac575bed51755e5"
+      },
+      {
+        "path": "scripts/ops/preflight_30_users.py",
+        "sha256": "a0cd84c500d2303661f4a993f750e11f1a6deee5d08020b494e3a5a6d500bcc3"
+      },
+      {
+        "path": "scripts/ops/profile_warehouse_r1.py",
+        "sha256": "acd535fc21a054b3a04b594bcee8939a90ac2284586add7d9042524f4c888ec9"
+      },
+      {
+        "path": "scripts/ops/project_legacy_effects.py",
+        "sha256": "ad9e64ee8699c80d28c2abaa589d6b337306b68cdb4986e143e34922c4b51feb"
+      },
+      {
+        "path": "scripts/ops/reconcile_inventory.bat",
+        "sha256": "7d85064425b2c9cea66c4628e22fb74d8d28ef4400af279a83b40bf4babdf6b3"
+      },
+      {
+        "path": "scripts/ops/recovery_owner.py",
+        "sha256": "b885fb608cb3e8785c43067fbe30a74b1f8ac8003b7bc9399dd0ed50c05b0713"
+      },
+      {
+        "path": "scripts/ops/register-weekly-inventory-snapshot.ps1",
+        "sha256": "2783df3cdfb9ee9cb492347865051de4a30743e5a345c265c5d156f158f6e34e"
+      },
+      {
+        "path": "scripts/ops/restore_db.bat",
+        "sha256": "3e59c7c4a439221b1c02562174f0117112a697a423bcc7818be85d34321d29a7"
+      },
+      {
+        "path": "scripts/ops/restore_db.py",
+        "sha256": "aa68a20d04091d5642d2a0d3e988fe9ef893573c9d8ecc6128036c6f2c0f9be8"
+      },
+      {
+        "path": "scripts/ops/sync_department_inventory.py",
+        "sha256": "9a93bacb7975c73fe1f27da01de9ce91f6e048bbd6762ad0385948df84d7c6ee"
+      },
+      {
+        "path": "scripts/ops/sync_warehouse_inventory.py",
+        "sha256": "89e444d98f8ad59cffa23a29eb15210ba32f8932bed9cac8c82cf885ae2fc499"
+      },
+      {
+        "path": "scripts/ops/tests/test_legacy_db_candidate.py",
+        "sha256": "0902cb0ff0c077882c5c6824caef688a3468f5fe5a56498e9ecb5b3942a12c2e"
+      },
+      {
+        "path": "scripts/ops/tests/test_legacy_effect_projection.py",
+        "sha256": "c2d10de88c4890d9dad6ba2cb0407f1b5b835c5f0c40b3b3670b1c7224c60909"
+      },
+      {
+        "path": "scripts/ops/verify_backup.bat",
+        "sha256": "22f6d9f7e831be4bc6621ee9de6be9028a5ea034a493981a301548602d952016"
+      },
+      {
+        "path": "scripts/ops/verify_inventory_snapshot.py",
+        "sha256": "d08ff8a765f8fe1f0e086bb2a88e43200584226cf315f849e30c26b5864b1e47"
+      },
+      {
+        "path": "scripts/runtime_paths.py",
+        "sha256": "ed9cee5d4c3cd13b6c81fb6dbdd0e5dd023409a16854f4d8697e9480350c1459"
+      }
+    ],
+    "sha256": "46260a1b90a4948ddaadb87e4710927f48fa4a6ad9545ec0e440f95fb0f87df4"
+  },
+  "raw": {
+    "path": "_attic/runtime/mes-expectations/final-c13-verified-20261009/pytest-6eb3066497.xml",
+    "sha256": "49b20d056c8dda1a401a0c3e443587c2da52aafb1c1fc94eb0df70df675c8bd3"
+  },
+  "environment": {
+    "kind": "unit",
+    "versions": {
+      "node": "v20.20.2",
+      "python": "Python 3.12.0"
+    }
+  },
+  "conditions": [
+    {
+      "caseId": "8.19-25",
+      "conditionId": "verified-backup-and-command-required",
+      "fingerprint": "4a87c1306123edad775396fe75b7eaf4cb7f0c9e5fd97eda4404fe719c4ae635",
+      "targets": [
+        {
+          "file": "backend/tests/ops/test_inventory_operation_admin_real_backup.py",
+          "selector": "test_explicit_apply_backup_uses_real_verifier_and_preserves_validated_pair",
+          "instances": [
+            "test_explicit_apply_backup_uses_real_verifier_and_preserves_validated_pair"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "8.19-25",
+      "conditionId": "repair-command-problem-and-approver",
+      "fingerprint": "d66eece6ee9d4669d166a649b0ce45d2e73846ffd5e1bb2e89ebe04b0d3dbae7",
+      "targets": [
+        {
+          "file": "backend/tests/ops/test_inventory_operation_admin.py",
+          "selector": "test_repair_command_requires_problem_id_and_approver",
+          "instances": [
+            "test_repair_command_requires_problem_id_and_approver"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "8.19-25",
+      "conditionId": "automated-backup-reverified",
+      "fingerprint": "8b270be4ab07159c066002a31b8220d38cb00f5c1dfec8225290dd415c9504c9",
+      "targets": [
+        {
+          "file": "backend/tests/ops/test_inventory_operation_admin.py",
+          "selector": "test_automatically_created_backup_is_reverified_before_apply",
+          "instances": [
+            "test_automatically_created_backup_is_reverified_before_apply[False]",
+            "test_automatically_created_backup_is_reverified_before_apply[True]"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "8.19-25",
+      "conditionId": "missing-backup-rejected",
+      "fingerprint": "47a2b9881af94857690d95d85d71ff2465e5f3b0186fcc78061a8dd278f79cfa",
+      "targets": [
+        {
+          "file": "backend/tests/ops/test_inventory_operation_admin.py",
+          "selector": "test_8_19_25_apply_rejects_missing_validated_backup",
+          "instances": [
+            "test_8_19_25_apply_rejects_missing_validated_backup"
+          ]
+        }
+      ]
+    }
+  ],
+  "collection": {
+    "path": "_attic/runtime/mes-expectations/final-c13-verified-20261009/pytest-6eb3066497-collection.json",
+    "sha256": "f95ab464de7aab5b0fc6053642c97c486239ede69409e6439247086b28ecaed8"
+  }
+}

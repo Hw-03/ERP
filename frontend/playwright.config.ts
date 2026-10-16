@@ -34,8 +34,8 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   use: {
     baseURL: process.env.E2E_BASE_URL ?? `http://localhost:${FRONT_PORT}`,
-    trace: "on-first-retry",
-    screenshot: "only-on-failure",
+    trace: "retain-on-failure",
+    screenshot: process.env.MES_EXPECTATION_ENVIRONMENT ? "on" : "only-on-failure",
     video: "retain-on-failure",
     locale: "ko-KR",
     timezoneId: "Asia/Seoul",

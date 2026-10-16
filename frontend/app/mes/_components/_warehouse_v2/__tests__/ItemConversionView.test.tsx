@@ -531,10 +531,12 @@ describe("ItemConversionView", () => {
     expect(details).toHaveTextContent("출하 현재고 3 EA");
     expect(details).toHaveTextContent("3-PR-0002");
     expect(details).toHaveTextContent("조립 현재고 5 EA");
-    expect(details).not.toHaveTextContent("예약");
-    expect(details).not.toHaveTextContent("가용");
-    expect(details).not.toHaveTextContent("필요");
-    expect(details).not.toHaveTextContent("부족 1 EA");
+    const sourceShortage = within(details).getAllByTestId("item-conversion-shortage-row").find(row => row.textContent?.includes("3-AF-0001"))!;
+    expect(sourceShortage).toHaveTextContent("가용 1 EA · 필요 2 EA · 부족 1 EA");
+    const cableShortage = within(details).getAllByTestId("item-conversion-shortage-row").find(row => row.textContent?.includes("3-PR-0001"))!;
+    expect(cableShortage).toHaveTextContent("가용 1 EA · 필요 3 EA · 부족 2 EA");
+    const bracketShortage = within(details).getAllByTestId("item-conversion-shortage-row").find(row => row.textContent?.includes("3-PR-0002"))!;
+    expect(bracketShortage).toHaveTextContent("가용 2 EA · 필요 4 EA · 부족 2 EA");
     expect(screen.getAllByTestId("item-conversion-shortage-row")).toHaveLength(3);
     expect(screen.queryByText("추가 구성품 재고가 부족합니다.")).not.toBeInTheDocument();
     expect(screen.getByTestId("item-conversion-execute-next-button")).toBeDisabled();

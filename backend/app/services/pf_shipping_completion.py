@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -31,9 +32,9 @@ def list_pf_shipping_completions(
     *,
     start_at: datetime,
     end_at: datetime,
-    cancellation_as_of: datetime | None = None,
+    cancellation_as_of: datetime | Callable[[datetime], datetime] | None = None,
 ) -> list[PfShippingCompletion]:
-    """기간 안 최종 PF 픽업을 취소 시점 기준으로 재구성한다."""
+    """기간 안 픽업을 고정 또는 발생일별 마감 기준으로 한 번에 조회한다."""
     reversal = aliased(TransactionLog)
     cancellation_filters = [
         or_(
@@ -44,16 +45,23 @@ def list_pf_shipping_completions(
             TransactionLog.cancelled.is_(False),
             TransactionLog.cancelled_at > cancellation_as_of,
         ),
-    ] if cancellation_as_of is not None else [
+    ] if isinstance(cancellation_as_of, datetime) else [
         reversal.log_id.is_(None),
         TransactionLog.cancelled.is_(False),
     ]
+    cutoff_for_completion = cancellation_as_of if callable(cancellation_as_of) else None
+    if cutoff_for_completion is not None:
+        cancellation_filters = []
     rows = (
         db.query(
             TransactionLog.item_id,
             Item.model_symbol,
             TransactionLog.quantity_change,
             TransactionLog.created_at,
+            TransactionLog.cancelled,
+            TransactionLog.cancelled_at,
+            reversal.log_id.label("reversal_id"),
+            reversal.created_at.label("reversal_at"),
         )
         .join(ShippingRequest, ShippingRequest.request_id == TransactionLog.shipping_request_id)
         .join(Item, Item.item_id == TransactionLog.item_id)
@@ -71,6 +79,16 @@ def list_pf_shipping_completions(
         .order_by(TransactionLog.created_at, TransactionLog.log_id)
         .all()
     )
+    if cutoff_for_completion is not None:
+        visible = []
+        for row in rows:
+            cutoff = cutoff_for_completion(row.created_at)
+            if row.reversal_id is not None and (row.reversal_at is None or row.reversal_at <= cutoff):
+                continue
+            if row.cancelled and (row.cancelled_at is None or row.cancelled_at <= cutoff):
+                continue
+            visible.append(row)
+        rows = visible
     return [
         PfShippingCompletion(
             item_id=row.item_id,

@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import uuid
+import json
+from collections.abc import Callable
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from app.models import Employee, IoBatch, TransactionLog, TransactionTypeEnum
 from app.routers.daily_work_reports import _operation_for
@@ -14,12 +19,293 @@ from app.routers.daily_work_reports import _operation_for
 WORK_DATE = "2026-07-27"
 
 
+@pytest.mark.parametrize("linked_batch", [False, True])
+@pytest.mark.parametrize("approval_role", ["department", "warehouse"])
+def test_daily_activity_preserves_same_history_request_approval_and_memo(
+    client: TestClient, db_session: Session, make_item: Callable[..., Any],
+    linked_batch: bool, approval_role: str,
+) -> None:
+    """같은 거래의 저장된 결재 정보를 일보에서 잃거나 다른 사람으로 추정하지 않는다."""
+    from app.models import StockRequest, StockRequestStatusEnum, StockRequestTypeEnum
+
+    requester = _employee(db_session, name="일보 요청자", department="튜브")
+    approver = _employee(db_session, name="일보 실제 승인자", department="튜브")
+    item = make_item(process_type_code="TR")
+    submitted_at = datetime(2026, 7, 27, 0, 4)
+    approved_at = datetime(2026, 7, 27, 0, 5)
+    request = StockRequest(
+        request_code=f"DAILY-{uuid.uuid4().hex[:8]}", requester_employee_id=requester.employee_id,
+        requester_name=requester.name, requester_department=requester.department,
+        request_type=StockRequestTypeEnum.MANUAL_ADJUSTMENT, status=StockRequestStatusEnum.COMPLETED,
+        requires_warehouse_approval=approval_role == "warehouse", requires_department_approval=approval_role == "department",
+        submitted_at=submitted_at, notes="같은 거래 실제 메모",
+        **({"department_approved_by_employee_id": approver.employee_id, "department_approved_by_name": approver.name, "department_approved_at": approved_at}
+           if approval_role == "department" else {"approved_by_employee_id": approver.employee_id, "approved_by_name": approver.name, "approved_at": approved_at}),
+    )
+    db_session.add(request)
+    db_session.flush()
+    batch = None
+    if linked_batch:
+        batch = IoBatch(work_type="process", sub_type="adjust_in", status="completed",
+                        requester_employee_id=requester.employee_id, requester_name=requester.name,
+                        requester_department=requester.department, stock_request_id=request.request_id,
+                        submitted_at=submitted_at)
+        db_session.add(batch)
+        db_session.flush()
+    log = TransactionLog(item_id=item.item_id, transaction_type=TransactionTypeEnum.ADJUST,
+                         quantity_change=1, department="튜브", producer_employee_id=requester.employee_id,
+                         produced_by=approver.name, notes=request.notes, reference_no=request.request_code,
+                         operation_batch_id=batch.batch_id if batch else None,
+                         created_at=datetime(2026, 7, 27, 0, 6))
+    db_session.add(log)
+    db_session.commit()
+    before = (db_session.query(TransactionLog).count(), db_session.query(StockRequest).count(), request.status)
+    history = client.get("/api/inventory/transactions", params={"log_id": str(log.log_id)})
+    assert history.status_code == 200, history.text
+    original = history.json()[0]
+    assert original["approver_name"] == approver.name
+    response = client.get(f"/api/daily-work-reports/{requester.employee_id}/{WORK_DATE}/activity")
+    assert response.status_code == 200, response.text
+    observed = next(entry for group in response.json()["details"] for entry in group["logs"] if entry["log_id"] == str(log.log_id))
+    assert observed["approver_name"] == approver.name
+    for field in ["log_id", "requester_name", "approver_name", "requested_at", "approved_at", "notes", "inventory_effect", "history_batch"]:
+        assert observed[field] == original[field], field
+    assert (db_session.query(TransactionLog).count(), db_session.query(StockRequest).count(), request.status) == before
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_daily_report_inactive_department_blocks_new_save_but_preserves_history(client, db_session, existing):
+    from app.models import ActivityAuditLog, DailyWorkReport, Department
+
+    department = Department(name="일보 사용중지 검수", is_active=True)
+    db_session.add(department)
+    employee = _employee(db_session, name="부서 일보 검수", department=department.name)
+    db_session.commit()
+    if existing:
+        assert _put(client, employee, "기존 보존 본문").status_code == 200
+    before_audits = db_session.query(ActivityAuditLog).filter_by(action_key="daily_work_report.save").count()
+    department.is_active = False
+    db_session.commit()
+
+    rejected = _put(client, employee, "중지 후 저장 금지")
+    assert rejected.status_code == 422, rejected.text
+    assert "사용 중지된 부서" in rejected.json()["detail"]["message"]
+    db_session.expire_all()
+    rows = db_session.query(DailyWorkReport).filter_by(employee_id=employee.employee_id).all()
+    assert [row.content for row in rows] == (["기존 보존 본문"] if existing else [])
+    assert db_session.query(ActivityAuditLog).filter_by(action_key="daily_work_report.save").count() == before_audits
+    for url in [f"/api/daily-work-reports?work_date={WORK_DATE}", f"/api/daily-work-reports/{employee.employee_id}/{WORK_DATE}", f"/api/daily-work-reports/{employee.employee_id}/{WORK_DATE}/activity"]:
+        assert client.get(url).status_code == 200
+    if existing:
+        assert client.get(f"/api/daily-work-reports/{employee.employee_id}/{WORK_DATE}").json()["content"] == "기존 보존 본문"
+        removed = client.delete(f"/api/daily-work-reports/{employee.employee_id}/{WORK_DATE}", params={"actor_employee_id": employee.employee_id})
+        assert removed.status_code == 204
+
+
+
+@pytest.mark.parametrize("endpoint", ["list", "detail", "activity"])
+def test_daily_report_future_read_is_rejected_without_returning_report_data(client, db_session, endpoint):
+    employee = _employee(db_session, name="미래 조회 검수")
+    db_session.commit()
+    url = "/api/daily-work-reports?work_date=2099-01-01" if endpoint == "list" else f"/api/daily-work-reports/{employee.employee_id}/2099-01-01" + ("/activity" if endpoint == "activity" else "")
+    response = client.get(url)
+    assert response.status_code == 422, response.text
+    assert response.json()["detail"]["message"] == "미래 날짜의 일보는 조회할 수 없습니다."
+
+
+def test_daily_report_keeps_before_after_and_current_actor_for_every_successful_save(client, db_session):
+    from app.models import ActivityAuditLog
+
+    employee = _employee(db_session, name="수정 감사 검수")
+    db_session.commit()
+    report_id = None
+    for content in ["첫 내용\n ", "최종 내용", ""]:
+        response = _put(client, employee, content)
+        assert response.status_code == 200, response.text
+        report_id = response.json()["report_id"]
+    rows = db_session.query(ActivityAuditLog).filter(ActivityAuditLog.action_key == "daily_work_report.save").order_by(ActivityAuditLog.occurred_at).all()
+    assert len(rows) == 3
+    transitions = [json.loads(row.target_summary) for row in rows]
+    assert [(entry["before"], entry["after"]) for entry in transitions] == [(None, "첫 내용\n "), ("첫 내용\n ", "최종 내용"), ("최종 내용", "")]
+    assert all(entry["work_date"] == WORK_DATE for entry in transitions)
+    assert all(row.related_id == report_id and row.actor_employee_code == employee.employee_code and row.actor_employee_name == employee.name for row in rows)
+    latest = client.get(f"/api/daily-work-reports/{employee.employee_id}/{WORK_DATE}").json()
+    assert latest["content"] == ""
+    assert latest["updated_at"]
+
+
+def test_daily_report_audit_failure_cannot_commit_changed_content(client, db_session, monkeypatch):
+    from app.models import DailyWorkReport, ActivityAuditLog
+    employee = _employee(db_session, name="감사 원자성 검수")
+    db_session.commit()
+    assert _put(client, employee, "보존할 내용").status_code == 200
+    before_count = db_session.query(ActivityAuditLog).filter(ActivityAuditLog.action_key == "daily_work_report.save").count()
+
+    def fail_record(*args, **kwargs):
+        raise RuntimeError("daily audit unavailable")
+
+    monkeypatch.setattr("app.services.activity_audit.record", fail_record)
+    with pytest.raises(RuntimeError, match="daily audit unavailable"):
+        _put(client, employee, "기록되면 안 되는 수정")
+    db_session.rollback()
+    assert db_session.query(DailyWorkReport).filter_by(employee_id=employee.employee_id).one().content == "보존할 내용"
+    assert db_session.query(ActivityAuditLog).filter(ActivityAuditLog.action_key == "daily_work_report.save").count() == before_count
+
+
 def test_daily_activity_classifies_warehouse_adjust_as_warehouse():
     log = TransactionLog(transaction_type=TransactionTypeEnum.ADJUST)
 
     for sub_type in ("warehouse_adjust_in", "warehouse_adjust_out"):
         batch = IoBatch(work_type="warehouse_adjust", sub_type=sub_type)
         assert _operation_for(log, batch) == ("warehouse", "창고")
+
+
+def test_daily_activity_counts_one_completed_work_for_multiple_logs_and_keeps_units_separate(client, db_session, make_item):
+    worker = _employee(db_session, name="묶음 단위 검수")
+    ea = make_item(name="묶음 EA")
+    box = make_item(name="묶음 BOX")
+    box.unit = "BOX"
+    batch = IoBatch(work_type="process", sub_type="produce", status="completed", requester_employee_id=worker.employee_id, requester_name=worker.name, requester_department=worker.department)
+    db_session.add(batch)
+    db_session.flush()
+    for item, quantity in [(ea, 2), (box, 3)]:
+        db_session.add(TransactionLog(item_id=item.item_id, transaction_type=TransactionTypeEnum.PRODUCE, quantity_change=Decimal(quantity), operation_batch_id=batch.batch_id, created_at=datetime(2026, 7, 26, 16, 0)))
+    db_session.commit()
+    response = client.get(f"/api/daily-work-reports/{worker.employee_id}/{WORK_DATE}/activity")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert len(body["details"]) == 1
+    assert len(body["details"][0]["logs"]) == 2
+    assert body["summary"] == [{"operation_key": "process", "operation_label": "공정", "work_count": 1, "quantity_by_unit": {"EA": 2, "BOX": 3}}]
+
+
+@pytest.mark.parametrize("legacy_cancelled", [False, True])
+def test_daily_activity_keeps_reversal_detail_without_counting_it_as_completed_work(client, db_session, make_item, legacy_cancelled):
+    from app.models import InventoryOperation, InventoryOperationKindEnum
+    worker = _employee(db_session, name="역거래 검수")
+    item = make_item(name="취소 입고품")
+    business = InventoryOperation(kind=InventoryOperationKindEnum.BUSINESS, domain="WAREHOUSE", action="RECEIVE", display_label="원자재 입고", actor_employee_id=worker.employee_id, actor_name=worker.name, effective_at=datetime(2026, 7, 26, 16, 0))
+    db_session.add(business)
+    db_session.flush()
+    operation = InventoryOperation(kind=InventoryOperationKindEnum.CANCELLATION, domain="WAREHOUSE", action="RECEIVE", display_label="원자재 입고 취소", actor_employee_id=worker.employee_id, actor_name=worker.name, reverses_operation_id=business.operation_id, effective_at=datetime(2026, 7, 26, 17, 0))
+    db_session.add(operation)
+    db_session.flush()
+    original = TransactionLog(item_id=item.item_id, transaction_type=TransactionTypeEnum.RECEIVE, quantity_change=Decimal(3), producer_employee_id=worker.employee_id, cancelled=legacy_cancelled, operation_id=business.operation_id, created_at=datetime(2026, 7, 26, 16, 0))
+    db_session.add(original)
+    db_session.flush()
+    db_session.add(TransactionLog(item_id=item.item_id, transaction_type=TransactionTypeEnum.RECEIVE, quantity_change=Decimal(-3), producer_employee_id=worker.employee_id, operation_id=operation.operation_id, reverses_log_id=original.log_id, created_at=datetime(2026, 7, 26, 17, 0)))
+    db_session.commit()
+    response = client.get(f"/api/daily-work-reports/{worker.employee_id}/{WORK_DATE}/activity")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["summary"] == []
+    assert body["cancelled_count"] == 1
+    assert sum(len(group["logs"]) for group in body["details"]) == 2
+    logs = [log for group in body["details"] for log in group["logs"]]
+    assert {log["operation_kind"] for log in logs} == {"BUSINESS", "CANCELLATION"}
+    assert {log["operation_effective_status"] for log in logs} == {"cancelled", "cancellation"}
+    assert next(log for log in logs if log["operation_kind"] == "CANCELLATION")["executor_name"] == worker.name
+
+
+@pytest.mark.parametrize(
+    ("original_at", "cancel_at", "work_date", "expected_count", "expected_log_count"),
+    [
+        (datetime(2026, 7, 26, 14, 59, 59), datetime(2026, 7, 26, 15), "2026-07-26", 1, 2),
+        (datetime(2026, 7, 26, 14, 59, 59), datetime(2026, 7, 26, 15), "2026-07-27", 1, 2),
+        (datetime(2026, 7, 26, 14, 59, 59), datetime(2026, 7, 26, 15), "2026-07-28", 0, 0),
+        (datetime(2026, 7, 27, 0), datetime(2026, 7, 27, 1), "2026-07-27", 1, 4),
+    ],
+)
+def test_daily_activity_counts_cancellation_once_and_preserves_original_day_status(
+    client: TestClient, db_session: Session, make_item: Callable[..., Any],
+    original_at: datetime, cancel_at: datetime, work_date: str,
+    expected_count: int, expected_log_count: int,
+) -> None:
+    """원본 날짜의 취소 상태와 취소 발생 날짜를 보존하고 같은 작업은 한 건으로 센다."""
+    from app.models import InventoryOperation, InventoryOperationKindEnum
+
+    worker = _employee(db_session, name="취소 날짜 검수")
+    business = InventoryOperation(
+        kind=InventoryOperationKindEnum.BUSINESS, domain="inventory_io", action="receive_supplier",
+        display_label="원자재 입고", actor_employee_id=worker.employee_id,
+        actor_name=worker.name, effective_at=original_at,
+    )
+    db_session.add(business)
+    db_session.flush()
+    cancellation = InventoryOperation(
+        kind=InventoryOperationKindEnum.CANCELLATION, domain="inventory_io", action="receive_supplier",
+        display_label="원자재 입고 취소", actor_employee_id=worker.employee_id,
+        actor_name=worker.name, reverses_operation_id=business.operation_id, effective_at=cancel_at,
+    )
+    db_session.add(cancellation)
+    db_session.flush()
+    for index in range(2):
+        item = make_item(name=f"취소 날짜 검수품 {index}")
+        original = TransactionLog(
+            item_id=item.item_id, transaction_type=TransactionTypeEnum.RECEIVE,
+            quantity_change=2, producer_employee_id=worker.employee_id,
+            operation_id=business.operation_id, created_at=original_at,
+        )
+        db_session.add(original)
+        db_session.flush()
+        db_session.add(TransactionLog(
+            item_id=item.item_id, transaction_type=TransactionTypeEnum.RECEIVE,
+            quantity_change=-2, producer_employee_id=worker.employee_id,
+            operation_id=cancellation.operation_id, reverses_log_id=original.log_id,
+            created_at=cancel_at,
+        ))
+    db_session.commit()
+
+    response = client.get(f"/api/daily-work-reports/{worker.employee_id}/{work_date}/activity")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["summary"] == []
+    assert body["cancelled_count"] == expected_count
+    assert sum(len(group["logs"]) for group in body["details"]) == expected_log_count
+
+
+def test_daily_activity_counts_legacy_cancelled_batch_once(
+    client: TestClient, db_session: Session, make_item: Callable[..., Any],
+) -> None:
+    """역거래가 없는 과거 취소도 품목 행 수가 아닌 저장된 작업 묶음 수로 센다."""
+    worker = _employee(db_session, name="과거 취소 묶음")
+    batch = IoBatch(
+        work_type="warehouse_io", sub_type="warehouse_to_dept", status="completed",
+        requester_employee_id=worker.employee_id, requester_name=worker.name,
+        requester_department=worker.department,
+    )
+    db_session.add(batch)
+    db_session.flush()
+    for index in range(2):
+        item = make_item(name=f"과거 취소 묶음 품목 {index}")
+        db_session.add(TransactionLog(
+            item_id=item.item_id, transaction_type=TransactionTypeEnum.TRANSFER_TO_PROD,
+            quantity_change=0, transfer_qty=2, producer_employee_id=worker.employee_id,
+            operation_batch_id=batch.batch_id, cancelled=True, created_at=datetime(2026, 7, 27, 1),
+        ))
+    db_session.commit()
+
+    response = client.get(f"/api/daily-work-reports/{worker.employee_id}/{WORK_DATE}/activity")
+    assert response.status_code == 200, response.text
+    assert response.json()["summary"] == []
+    assert response.json()["cancelled_count"] == 1
+    assert len(response.json()["details"]) == 1
+
+
+def test_daily_activity_detail_preserves_actual_warehouse_adjust_batch_context(client, db_session, make_item):
+    employee = _employee(db_session, name="창고 조정 문맥 검수")
+    item = make_item()
+    batch = IoBatch(work_type="warehouse_adjust", sub_type="warehouse_adjust_in", status="completed", requester_employee_id=employee.employee_id, requester_name=employee.name, requester_department=employee.department)
+    db_session.add(batch)
+    db_session.flush()
+    db_session.add(TransactionLog(item_id=item.item_id, transaction_type=TransactionTypeEnum.ADJUST, quantity_change=2, operation_batch_id=batch.batch_id, producer_employee_id=employee.employee_id, created_at=datetime(2026, 7, 27, 1)))
+    db_session.commit()
+    response = client.get(f"/api/daily-work-reports/{employee.employee_id}/{WORK_DATE}/activity")
+    assert response.status_code == 200, response.text
+    assert response.json()["summary"][0]["operation_key"] == "warehouse"
+    context = response.json()["details"][0]["logs"][0]["history_batch"]
+    assert context["work_type"] == "warehouse_adjust"
+    assert context["sub_type"] == "warehouse_adjust_in"
 
 
 def _employee(

@@ -37,7 +37,14 @@ export function matchesSearch(item: Item, keyword: string): boolean {
   return matchesItemSearch(item, keyword);
 }
 
+/** 재고 카드와 목록이 같은 PA·PF 제외 모집단을 사용한다. */
+export function isKpiInventoryItem(item: Item): boolean {
+  const process = item.process_type_code?.toUpperCase() ?? item.mes_code?.split("-")[1]?.toUpperCase();
+  return process !== "PA" && process !== "PF";
+}
+
 export function matchesKpi(item: Item, kpi: KpiFilter): boolean {
+  if (!isKpiInventoryItem(item)) return false;
   const qty = safeQty(item);
   const min = getMinStock(item);
   if (kpi === "NORMAL") return qty > 0 && qty >= min;

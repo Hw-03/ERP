@@ -1,0 +1,17 @@
+{
+  "status": "PASS",
+  "recordedAt": "2026-10-14T00:49:02.940Z",
+  "originalGroups": 9,
+  "artifactReferences": 352,
+  "eligibleConditions": 1058,
+  "verifiedReuse": 1058,
+  "newBusinessRuns": 0,
+  "originalReportsUnchanged": true,
+  "originalFeedbackUnchanged": true,
+  "priorHistoryAndBindingsPreserved": true,
+  "generatedLedgerMatches": true,
+  "installedNodePythonAndPackagesMatch": true,
+  "worktreeProtectedDbUnchanged": true,
+  "indexEmpty": true,
+  "strictValidation": "tracked separately; this audit does not replace it"
+}

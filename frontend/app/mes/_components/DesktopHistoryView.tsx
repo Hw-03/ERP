@@ -1,5 +1,6 @@
 "use client";
 import { useDesktopTabHome } from "./DesktopTabHome";
+import { useCurrentOperator } from "./login/useCurrentOperator";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -13,7 +14,6 @@ import { HistoryTable } from "./_history_sections/HistoryTable";
 import type { HistoryTableFocusTarget } from "./_history_sections/HistoryTable";
 import { DesktopHistoryRightPanel } from "./_history_sections/DesktopHistoryRightPanel";
 import { useHistoryGroups } from "./_hooks/useHistoryGroups";
-import { useCurrentOperator } from "./login/useCurrentOperator";
 import { useToggleSet } from "./_hooks/useToggleSet";
 import { useTransactionDisplayCalendarQuery, useTransactionReferenceSummariesQuery, useTransactionsSummaryQuery } from "@/lib/queries/useTransactionsQuery";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
@@ -62,14 +62,24 @@ function DesktopHistoryContent({ employeeId }: { employeeId?: string }) {
   const deptParam = selectedDepts.join(",");
   const opParam = selectedOps.join(",");
   const [dateFilter, setDateFilter] = useState("MONTH");
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  // Reuse the same cached query on tab return without leaking another employee's search.
+  const cachedSearch = employeeId
+    ? queryClient.getQueryData<string>(queryKeys.transactions.searchState(employeeId)) ?? ""
+    : "";
+  const [searchState, setSearchState] = useState({ employeeId, value: cachedSearch });
+  const search = searchState.employeeId === employeeId ? searchState.value : cachedSearch;
+  const setSearch = useCallback((value: string) => {
+    setSearchState({ employeeId, value });
+    if (employeeId) queryClient.setQueryData(queryKeys.transactions.searchState(employeeId), value);
+  }, [employeeId, queryClient]);
+  const [debouncedState, setDebouncedState] = useState({ employeeId, value: search.trim() });
+  const debouncedSearch = debouncedState.employeeId === employeeId ? debouncedState.value : search.trim();
 
   // search debounce — 목록과 달력 fetch 가 같은 값을 공유.
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS);
+    const t = setTimeout(() => setDebouncedState({ employeeId, value: search.trim() }), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
-  }, [search]);
+  }, [employeeId, search]);
 
   // 필터 패널 "모델 구분" 칩 소스 — useModelsQuery 캐시에서 모델명만 추려 dedup.
   const availableModels = useMemo(

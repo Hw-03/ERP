@@ -41,7 +41,7 @@ export function useResetMyItemOrderMutation() {
   return useMutation({
     mutationFn: (employeeId: string) => itemsApi.resetMyItemOrder(employeeId),
     onSuccess: (_data, employeeId) => {
-      void qc.invalidateQueries({
+      return qc.invalidateQueries({
         queryKey: queryKeys.myItemOrder.byEmployee(employeeId),
       });
     },

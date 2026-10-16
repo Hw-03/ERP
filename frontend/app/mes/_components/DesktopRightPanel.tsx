@@ -51,6 +51,7 @@ export function DesktopRightPanel({
   titleId,
   subtitle,
   subtitleBadge,
+  subtitleAction,
   headerBadge,
   backButton,
   headerAction,
@@ -67,6 +68,7 @@ export function DesktopRightPanel({
   titleId?: string;
   subtitle?: string;
   subtitleBadge?: React.ReactNode;
+  subtitleAction?: ReactNode;
   headerBadge?: React.ReactNode;
   backButton?: React.ReactNode;
   headerAction?: React.ReactNode;
@@ -118,10 +120,18 @@ export function DesktopRightPanel({
                 >
                   {title}
                 </TruncatedText>
-                {subtitle || subtitleBadge ? (
+                {subtitle || subtitleBadge || subtitleAction ? (
                   <div className="mt-1.5 flex items-center gap-2 text-sm leading-6" style={{ color: LEGACY_COLORS.muted2 }}>
-                    {subtitle ? <span>{subtitle}</span> : null}
-                    {subtitleBadge}
+                    {subtitleAction ? <>
+                      <div className="min-w-0 flex flex-wrap items-center gap-2 break-all">
+                        {subtitle ? <span>{subtitle}</span> : null}
+                        {subtitleBadge}
+                      </div>
+                      <div className="ml-auto shrink-0">{subtitleAction}</div>
+                    </> : <>
+                      {subtitle ? <span>{subtitle}</span> : null}
+                      {subtitleBadge}
+                    </>}
                   </div>
                 ) : null}
               </div>

@@ -13,6 +13,7 @@ from app.routers.inventory._tx_filters import (_batch_name_map, _history_batch_r
     _history_request_date_expr, _stock_request_info_map, _to_log_response)
 from app.services import inventory_operation_cancellation as cancellation_svc
 from app.services.request_order_stock import load_request_order_stock
+from app.services.inventory_effect_history import load_inventory_effect_quantities
 
 
 def item_operation_ids(db: Session, item_id: uuid.UUID) -> set[uuid.UUID]:
@@ -76,8 +77,8 @@ def _line_payload(
     return {
         "log_id": str(log.log_id),
         "item_id": str(log.item_id),
-        "item_name": item.item_name if item else None,
-        "mes_code": item.mes_code if item else None,
+        "item_name": history_log.item_name if history_log else item.item_name if item else None,
+        "mes_code": history_log.mes_code if history_log else item.mes_code if item else None,
         "transaction_type": log.transaction_type.value,
         "quantity_change": str(log.quantity_change),
         "quantity_before": (
@@ -113,6 +114,7 @@ def _history_log_map(
         db, {log.reference_no for log in logs if log.reference_no}
     )
     response_by_log_id: dict[uuid.UUID, TransactionLogResponse] = {}
+    effect_quantities = load_inventory_effect_quantities(db, logs)
     for log in logs:
         item = items.get(log.item_id)
         if item is None:
@@ -132,6 +134,8 @@ def _history_log_map(
             history_batch=_history_batch_response(batch_map.get(log.operation_batch_id)),
         )
         response.request_order_stock = request_order_stock.get(log.log_id)
+        if log.log_id in effect_quantities:
+            response.inventory_effect = effect_quantities[log.log_id]
         response_by_log_id[log.log_id] = response
     return response_by_log_id
 
@@ -192,6 +196,7 @@ def operation_payload(
             db,
             item_ids,
             request_date_expr=_history_request_date_expr(),
+            target_log_ids={log.log_id for log in logs},
         )
     history_logs = _history_log_map(
         db,

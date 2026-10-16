@@ -11,3 +11,9 @@
 
 # Audit originals and execution artifacts retain their exact evidence bytes.
 docs/superpowers/specs/2026-10-07-mes-expectations.sources/** -text
+# Preserved Windows JSON snapshots use CRLF without changing their source hashes.
+docs/superpowers/specs/2026-10-07-mes-expectations.sources/schema1-policy.json whitespace=trailing-space,space-before-tab,cr-at-eol
+docs/superpowers/specs/2026-10-07-mes-expectations.sources/schema1-registry.json whitespace=trailing-space,space-before-tab,cr-at-eol
+# Preserve the reviewed-reuse execution logs, including their original CRLF bytes.
+docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/local-seven.log whitespace=trailing-space,space-before-tab,cr-at-eol
+docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/strict-completion.txt whitespace=trailing-space,space-before-tab,cr-at-eol

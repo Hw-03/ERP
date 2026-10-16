@@ -29,6 +29,7 @@ export const departmentsApi = {
     id: number,
     payload: {
       name?: string;
+      display_name?: string;
       display_order?: number;
       is_active?: boolean;
       color_hex?: string | null;

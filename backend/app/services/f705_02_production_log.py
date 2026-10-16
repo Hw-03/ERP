@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 import zipfile
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Item, ProductSymbol, TransactionLog, TransactionTypeEnum
 from app.services.pf_shipping_completion import list_pf_shipping_completions
+from app.services.weekly_inventory_snapshot import sunday_cutoff_utc
 
 
 TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "assets" / "f705_02_template.xlsx"
@@ -36,6 +37,7 @@ _Q = lambda name: f"{{{_XLSX_NS}}}{name}"
 _PROCESS_CODES = ("HF", "VF", "NF", "AF", "PF")
 _MODELS = ("DX3000", "ADX4000W", "ADX6000FB", "COCOON", "SOLO")
 _COMPONENT_CHANGE_PHASE = "COMPONENT_CHANGE"
+_KST = timezone(timedelta(hours=9))
 _ROW_MAP = {
     "HF": {"DX3000": 3, "ADX4000W": 4, "ADX6000FB": 5, "COCOON": 6, "SOLO": 7},
     "VF": {"DX3000": 9, "ADX4000W": 10, "ADX6000FB": 11, "COCOON": 12, "SOLO": 13},
@@ -75,8 +77,9 @@ def collect_daily_quantities(db: Session, year: int) -> DailyQuantities:
     absolute.  This matches the weekly matrix's item-level aggregation when a
     report is queried for one day.
     """
-    start = datetime(year, 1, 1)
-    end = datetime(year + 1, 1, 1)
+    # Ledger timestamps are UTC-naive; the workbook's year and days are KST.
+    start = datetime(year, 1, 1, tzinfo=_KST).astimezone(timezone.utc).replace(tzinfo=None)
+    end = datetime(year + 1, 1, 1, tzinfo=_KST).astimezone(timezone.utc).replace(tzinfo=None)
     logs_and_items = (
         db.query(Item, TransactionLog.quantity_change, TransactionLog.created_at)
         .join(TransactionLog, Item.item_id == TransactionLog.item_id)
@@ -111,7 +114,7 @@ def collect_daily_quantities(db: Session, year: int) -> DailyQuantities:
         process = item.process_type_code or ""
         if model is None or process not in _ROW_MAP or created_at is None:
             continue
-        key = (created_at.date(), str(item.item_id), process, model)
+        key = ((created_at.replace(tzinfo=timezone.utc).astimezone(_KST)).date(), str(item.item_id), process, model)
         by_item_day[key] += Decimal(str(quantity_change or 0))
 
     quantities: DailyQuantities = {}
@@ -122,7 +125,17 @@ def collect_daily_quantities(db: Session, year: int) -> DailyQuantities:
         daily_quantities = quantities.setdefault(occurred_on, {})
         daily_quantities[(process, model)] = daily_quantities.get((process, model), 0) + absolute_quantity
 
-    for completion in list_pf_shipping_completions(db, start_at=start, end_at=end):
+    # A later cancellation must not rewrite a closed week's exported PF cells.
+    # Keep the annual file's day buckets, but use the weekly report's cutoff.
+    now = datetime.now(timezone.utc)
+    today = now.astimezone(_KST).date()
+    def cancellation_cutoff(completed_at: datetime) -> datetime:
+        """Preserve closed-week figures, including weeks spanning a year boundary."""
+        occurred_on = completed_at.replace(tzinfo=timezone.utc).astimezone(_KST).date()
+        week_end = occurred_on + timedelta(days=6 - occurred_on.weekday())
+        return now.replace(tzinfo=None) if week_end - timedelta(days=6) <= today <= week_end else sunday_cutoff_utc(week_end)
+
+    for completion in list_pf_shipping_completions(db, start_at=start, end_at=end, cancellation_as_of=cancellation_cutoff):
         symbol = (completion.model_symbol or "").strip()
         model = symbols.get(symbol)
         if model not in _MODELS:
@@ -130,7 +143,8 @@ def collect_daily_quantities(db: Session, year: int) -> DailyQuantities:
         quantity = int(completion.quantity)
         if quantity == 0:
             continue
-        daily_quantities = quantities.setdefault(completion.completed_at.date(), {})
+        occurred_on = completion.completed_at.replace(tzinfo=timezone.utc).astimezone(_KST).date()
+        daily_quantities = quantities.setdefault(occurred_on, {})
         daily_quantities[("PF", model)] = daily_quantities.get(("PF", model), 0) + quantity
     return quantities
 

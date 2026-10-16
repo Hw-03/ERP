@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "kind": "historical-baseline-preservation",
+  "preservedAt": "2026-10-15",
+  "originalCommit": "f4f41e6be6fe02e42c2ebeb183962120f7193817",
+  "originals": [
+    {
+      "path": "docs/superpowers/specs/2026-10-07-mes-expectations.assertions.json",
+      "commit": "f4f41e6be6fe02e42c2ebeb183962120f7193817",
+      "gitBlob": "93e0914e11d11683d9c3a385cfdbb0fb9acb4835",
+      "gitBytesSha256": "fbcf94c39bbba199c1a84827ecffcb947324e71895056403edffd969fa6ddc5b",
+      "localBytesSha256": "6b328f7c43e619b6ed5ccafedb88eec4adf4e0e637f3c1b5103229d1588cea0e"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-07-mes-expectations.json",
+      "commit": "f4f41e6be6fe02e42c2ebeb183962120f7193817",
+      "gitBlob": "6e935894ec96b59cb3b3a0da4aacb3bb4707ff5e",
+      "gitBytesSha256": "a1295db836ee8c858a69115fecbe3a189d99b160edf85a2a9e3d3a82d08d1a5f",
+      "localBytesSha256": "65b201a337f8770d14d515030cce155139b348bd8a9aaf2966c19a5a662ee9e8"
+    }
+  ],
+  "originalConditions": 1058,
+  "evidenceReferences": [
+    {
+      "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/history-width-ci-20261014/node-a86a95cbd0-baseline.json",
+      "evidenceHash": "f116ae6c59c6be795d4cd108ce01d6421309013ffacf829fb26fd90218547ad6"
+    },
+    {
+      "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/history-width-ci-20261014/node-ff9f8c06ce-baseline.json",
+      "evidenceHash": "d7fa2765b9769d21fd79631933a03341744ef13791ab5f4a0efa07e4d96251a0"
+    },
+    {
+      "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/history-width-ci-20261014/node-6cec52101c-baseline.json",
+      "evidenceHash": "41ada72fb938dd613b1f0d8fb31628102d2c0594d104e3a5ce37ff67cc623a15"
+    },
+    {
+      "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/history-width-ci-20261014/pytest-0929f3cdc2-baseline.json",
+      "evidenceHash": "d1fbfa516643476ff3005f1f54516663e8966198e83f86101d2c5ab34946b878"
+    },
+    {
+      "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/history-width-ci-20261014/playwright-a39d40068b-baseline.json",
+      "evidenceHash": "bb75020ec729be526ab06fddbfefc5a3266913f9de64bed712d7d62147de57af"
+    },
+    {
+      "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/history-width-ci-20261014/vitest-d4c81f0c18-baseline.json",
+      "evidenceHash": "39770a575d2a6ac658fb76190713a4cbf9a8df340c63048f1bac91f2791efb68"
+    },
+    {
+      "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/history-width-ci-20261014/pytest-6eb3066497-baseline.json",
+      "evidenceHash": "6a1cccc4534af906ab6dd2bcf09c4c07728e527704e4ce06f3fd7f17d584f591"
+    },
+    {
+      "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/history-width-ci-20261014/playwright-411a1b28c5-baseline.json",
+      "evidenceHash": "c8d385e77ae0239ec6cfd7b51a486c141b1e70eeb4d70ccb2e488445e53f587c"
+    },
+    {
+      "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/history-width-ci-20261014/playwright-8338f033f9-baseline.json",
+      "evidenceHash": "5ba1744b31de324830c7d9569605f07cbe7fe5968bbc5ca748699ddcc2d76add"
+    }
+  ],
+  "currentExecution": "NOT_RUN",
+  "note": "과거 완료의 원본 Git blob·실행 보고서는 보존한다. 새 통합 조합의 실행 결과는 별도 국소 검사와 CI 기록이며 전체 기대값 PASS로 승격하지 않는다."
+}

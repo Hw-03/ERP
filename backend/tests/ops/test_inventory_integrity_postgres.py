@@ -524,7 +524,7 @@ def _break_invariant(session: Session, item: Item, case_name: str) -> None:
                 quantity_change=1,
                 operation_id=operation.operation_id,
                 created_at=datetime(2026, 9, 1, 23, 59),
-                inventory_effect=[{"scope": "warehouse", "delta": 1}],
+                inventory_effect=[{"scope": "warehouse", "delta": "invalid"}],
             )
         )
     else:

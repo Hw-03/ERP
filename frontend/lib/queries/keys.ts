@@ -77,6 +77,7 @@ export const queryKeys = {
     operations: (params?: object) => ["transactions", "operations", params ?? {}] as const,
     displayCalendar: (params: object) => ["transactions", "displayCalendar", params] as const,
     batchCache: () => ["transactions", "batchCache"] as const,
+    searchState: (employeeId: string) => ["transactions", "searchState", employeeId] as const,
     summary: (params?: object) => ["transactions", "summary", params ?? {}] as const,
     referenceSummaries: (params?: object) => ["transactions", "referenceSummaries", params ?? {}] as const,
     edits: (logId: string) => ["transactions", "edits", logId] as const,

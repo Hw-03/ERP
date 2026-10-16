@@ -29,6 +29,7 @@ function WeeklyDetailTableImpl({ group, stockBasis, onItemSelect, loading = fals
         description=""
         compact
         illustrated
+        aboveFold
         className="min-h-[200px]"
       />
     );

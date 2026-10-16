@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 4,
+  "kind": "baseline-verification",
+  "original": {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/reviewed-reuse-20261014/node-a86a95cbd0-reuse.json",
+    "sha256": "7b08679f83264c66e06f708d04a66bdc14f4d8f7d7b99337fc511441111067fb"
+  },
+  "review": {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/history-width-ci-20261014/review.json",
+    "sha256": "7cdd95aea2e985414c1f1c35c0389f31feedaa629e61fd508a666cbc6ef6c2c6"
+  }
+}

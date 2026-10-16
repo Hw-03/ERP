@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Employee, ShippingRequest
@@ -11,10 +12,36 @@ from app.services import shipping as shipping_svc
 from app.services._tx import transactional
 
 
-def create_request(db: Session, payload: dict) -> ShippingRequest:
-    """출하 요청 생성 전체를 원자적으로 확정한다."""
-    with transactional(db):
-        return shipping_svc.create_request(db, payload)
+def _submission_match(request: ShippingRequest, payload_hash: str | None) -> ShippingRequest:
+    """수정된 현재 요청 대신 최초 제출 내용을 비교해 재시도만 허용한다."""
+    if payload_hash is None or request.submission_payload_hash != payload_hash:
+        raise shipping_svc.ShippingConflictError("같은 요청 키에 다른 출하 내용이 전달되었습니다.")
+    return request
+
+
+def create_request(
+    db: Session,
+    payload: dict,
+    *,
+    request_id: uuid.UUID | None = None,
+    submission_payload_hash: str | None = None,
+) -> ShippingRequest:
+    """최초 제출 해시와 요청을 함께 확정하고 동시 재전송은 PK로 중복 방지한다."""
+    try:
+        with transactional(db):
+            if request_id is not None:
+                existing = db.get(ShippingRequest, request_id)
+                if existing is not None:
+                    return _submission_match(existing, submission_payload_hash)
+            return shipping_svc.create_request(
+                db, payload, request_id=request_id, submission_payload_hash=submission_payload_hash,
+            )
+    except IntegrityError:
+        # The failed transaction has rolled back; a concurrent winner is now visible.
+        existing = db.get(ShippingRequest, request_id) if request_id is not None else None
+        if existing is None:
+            raise
+        return _submission_match(existing, submission_payload_hash)
 
 
 def update_request(

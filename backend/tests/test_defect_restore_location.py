@@ -87,11 +87,22 @@ def test_restore_uses_original_normal_cell_and_cancel_restores_quarantine(
                   for entry in log.inventory_effect}
         assert effect == {normal_key: int(log.transfer_qty),
                           ("location", department.value, "DEFECTIVE"): -int(log.transfer_qty)}
-    for log in reversed(logs):
+    if mode == "bulk":
+        assert len({log.operation_id for log in logs}) == 1
+    for index, log in enumerate(reversed(logs)):
         cancelled = client.post(f"/api/inventory/transactions/{log.log_id}/cancel", json={
             "employee_code": actor.employee_code, "pin": "0000", "reason": "복귀 취소 검증",
         })
-        assert cancelled.status_code == 200, cancelled.text
+        assert cancelled.status_code == (422 if index else 200), cancelled.text
+        db_session.expire_all()
+        assert inv_effect.snapshot_cells(db_session, item.item_id) == before
+        assert sum(record.remaining_quantity for record in records) == 2
     db_session.expire_all()
     assert inv_effect.snapshot_cells(db_session, item.item_id) == before
     assert sum(record.remaining_quantity for record in records) == 2
+    original_ids = {log.log_id for log in logs}
+    reversals = db_session.query(TransactionLog).filter(
+        TransactionLog.reverses_log_id.in_(original_ids),
+    ).all()
+    assert len(reversals) == len(logs)
+    assert {log.reverses_log_id for log in reversals} == original_ids

@@ -141,6 +141,45 @@ describe("usePutMyItemOrderMutation", () => {
 // ─── useResetMyItemOrderMutation ──────────────────────────────────────────
 
 describe("useResetMyItemOrderMutation", () => {
+  it("초기화 완료는 기본 순서 재조회까지 기다리고 다른 직원 순서는 보존한다", async () => {
+    const oldOrder = [{ item_id: "B", display_order: 0 }, { item_id: "A", display_order: 1 }];
+    const otherOrder = [{ item_id: "OTHER", display_order: 0 }];
+    let reads = 0;
+    let finishRead!: (response: Response) => void;
+    const resetRead = new Promise<Response>((resolve) => { finishRead = resolve; });
+    globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "DELETE") return Promise.resolve(makeResponse({ ok: true }));
+      if (String(input).includes("employee_id=emp2")) return Promise.resolve(makeResponse(otherOrder));
+      reads++;
+      return reads === 1 ? Promise.resolve(makeResponse(oldOrder)) : resetRead;
+    }) as typeof fetch;
+    const client = makeClient();
+    const { result, unmount } = renderHook(() => ({
+      order: useMyItemOrderQuery("emp1"),
+      other: useMyItemOrderQuery("emp2"),
+      reset: useResetMyItemOrderMutation(),
+    }), { wrapper: makeWrapper(client) });
+    await waitFor(() => expect(result.current.order.data).toEqual(oldOrder));
+    await waitFor(() => expect(result.current.other.data).toEqual(otherOrder));
+    let completed = false;
+    let mutation!: Promise<void>;
+    try {
+      await act(async () => {
+        mutation = result.current.reset.mutateAsync("emp1").then(() => { completed = true; });
+      });
+      await waitFor(() => expect(reads).toBe(2));
+      expect(completed).toBe(false);
+      expect(result.current.reset.isPending).toBe(true);
+    } finally {
+      await act(async () => { finishRead(makeResponse([])); await mutation; });
+    }
+    await waitFor(() => expect(result.current.order.data).toEqual([]));
+    expect(result.current.other.data).toEqual(otherOrder);
+    expect(completed).toBe(true);
+    unmount();
+    client.clear();
+  });
+
   it("DELETE 호출 후 my-order 쿼리 invalidate", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ ok: true })));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;

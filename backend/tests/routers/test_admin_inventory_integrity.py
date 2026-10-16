@@ -29,6 +29,38 @@ from app.models import (
 ADMIN_HEADERS = {"X-Admin-Pin": "0000"}
 
 
+def test_admin_integrity_returns_all_engine_problems_without_mutation_but_default_stays_bounded(client, db_session, make_item):
+    from app.models import Inventory
+    from app.services.inventory_integrity import diagnose_inventory_integrity
+
+    items = [make_item(name=f"전체 상세 검수 {index}", warehouse_qty=Decimal("1")) for index in range(7)]
+    ids = {item.item_id for item in items}
+    rows = db_session.query(Inventory).filter(Inventory.item_id.in_(ids)).all()
+    for row in rows:
+        row.quantity = Decimal("2")
+    db_session.commit()
+    before = [(row.item_id, row.quantity, row.warehouse_qty, row.pending_quantity) for row in rows]
+    before_logs = db_session.query(TransactionLog).count()
+    first = client.get("/api/admin/inventory-integrity", headers=ADMIN_HEADERS)
+    second = client.get("/api/admin/inventory-integrity", headers=ADMIN_HEADERS)
+    assert first.status_code == second.status_code == 200
+    first_check = next(check for check in first.json()["checks"] if check["check_id"] == "INVENTORY_TOTAL_MISMATCH")
+    second_check = next(check for check in second.json()["checks"] if check["check_id"] == "INVENTORY_TOTAL_MISMATCH")
+    assert first_check["count"] == 7
+    assert len(first_check["samples"]) == 7
+    assert {sample["item_id"] for sample in first_check["samples"]} == {str(item_id) for item_id in ids}
+    assert all(sample["stored_quantity"] == 2 and sample["computed_quantity"] == 1 for sample in first_check["samples"])
+    assert first_check == second_check
+    bounded = diagnose_inventory_integrity(db_session).contract_payload()
+    bounded_check = next(check for check in bounded["checks"] if check["check_id"] == "INVENTORY_TOTAL_MISMATCH")
+    assert bounded_check["count"] == 7
+    assert len(bounded_check["samples"]) == 5
+    db_session.expire_all()
+    assert before == [(row.item_id, row.quantity, row.warehouse_qty, row.pending_quantity) for row in rows]
+    assert db_session.query(TransactionLog).count() == before_logs
+
+
+
 def _operation(*, kind: InventoryOperationKindEnum, reverses=None) -> InventoryOperation:
     return InventoryOperation(
         operation_id=uuid.uuid4(),

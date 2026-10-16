@@ -32,6 +32,9 @@ export interface UseAdminBootstrapOptions {
 }
 
 export interface UseAdminBootstrapResult {
+  loading: boolean;
+  hasData: boolean;
+  loadError: string | null;
   items: Item[];
   setItems: React.Dispatch<React.SetStateAction<Item[]>>;
   employees: Employee[];
@@ -57,8 +60,13 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
   const [productModels, setProductModels] = useState<ProductModel[]>([]);
   const [allBomRows, setAllBomRows] = useState<BOMDetailEntry[]>([]);
   const [departments, setDepartments] = useState<DepartmentMaster[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [hasData, setHasData] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const loadGeneration = useRef(0);
   const itemsRequestId = useRef(0);
   const employeesRequestId = useRef(0);
+  const departmentsRequestId = useRef(0);
   const allBomRequestId = useRef(0);
 
   // 개인 저장 결과보다 먼저 시작한 조회가 저장 상태를 되돌리지 않게 한다.
@@ -74,8 +82,13 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
   }, [modelsData]);
 
   const loadData = useCallback(async () => {
+    const generation = ++loadGeneration.current;
+    setLoading(true);
+    setLoadError(null);
     const requestId = ++itemsRequestId.current;
     const employeeRequestId = ++employeesRequestId.current;
+    const departmentRequestId = ++departmentsRequestId.current;
+    try {
     const [nextItems, nextEmployees, nextDepts] = await Promise.all([
       api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
       api.getEmployees({ activeOnly: false }),
@@ -83,7 +96,16 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
     ]);
     if (requestId === itemsRequestId.current) setItems(nextItems);
     if (employeeRequestId === employeesRequestId.current) setEmployeesState(nextEmployees);
-    setDepartments(nextDepts);
+    if (departmentRequestId === departmentsRequestId.current) setDepartments(nextDepts);
+    if (generation === loadGeneration.current) {
+      setHasData(true);
+    }
+    } catch (error) {
+      if (generation === loadGeneration.current) setLoadError(error instanceof Error ? error.message : "관리자 데이터를 불러오지 못했습니다.");
+      throw error;
+    } finally {
+      if (generation === loadGeneration.current) setLoading(false);
+    }
   }, [globalSearch]);
 
   const refreshAllBom = useCallback(() => {
@@ -111,6 +133,13 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
     if (requestId === employeesRequestId.current) setEmployeesState(next);
   }, []);
 
+  // 부서 후보만 갱신하여 열린 직원 편집 입력을 보존한다.
+  const refreshDepartments = useCallback(async (): Promise<void> => {
+    const requestId = ++departmentsRequestId.current;
+    const next = await api.getDepartments();
+    if (requestId === departmentsRequestId.current) setDepartments(next);
+  }, []);
+
   // items/employees/departments 부트스트랩 — unlocked + globalSearch 변화 시
   useEffect(() => {
     if (!unlocked) return;
@@ -133,10 +162,14 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
     void refreshEmployees().catch((nextError) =>
       onError(nextError instanceof Error ? nextError.message : "직원 목록을 새로고침하지 못했습니다."),
     );
+    void refreshDepartments().catch((nextError) =>
+      onError(nextError instanceof Error ? nextError.message : "부서 후보를 새로고침하지 못했습니다."),
+    );
     refreshAllBom();
-  }, [unlocked, realtimeRevision, refreshItems, refreshEmployees, refreshAllBom, onError]);
+  }, [unlocked, realtimeRevision, refreshItems, refreshEmployees, refreshDepartments, refreshAllBom, onError]);
 
   return {
+    loading, hasData, loadError,
     items, setItems,
     employees, setEmployees,
     productModels, setProductModels,

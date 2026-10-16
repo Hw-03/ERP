@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="Vitest 원본 JSON의 모든 파라미터 인스턴스를 선언 위치에 연결한다" time="0.011104" classname="test"/>
+	<testcase name="0매칭·파라미터 일부·중복·SKIP·다른 선언 위치는 PASS가 아니다" time="0.001093" classname="test"/>
+	<testcase name="실제 runner 실패·재시도·expected failure는 성공 목록으로 덮어쓸 수 없다" time="0.000856" classname="test"/>
+	<testcase name="Playwright 프로젝트·선언 위치·재시도 없는 실제 성공을 검증한다" time="0.000790" classname="test"/>
+	<testcase name="JUnit은 XML parser로 읽으며 실패·skip과 HTML entity를 보존한다" time="0.280416" classname="test"/>
+	<testcase name="입력 snapshot은 CRLF 차이를 무시하고 파일 추가·삭제·본문 변경을 탐지한다" time="0.002827" classname="test"/>
+	<testcase name="조건 지문은 원문과 연결 변경을 탐지하고 실행 기록 갱신에는 영향받지 않는다" time="0.000945" classname="test"/>
+	<testcase name="schema 2는 raw runner·조건 지문·제품 snapshot을 함께 검증한다" time="0.001644" classname="test"/>
+	<testcase name="제품 변경·raw 변조·exit 실패·다른 조건·입력 축소·옛 요약 PASS를 거부한다" time="0.002785" classname="test"/>
+	<testcase name="browser 필수 조건은 unit 결과로 닫지 않으며 DB·fixture 식별을 요구한다" time="0.001076" classname="test"/>
+	<testcase name="전체 수집 목록에 있는 파라미터를 raw와 요약에서 함께 빼도 탐지한다" time="0.000968" classname="test"/>
+	<testcase name="Vitest 공식 JSON이 숨기는 retry/fails 상태는 runner 관찰 자료에서 확인한다" time="0.002065" classname="test"/>
+	<testcase name="공유 테스트 helper·bootstrap·실제 프론트 설정도 관련 입력에 포함한다" time="0.001120" classname="test"/>
+	<testcase name="브라우저 성공 화면은 원본 첨부와 연결된 바이트 근거가 있어야 한다" time="0.004959" classname="test"/>
+	<!-- tests 14 -->
+	<!-- suites 0 -->
+	<!-- pass 14 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 447.6412 -->
+</testsuites>

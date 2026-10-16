@@ -24,6 +24,8 @@ const apiMocks = vi.hoisted(() => ({
   listStockRequestDrafts: vi.fn(),
   listDrafts: vi.fn(),
   countAsResearchQueue: vi.fn(),
+  countWarehouseQueue: vi.fn(),
+  countDepartmentQueue: vi.fn(),
 }));
 
 const operatorState = vi.hoisted(() => ({
@@ -58,14 +60,17 @@ vi.mock("@/app/mes/_components/_warehouse_sections/WarehouseDraftPanelTabs", () 
     onContinueIoDraft,
     onEmptyStateChange,
     targetRequestId,
+    canSeeQueue, canSeeDeptQueue, canSeeAsResearchQueue,
   }: {
     sectionTab: string;
     onContinueIoDraft?: (draft: never) => void;
     onEmptyStateChange?: (empty: boolean) => void;
     targetRequestId?: string | null;
+    canSeeQueue: boolean; canSeeDeptQueue: boolean; canSeeAsResearchQueue: boolean;
   }) => {
     currentWorkAreaProps.value = { onEmptyStateChange, targetRequestId };
     if (sectionTab === "compose") return null;
+    if ((sectionTab === "queue" && !canSeeQueue) || (sectionTab === "dept-queue" && !canSeeDeptQueue) || (sectionTab === "as-research-queue" && !canSeeAsResearchQueue)) return null;
 
     return (
       <>
@@ -92,6 +97,7 @@ vi.mock("@/app/mes/_components/_warehouse_v2/IoComposeView", () => ({
     currentComposeProps.value = props;
     return (
       <div data-testid="io-compose-view">
+        <input aria-label="작성 중인 수량" defaultValue="7" />
         <button type="button" data-testid="item-conversion-focus" onClick={() => props.onItemConversionFocusChange(true)}>
           품목 전환 포커스
         </button>
@@ -113,6 +119,8 @@ describe("DesktopWarehouseView", () => {
     apiMocks.listStockRequestDrafts.mockReturnValue(new Promise(() => {}));
     apiMocks.listDrafts.mockReturnValue(new Promise(() => {}));
     apiMocks.countAsResearchQueue.mockResolvedValue({ count: 0 });
+    apiMocks.countWarehouseQueue.mockReset().mockReturnValue(new Promise(() => {}));
+    apiMocks.countDepartmentQueue.mockReset().mockReturnValue(new Promise(() => {}));
     operatorState.value = {
       employee_id: "emp-1",
       warehouse_role: "none",
@@ -139,6 +147,36 @@ describe("DesktopWarehouseView", () => {
     expect(tabs[1]).toHaveTextContent("작성 중");
     expect(tabs[2]).toHaveTextContent("내 요청");
     tabs.forEach((tab) => expect(tab).toBeVisible());
+  });
+
+  it.each(["queue", "dept-queue", "as-research-queue"])("열린 %s 역할 회수는 빈 업무영역 대신 기본 요청으로 복구한다", (section) => {
+    apiMocks.countAsResearchQueue.mockReturnValue(new Promise(() => {}));
+    operatorState.value = { ...operatorState.value, warehouse_role: "primary", department_role: "deputy", as_research_approver: true };
+    const historyState = { __NA: true, tree: ["mes"], mobileShippingIndex: 4 };
+    window.history.replaceState(historyState, "", `/mes?tab=warehouse&section=${section}&stockRequestId=old-request`);
+    const view = render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "continue draft" })).toBeInTheDocument();
+    expect(screen.queryByTestId("io-compose-view")).not.toBeInTheDocument();
+    operatorState.value = { ...operatorState.value, ...(section === "queue" ? { warehouse_role: "none" } : section === "dept-queue" ? { department_role: "none" } : { as_research_approver: false }) };
+    view.rerender(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+    expect(screen.getByTestId("io-compose-view")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "continue draft" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /요청 작성/ })).toHaveAttribute("aria-selected", "true");
+    expect(window.location.search).toBe("?tab=warehouse");
+    expect(window.history.state).toMatchObject(historyState);
+  });
+
+  it("작성 중 기본 요청에서 역할 갱신은 입력과 복원 URL을 초기화하지 않는다", () => {
+    operatorState.value = { ...operatorState.value, warehouse_role: "primary" };
+    window.history.replaceState({ __NA: true }, "", "/mes?tab=warehouse&step=3");
+    const view = render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+    const input = screen.getByLabelText("작성 중인 수량");
+    fireEvent.change(input, { target: { value: "13" } });
+    operatorState.value = { ...operatorState.value, warehouse_role: "none" };
+    view.rerender(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+    expect(screen.getByLabelText("작성 중인 수량")).toBe(input);
+    expect(input).toHaveValue("13");
+    expect(window.location.search).toBe("?tab=warehouse&step=3");
   });
 
   it("AS·연구 권한 없이 전용 딥링크로 진입하면 승인함과 패널을 열지 않는다", () => {
@@ -440,6 +478,26 @@ describe("DesktopWarehouseView", () => {
     await waitFor(() => expect(screen.getByTestId("item-conversion-focus")).toBeInTheDocument());
     expect(currentComposeProps.value?.restoreDraft?.batch_id).toBe("draft-1");
     expect(currentComposeProps.value?.restoreStep).toBe(4);
+  });
+
+  it("늦은 URL 초안 응답은 선택한 작성 중 탭을 요청 작성으로 되돌리지 않는다", async () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=4&draftId=saved-draft");
+    apiMocks.listStockRequestDrafts.mockResolvedValue([]);
+    let resolveDrafts!: (rows: { batch_id: string }[]) => void;
+    apiMocks.listDrafts.mockReturnValue(new Promise<{ batch_id: string }[]>((resolve) => { resolveDrafts = resolve; }));
+    render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: /작성 중/ }));
+    expect(screen.getByRole("tab", { name: /작성 중/ })).toHaveAttribute("aria-selected", "true");
+    await act(async () => resolveDrafts([{ batch_id: "saved-draft" }]));
+
+    expect(screen.getByRole("tab", { name: /작성 중/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "continue draft" })).toBeInTheDocument();
+    expect(screen.queryByTestId("io-compose-view")).not.toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get("section")).toBe("cart");
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "continue draft" })));
+    expect(currentComposeProps.value?.restoreDraft?.batch_id).toBe("draft-2");
+    expect(screen.getByRole("tab", { name: /요청 작성/ })).toHaveAttribute("aria-selected", "true");
   });
 
   it("keeps a URL draft restore error visible and retries instead of opening a blank compose", async () => {

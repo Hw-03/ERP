@@ -7,6 +7,7 @@ import binascii
 import csv
 import json
 import logging
+import sqlite3
 from time import perf_counter
 import uuid
 from calendar import monthrange
@@ -18,10 +19,12 @@ from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import String, and_, case, cast, func, literal, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy import String, and_, case, cast, func, literal, literal_column, or_, select
+from sqlalchemy.exc import DataError
+from sqlalchemy.orm import Query as ORMQuery, Session, load_only
 from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.engine import Row
+from sqlalchemy.sql.selectable import SelectBase
 
 from app.database import get_db
 from app.models import (
@@ -46,6 +49,7 @@ from app.schemas import (
     TransactionQuantityCorrectionResponse,
 )
 from app.services import transaction_actions as transaction_actions_svc
+from app.services.transaction_item_identity import transaction_item_identity
 from app.services import inventory_operation_cancellation as operation_cancellation_svc
 from app.services import legacy_inventory_operation_adoption as legacy_adoption_svc
 from app.services.transaction_display_groups import DisplayGroup, DisplayGroupRecord, group_display_records
@@ -58,6 +62,7 @@ from app.services.item_search import build_item_search_filter, get_search_config
 from app._actor import set_actor
 from app.routers.inventory._tx_filters import (
     KST,
+    LEGACY_DEFECT_REWORK_REFERENCE_PREFIX,
     _SUMMARY_WAREHOUSE_TYPES,
     _SUMMARY_DEPT_TYPES,
     _SUMMARY_ADJUST_TYPES,
@@ -70,12 +75,16 @@ from app.routers.inventory._tx_filters import (
     _history_search_filter,
     _kst_date_to_utc_naive_bounds,
     _batch_name_map,
+    _batch_line_display_types,
     _history_batch_response,
     _operation_info_map,
     _stock_request_info_map,
     _to_log_response,
 )
 from app.repositories import item_repository, inventory_repository
+from app.services.inventory_effect_history import load_inventory_effect_quantities
+from app.services.inventory_operation_ownership import operation_requester_id
+from app.services.sqlite_datetime_contract import canonical_datetime, supports_datetime_guard
 
 
 router = APIRouter()
@@ -213,6 +222,169 @@ def _is_after_display_group_cursor(
     )
 
 
+def _pure_solo_display_filter() -> ColumnElement[bool]:
+    """연결 키와 lifecycle 양쪽 유형이 없는 로그만 독립 페이지로 제한한다."""
+    return and_(
+        TransactionLog.operation_id.is_(None),
+        TransactionLog.submission_id.is_(None),
+        TransactionLog.operation_batch_id.is_(None),
+        TransactionLog.reverses_log_id.is_(None),
+        or_(TransactionLog.reference_no.is_(None), TransactionLog.reference_no == ""),
+        TransactionLog.transaction_type.notin_((
+            TransactionTypeEnum.MARK_DEFECTIVE, TransactionTypeEnum.DEFECT_SCRAP,
+            TransactionTypeEnum.SUPPLIER_RETURN, TransactionTypeEnum.DISASSEMBLE,
+        )),
+    ).is_(True)
+
+
+def _canonical_display_group_cursor(
+    cursor: dict[str, str | None],
+) -> tuple[datetime, datetime, uuid.UUID] | None:
+    """생성형 커서만 SQL 비교로 옮기고 나머지는 기존 문자열 비교를 보존한다."""
+    try:
+        sort_at = datetime.fromisoformat(cursor["sort_at"] or "")
+        created_at = datetime.fromisoformat(cursor["created_at"] or "")
+        log_id = uuid.UUID(cursor["log_id"] or "")
+    except ValueError:
+        return None
+    if (
+        sort_at.tzinfo is not None or created_at.tzinfo is not None
+        or sort_at.isoformat() != cursor["sort_at"]
+        or created_at.isoformat() != cursor["created_at"]
+        or str(log_id) != cursor["log_id"]
+    ):
+        return None
+    return sort_at, created_at, log_id
+
+
+def _bounded_submission_metadata(
+    query: ORMQuery, db: Session, limit: int,
+    sql_cursor: tuple[datetime, datetime, uuid.UUID] | None,
+) -> SelectBase:
+    """Limit complete original envelopes; preserve every independent/legacy row in one snapshot."""
+    dialect = db.get_bind().dialect
+    if dialect.name != "sqlite" or (dialect.server_version_info or ()) < (3, 35, 0):
+        return query.statement
+    raw_connection = db.connection().connection.driver_connection
+    getlimit = getattr(raw_connection, "getlimit", None)
+    if (
+        getlimit is None
+        or getlimit(sqlite3.SQLITE_LIMIT_COLUMN) < len(query.column_descriptions) + 3
+        or getlimit(sqlite3.SQLITE_LIMIT_FUNCTION_ARG) < 3
+    ):
+        return query.statement
+
+    # Reuse derived request dates in guards and envelope selection rather than flattening them.
+    source = query.statement.cte("display_connected").prefix_with("MATERIALIZED")
+
+    def canonical(value: ColumnElement) -> ColumnElement[bool]:
+        """Raw SQL grouping is valid only when UUID result/bind normalization is an identity."""
+        return or_(value.is_(None), and_(
+            func.typeof(value) == literal_column("'text'"),
+            func.length(value) == literal_column("32"),
+            value.op("NOT GLOB")(literal_column("'*[^0-9a-f]*'")),
+        ))
+
+    safe = and_(
+        ~select(literal_column("1")).select_from(source).where(or_(
+            *(~canonical(source.c[name]) for name in (
+                "log_id", "operation_id", "operation_batch_id", "submission_id", "reverses_log_id",
+            )), canonical_datetime(source.c.created_at).is_not(True),
+            canonical_datetime(source.c.request_order_at).is_not(True),
+        )).exists(),
+        # The old OR query can hydrate an alias through a reversal, even when its PK is not requested.
+        ~select(literal_column("1")).select_from(InventoryOperation).where(or_(
+            ~canonical(InventoryOperation.operation_id),
+            ~canonical(InventoryOperation.reverses_operation_id),
+        )).exists(),
+        ~select(literal_column("1")).select_from(IoBatch).where(~canonical(IoBatch.batch_id)).exists(),
+        ~select(literal_column("1")).select_from(TransactionLog).where(~canonical(TransactionLog.log_id)).exists(),
+    )
+    kind = select(InventoryOperation.kind).where(
+        InventoryOperation.operation_id == source.c.operation_id,
+    ).correlate(source).scalar_subquery()
+    envelope = case((and_(source.c.reverses_log_id.is_(None), func.coalesce(kind, literal_column("''")) != literal_column("'CANCELLATION'")), case(
+        (source.c.submission_id.is_not(None), literal_column("'submission:'", String) + cast(source.c.submission_id, String)),
+        (source.c.operation_batch_id.is_not(None), literal_column("'io-submission:'", String) + cast(source.c.operation_batch_id, String)),
+    )))
+    keyed = select(*source.c, envelope.label("envelope_key")).cte("display_envelopes")
+    lifecycle = keyed.c.transaction_type.in_(tuple(literal_column(repr(value)) for value in (
+        "MARK_DEFECTIVE", "DEFECT_SCRAP", "SUPPLIER_RETURN", "DISASSEMBLE",
+    )))
+    # Only safe 26-character dates and 32-character UUIDs use this tuple-equivalent anchor.
+    anchor = cast(keyed.c.request_order_at, String) + cast(keyed.c.created_at, String) + cast(keyed.c.log_id, String)
+    summary = select(
+        keyed.c.envelope_key,
+        func.max(case((lifecycle, literal_column("1")), else_=literal_column("0"))).label("has_lifecycle"),
+        func.max(anchor).label("anchor"),
+    ).group_by(keyed.c.envelope_key).cte("display_envelope_summary")
+    candidates = select(summary.c.envelope_key).where(
+        summary.c.envelope_key.is_not(None), summary.c.has_lifecycle == literal_column("0"),
+    )
+    if sql_cursor is not None:
+        # Canonical typed cursor literals avoid adding SQLite variables to a previously valid query.
+        sort_at, created_at, log_id = (
+            literal_column(str(literal(value, type_=column.type).compile(
+                dialect=dialect, compile_kwargs={"literal_binds": True},
+            )), type_=column.type)
+            for value, column in zip(sql_cursor, (
+                source.c.request_order_at, source.c.created_at, source.c.log_id,
+            ))
+        )
+        cursor_anchor = cast(sort_at, String) + cast(created_at, String) + cast(log_id, String)
+        candidates = candidates.where(summary.c.anchor < cursor_anchor)
+    candidates = candidates.order_by(summary.c.anchor.desc()).limit(literal_column(str(limit + 1))).offset(literal_column("0"))
+    return select(*(keyed.c[column.key] for column in source.c)).outerjoin(
+        summary, keyed.c.envelope_key == summary.c.envelope_key,
+    ).where(or_(
+        ~safe, keyed.c.envelope_key.is_(None), summary.c.has_lifecycle != literal_column("0"),
+        keyed.c.envelope_key.in_(candidates),
+    ))
+
+
+def _bounded_solo_metadata(
+    query: ORMQuery, db: Session, limit: int,
+    sql_cursor: tuple[datetime, datetime, uuid.UUID] | None,
+) -> SelectBase:
+    """독립 거래도 원문 날짜·UUID 순서가 보존될 때만 SQL 커서로 제한한다."""
+    if db.get_bind().dialect.name != "sqlite":
+        if sql_cursor is not None:
+            sort_at, created_at, log_id = sql_cursor
+            requested_at_order = next(
+                column["expr"].element for column in query.column_descriptions
+                if column["name"] == "request_order_at"
+            )
+            query = query.filter(or_(
+                requested_at_order < sort_at,
+                and_(requested_at_order == sort_at, TransactionLog.created_at < created_at),
+                and_(requested_at_order == sort_at, TransactionLog.created_at == created_at,
+                     TransactionLog.log_id < log_id),
+            ))
+        return query.limit(limit + 1).statement
+    if not supports_datetime_guard(db):
+        return query.statement
+    source = query.order_by(None).statement.cte("display_solos").prefix_with("MATERIALIZED")
+    safe = ~select(literal_column("1")).select_from(source).where(or_(
+        canonical_datetime(source.c.created_at).is_not(True),
+        canonical_datetime(source.c.request_order_at).is_not(True),
+        func.typeof(source.c.log_id) != literal_column("'text'"),
+        func.length(source.c.log_id) != literal_column("32"),
+        source.c.log_id.op("GLOB")(literal_column("'*[^0-9a-f]*'")),
+    )).exists()
+    result = select(*source.c)
+    if sql_cursor is not None:
+        sort_at, created_at, log_id = sql_cursor
+        result = result.where(or_(~safe,
+            source.c.request_order_at < sort_at,
+            and_(source.c.request_order_at == sort_at, source.c.created_at < created_at),
+            and_(source.c.request_order_at == sort_at, source.c.created_at == created_at,
+                 source.c.log_id < log_id),
+        ))
+    return result.order_by(source.c.request_order_at.desc(), source.c.created_at.desc(), source.c.log_id.desc()).limit(
+        case((safe, literal_column(str(limit + 1))), else_=literal_column("-1")),
+    ).offset(literal_column("0"))
+
+
 def _require_export_range(start_date: Optional[date], end_date: Optional[date]) -> tuple[datetime, datetime]:
     """export 는 start_date / end_date 모두 필수. 없으면 400."""
     if start_date is None or end_date is None:
@@ -287,6 +459,11 @@ def _history_work_key() -> ColumnElement:
     return case(
         (TransactionLog.operation_id.is_not(None), literal("operation:") + cast(TransactionLog.operation_id, String)),
         (TransactionLog.operation_batch_id.is_not(None), literal("batch:") + cast(TransactionLog.operation_batch_id, String)),
+        (TransactionLog.reference_no.like(f"{LEGACY_DEFECT_REWORK_REFERENCE_PREFIX}%"),
+         literal("rework:") + TransactionLog.reference_no + case(
+             (TransactionLog.reverses_log_id.is_not(None), literal(":reverse")),
+             else_=literal(":original"),
+         )),
         (and_(TransactionLog.shipping_request_id.is_not(None), TransactionLog.transaction_type == TransactionTypeEnum.SHIP,
               TransactionLog.reference_no.like("SHIP-%")),
          literal("shipping:") + cast(TransactionLog.shipping_request_id, String) + literal(":") + TransactionLog.reference_no),
@@ -346,6 +523,7 @@ def monthly_counts(
 
 @router.get("/transactions", response_model=List[TransactionLogResponse])
 def list_transactions(
+    log_id: Optional[uuid.UUID] = Query(None),
     item_id: Optional[uuid.UUID] = Query(None),
     operation_id: Optional[uuid.UUID] = Query(None),
     operation_batch_id: Optional[uuid.UUID] = Query(None),
@@ -383,6 +561,9 @@ def list_transactions(
         .join(Item, TransactionLog.item_id == Item.item_id)
         .outerjoin(IoBatch, TransactionLog.operation_batch_id == IoBatch.batch_id)
     )
+
+    if log_id:
+        query = query.filter(TransactionLog.log_id == log_id)
 
     if item_id:
         query = query.filter(TransactionLog.item_id == item_id)
@@ -463,9 +644,13 @@ def list_transactions(
         db,
         {log.item_id for log, _, _ in rows},
         request_date_expr=requested_at_order,
+        target_log_ids={log.log_id for log, _, _ in rows},
     )
+    effect_quantities = load_inventory_effect_quantities(db, [log for log, _, _ in rows])
     for response in result:
         response.request_order_stock = request_order_stock.get(response.log_id)
+        if response.log_id in effect_quantities:
+            response.inventory_effect = effect_quantities[response.log_id]
     return result
 
 
@@ -477,9 +662,12 @@ def _load_display_work_groups(
     model: Optional[str] = None, process_step: Optional[str] = None,
     date_from: Optional[date] = None, date_to: Optional[date] = None, include_archived: bool = False,
     requester_employee_id: Optional[uuid.UUID] = None,
+    page_limit: int | None = None,
+    cursor_value: dict[str, str | None] | None = None,
     search_config: dict | None = None,
 ) -> _DisplayWorkQuery:
-    """Keep list and calendar work identity and search membership identical."""
+    """Keep list/calendar membership identical; bound only list metadata reads."""
+    sql_cursor = _canonical_display_group_cursor(cursor_value) if cursor_value else None
     query = (
         db.query(TransactionLog)
         .join(Item, TransactionLog.item_id == Item.item_id)
@@ -515,7 +703,12 @@ def _load_display_work_groups(
         if search_filter is not None else None
     )
     requested_at_order = _history_request_date_expr()
-    rows = query.with_entities(
+    # Typed observations supply their own groups and must not consume transaction page slots.
+    query = query.filter(or_(
+        TransactionLog.operation_id.is_(None),
+        TransactionLog.operation_id.notin_(select(StocktakeApplication.operation_id)),
+    ))
+    metadata_query = query.with_entities(
         TransactionLog.log_id, TransactionLog.item_id, TransactionLog.transaction_type,
         TransactionLog.quantity_change, TransactionLog.created_at,
         TransactionLog.operation_id, TransactionLog.operation_batch_id,
@@ -528,8 +721,36 @@ def _load_display_work_groups(
         _department_label_expr().label("history_department"),
     ).order_by(
         requested_at_order.desc(), TransactionLog.created_at.desc(), TransactionLog.log_id.desc(),
-    ).all()
-    batch_map = _batch_name_map(db, {row.operation_batch_id for row in rows if row.operation_batch_id})
+    )
+    if page_limit is None or (cursor_value is not None and sql_cursor is None):
+        rows = metadata_query.all()
+    else:
+        solo_filter = _pure_solo_display_filter()
+        connected_query = metadata_query.filter(solo_filter.is_not(True)).order_by(None)
+        connected_statement = (
+            _bounded_submission_metadata(connected_query, db, page_limit, sql_cursor)
+            if search_filter is None else connected_query.statement
+        )
+        solo_query = metadata_query.filter(solo_filter)
+        if search_filter is not None:
+            solo_query = solo_query.filter(search_filter)
+        limited_solos = _bounded_solo_metadata(solo_query, db, page_limit, sql_cursor).subquery()
+        # 레거시 편입 중에도 두 집합을 같은 snapshot에서 읽어 원거래 누락을 막는다.
+        metadata = connected_statement.union_all(select(*limited_solos.c)).subquery()
+        try:
+            rows = db.query(*metadata.c).order_by(
+                metadata.c.request_order_at.desc(), metadata.c.created_at.desc(), metadata.c.log_id.desc(),
+            ).all()
+        except DataError as error:
+            # CTE-derived fields may exceed a lowered SQLite record limit even when the old row fits.
+            if db.get_bind().dialect.name != "sqlite" or getattr(error.orig, "sqlite_errorcode", None) != sqlite3.SQLITE_TOOBIG:
+                raise
+            metadata = connected_query.statement.union_all(select(*limited_solos.c)).subquery()
+            rows = db.query(*metadata.c).order_by(
+                metadata.c.request_order_at.desc(), metadata.c.created_at.desc(), metadata.c.log_id.desc(),
+            ).all()
+    batch_map = _batch_name_map(db, {row.operation_batch_id for row in rows if row.operation_batch_id},
+                              include_line_details=False)
     stock_request_map = _stock_request_info_map(db, {row.reference_no for row in rows if row.reference_no})
     operation_map = _operation_info_map(db, {row.operation_id for row in rows if row.operation_id})
     queried_at = perf_counter()
@@ -601,13 +822,17 @@ def list_transaction_display_groups(
             process_step, date_from, date_to, requester_employee_id))):
         raise http_error(400, ErrorCode.BAD_REQUEST, "작업 전용 이력은 품목 ID만 지정하여 조회해 주세요.")
     started = perf_counter()
+    cursor_value = _decode_display_group_cursor(cursor) if cursor else None
     search_config = get_search_config(db)
     search_version = search_config["version"]
+    if cursor_value is not None and cursor_value.get("search_version") != search_version:
+        raise http_error(409, "SEARCH_CONFIG_STALE", "검색 설정이 변경되었습니다. 처음부터 다시 조회해 주세요.")
     data = _load_display_work_groups(db, item_id=item_id, operation_batch_id=operation_batch_id,
         transaction_type=transaction_type, transaction_types=transaction_types, operation_keys=operation_keys,
         reference_no=reference_no, search=search, department=department, model=model, process_step=process_step,
         date_from=date_from, date_to=date_to, include_archived=include_archived,
-        requester_employee_id=requester_employee_id, search_config=search_config)
+        requester_employee_id=requester_employee_id, search_config=search_config,
+        page_limit=None if include_operation_only else limit, cursor_value=cursor_value)
     groups, rows = data.groups, data.rows
     batch_map, stock_request_map, operation_map = data.batch_map, data.stock_request_map, data.operation_map
     queried_at = data.queried_at
@@ -624,14 +849,17 @@ def list_transaction_display_groups(
         groups = [*groups, *(TransactionDisplayGroupResponse(type="operation", key=str(operation.operation_id), logs=[],
             operation={"effective_at": operation.effective_at, "operation_id": str(operation.operation_id)}) for operation in operation_rows)]
         groups.sort(key=_display_group_sort_tuple, reverse=True)
-    if cursor:
-        cursor_value = _decode_display_group_cursor(cursor)
-        if cursor_value.get("search_version") != search_version:
-            raise http_error(409, "SEARCH_CONFIG_STALE", "검색 설정이 변경되었습니다. 처음부터 다시 조회해 주세요.")
+    if cursor_value is not None:
         groups = [group for group in groups if _is_after_display_group_cursor(group, cursor_value)]
     selected_groups = groups[:limit]
     grouped_at = perf_counter()
     selected_ids = {log.log_id for group in selected_groups for log in group.logs}
+    selected_batch_ids = {log.operation_batch_id for group in selected_groups for log in group.logs
+                          if log.operation_batch_id in batch_map}
+    display_types = _batch_line_display_types(db, {batch_id: batch_map[batch_id].sub_type
+                                                 for batch_id in selected_batch_ids})
+    for batch_id, display_type in display_types.items():
+        batch_map[batch_id] = batch_map[batch_id]._replace(display_transaction_type=display_type)
     details = {}
     if selected_ids:
         # The expensive detail fields and edit counts are needed only for this page.
@@ -642,8 +870,10 @@ def list_transaction_display_groups(
         )
         detail_rows = (
             db.query(TransactionLog, Item).join(Item, TransactionLog.item_id == Item.item_id)
+            .options(load_only(Item.item_name, Item.mes_code, Item.process_type_code, Item.unit, raiseload=True))
             .filter(TransactionLog.log_id.in_(selected_ids)).all()
         )
+        effect_quantities = load_inventory_effect_quantities(db, [log for log, _ in detail_rows])
         requested_at_by_id = {row.log_id: row.request_order_at for row in rows if row.log_id in selected_ids}
         for log, item in detail_rows:
             info = stock_request_map.get(log.reference_no) or batch_map.get(log.operation_batch_id)
@@ -658,6 +888,8 @@ def list_transaction_display_groups(
                 reversal=operation_info.reversal if operation_info else None,
                 history_batch=_history_batch_response(batch_map.get(log.operation_batch_id)),
             )
+            if log.log_id in effect_quantities:
+                details[log.log_id].inventory_effect = effect_quantities[log.log_id]
     page_groups = [
         group if isinstance(group, TransactionDisplayGroupResponse) else TransactionDisplayGroupResponse(
             type=group.type, key=group.key, logs=[details[log.log_id] for log in group.logs],
@@ -687,6 +919,7 @@ def list_transaction_display_groups(
     request_order_stock = load_request_order_stock(
         db, {log.item_id for group in page_groups for log in group.logs},
         request_date_expr=requested_at_order,
+        target_log_ids={log.log_id for group in page_groups for log in group.logs},
     )
     for group in page_groups:
         for log in group.logs:
@@ -1018,6 +1251,8 @@ def export_transactions_csv(
     if transaction_type:
         query = query.filter(TransactionLog.transaction_type == transaction_type)
     search_filter = build_item_search_filter(db, search, name_columns=[Item.item_name], item_id_column=Item.item_id,
+        guarded_name_columns=[(TransactionLog.item_snapshot["item_name"].as_string(), TransactionLog.item_snapshot.is_not(None))],
+        guarded_literal_columns=[(TransactionLog.item_snapshot["mes_code"].as_string(), TransactionLog.item_snapshot.is_not(None))],
         literal_columns=[
         Item.mes_code,
         TransactionLog.reference_no,
@@ -1056,9 +1291,11 @@ def export_transactions_csv(
             "approver_name",
             "supplier_name",
             "notes",
+            "item_identity_basis", "current_item_name", "current_mes_code",
         ]
     )
     for log, item in rows:
+        identity = transaction_item_identity(log, item)
         info = sr_map.get(log.reference_no) if log.reference_no else None
         if info is None:
             info = batch_map.get(log.operation_batch_id)
@@ -1068,9 +1305,9 @@ def export_transactions_csv(
             [
                 log.created_at.isoformat(),
                 log.transaction_type.value,
-                item.mes_code or "",
-                item.item_name,
-                item.process_type_code or "",
+                identity["mes_code"] or "",
+                identity["item_name"],
+                identity["item_process_type_code"] or "",
                 float(log.quantity_change),
                 "" if log.quantity_before is None else float(log.quantity_before),
                 "" if log.quantity_after is None else float(log.quantity_after),
@@ -1080,6 +1317,8 @@ def export_transactions_csv(
                 approver or "",
                 log.supplier_name_snapshot or "",
                 log.notes or "",
+                "거래 당시" if identity["item_snapshot_preserved"] else "현재 품목 (당시 정보 미보존)",
+                identity["current_item_name"], identity["current_mes_code"] or "",
             ]
         )
 
@@ -1114,6 +1353,8 @@ def export_transactions_xlsx(
     if transaction_type:
         query = query.filter(TransactionLog.transaction_type == transaction_type)
     search_filter = build_item_search_filter(db, search, name_columns=[Item.item_name], item_id_column=Item.item_id,
+        guarded_name_columns=[(TransactionLog.item_snapshot["item_name"].as_string(), TransactionLog.item_snapshot.is_not(None))],
+        guarded_literal_columns=[(TransactionLog.item_snapshot["mes_code"].as_string(), TransactionLog.item_snapshot.is_not(None))],
         literal_columns=[
         Item.mes_code,
         TransactionLog.reference_no,
@@ -1151,6 +1392,7 @@ def export_transactions_xlsx(
     columns = [
         "일시", "유형", "품목 코드", "품목명", "공정코드",
         "수량변화", "이전재고", "이후재고", "참조번호", "담당자", "요청자", "승인자", "공급업체", "메모",
+        "품목 정보 기준", "현재 품목명", "현재 품목 코드",
     ]
     apply_header(ws, columns)
 
@@ -1158,6 +1400,7 @@ def export_transactions_xlsx(
     negative_font = Font(color="CC0000", bold=True)
 
     for log, item in rows:
+        identity = transaction_item_identity(log, item)
         tx_val = log.transaction_type.value
         info = sr_map.get(log.reference_no) if log.reference_no else None
         if info is None:
@@ -1173,9 +1416,9 @@ def export_transactions_xlsx(
                 if tx_val == "INTERNAL_USE" and log.department == "연구"
                 else tx_label.get(tx_val, tx_val)
             ),
-            item.mes_code or "",
-            item.item_name,
-            item.process_type_code or "",
+            identity["mes_code"] or "",
+            identity["item_name"],
+            identity["item_process_type_code"] or "",
             float(log.quantity_change),
             float(log.quantity_before) if log.quantity_before is not None else "",
             float(log.quantity_after) if log.quantity_after is not None else "",
@@ -1185,6 +1428,8 @@ def export_transactions_xlsx(
             approver or "",
             log.supplier_name_snapshot or "",
             log.notes or "",
+            "거래 당시" if identity["item_snapshot_preserved"] else "현재 품목 (당시 정보 미보존)",
+            identity["current_item_name"], identity["current_mes_code"] or "",
         ]
         ws.append(row_data)
 
@@ -1410,7 +1655,7 @@ def cancel_transaction(
 ):
     """거래 취소 — 내역 유지 + 재고 자동 롤백 + '취소됨' 표시.
 
-    권한: 배치 요청자 본인(배치가 없으면 producer_employee_id) 또는 결재 권한자.
+    권한: 배치·작업 요청자 본인(원장 연결이 없으면 처리자) 또는 결재 권한자.
     BOM 배치(PRODUCE+BACKFLUSH)는 operation_batch_id 단위로 일괄 취소.
     """
     log = db.query(TransactionLog).filter(TransactionLog.log_id == log_id).first()
@@ -1435,7 +1680,8 @@ def cancel_transaction(
     # 권한 체크: 본인(요청자) 또는 결재 권한자
     # 요청자 식별 — 히스토리 화면의 '요청자' 표기와 동일한 우선순위로 판정한다:
     #   1) operation_batch_id -> IoBatch.requester_employee_id
-    #   2) producer_employee_id (배치 요청자 정보가 없는 거래)
+    #   2) 작업 원장의 불변 StockRequest 연결 또는 작업 처리자
+    #   3) producer_employee_id (배치·원장 연결이 없는 거래)
     # 승인 거래의 producer_employee_id는 요청자가 아닌 승인 처리자일 수 있다.
     # produced_by is only a display snapshot and is not trusted for authorization.
     requester_eid: Optional[str] = None
@@ -1447,7 +1693,11 @@ def cancel_transaction(
         )
         if batch is not None and batch.requester_employee_id is not None:
             requester_eid = str(batch.requester_employee_id)
-    if requester_eid is None and log.producer_employee_id is not None:
+    if requester_eid is None and log.operation_id is not None:
+        operation = db.get(InventoryOperation, log.operation_id)
+        requester = operation_requester_id(db, operation) if operation is not None else None
+        requester_eid = str(requester) if requester is not None else None
+    if requester_eid is None and log.operation_id is None and log.producer_employee_id is not None:
         requester_eid = str(log.producer_employee_id)
     is_self = requester_eid == str(canceller.employee_id) if requester_eid is not None else False
     is_approver = (

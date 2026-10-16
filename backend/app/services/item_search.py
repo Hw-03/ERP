@@ -6,7 +6,7 @@ import json
 import re
 from collections.abc import Sequence
 
-from sqlalchemy import ColumnElement, and_, exists, or_
+from sqlalchemy import ColumnElement, and_, case, exists, or_
 from sqlalchemy.orm import Session
 
 from app.utils.search import NormalizedSearchText, SearchBoundaryText, _SEARCH_WHITESPACE, normalize_search_boundary_text, normalize_search_text
@@ -111,6 +111,8 @@ def load_synonym_groups(db: Session) -> list[list[str]]:
 def build_item_search_filter(db: Session | None, search: str | None, *,
                              name_columns: Sequence[ColumnElement[str]],
                              literal_columns: Sequence[ColumnElement[str]] = (),
+                             guarded_name_columns: Sequence[tuple[ColumnElement[str], ColumnElement[bool]]] = (),
+                             guarded_literal_columns: Sequence[tuple[ColumnElement[str], ColumnElement[bool]]] = (),
                              item_id_column: ColumnElement | None = None,
                              groups: Sequence[Sequence[str]] | None = None) -> ColumnElement[bool] | None:
     """Correlated alias EXISTS prevents duplicated rows before count and paging."""
@@ -128,6 +130,11 @@ def build_item_search_filter(db: Session | None, search: str | None, *,
                 for alt in alternatives if alt != original])
         conditions = [name_match(column) for column in name_columns]
         conditions.extend(_literal_match(column, original) for column in literal_columns)
+        # Historical evidence is sparse; guard normalization without excluding it from token matching.
+        conditions.extend(case((guard, name_match(column)), else_=False)
+                          for column, guard in guarded_name_columns)
+        conditions.extend(case((guard, _literal_match(column, original)), else_=False)
+                          for column, guard in guarded_literal_columns)
         if item_id_column is not None:
             from app.models.item_search import ItemAlias
             conditions.append(exists().where(ItemAlias.item_id == item_id_column, name_match(ItemAlias.alias)))

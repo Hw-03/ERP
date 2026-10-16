@@ -102,7 +102,7 @@ export function AdminDepartmentsSection({
         if (statusFilter === "inactive" && d.is_active) return false;
         return true;
       })
-      .filter((d) => matchesSearchText(d.name, search));
+      .filter((d) => matchesSearchText(`${d.display_name ?? d.name} DPT-${String(d.id).padStart(2, "0")}`, search));
   }, [departments, statusFilter, search]);
 
   const stats = useMemo(() => {
@@ -150,7 +150,7 @@ export function AdminDepartmentsSection({
       });
       setDepartments((prev) => prev.map((d) => (d.id === dept.id ? updated : d)));
       setSelectedDept(updated);
-      onStatusChange(`'${dept.name}' 부서를 ${updated.is_active ? "활성화" : "비활성화"}했습니다.`);
+      onStatusChange(`'${dept.display_name ?? dept.name}' 부서를 ${updated.is_active ? "활성화" : "비활성화"}했습니다.`);
       void refreshDepartments();
     } catch (err) {
       onError(err instanceof Error ? err.message : "상태 변경 실패");
@@ -163,7 +163,7 @@ export function AdminDepartmentsSection({
       await api.deleteDepartment(deleteTarget.id, adminPin);
       setDepartments((prev) => prev.filter((d) => d.id !== deleteTarget.id));
       setSelectedDept(null);
-      onStatusChange(`'${deleteTarget.name}' 부서를 삭제했습니다.`);
+      onStatusChange(`'${deleteTarget.display_name ?? deleteTarget.name}' 부서를 삭제했습니다.`);
       void refreshDepartments();
     } catch (err) {
       onError(err instanceof Error ? err.message : "삭제 실패");
@@ -266,7 +266,7 @@ export function AdminDepartmentsSection({
                       style={{ background: color }}
                     />
                     <div className="min-w-0 truncate text-[14px] font-bold" style={{ color: LEGACY_COLORS.text }}>
-                      {dept.name}
+                      {dept.display_name ?? dept.name}
                     </div>
                   </div>
                   <div role="gridcell" className="truncate text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -285,7 +285,7 @@ export function AdminDepartmentsSection({
               addMode
                 ? "새 부서 추가"
                 : selectedDept
-                  ? selectedDept.name
+                  ? selectedDept.display_name ?? selectedDept.name
                   : "부서를 선택하세요"
             }
             subtitle={
@@ -348,7 +348,7 @@ export function AdminDepartmentsSection({
 
       <ConfirmModal
         open={deleteTarget !== null}
-        title={`'${deleteTarget?.name}' 부서를 영구 삭제하시겠습니까?`}
+        title={`'${deleteTarget?.display_name ?? deleteTarget?.name}' 부서를 영구 삭제하시겠습니까?`}
         tone="danger"
         cautionMessage="이 작업은 되돌릴 수 없습니다. 부서에 속한 직원과 품목 매핑은 유지되지만, 부서명 참조가 사라집니다."
         confirmLabel="삭제"
