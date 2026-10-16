@@ -481,6 +481,121 @@ def test_department_approve_rejects_unauthorized(db_session, make_item):
     assert req.department_approved_by_employee_id is None
 
 
+@pytest.mark.parametrize("role", ["primary", "deputy"])
+@pytest.mark.parametrize("action", ["department-approve", "department-reject"])
+def test_department_api_rejects_warehouse_only_without_changing_reservations(
+    db_session, client, make_item, role, action
+):
+    item = make_item(name="department-role-separation", process_type_code="AR", warehouse_qty=D("10"))
+    requester = _make_employee(db_session, code="ROLE-REQUESTER")
+    warehouse = _make_employee(db_session, code="ROLE-WAREHOUSE", warehouse_role=role)
+    req = _make_dual_reserved_request(db_session, requester, item, qty=D("3"))
+    request_id = req.request_id
+    actor_id = warehouse.employee_id
+    db_session.commit()
+
+    response = client.post(
+        f"/api/stock-requests/{request_id}/{action}",
+        json={"actor_employee_id": str(actor_id), "pin": "0000", "reason": "권한 분리 검사"},
+    )
+
+    assert response.status_code == 403, response.json()
+    db_session.expire_all()
+    assert req.status == StockRequestStatusEnum.RESERVED
+    assert req.department_approved_by_employee_id is None
+    assert req.rejected_by_employee_id is None
+    assert _inv(db_session, item.item_id).pending_quantity == D("3")
+    assert _inv(db_session, item.item_id).warehouse_qty == D("10")
+    assert _prod_qty(db_session, item.item_id) == D("0")
+
+
+@pytest.mark.parametrize("action", ["approve", "reject"])
+@pytest.mark.parametrize("role", ["primary", "deputy"])
+def test_warehouse_api_rejects_production_only_without_changing_reservations(
+    db_session, client, make_item, role, action
+):
+    """생산부 정·부나 이전 관리자 등급만으로 창고 결재를 우회하지 못한다."""
+    item = make_item(name="warehouse-role-separation", process_type_code="AR", warehouse_qty=D("10"))
+    requester = _make_employee(db_session, code="WH-ONLY-REQUESTER")
+    production = _make_employee(db_session, code="WH-ONLY-PRODUCTION", department_role=role)
+    production.level = "ADMIN"
+    req = _make_reserved_request(db_session, requester, item, qty=D("3"))
+    request_id, actor_id = req.request_id, production.employee_id
+    db_session.commit()
+
+    response = client.post(
+        f"/api/stock-requests/{request_id}/{action}",
+        json={"actor_employee_id": str(actor_id), "pin": "0000", "reason": "양방향 역할 분리 검사"},
+    )
+
+    assert response.status_code == 403, response.json()
+    db_session.expire_all()
+    assert req.status == StockRequestStatusEnum.RESERVED
+    assert req.approved_by_employee_id is None
+    assert req.rejected_by_employee_id is None
+    assert _inv(db_session, item.item_id).pending_quantity == D("3")
+    assert _inv(db_session, item.item_id).warehouse_qty == D("10")
+    assert _prod_qty(db_session, item.item_id) == D("0")
+
+
+@pytest.mark.parametrize("action", ["approve", "reject"])
+def test_warehouse_api_cannot_decide_department_only_request(
+    db_session, client, make_item, action
+):
+    item = make_item(name="department-only-request", process_type_code="AR", warehouse_qty=D("10"))
+    requester = _make_employee(db_session, code="DEPT-ONLY-REQUESTER")
+    warehouse = _make_employee(db_session, code="DEPT-ONLY-WAREHOUSE", warehouse_role="primary")
+    req = _make_dual_reserved_request(db_session, requester, item, qty=D("3"))
+    req.requires_warehouse_approval = False
+    request_id, actor_id = req.request_id, warehouse.employee_id
+    db_session.commit()
+
+    response = client.post(
+        f"/api/stock-requests/{request_id}/{action}",
+        json={"actor_employee_id": str(actor_id), "pin": "0000", "reason": "권한 분리 검사"},
+    )
+
+    assert response.status_code == 422, response.json()
+    db_session.expire_all()
+    assert req.status == StockRequestStatusEnum.RESERVED
+    assert req.approved_by_employee_id is None
+    assert req.rejected_by_employee_id is None
+    assert _inv(db_session, item.item_id).pending_quantity == D("3")
+
+
+@pytest.mark.parametrize(
+    ("warehouse_role", "department_role", "expected_count"),
+    [("primary", "none", 0), ("deputy", "none", 0), ("none", "primary", 6),
+     ("none", "deputy", 6), ("primary", "deputy", 6), ("none", "none", 0)],
+)
+def test_department_queue_roles_cover_all_production_processes(
+    db_session, client, make_item, warehouse_role, department_role, expected_count
+):
+    processes = (DepartmentEnum.TUBE, DepartmentEnum.HIGH_VOLTAGE, DepartmentEnum.VACUUM,
+                 DepartmentEnum.TUNING, DepartmentEnum.ASSEMBLY, DepartmentEnum.SHIPPING)
+    item = make_item(name="production-queue-role-scope", process_type_code="AR", warehouse_qty=D("100"))
+    requester = _make_employee(db_session, code="QUEUE-REQUESTER")
+    actor = _make_employee(db_session, code="QUEUE-ACTOR", department=DepartmentEnum.AS,
+                           warehouse_role=warehouse_role, department_role=department_role)
+    request_ids = set()
+    for process in processes:
+        req = sr_svc.create_manual_adjustment_request(
+            db_session, requester=requester,
+            lines_input=[_wh_to_dept_line(item.item_id, qty=D("1"), dept=process)],
+            approval_department=process.value, reference_no=None, notes="생산부 전체 공정",
+        )
+        request_ids.add(str(req.request_id))
+    actor_id = actor.employee_id
+    db_session.commit()
+
+    queue = client.get("/api/stock-requests/department-queue", params={"actor_employee_id": str(actor_id)})
+    count = client.get("/api/stock-requests/department-queue/count", params={"actor_employee_id": str(actor_id)})
+
+    assert queue.status_code == count.status_code == 200
+    assert len(queue.json()) == count.json()["count"] == expected_count
+    assert {row["request_id"] for row in queue.json()} == (request_ids if expected_count else set())
+
+
 def test_department_approve_twice_rejected(db_session, make_item):
     """이미 부서 결재된 요청 재승인 → ValueError (재처리 방지)."""
     item = make_item(name="DUAL4", warehouse_qty=D("10"))

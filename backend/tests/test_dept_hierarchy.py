@@ -77,15 +77,22 @@ class TestCanApproveDepartment:
             actor = _make_employee(department_role=role)
             assert can_approve_department(actor, "창고") is False
 
-    def test_창고_정은_모든_부서_OK(self):
+    def test_창고_정은_부서_결재_거부(self):
         actor = _make_employee(warehouse_role="primary")
         for dept in ("튜브", "영업", "연구", "기타", "창고"):
-            assert can_approve_department(actor, dept) is True
+            assert can_approve_department(actor, dept) is False
 
-    def test_창고_부도_모든_부서_OK(self):
+    def test_창고_부도_부서_결재_거부(self):
         actor = _make_employee(warehouse_role="deputy")
         for dept in ("진공", "AS", "창고"):
+            assert can_approve_department(actor, dept) is False
+
+    @pytest.mark.parametrize("role", ["primary", "deputy"])
+    def test_겸임자는_부서_역할로_다른_공정도_결재(self, role):
+        actor = _make_employee(department="조립", warehouse_role=role, department_role=role)
+        for dept in PRODUCTION_LINES:
             assert can_approve_department(actor, dept) is True
+        assert can_approve_department(actor, "창고") is False
 
     def test_admin_레벨_단독은_결재_불가(self):
         # G 결정: admin level은 결재 권한과 무관 — warehouse/dept role 없으면 거부
@@ -105,11 +112,11 @@ class TestCanApproveDepartment:
 
 
 class TestApprovableDepartments:
-    def test_창고_정부는_None(self):
+    def test_창고_정부는_부서_승인함_없음(self):
         actor = _make_employee(warehouse_role="primary")
-        assert approvable_departments(actor) is None
+        assert approvable_departments(actor) == frozenset()
         actor2 = _make_employee(warehouse_role="deputy")
-        assert approvable_departments(actor2) is None
+        assert approvable_departments(actor2) == frozenset()
 
     def test_admin_레벨_단독은_빈_frozenset(self):
         # G 결정: admin level은 결재 권한과 무관 — warehouse/dept role 없으면 빈 셋

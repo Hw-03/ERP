@@ -522,14 +522,13 @@ def test_department_recipients_follow_can_approve_rule(db_session):
     line_codes = {
         e.employee_code for e in notif_svc.recipients_for_department_approval(db_session, "조립")
     }
-    assert line_codes == {"DP", "WP"}  # admin level 단독(AD)·일반 직원(PL) 제외
+    assert line_codes == {"DP"}  # 창고 역할·이전 admin 등급·일반 직원 제외
 
-    # 창고 부서 대상이면 부서 정/부는 제외(can_approve_department 룰), 창고 정/부는 포함
+    # 창고 결재 알림은 별도의 warehouse 경로만 사용한다.
     wh_codes = {
         e.employee_code for e in notif_svc.recipients_for_department_approval(db_session, "창고")
     }
-    assert "DP" not in wh_codes
-    assert "WP" in wh_codes
+    assert wh_codes == set()
 
 
 def test_as_research_request_notifies_only_active_special_approvers(db_session):
