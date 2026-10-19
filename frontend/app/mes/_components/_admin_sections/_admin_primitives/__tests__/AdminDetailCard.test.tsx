@@ -55,6 +55,35 @@ describe("AdminDetailCard", () => {
     expect(animate).toHaveBeenCalledOnce();
   });
 
+  it("fades only the body once when the selected item and active tab change together", () => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
+    const tabs = [{ id: "info", label: "Info" }, { id: "stock", label: "Stock" }];
+    const content = (selectionKey: string, activeTab: string) => (
+      <AdminDetailCard selectionKey={selectionKey} tabs={tabs} activeTab={activeTab} footer={<button>Save</button>}>
+        <input aria-label="Draft" defaultValue="draft" />
+      </AdminDetailCard>
+    );
+    const { rerender } = render(content("first", "info"));
+    const panel = screen.getByRole("tabpanel");
+    panel.style.setProperty("--admin-fade-duration", "350ms");
+    const animate = vi.fn(() => ({ cancel: vi.fn() }));
+    Object.defineProperty(panel, "animate", { value: animate });
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "unsaved" } });
+    const stockTab = screen.getByRole("tab", { name: "Stock" });
+    stockTab.focus();
+
+    rerender(content("first", "stock"));
+    expect(animate).toHaveBeenCalledTimes(1);
+    expect(stockTab).toHaveFocus();
+    expect(input).toHaveValue("unsaved");
+    expect(panel).not.toContainElement(stockTab);
+    expect(panel).not.toContainElement(screen.getByRole("button", { name: "Save" }));
+    rerender(content("first", "stock"));
+    expect(animate).toHaveBeenCalledTimes(1);
+    rerender(content("second", "info"));
+    expect(animate).toHaveBeenCalledTimes(2);
+  });
 
   it("renders detail tabs as rounded selectable buttons and reserves scrollbar space for content", () => {
     const onTabChange = vi.fn();

@@ -39,7 +39,7 @@ export function AdminDetailCard({
   children,
   footer,
 }: AdminDetailCardProps) {
-  const fadeRef = useAdminSelectionFade(selectionKey);
+  const fadeRef = useAdminSelectionFade(selectionKey === undefined ? undefined : JSON.stringify([selectionKey, activeTab]));
   const tabInstanceId = useId();
   const hasTabs = Boolean(tabs?.length);
   const activeTabIndex = tabs?.findIndex((tab) => tab.id === activeTab) ?? -1;

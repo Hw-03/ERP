@@ -77,6 +77,24 @@ afterEach(() => {
 });
 
 describe("AdminMasterItemsSection", () => {
+  it("다른 품목을 선택하면 기본 탭으로 바로 복귀하고 본문 페이드는 한 번만 재생한다", () => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
+    context.selectedItem = item;
+    const view = () => <DirtyGuardProvider><AdminMasterItemsSection allBomRows={[]} /></DirtyGuardProvider>;
+    const { rerender } = render(view());
+    const panel = screen.getByRole("tabpanel");
+    panel.style.setProperty("--admin-fade-duration", "350ms");
+    const animate = vi.fn(() => ({ cancel: vi.fn() }));
+    Object.defineProperty(panel, "animate", { value: animate });
+    fireEvent.click(screen.getByRole("tab", { name: "재고·구매" }));
+    expect(animate).toHaveBeenCalledOnce();
+    animate.mockClear();
+
+    context.selectedItem = { ...item, item_id: "second", item_name: "다른 품목" };
+    rerender(view());
+    expect(screen.getByRole("tab", { name: "기본 정보" })).toHaveAttribute("aria-selected", "true");
+    expect(animate).toHaveBeenCalledOnce();
+  });
 
   it("삭제 품목을 재고 상태 집계에서 제외하고 별도 집계한다", () => {
     context.visibleItems = [

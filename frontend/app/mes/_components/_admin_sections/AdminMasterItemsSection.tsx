@@ -57,7 +57,10 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
     restoreItem,
   } = useAdminMasterItemsContext();
 
-  const [tab, setTab] = useState<DetailTab>("info");
+  const [tabState, setTabState] = useState({ itemId: selectedItem?.item_id, tab: "info" as DetailTab });
+  // 선택 변경과 첫 탭 복귀를 같은 화면 갱신에 반영해 중간 탭을 그리지 않는다.
+  const tab = tabState.itemId === selectedItem?.item_id ? tabState.tab : "info";
+  const setTab = (tab: DetailTab): void => setTabState({ itemId: selectedItem?.item_id, tab });
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const deleteTriggerRef = useRef<HTMLButtonElement>(null);
   const deleteCancelRef = useRef<HTMLButtonElement>(null);
@@ -157,7 +160,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
   // 선택이 바뀌면 첫 탭으로 리셋 + 삭제 확인 닫기
   useEffect(() => {
     restoreDeleteFocusRef.current = false;
-    setTab("info");
+    setTabState({ itemId: selectedItem?.item_id, tab: "info" });
     setDeleteConfirm(false);
   }, [selectedItem?.item_id]);
 
