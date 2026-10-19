@@ -13,7 +13,8 @@ const state = vi.hoisted(() => ({
   updateCurrentAuditTerminal: vi.fn(),
   getAuditTerminalId: vi.fn(() => "terminal-123"),
   queryResult: {
-    data: [] as ActivityAuditFileFixture[],
+    data: [] as ActivityAuditFileFixture[] | undefined,
+    refetch: vi.fn(),
     isLoading: false,
     error: null as Error | null,
   },
@@ -45,6 +46,20 @@ function stubObjectUrl(url = "blob:activity-audit-export") {
 }
 
 describe("AdminActivityAuditControls", () => {
+  it("초기 조회 오류는 재시도하고 재조회 오류에는 기존 선택을 유지한다", () => {
+    state.queryResult.data = undefined;
+    state.queryResult.error = new Error("초기 조회 실패");
+    const { rerender } = render(<AdminActivityAuditControls />);
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(state.queryResult.refetch).toHaveBeenCalled();
+    state.queryResult.data = [{ month: "2026-08", file_name: "audit.csv", row_count: 1, size_bytes: 10 }];
+    state.queryResult.error = null;
+    rerender(<AdminActivityAuditControls />);
+    fireEvent.click(screen.getByRole("button", { name: "Excel" }));
+    state.queryResult.error = new Error("재조회 실패");
+    rerender(<AdminActivityAuditControls />);
+    expect(screen.getByRole("button", { name: "2026년 8월 작업 감사 Excel 다운로드" })).toBeInTheDocument();
+  });
   beforeEach(() => {
     state.downloadActivityAuditFile.mockReset();
     state.updateCurrentAuditTerminal.mockReset();
@@ -94,6 +109,7 @@ describe("AdminActivityAuditControls", () => {
   });
 
   it("목록 조회 오류와 단말 등록 오류를 각 제어 영역에 표시한다", async () => {
+    state.queryResult.data = undefined;
     state.queryResult.error = new Error("감사 목록 조회 실패");
     state.updateCurrentAuditTerminal.mockRejectedValue(new Error("단말 등록 실패"));
     render(<AdminActivityAuditControls />);

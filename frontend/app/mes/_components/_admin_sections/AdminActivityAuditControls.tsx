@@ -9,6 +9,7 @@ import { useActivityAuditListQuery } from "@/lib/queries/useSettingsQuery";
 import { Button } from "@/lib/ui/Button";
 import { AppSelect } from "../common/AppSelect";
 import { EmptyState } from "../common";
+import { AdminDownloadSkeleton } from "./_admin_primitives/AdminSkeleton";
 import { FilterChip } from "../common/FilterChip";
 
 type ActivityAuditFormat = "csv" | "xlsx";
@@ -37,7 +38,8 @@ function downloadBlob(blob: Blob, fileName: string): void {
 
 /** 현재 브라우저 단말명과 월별 작업 감사 파일 다운로드를 관리한다. */
 export function AdminActivityAuditControls(): ReactNode {
-  const { data: files = [], isLoading, error: queryError } = useActivityAuditListQuery();
+  const { data: loadedFiles, isLoading, error: queryError, refetch } = useActivityAuditListQuery();
+  const files = useMemo(() => loadedFiles ?? [], [loadedFiles]);
   const [terminalName, setTerminalName] = useState("");
   const [registering, setRegistering] = useState(false);
   const [terminalFeedback, setTerminalFeedback] = useState<ActivityAuditFeedback | null>(null);
@@ -142,13 +144,12 @@ export function AdminActivityAuditControls(): ReactNode {
         )}
       </div>
 
-      {isLoading ? (
-        <div role="status" className="rounded-[12px] border px-3 py-4 text-[14px] font-bold" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-          작업 감사 로그를 불러오는 중입니다.
-        </div>
-      ) : queryError ? (
+      {isLoading && loadedFiles === undefined ? (
+        <AdminDownloadSkeleton />
+      ) : queryError && loadedFiles === undefined ? (
         <div role="alert" className="rounded-[12px] border px-3 py-3 text-[14px] font-bold" style={{ background: LEGACY_COLORS.errorBg, borderColor: LEGACY_COLORS.red, color: LEGACY_COLORS.red }}>
           {queryError instanceof Error ? queryError.message : "작업 감사 파일 목록 조회에 실패했습니다."}
+          <Button size="sm" onClick={() => void refetch()} className="ml-3">다시 시도</Button>
         </div>
       ) : monthOptions.length === 0 ? (
         <EmptyState
