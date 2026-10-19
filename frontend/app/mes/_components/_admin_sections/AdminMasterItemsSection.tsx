@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import listPerformance from "./AdminListPerformance.module.css";
 import { Box, GripVertical, Plus, Save, Trash2, X } from "lucide-react";
 import type { BOMDetailEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -293,7 +294,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                 tabIndex={0}
                 onClick={() => handleSelectItem(item, isSelected)}
                 onKeyDown={(event) => handleItemRowKeyDown(event, item, isSelected)}
-                className={`relative grid w-full grid-cols-[minmax(0,1fr)_110px_80px] items-center border-b px-3 py-2 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[color:var(--c-blue)]/30 ${styles.tableRow}`}
+                className={`relative grid w-full grid-cols-[minmax(0,1fr)_110px_80px] items-center border-b px-3 py-2 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[color:var(--c-blue)]/30 ${styles.tableRow} ${listPerformance.itemRow}`}
                 style={{
                   opacity: isDragging ? 0.4 : isDeleted ? 0.5 : 1,
                   borderBottomColor: LEGACY_COLORS.border,
