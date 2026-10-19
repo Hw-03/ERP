@@ -2,6 +2,71 @@
 
 **현재 판단: 두 원인은 미확정이며 병합 보류다.** 승인된 일반 E2E 관측 1회는 첫 실패에서 종료했다. 32건 통과 뒤 선행 `STATE01 defect`가 실패해, 원 BOM·AS를 포함한 나머지 268건은 미실행이다. 관측 도구와 정리 전 보존은 통과했지만 제품 원인 해결·수정·회귀 검증의 완료 조건은 충족하지 않았다.
 
+## 2026-10-19 13:42 KST — 진행 불가 판정과 재개 조건
+
+마지막 새 근거인 입력 노드 동일성 감사 뒤 세 차례 후속 점검에서 같은 증거 공백을 확인했다. 후보 HEAD63d4ed59·미커밋 범위가 그대로이고 진단CI39195321428은 종료된 실패이며, 이후 진단도 skipped/일반CI cancelled로 종료됐다. 새 실패 자료와 진행 중인 진단은 없다. 이 상태 확인은 새 원인 근거나 검증 통과가 아니다.
+
+**두 원인의 해결 목표는 미완료이며 진행 불가로 남긴다.** BOM의 실제 입력·React 상태·writer 순서와 AS 원 read/-104 요청의 소켓·종료 주체 기록이 각각 부족하다. 따라서 원인에 따른 수정, 수정 전후·되돌림 대조, 새 회귀10회·원 선택자3회도 완료하지 않았다. CP0/1/2와 기록 작업의 완료를 이 요구의 완료로 대체하지 않는다.
+
+재개 조건은 준비된 관측 기록을 포함한 새 원 실패 또는 아직 시도하지 않은 구체적인 판별 조건에 대한 실행 승인이다. 동일한 일반 묶음·정상 선택자 반복, 인위적 상태 변경·RST, 추측 패치로 이 공백을 메우지 않는다. 원문과 도구는 보존한다. 감사 원문은 `W/_attic/runtime/flaky-capture-20261019/no-progress-audit-*.json`이며 마지막 기록에 요구별 미충족과 연속 확인을 적었다. 이번 후속 점검에서 제품 코드·DB·서버 변경, 새 검사·커밋·푸시는 없다. main·직원 환경 미변경, 검토3038/8038은 PID46916/10744로 유지됐다.
+
+## 2026-10-19 13:38 KST — 입력 노드 교체 가설의 읽기 감사
+
+새 시험은 실행하지 않았다. 값 setter 관측이 놓칠 수 있는 “기존 입력칸 제거 → 기본값 1인 새 입력칸 생성”을 원 실패 trace와 실제 렌더링 경로로 확인했다.
+
+- 원 VAR의 `1-trace.trace:325/332`, GEN의 `:312/324`에서 동일 frame의 input/after snapshot 번호는 각각 36/37이다. after의 전체 HTML은 `[[1,20]]`으로 직전 input snapshot의 HTML 루트(postorder20)를 재사용한다. 그 안의 대상 INPUT은 postorder0이며 `__playwright_target__`가 해당 fill 호출을 가리킨다. 아래 13:30절의 원 zip을 그대로 읽었다.
+- 설치된 Playwright 1.60의 `frontend/node_modules/playwright-core/lib/coreBundle.js:14730–14738,15007–15013,15032–15039`는 DOM 객체별 cache와 실제 자식 객체 참조가 같을 때 이 참조를 사용한다. `:16456–16469,25424–25434`에 따라 input snapshot은 실제 fill 주입 전에 수집된다. 따라서 **이 두 snapshot 사이에 대상이 새 DOM 입력으로 교체됐다는 설명은 보존된 노드 동일성과 맞지 않는다.** 같은 노드를 잠시 떼었다 다시 붙였는지, before→input 구간, 중간 값·이벤트·상태 변화는 이 자료로 확정하지 않는다.
+- 실제 화면도 `DesktopShippingView.tsx:3151–3152,3925,3984,4006–4014`의 모듈 수준 BomEditor·고정 위치·`line.key`와 `common/QuantityInput.tsx:10–18`의 고정 input을 사용한다. `lib/shipping/request-draft.ts:97–103`의 정렬은 줄 객체와 key를 바꾸지 않는다. 품목 갱신 자체가 새 입력을 만드는 경로는 이 범위에서 확인되지 않았다. 상위 강제 새로고침은 `DesktopMesShell.tsx:293,476,604`의 별도 사용자 동작이다.
+- 이미 통과한 before-fill/focus 기록도 각각 같은 `uid=5`가 focus→input→blur에서 연결된 채 유지되고, input capture의 DOM2/tracker1/React1이 bubble에서 모두2가 된다. 이 정상 자료를 원 실패의 원인으로 확대하지 않는다.
+- 원문 경로·파일 해시·snapshot 참조·정상 기록의 최소 추출: `W/_attic/runtime/flaky-capture-20261019/catalog-response-boundary/remount-readonly-audit.json`. 제품·관측 도구·DB·서버 변경과 새 검사 실행은 없다. 상세 결과·첫 비교표·활성 TODO·인계를 함께 갱신했다.
+
+**판정:** BOM 원인 후보를 하나 줄인 읽기 근거이며 해결 근거가 아니다. AS에는 새 연결 자료가 없다. 두 원인·직원 영향은 미확정, CP3와 병합 판단은 보류다. 다음 실행을 정당화할 새 실패 경계나 구체적인 추가 단서가 없으므로 같은 정상 검사·전체 묶음·임의 부하를 반복하지 않는다.
+
+## 2026-10-19 13:30 KST — 새 단서에 따른 BOM 응답 순서 국소 대조
+
+**추가 결과:** 과거 두 수량 실패에서 늦은 품목 응답과 `fill` 실행 구간이 겹친 공통점을 찾았다. 이를 근거로 새로운 단일 변수 대조를 했다. 입력 전 응답 전달은 정상으로 끝났고, 포커스 시점 방출은 실제 JSON 완료가 입력 이벤트 종료보다 9.9ms 늦어 목표 구간을 맞추지 못했다. 이 결과로 원인을 확정하거나 제품을 수정하지 않았다. 원 일반 묶음·AS 선택자는 재실행하지 않았다.
+
+### 무엇을 왜 확인했나
+
+원 실패는 수량 2 또는 3을 입력한 뒤 1이 사용된 사건이다. 과거 trace를 다시 읽어, 각각 두 번째 `GET /api/items?limit=2000` 완료가 Playwright의 `fill` 시작 후 19.520ms·38.129ms에 있었다는 점을 확인했다. 첫 번째와 두 번째 응답의 원문 resource도 각 실행 안에서는 같았다. **이는 API 호출 구간의 겹침이며 native 입력 이벤트·React 상태 갱신 중간에 응답이 처리됐다는 증거는 아니다.** 성공한 retry에는 해당 trace가 없어 동일 비교를 할 수 없다. 별도 메모 유실 사건을 같은 원인으로 합치지 않았다.
+
+| 원 실패 | 원문 위치와 범위 | 관측 시간(ms, 각 trace monotonic) |
+|---|---|---|
+| VAR, eddd0811 | `W/_attic/runtime/comparison-checks/ci-eddd0811-playwright-general/data/c8fb127e051e30527321dd0226f083751ef1d267.zip`, `1-trace.network:184,187`, `1-trace.trace:311,331` | 두 번째 조회 2912179.439→2912375.520, fill2 2912356.000→2912523.343 |
+| GEN, 782eb344 | `W/_attic/runtime/comparison-checks/ci-782eb344-playwright-general/data/6b0f331a9d0677fb1dcf6bd1f98dba28638ef962.zip`, `1-trace.network:185,189`, `1-trace.trace:302,322` | 두 번째 조회 2745196.986→2745382.596, fill3 2745344.467→2745517.200 |
+
+### 환경·실행 순서와 대조 결과
+
+- 후보 HEAD `63d4ed59acf223e6cad62b3a360d905825d92021`의 Gitless 사본, Ubuntu26.04/WSL의 동일 호스트에서 Node20.20.2·Python3.11.17·Playwright1.60.0·Chromium1223을 사용했다. 원 GitHub runner 이미지와 동일하다는 주장은 하지 않는다.
+- 주소는 `http://localhost:3100`과 `http://127.0.0.1:8021`, DB는 `/home/hw/mes-flaky-capture-20261019/catalog-response-boundary/source/backend/mes_e2e.db`다. 실행마다 합성 DB를 초기화했다. 사용자 검토용 3038/8038·B DB·초안·연구 요청은 사용하지 않았다.
+- 기존 `SHIP-VARIANT`의 합성 무권한 요청자 로그인 → 합성 기준 PF 선택 → BOM 구성 조정 → `parts.af` 수량 2 한 번 입력 → 즉시 다음 → 매칭 후보 선택 → 요청 정보·확인 → 저장 → 목록·상세 조회를 유지했다. 고정 실제 품목 코드를 쓰지 않았으며 합성 품목 식별값은 각 trace/DB에 있다.
+- shipping의 새 문서·main frame·정확한 query·요청 `networkId` 순서로 두 번째 자연 발생 조회만 보류했다. CDP `continueResponse({requestId})`로 기존 status/header/body를 전달했다. 새 조회·가짜 realtime 이벤트·제품 상태 쓰기·반복 입력은 추가하지 않았다.
+- 제품 `frontend/app`, `frontend/lib`, `backend/app` 전체 파일 해시가 사본 준비 전후 동일하다. native setter 관측은 기존 `--native-only`를 재사용했다. React setter를 함수형으로 바꾸거나 추가 렌더를 유발하는 계측은 사용하지 않았다.
+
+| 대조 | 원 업무 검사 | 실제 기록 | 판정 |
+|---|---|---|---|
+| 입력 전에 보류 응답 전달 | 원 VAR 1건 통과, retry0 | 해당 문서 JSON 완료2097.100 → arm2165.900 → focus2186.000 → input bubble2210.900ms. 수량2·매칭요청2·저장2·기본 BOM 불변 단언 통과 | 입력 전 JSON 완료 조건 성립. 원 실패 해결 근거는 아님 |
+| 실제 focus에서 응답 방출 | 원 VAR 1건 통과, retry0 | focus2200.200 → input bubble2220.500 → JSON 완료2230.400ms. 같은 수량·저장 단언 통과 | **조건 미충족.** CDP 방출 시각과 실제 앱 처리 시각이 달라 입력 중간 구간을 맞추지 못함 |
+| input bubble 시점 방출 | 미실행 | focus 대조의 조건 미충족을 기록하고 중단 | 정상 결과를 더 쌓으려고 반복하지 않음 |
+| AS 원 조회 | 미실행 | 기존 HTTP/Node/Uvicorn 자료 재검토에서 새로운 종료 주체 근거 없음 | 원 AS read/-104 원인 미확정 유지 |
+
+이 검사는 출하 요청과 BOM 저장까지이며 실제 준비·픽업·재고 사용·취소를 하지 않는다. 따라서 위치별 처리 전→후속 사용→취소 수량은 **이번 대조의 적용 대상 밖이며 새로 검증하지 않음**으로 남긴다. 기본 BOM 불변과 저장 수량 단언을 위치 재고 전체 검증으로 확대하지 않는다. main을 재실행하지 않았으므로 이번 원인이 main에도 같다는 새 비교 근거는 없다.
+
+### 보존한 근거와 진단 한계
+
+`W = C:/Users/user/.codex/worktrees/mes-main-candidate-comparison/ERP`, `C = W/_attic/runtime/flaky-capture-20261019/catalog-response-boundary`다. 실제 원문은 모두 ignored 로컬 자료다.
+
+- Windows 보존본 `C/linux-results/ready-03/{before-fill,focus}/`: `report.json`, `catalog-order.json`, `bom-boundary-extracted.json`, `response-body-audit.json`, `after-run.db`, 서버 로그와 `test-results/**/trace.zip`. `C/copied-evidence-hashes.json`으로 복사 자료를 확인한다. Linux 원문은 `/home/hw/mes-flaky-capture-20261019/catalog-response-boundary`에 유지한다.
+- `C/linux-results/summary.json`: 제품 소스 불변, 두 실행의 결과·입력 기록, 유실0·incident0. 실제 새 조회 호출자는 첫 조회 `ensureItemsLoaded`, 두 번째 `DesktopShippingView.useEffect`로 포착했다. 현재 소스의 realtime 조회(`DesktopShippingView.tsx:624–638`)와 맞지만 과거 실패의 동일 호출자까지 확정한 것은 아니다.
+- 두 실행 모두 종료 시 CDP 본문 조회는 문서 이동 때문에 unavailable이었다. **원 결과 JSON은 수정하지 않았다.** 이미 저장한 trace에서 같은 입력 문서의 유일한 두 GET과 순서를 연결하고 원문 SHA256 동일을 별도 `response-body-audit.json`에 기록했다. before-fill의 누락만 이 읽기 감사로 보완했으며 다시 실행하지 않았다. focus의 순서 미충족은 그대로다.
+- native 문서/incident 유실·warnings·destructive incident는 모두 0이다. `catalog.json.done`은 JSON 파싱 완료이며 React commit 완료가 아니다. 응답 방출·browser binding 관측이 timing에 주는 영향도 제거된 것은 아니다. 작고 새로운 합성 자료이므로 과거 전체 DB·worker 수명을 복원한 실험으로 표시하지 않는다.
+- 이번 국소 실행의 backend 소유 PID 종료는 영수증으로 확인했고, 프론트는 종료 영수증이 생성되지 않아 진단 포트 해제와 프로세스 부재만 확인했다. 이를 AS의 프로세스 종료 이유를 확보한 근거로 사용하지 않는다.
+- 준비 실패도 보존했다. 작은 CDP 검사에서 HTML Content-Type 누락을 고친 뒤 응답·요청1회·native fill 보존 확인. 첫 앱 준비는 외부 node_modules symlink 거부로 중단(`C/linux-results/before-fill`), 다음은 잘못된 시작 앵커로 시험0개 선택(`C/linux-results/ready-02/before-fill`)이었다. 동일 의존성의 내부 사본과 실제 수집1개 확인 후 업무를 시작했으며 이 준비 실패를 제품 실패로 세지 않는다.
+
+**직원 영향·수정 판정:** 이번에 직원 제품 결함이나 자동화만의 결함을 확정하지 못했다. 제품 원인 패치·새 회귀10회·production 재빌드 단계로 진행하지 않았다. AS 완료 문구의 기존 미커밋 변경과도 별개다. main·직원 서버·DB·예약은 변경하지 않았다. 진단 포트3100/8021은 해제됐고, 3038 PID46916/8038 PID10744 및 B DB/session 해시는 이전 보호 기록과 동일하다.
+
+**다음 행동의 한계:** 같은 전체 묶음·같은 정상 선택자를 반복하지 않는다. BOM은 실제 DOM2/3→1 writer stack과 당시 React 값/상태 호출, AS는 원 read/-104 GET의 socket·종료 주체·프로세스 이유가 여전히 필요하다. 새 실패나 그 경계를 겨냥할 추가 근거가 없으면 원인 미확정·병합 보류를 유지한다.
+
 ## 2026-10-19 12:52 KST — 이번 실행의 최종 결과
 
 후보 실행 HEAD는 `edd81fa0cbf4b115b74dce53edf25bed6ff1acd5`, [진단 CI39195321428](https://github.com/Hw-03/ERP/actions/runs/39195321428)는 실패로 종료했다. 같은 HEAD의 자동 일반 CI39195321547만 승인 범위에 따라 취소했다. 아래 결과는 이 HEAD·이 입력의 관측이며 새 전체 CI 성공이 아니다. 이후 절의 준비 결과와 “시작 전” 문장은 당시 경과를 보존한 것이다.

@@ -1,22 +1,88 @@
 # 개발서버·병합 후보 비교 검증
 
+## 2026-10-19 최신 main → 후보 통합: 완료 0 / 전체 5
+
+승인 계획: [후보 통합 실행](../../../docs/superpowers/plans/2026-10-19-mes-candidate-main-integration.md). 기존 미확정 원인의 추가 진단은 중단하고 아래 통합을 진행한다. 과거 미확정 기록은 해결로 승격하지 않는다.
+
+- [ ] CP0 기존 변경·후보 DB 보존과 선행 커밋, 후보 서버 중지.
+- [ ] CP1 최신 main을 후보에 병합하고 양쪽 계약 보존.
+- [ ] CP2 관련 자동 검사·DB 사본·타입·정적·production 빌드.
+- [ ] CP3 격리 브라우저 확인·사용자 자료 보존·후보 서버 복원.
+- [ ] CP4 후보 브랜치 푸시·최종 CI·결과 기록.
+
+현재 후보63d4ed59, 통합 main9824903e. 원문 `_attic/runtime/integration-main-20261019/preflight.json`. main·직원·예약은 변경하지 않는다.
+
+## 2026-10-19 관측 신뢰성 보완: 완료 5 / 전체 5, 과거 제품 원인 미확정
+
+[승인 계획](../../../docs/superpowers/plans/2026-10-19-mes-observation-reliability.md)·[현재 결과](../../../docs/superpowers/plans/2026-10-19-mes-observation-reliability-results.md). 이번 목표는 도구 보완이며 과거 제품 원인 해결과 별도다.
+
+- [x] CP0 (16:58): HEAD·기존 변경·보호 DB/session/PID 보존. `flaky-observation-reliability-20261019-165811/preflight.json`과 `start-files/`.
+- [x] CP1 (2026-10-19): 실시간 IPC·20ms guard·발행 전 중단·진행 요청 보존. 초기50/후속26 근거 보존, 지정 Linux Node20 최종51검사 통과. 실제 Next worker/고정 GET probe 통과. `R/as-unit/`, `R/linux-evidence/next-01/`.
+- [x] CP2 (2026-10-19): kernel 포트 필터·100ms/reset 구간 누계·손실 중단 연결. 패킷25검사, 커널 수명/보존 Linux20검사, 실제 필터 및 Next 양방향 기록 확인. `R/packet-unit/`, `R/kernel-health-linux-green.log`, `R/linux-evidence/packet-linux-01/`.
+- [x] CP3 (2026-10-19): passive 복사본·원 입력/단언 유지·이벤트 부재/관측 손실 분리·정리 전 보존. Windows37, Linux Node20의36+플랫폼 준비 수정 후 국소1 통과. 실제 React off/on/on-reviewed 동일, 원 선택자2개는 `--list`만 확인. `R/bom-unit/`, `R/bom-generated-list.log`.
+- [x] CP4 (2026-10-19 17:34): 묶음별 상세/첫표/인계, 최종 소스·근거 해시, 보호 DB/session/main/검토 PID 불변과 진단 포트 해제 확인. `R/final-audit.json`, `R/postflight-ports.json`, `R/verification-index.json`. R=`_attic/runtime/flaky-observation-reliability-20261019-165811`.
+
+AS 기존 업무 구간·BOM 정상 선택자·전체 검사·커밋·푸시·CI는 실행하지 않았다. main·직원·검토3038/8038 보존. 자연 발생 실패 기록은 기본 비활성이며 다음에 해당 검사가 필요할 때만 사용한다. 아래 이전 실행의 제품 원인 미완료 상태와 병합 보류는 그대로다.
+
+## 2026-10-19 입력 전달 조사: 실행·기록 완료 4 / 전체 5, 제품 원인 해결 미완료
+
+새 승인 [계획](../../../docs/superpowers/plans/2026-10-19-mes-input-transport-diagnosis.md)·[결과](../../../docs/superpowers/plans/2026-10-19-mes-input-transport-results.md). 기존 한도 종료 기록은 과거 상태로 보존한다. 이번은 AS 도구 대기 제거와 새 BOM 입력 방식 대조이며 main·직원·검토3038/8038 미변경이다.
+
+- [x] CP0 (15:43): 후보63d4ed59·기존변경·보호DB/session/PID 보존, 새실행자료 `flaky-input-transport-20261019-154319/preflight.json`.
+- [x] CP1 (16:00): AS 도구32검사·실제 무업무 probe 통과, 실제 Next worker 관측 확인. 새1구간36응답·제출201/조회200. 발행 최대7.385ms지만 Next 수신14건 초과·packet drop2로 조건 미충족, 원 오류 미재현. `flaky-input-transport-20261019-154319/linux-evidence/as/preparation-01`에 실패 전 보존 형식·DB·분석 저장. 추가 AS 실행 금지. 제품 해결 완료 아님.
+- [x] CP2 (16:16): 무업무 React off/on 동일값 확인. 첫 helper 누락은 입력 전 준비 실패로 보존·의존 검사 보완. ready-02의 fill2·숫자키2·숫자키3·fill3 각1회 정상, 명령/native/React/상태/매칭 연결·손실0·pause0. `flaky-input-transport-20261019-154319/bom-evidence-index-97.json` 및 조건별 admission. 원 실패 미재현, 최종 저장·재고·취소는 새 검증 아님.
+- [ ] CP3: 원인확보후최소수정·직접관련검사. 근거없으면미완료유지.
+- [x] CP4 (16:18): 상세·첫표·인계에 새 결과/재사용/미실행/도구 한계 구분. `postflight.json`에서 HEAD/main ref·보호 DB/session/PID·제품 소스 불변, 진단3100/8021 종료 확인. 제품·전체 검사·커밋·푸시·CI·main·직원 변경 없음. 두 원인 해결·병합 가능으로 승격하지 않음.
+
+## 2026-10-19 직접 경계 조사: 실행·기록 완료 3 / 전체 5, 원인 해결 미완료
+
+새 승인 [계획](../../../docs/superpowers/plans/2026-10-19-mes-direct-boundary-diagnosis.md)·[결과](../../../docs/superpowers/plans/2026-10-19-mes-direct-boundary-results.md). 새 정상 업무 재현 결함과 원 CI 귀속은 별도 판정한다. 아래 이전 완료 수치는 당시 관측·기록 범위다.
+
+15:12 KST: 마지막 추가 읽기 근거 뒤3회 동일한 차단 조건을 재확인했다. 실행 한도 소진·새 원실패 근거 부재·진행 중 진단 없음으로 목표 진행 불가 판정. CP2/CP3와 완료 수치는 그대로이며 해결 완료가 아니다. 재개에는 새 실제 실패 기록 또는 추가 실행 범위가 필요하다. 감사=`flaky-boundaries-20261019-135838/tool-checks/no-progress-after-1506-03.json`.
+
+- [x] CP0: 후보63d4ed59·기존 미커밋·소스/lock·검토 DB/session 해시·PID 보존. 새 Linux 합성 사본과3100/8021만 사용.
+- [x] CP1 (2026-10-19): 두 사용자 실제 구매 메모 저장/SSE/목록 갱신과 BOM 입력2·3 네 조건을 각1회 실행. 입력 중 조건의 실제 겹침과 값 유지 확인, 관측 유실0. `flaky-boundaries-20261019-135838`의 조건별 admission/trace/DB 보존. 원인 해결은 미확정이며 같은 조건 반복 금지.
+- [ ] CP2 (조건 미충족): 시계 준비 보완 후 실제 AS1회 시도. 초기11GET200이나 첫 CDP발행표식+83.886ms로20ms 기준 초과, 제출/문제GET 포함25요청 미발행. marker·before-cleanup·775kernel이벤트/유실0 보존. 같은 구간 재시도 금지, 원인 판정 조건 미충족 유지.
+- [ ] CP3: 확보된 실패의 원인 변수 대조·최소 수정·관련 회귀. 원인 확보 전 제품 변경 없음.
+- 진단 도구 보완(2026-10-19): Next 자식 옵션에서 중복 `--require`가 마지막 것만 남는 원인을 확인하고 단일 preload로 보완. 실제 설치 parser와 일반 자식 Node에서 기존 미로딩/새 로딩 대조 통과. 서버·요청 재생 없이 기록했으며 CP2·CP3 완료로 세지 않는다. 근거 `flaky-boundaries-20261019-135838/tool-checks/as-preload.json`.
+- 추가 읽기(15:06): AS 첫 `page.evaluate`가 fetch 전에 기다린 DOM snapshot 구간53.021ms를 저장 trace·설치 소스로 확인. 20ms 시각 조건을 놓친 도구 대기 근거이며 원 reset 원인은 아니다. 원문 `tool-checks/as-snapshot-dispatch-readonly.json`. 새 검사·요청 실행0건, CP2·CP3 상태와 한도 유지.
+- [x] CP4 (2026-10-19): 상세/첫표/인계에 새 정상·조건 미충족·미실행·재사용을 구분. 로컬 원문249파일 해시 보존, 소유 진단3100/8021/3154 정리, 사용자3038/8038 PID·DB/session 해시·제품 소스 보존 확인. 커밋/푸시·main·직원 변경 없음. 원인 해결 완료로 승격하지 않음.
+
 ## 2026-10-19 실패 순간 보존 재개: 완료 4 / 전체 5
+
+**13:42 진행 불가 판정:** 마지막 새 증거 후3개 후속 턴에서 원인 판별 자료 부재·진단 종료 상태가 유지됐다. 원인 수정·회귀 검증은 미완료이며 CP3는 열어 둔다. 새 원 실패의 writer/소켓 경계 또는 구체적인 새 판별 조건의 실행 승인 전에는 같은 검사 반복을 재개하지 않는다. 상세 결과13:42절과 ignored `no-progress-audit-*.json`에 근거·재개 조건을 남겼다.
 
 새 승인 범위: [실행 계획](../../../docs/superpowers/plans/2026-10-19-mes-failure-capture.md). [단계별 결과](../../../docs/superpowers/plans/2026-10-19-mes-failure-capture-results.md). 아래 이전 진단의 미확정 판정과 원문은 보존한다.
 
 - [x] CP0: 후보121706c3·기존 미커밋·검토 서버·DB 해시 보존. 별도 synthetic Linux/3100·8021만 사용. main·직원·3038/8038 미변경.
 - [x] CP1 (2026-10-19): native setter/React 입력·kernel 종료·정리 전 DB/trace 보존 자체 검사 완료. 후보edd81fa0의 CI39195321428에서 실제 kernel6.17/bpftrace0.20과 브라우저 관측 가드까지 통과. 준비 실패·호환 보완은 별도 기록이며 제품 원인으로 세지 않음.
 - [x] CP2 (2026-10-19): 원 선택·순서의 일반 묶음1회 실행 후 첫 실패에서 중단. CI39195321428 결과32통과/1실패/268미실행, retry0. 선행 STATE01 defect의 클릭 전 버튼 소실을 화면·trace·DB에 보존한 뒤 정리. kernel decode/loss0, capture complete. 원 AS204번째·BOM263/265번째는 미실행.
-- [ ] CP3: 원 BOM·AS의 실패 경계와 최소 수정·회귀 검증은 미충족. 새 선행 실패는 시험의 empty 응답 전환→추가GET→클릭 전 버튼 소실까지 확인했으나 추가 조회의 직접 예약자는 미확정. Next 선행destroy reset은 원AS read/-104와 다름. 새 제품 패치 없음. 같은 전체 묶음 반복 금지.
+- [ ] CP3 (13:30 갱신): 원 BOM·AS의 실패 경계와 최소 수정·회귀 검증은 미충족. 과거 두 BOM fill 구간과 두 번째 full 품목응답의 겹침을 찾아 응답 순서만 국소 대조했다. before-fill의 원VAR1건은 정상·원문동일, focus의 원VAR1건도 정상이나 JSON완료가 input bubble보다9.9ms 늦어 조건 미충족. input-bubble arm·AS는 미실행, 새 제품 패치 없음. 유실0·제품 소스불변. 본문 조회 누락은 기존 trace 읽기로만 보완하고 재실행하지 않았다. 상세는 실패 순간 보존 결과13:30절과 ignored `catalog-response-boundary/linux-results/summary.json`. Next 선행destroy reset은 원AS read/-104와 다르며 전체 묶음/같은 정상검사 반복 금지.
 - [x] CP4 (2026-10-19): 상세 결과·첫 표·인계에 실패 원문, 미실행, 재사용 범위, 보호 DB/session 해시·검토 PID 유지, 다음 안전한 지점 기록. 이 기록 완료가 두 원인 해결을 뜻하지 않으며 병합 보류 유지.
 
 승인된 긴 관측은 소진했다. 원문은 후보 `_attic/runtime/flaky-capture-20261019/ci-39195321428`, 별도 해시/순서 감사는 같은 상위의 `final-capture-audit.json`. 원 두 조건에 도달하지 못한 결과를 반복 통과나 해결로 바꾸지 않는다. 아래 이전 계획의 수치는 당시 경과다.
+
+13:30 후속 국소 대조와13:38 입력 노드 교체 가설의 읽기 기록·첫 비교표·인계 갱신 완료. 원 두 BOM trace의 input→after가 같은 DOM 노드라는 근거를 확인했지만 값 변경 원인은 미확정이다. 새 검사0건, AS 새 근거 없음. CP3를 완료로 올리지 않으므로 대시보드는4/5 유지한다. 현재 코드HEAD63d4ed59, 진단3100/8021종료, 마지막13:30 확인의 보호3038/8038·B DB/session 유지. 새 실패의 writer/연결 경계가 없는 상태에서 추측 패치·추가 전체 실행을 시작하지 않는다.
+
+## 2026-10-19 원인 확정 실행: 완료 1 / 전체 5
+
+승인 계획: [BOM 입력·AS 조회 오류](../../../docs/superpowers/plans/2026-10-19-mes-flaky-root-cause.md). 이번 목표는 기존 두 미확정 실패의 원인·최소 수정·국소 검증이다. 아래 과거 완료 기록은 당시 근거다.
+
+- [x] CP0 (2026-10-19): 소스·기존 변경·소유권 보존, 같은 Linux 호스트의 합성 환경 준비. Node20.20.2/Python3.11.17/고정 JS 의존성/Chromium1223, Python 패키지는 원 CI 설치 목록과 맞춤. OS는 Ubuntu26.04/WSL로 과거24.04 CI와 다름. 실제 앱 load·로그인 선택 준비1건 통과(8.7초, 전체43.7초). 원문 `/home/hw/mes-flaky-20261019-0902/artifacts/preflight-01`, 시작 기록은 후보 `_attic/runtime/flaky-diagnosis-20261019-0902/preflight.json`. 사용자 DB/초안은 재현에 사용하지 않음. 종료된 검토 프론트만 동일 빌드로 복원한 별도 기록은 조사 결과 참조.
+- [ ] CP1: BOM 입력/상태 및 API 연결 종료 계측·원인 구분. CI39183694728의 native-only 대조에서 선행 DISCARD 메모 유실을 관측했으나 원 BOM과 같은 원인인지 미확인이다. 값/tracker/React 관측을 보강한 CI39185603420 attempt1~3은 각각 준비1+4조건 통과·누락0으로 한도 내 관측을 종료했다. 실패 순간 경계는 여전히 부족하다. AS 두 GET은 실제500 응답이며 정상 화면 이탈 취소로 설명되지 않지만 reset 주체는 미확정이다.
+- [ ] CP2: 필요한 국소 CI와 확인된 원인만 최소 수정. IO 준비 단언을 GET 계약에 맞춘 뒤 CI39183151452의286개 준비1+원IO1통과. 원 trace의 같은286개 품목 조회는 제출 직전103ms→직후672ms였고 예약·가용량4필드만 달랐다. 일시 지연과 read reset 원인은 미확정이다. 현재 후보121706c3, 제품 원인 패치 없음. [조사 결과와 실행 원장](../../../docs/superpowers/plans/2026-10-19-mes-flaky-investigation-results.md).
+- [ ] CP3: 재발 방지·원 선택자·production 영향 검사.
+- [ ] CP4: 상세/첫표/인계의 중간 기록과 진단 프로세스 정리는 완료. 최종 해결 판정은 미충족. 원 CI의 서버 로그가 업로드되지 않아 복원 불가하며, 입력 capture 인위적 상태 갱신 실험은 기전 확인일 뿐 원 실패 증거가 아니다. 동일 관측3회 한도를 끝냈으므로 새 실패 경계나 증거 없이 재실행하지 않는다.
 
 기준: [승인 실행 계획](../../../docs/superpowers/plans/2026-10-16-mes-main-candidate-comparison.md).
 
 현황: 완료 4 / 전체 5, 남음 1(CP4의 병합 판단 보류 사유 2건). `eddd0811`까지9커밋을 후보에 푸시했고 CI38886739485는8/8 job 성공이다. 일반 E2E는299건 첫 통과·2건 재시도 통과이며 실패 원문 읽기 조사를 마쳤다. 연결 reset 원인과 BOM2→1 입력 처리 순서는 미확정이다. 프론트4,601·빌드와 backend pytest/PostgreSQL/OpenAPI는 성공했다. CP2 지정 대표 업무와 CP3 상세 기록은 완료했다. 종료 문서 후속 커밋/CI는 로컬 최종 영수증과 최종 응답에 기록하며 이 문서 자체 해시를 미리 단정하지 않는다. main 병합·직원 배포 금지.
 
 사용자용 기준 문서: [첫 페이지 비교표·업무별 8항목 상세](../../../docs/superpowers/plans/2026-10-16-mes-main-candidate-comparison-report.md). 재개용 기준: [현재 단계와 다음 행동](2026-10-16-mes-main-candidate-comparison-handoff.md). 실제 직원 원문은 ignored runtime에만 둔다.
+
+## 2026-10-19 별도 후속: 완료 1 / 전체 1
+
+- [x] AS·연구 완료창의 잘못된 창고 결재 문구 정정. 후보 `782eb344` 위 공용 제출 함수 분기만 수정. 기존 관련 Vitest 42건·ESLint·production 빌드·3.25MiB 번들 검사 통과. 후보 실제 AS 전용 요청에서 새 제목을 확인하고 해당 QA 요청만 취소했다. 사용자 연구 요청은 대기로 보존. 원문은 `C:/ERP/_attic/runtime/main-candidate-20261016/manual-review-20261019/label-*`, 상세는 비교 보고서 AS02 후속. 화면 크기 경고는 제외. 커밋·푸시·main 반영·직원 배포 없음. 위 CP4 미확정 두 건을 해결한 것으로 표시하지 않는다.
 
 - [x] CP0 환경 고정 (2026-10-16): main 29583972, 대기 5927e532. 새 후보 codex/mes-main-candidate-comparison-20261016에 자동 병합 충돌 없음, 후속 e9560587에 커밋. 개발/직원 online backup 및 schema/SQLite/FK 검증 완료. 직원 원형에서 A/B 분기, 기존 업무 86개 테이블 보존 및 후보 신규 nullable 필드 백필 없음 확인. QA 직원 6명은 사본에만 추가. 실행자료 C:/ERP/_attic/runtime/main-candidate-20261016/pair-preparation.json.
 - [x] CP1 공통 시나리오·1920×1080·근거 재사용 확정 (2026-10-16). A/B 별도 호스트와 탭, 부모만 조작. 실제 DOM 크기를 확인하고 로그인 뒤 크기가 풀린 경우 재적용하며 사진 저장 시 크기를 검사한다. 이전 CI는 당시 근거로 구분하고 새 승인 정책 소비자는 국소 재실행.
