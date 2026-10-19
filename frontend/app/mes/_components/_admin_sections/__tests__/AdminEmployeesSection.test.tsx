@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { AdminEmployeesSection } from "../AdminEmployeesSection";
 import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
 
@@ -73,6 +73,8 @@ vi.mock("@/lib/queries/useModelsQuery", () => ({
 }));
 
 describe("AdminEmployeesSection", () => {
+
+
   it("직원 목록을 이름·부서 직급·상태 열의 평평한 표 행으로 표시한다", () => {
     const inactiveEmployee = {
       ...defaultEmployee,
@@ -183,6 +185,9 @@ describe("AdminEmployeesSection", () => {
 
     expect(saveButton).toHaveClass("h-11", "min-w-[88px]", "px-4", "py-2", "text-[13px]");
     expect(saveButton.querySelector("svg")).toHaveClass("h-4", "w-4");
+    context.saveEmployee.mockClear();
+    fireEvent.click(saveButton);
+    expect(context.saveEmployee).toHaveBeenCalledOnce();
   });
 
   it("legacy 부서/직급은 목록과 선택 헤더에서 표준 직급으로 표시한다", () => {
@@ -210,7 +215,8 @@ describe("AdminEmployeesSection", () => {
       </DirtyGuardProvider>,
     );
 
-    expect(screen.getAllByText("영업 · 과장")).toHaveLength(2);
+    expect(screen.getAllByText("영업 · 과장")).toHaveLength(1);
+    expect(within(screen.getByRole("group", { name: "직원 기본 정보" })).getByRole("combobox", { name: "직급" })).toHaveTextContent("과장");
   });
 
   it("비선택 legacy 직원도 목록에서 표준 직급으로 표시한다", () => {
@@ -298,7 +304,8 @@ describe("AdminEmployeesSection", () => {
       </DirtyGuardProvider>,
     );
 
-    expect(screen.getAllByText("조립 · 대리")).toHaveLength(2);
+    expect(screen.getAllByText("조립 · 대리")).toHaveLength(1);
+    expect(within(screen.getByRole("group", { name: "직원 기본 정보" })).getByRole("combobox", { name: "직급" })).toHaveTextContent("대리");
     expect(context.saveEmployee).not.toHaveBeenCalled();
   });
 
@@ -331,8 +338,8 @@ describe("AdminEmployeesSection", () => {
     );
 
     const deptFilter = screen.getByRole("combobox", { name: "부서 필터" });
-    expect(deptFilter.parentElement).toHaveClass("w-[144px]");
-    expect(screen.getByText("직원 목록").parentElement?.parentElement).toContainElement(deptFilter);
+    expect(deptFilter.parentElement).toHaveClass("w-[48%]", "min-w-[144px]");
+    expect(deptFilter.closest("div.flex.shrink-0")).toContainElement(screen.getByText("직원 목록"));
   });
 
   it("직원 추가를 시작하면 비어 있는 직급을 사원으로 채운다", () => {

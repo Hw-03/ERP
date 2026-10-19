@@ -24,6 +24,7 @@ import { EmployeeAddInline } from "./_employee_parts/EmployeeAddInline";
 import { EmployeeDetailGrid } from "./_employee_parts/EmployeeDetailGrid";
 import { normalizeEmployeePosition } from "./_employee_parts/employeeRoleLabels";
 import { matchesSearchText } from "@/lib/searchText";
+import styles from "./_admin_primitives/AdminMasterData.module.css";
 
 export function AdminEmployeesSection() {
   const ctx = useAdminEmployeesContext();
@@ -129,7 +130,7 @@ export function AdminEmployeesSection() {
 
   return (
     <>
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className={`flex min-h-0 flex-1 flex-col ${styles.workspace} ${styles.employeeWorkspace}`}>
         <AdminPageHeader
           icon={Users}
           title="직원 관리"
@@ -144,7 +145,7 @@ export function AdminEmployeesSection() {
             />
           }
           actions={
-            <Button variant="primary" size="md" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>
+            <Button variant="primary" size="md" className="min-h-11" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>
               직원 추가
             </Button>
           }
@@ -154,7 +155,7 @@ export function AdminEmployeesSection() {
           <AdminListPanel
             title="직원 목록"
             countLabel={`${filteredEmployees.length}명`}
-            width={288}
+            width="clamp(360px, 28vw, 440px)"
             searchValue={search}
             searchPlaceholder="이름·부서·직급 검색"
             onSearchChange={setSearch}
@@ -163,22 +164,22 @@ export function AdminEmployeesSection() {
                 value={deptFilter}
                 onChange={setDeptFilter}
                 options={deptOptions.map((d) => ({ value: d, label: d === "ALL" ? "전체 부서" : d }))}
-                size="sm"
-                className="w-[144px] shrink-0"
-                triggerClassName="whitespace-nowrap"
+                size="md"
+                className="w-[48%] min-w-[144px] shrink-0"
+                triggerClassName="min-h-11 whitespace-nowrap"
                 triggerAriaLabel="부서 필터"
                 triggerStyle={{ background: LEGACY_COLORS.s2 }}
               />
             }
             listRole="grid"
             listAriaLabel="직원 목록"
-            listClassName="flex min-h-0 flex-1 flex-col overflow-y-auto pr-0.5"
+            externalScrollbar
             listHeader={
               <div
                 data-admin-list-header="employees"
                 role="row"
-                className="sticky top-0 z-10 grid grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_76px] border-b px-3 py-2 text-[11px] font-bold tracking-[0.08em]"
-                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+                className={`sticky top-0 z-10 grid grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_76px] border-b px-3 py-2 text-[12px] font-bold ${styles.tableHeader}`}
+                style={{ background: "var(--c-inventory-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
               >
                 <span role="columnheader">이름</span>
                 <span role="columnheader">부서·직급</span>
@@ -216,11 +217,8 @@ export function AdminEmployeesSection() {
                   }}
                   aria-selected={active}
                   tabIndex={0}
-                  className="grid w-full grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_76px] items-center border-b px-3 py-2 text-left transition-colors duration-150 hover:bg-[var(--c-s4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30"
+                  className={`grid w-full grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_76px] items-center border-b px-3 py-2 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[color:var(--c-blue)]/30 ${styles.tableRow}`}
                   style={{
-                    background: active
-                      ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
-                      : undefined,
                     borderColor: LEGACY_COLORS.border,
                   }}
                 >
@@ -262,32 +260,13 @@ export function AdminEmployeesSection() {
               empAddMode
                 ? "직원 추가"
                 : selectedEmployee
-                  ? selectedEmployee.name
+                  ? undefined
                   : "직원을 선택하세요"
-            }
-            subtitle={
-              !empAddMode && selectedEmployee
-                ? `${normalizeDepartment(editForm.department)}${
-                    editForm.role ? ` · ${normalizeEmployeePosition(editForm.role)}` : ""
-                  }`
-                : undefined
-            }
-            status={
-              !empAddMode && selectedEmployee ? (
-                <StatusPill
-                  label={selectedEmployee.is_active ? "활성" : "비활성"}
-                  tone={selectedEmployee.is_active ? "success" : "neutral"}
-                />
-              ) : null
             }
             actions={
               empAddMode ? (
                 <Button variant="secondary" size="sm" iconLeft={<X className="h-3.5 w-3.5" />} onClick={() => setEmpAddMode(false)}>
                   취소
-                </Button>
-              ) : selectedEmployee ? (
-                <Button variant="primary" size="md" className="h-11 min-w-[88px]" iconLeft={<Save className="h-4 w-4" />} onClick={saveEmployee}>
-                  저장
                 </Button>
               ) : null
             }
@@ -303,6 +282,7 @@ export function AdminEmployeesSection() {
             ) : selectedEmployee ? (
               <EmployeeDetailGrid
                 employee={selectedEmployee}
+                headerActions={<Button variant="primary" size="md" className="h-11 min-w-[88px]" iconLeft={<Save className="h-4 w-4" />} onClick={saveEmployee}>저장</Button>}
                 form={editForm}
                 setForm={setEditForm}
                 departments={departments}
