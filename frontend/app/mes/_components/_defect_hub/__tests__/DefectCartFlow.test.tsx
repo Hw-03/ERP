@@ -1170,6 +1170,24 @@ describe("DefectCartFlow", () => {
     expect(row).toHaveTextContent("가용 7");
   });
 
+  it.each([
+    { mode: "add" as const, initialAction: undefined },
+    { mode: "scrap" as const, initialAction: "scrap" as const },
+    { mode: "scrap" as const, initialAction: "rework" as const },
+  ])("기타 메모 안내는 한 번만 표시하고 입력하면 해제한다 ($mode/$initialAction)", async ({ mode, initialAction }) => {
+    render(<DefectCartFlow mode={mode} initialAction={initialAction} items={[{ ...fItem, has_bom: true }]} productModels={[]} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "완제품 장바구니에 추가" }));
+    fireEvent.click(screen.getByRole("button", { name: "수량·처리 정보 →", exact: true }));
+    await selectReasonCategory("기타");
+    expect(screen.getAllByText("기타 사유를 메모에 입력해 주세요.")).toHaveLength(1);
+    expect(screen.queryByText(/자동 부서/)).not.toBeInTheDocument();
+    const proceed = screen.getByRole("button", { name: initialAction === "rework" ? "BOM 확인 →" : mode === "add" ? /격리하기/ : /^즉시 폐기 \(/ });
+    expect(proceed).toBeDisabled();
+    fireEvent.change(screen.getByRole("textbox", { name: "메모" }), { target: { value: "분류되지 않은 불량 사유" } });
+    expect(screen.queryByText("기타 사유를 메모에 입력해 주세요.")).not.toBeInTheDocument();
+    expect(proceed).toBeEnabled();
+  });
+
   it("카테고리 미선택은 메모가 있어도 막고 기타는 메모도 요구한다", async () => {
     render(
       <DefectCartFlow mode="add" items={[rItem]} productModels={[]} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />,

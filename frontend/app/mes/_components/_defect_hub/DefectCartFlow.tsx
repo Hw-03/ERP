@@ -19,7 +19,7 @@ import { DefectManagementCategoryControl } from "./DefectManagementCategoryContr
 import type { DefectManagementCategory } from "@/lib/api/types/defects";
 import { makeClientRequestId } from "@/lib/uuid";
 import { queryKeys } from "@/lib/queries/keys";
-import { defectCartLineErrors, defectSourceStock } from "./defectCartValidation";
+import { defectCartLineErrors, defectSourceStock, OTHER_REASON_MEMO_REQUIRED_MESSAGE } from "./defectCartValidation";
 import { formatQty } from "@/lib/mes/format";
 import { MAX_QUARANTINE_LINES, groupDefectCartLines, insertDefectCartLine, defectCartGroupErrors } from "./defectCartGroups";
 import quarantineConfirmStyles from "./DefectQuarantineConfirm.module.css";
@@ -491,7 +491,7 @@ export function DefectCartFlow({
                               remove: <button type="button" disabled={busy} onClick={() => removeLine(line.key)} aria-label={`${group.item.item_name} 사유 ${index + 1} 삭제`}
                                 className="standard-hover no-btn-inset flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] disabled:opacity-50" style={{ color: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 10) }}><Trash2 className="h-4 w-4" /></button>,
                             }} />
-                          {validationErrors.filter((message) => message !== "사유 카테고리를 선택하세요.").map((message) => <div key={message} className="text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>{message}</div>)}
+                          {validationErrors.filter((message) => message !== "사유 카테고리를 선택하세요." && message !== OTHER_REASON_MEMO_REQUIRED_MESSAGE).map((message) => <div key={message} className="text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>{message}</div>)}
                         </fieldset>;
                       })}
                     </div>
@@ -506,7 +506,7 @@ export function DefectCartFlow({
                           <div className="min-w-0">
                             <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{line.item.mes_code ?? "(코드 없음)"}</div>
                             <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{line.item.item_name}</div>
-                            <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>자동 부서 · {source === "warehouse" ? "창고" : itemDepartment(line.item) ?? "부서 미지정"}</div>
+                            <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>부서 · {source === "warehouse" ? "창고" : itemDepartment(line.item) ?? "부서 미지정"}</div>
                           </div>
                         </div>
 
@@ -530,7 +530,7 @@ export function DefectCartFlow({
 
                         {fail && <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>실패: {fail.message}</div>}
                         {lastReason && groupErrors.has(line.item.item_id) && <div className="text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>{groupErrors.get(line.item.item_id)}</div>}
-                        {validationErrors.filter((message) => message !== "사유 카테고리를 선택하세요.").map((message) => (
+                        {validationErrors.filter((message) => message !== "사유 카테고리를 선택하세요." && message !== OTHER_REASON_MEMO_REQUIRED_MESSAGE).map((message) => (
                           <div key={message} className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>{message}</div>
                         ))}
                       </div>
