@@ -145,6 +145,7 @@ def prepare(checkout: Path, root: Path) -> None:
     generated = {
         "frontend/mes-flaky-diagnosis.config.ts": (HERE / "diagnosis.config.ts").read_text(encoding="utf-8"),
         "frontend/tests/e2e/mes-flaky-preflight.spec.ts": (HERE / "preflight.spec.ts").read_text(encoding="utf-8"),
+        "frontend/tests/e2e/000-mes-flaky-items.spec.ts": (HERE / "items-preseed.spec.ts").read_text(encoding="utf-8"),
     }
     for relative, value in generated.items():
         destination = source / relative

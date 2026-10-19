@@ -1,4 +1,4 @@
-"""Run only the three approved selectors, sequentially; stop at the first failure."""
+"""Restore only evidenced precursors, once; stop at the first failure."""
 
 from __future__ import annotations
 
@@ -19,9 +19,10 @@ from typing import Any
 
 HERE = Path(__file__).resolve().parent
 BATCHES = (
-    ("variant", "shipping-additional-expectations.spec.ts", "SHIP-VARIANT", 3),
-    ("generated-roles", "shipping-additional-expectations.spec.ts", "SHIP-GENERATED-ROLES", 3),
-    ("io-research-returns", "io-as-research-audit.spec.ts", "IO-RESEARCH-RETURNS", 3),
+    ("bom-original-precursors", ("shipping-additional-expectations.spec.ts",),
+     "SHIP-(DISCARD|VARIANT|CANDIDATE-DRIFT|GENERATED-ROLES) ", 4),
+    ("io-original-item-scale", ("000-mes-flaky-items.spec.ts", "io-as-research-audit.spec.ts"),
+     "MES-DIAG-ITEM-SHAPE|IO-RESEARCH-RETURNS", 2),
 )
 
 
@@ -143,7 +144,30 @@ def ports_free() -> None:
             connection.bind(("127.0.0.1", port))
 
 
-def run_batch(source: Path, artifacts: Path, name: str, spec: str, selector: str, repeats: int) -> dict[str, Any]:
+def verify_report(report: dict[str, Any], expected: int, same_worker: bool) -> list[int]:
+    """Reject partial success or an unintended browser-worker restart in a cohort."""
+    stats = report["stats"]
+    if stats.get("expected") != expected or any(stats.get(key, 0) for key in ("unexpected", "flaky", "skipped")):
+        raise ValueError("selector execution count or retry-free result mismatch")
+    results = []
+
+    def visit(suite: dict[str, Any]) -> None:
+        for spec in suite.get("specs", []):
+            for test in spec.get("tests", []):
+                results.extend(test.get("results", []))
+        for child in suite.get("suites", []):
+            visit(child)
+
+    visit(report)
+    if len(results) != expected or any(row.get("status") != "passed" or row.get("retry") != 0 for row in results):
+        raise ValueError("individual test result mismatch")
+    workers = sorted({row["workerIndex"] for row in results})
+    if same_worker and len(workers) != 1:
+        raise ValueError("original precursor cohort must keep one browser worker")
+    return workers
+
+
+def run_batch(source: Path, artifacts: Path, name: str, specs: tuple[str, ...], selector: str, expected: int) -> dict[str, Any]:
     output = artifacts / name
     output.mkdir()
     env = {**os.environ, "MES_DIAG_SOURCE": str(source), "MES_DIAG_OUTPUT": str(output),
@@ -154,7 +178,8 @@ def run_batch(source: Path, artifacts: Path, name: str, spec: str, selector: str
            "IO_RUN_ID": name, "IO_TRACE_TARGET_PORT": "8021",
            "IO_NODE_TRACE_FILE": str(output / "next-http.jsonl"), "IO_PY_TRACE_FILE": str(output / "backend-protocol.jsonl"),
            "NODE_OPTIONS": "--require=" + str(HERE / "io/next-preload.cjs"), "PYTHONPATH": str(HERE / "io")}
-    result: dict[str, Any] = {"name": name, "selector": selector, "max_repetitions": repeats, "retry": 0, "workers": 1,
+    result: dict[str, Any] = {"name": name, "selector": selector, "specs": specs, "max_repetitions": 1,
+                              "expected_tests": expected, "retry": 0, "workers": 1,
                               "started_wall_ns": time.time_ns(), "started_mono_ns": time.monotonic_ns(), "status": "infrastructure_failure",
                               "environment": {key: env[key] for key in ("CI", "APP_ENV", "REQUIRE_POSTGRES", "DATABASE_URL",
                                   "BACKEND_INTERNAL_URL", "MES_RUNTIME_ROOT", "AUDIT_CSV_DIR", "IO_RUN_ID", "IO_TRACE_TARGET_PORT", "MES_BOM_DIAG")}}
@@ -170,7 +195,7 @@ def run_batch(source: Path, artifacts: Path, name: str, spec: str, selector: str
         capture_ready(output / "packets.jsonl", collector)
         command = ["node", "node_modules/@playwright/test/cli.js", "test", "--config=mes-flaky-diagnosis.config.ts",
                    "--project=chromium", "--workers=1", "--retries=0", "--max-failures=1",
-                   "--repeat-each=" + str(repeats), "tests/e2e/" + spec, "--grep", selector]
+                   "--repeat-each=1", *("tests/e2e/" + spec for spec in specs), "--grep", selector]
         with (output / "runner-stdout.log").open("wb") as stdout, (output / "runner-stderr.log").open("wb") as stderr:
             runner = subprocess.Popen(command, cwd=source / "frontend", env=env, stdout=stdout, stderr=stderr, start_new_session=True)
         with (output / "pidwatch-stderr.log").open("wb") as stderr:
@@ -182,10 +207,10 @@ def run_batch(source: Path, artifacts: Path, name: str, spec: str, selector: str
         result["status"] = "passed" if result["exit_code"] == 0 else "failed"
         report = output / "report.json"
         if report.exists():
-            stats = json.loads(report.read_text())["stats"]
-            result["stats"] = stats
-            if result["exit_code"] == 0 and (stats.get("expected") != repeats or any(stats.get(key, 0) for key in ("unexpected", "flaky", "skipped"))):
-                raise RuntimeError("selector execution count or retry-free result mismatch")
+            contents = json.loads(report.read_text())
+            result["stats"] = contents["stats"]
+            if result["exit_code"] == 0:
+                result["worker_indices"] = verify_report(contents, expected, name == "bom-original-precursors")
         elif result["exit_code"] == 0:
             raise RuntimeError("successful runner did not produce its JSON report")
     except Exception as exc:
@@ -258,13 +283,13 @@ def main() -> None:
 
     signal.signal(signal.SIGTERM, interrupt)
     try:
-        preflight = run_batch(source, artifacts, "preflight", "mes-flaky-preflight.spec.ts", "MES-DIAG-APP-READY", 1)
+        preflight = run_batch(source, artifacts, "preflight", ("mes-flaky-preflight.spec.ts",), "MES-DIAG-APP-READY", 1)
         batches.append(preflight)
         if preflight["status"] != "passed":
             summary["status"] = "environment_readiness_failed"
             raise SystemExit(1)
-        for name, spec, selector, repeats in BATCHES:
-            current = run_batch(source, artifacts, name, spec, selector, repeats)
+        for name, specs, selector, expected in BATCHES:
+            current = run_batch(source, artifacts, name, specs, selector, expected)
             batches.append(current)
             if current["status"] != "passed":
                 summary["status"] = "first_failure_stopped"

@@ -69,9 +69,9 @@ jobs:
           "$MES_DIAG_ROOT/venv/bin/python" "$MES_DIAG_ROOT/source/scripts/dev/mes-flaky-diagnosis/environment.py"
           --source "$MES_DIAG_ROOT/source" --output "$MES_DIAG_ROOT/artifacts/environment.json"
 
-      - name: App readiness then three original selectors with no retry
+      - name: App readiness then evidenced precursors with no retry
         # Original test/expect timeout, bootstrap and seed remain intact.
-        # Each selector has at most 3 repetitions; batches run sequentially and stop on first failure.
+        # Each cohort runs once; batches run sequentially and stop on first failure.
         run: >-
           "$MES_DIAG_ROOT/venv/bin/python" "$MES_DIAG_ROOT/source/scripts/dev/mes-flaky-diagnosis/run.py"
           --root "$MES_DIAG_ROOT"

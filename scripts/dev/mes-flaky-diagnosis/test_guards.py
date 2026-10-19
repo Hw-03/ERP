@@ -30,6 +30,28 @@ def load_tool(name: str, path: Path) -> ModuleType:
 
 EXPORT = load_tool("mes_flaky_export_source", HERE / "export-source.py")
 BOM = load_tool("mes_flaky_bom_apply", HERE / "bom/apply-bom-diagnostics.py")
+RUNNER = load_tool("mes_flaky_runner", HERE / "run.py")
+
+
+class ReportTests(unittest.TestCase):
+    def report(self, workers: list[int]) -> dict:
+        """Model actual Playwright nesting, including each original retry ordinal."""
+        return {"stats": {"expected": len(workers), "unexpected": 0, "flaky": 0, "skipped": 0},
+                "suites": [{"suites": [{"specs": [{"tests": [{"results": [
+                    {"status": "passed", "retry": 0, "workerIndex": worker}]}]} for worker in workers]}]}]}
+
+    def test_worker_concurrency_does_not_prove_browser_reuse(self) -> None:
+        self.assertEqual(RUNNER.verify_report(self.report([0, 0, 0, 0]), 4, True), [0])
+        with self.assertRaisesRegex(ValueError, "worker"):
+            RUNNER.verify_report(self.report([0, 1, 2, 3]), 4, True)
+
+    def test_partial_or_retried_result_cannot_count_as_success(self) -> None:
+        with self.assertRaises(ValueError):
+            RUNNER.verify_report(self.report([0]), 2, False)
+        retried = self.report([0])
+        retried["suites"][0]["suites"][0]["specs"][0]["tests"][0]["results"][0]["retry"] = 1
+        with self.assertRaises(ValueError):
+            RUNNER.verify_report(retried, 1, False)
 
 
 class GuardTests(unittest.TestCase):
