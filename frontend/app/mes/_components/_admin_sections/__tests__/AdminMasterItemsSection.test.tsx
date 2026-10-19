@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
 import { AdminMasterItemsSection } from "../AdminMasterItemsSection";
+import styles from "../_admin_primitives/AdminMasterData.module.css";
 
 const item = {
   item_id: "item-1",
@@ -66,6 +67,7 @@ function findByClasses(container: HTMLElement, ...classes: string[]) {
 }
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   context.visibleItems = [item];
   context.selectedItem = null;
   context.addMode = false;
@@ -74,6 +76,8 @@ afterEach(() => {
 });
 
 describe("AdminMasterItemsSection", () => {
+
+
   it("[8.19-04] 1050개 visibleItems의 KPI·상태 합·목록·끝행이 같은 모집단을 사용한다", () => {
     context.visibleItems = Array.from({ length: 1050 }, (_, index) => ({
       ...item,
@@ -112,6 +116,30 @@ describe("AdminMasterItemsSection", () => {
     expect(screen.queryByTestId("item-reorder-grip")).not.toBeInTheDocument();
   });
 
+  it("바깥 스크롤 목록의 품목 핸들은 포인터 정렬 저장을 유지한다", () => {
+    const second = { ...item, item_id: "item-2", item_name: "두 번째 품목" };
+    context.visibleItems = [item, second];
+    context.reorderItems.mockClear();
+    const originalPoint = Object.getOwnPropertyDescriptor(document, "elementFromPoint");
+    vi.stubGlobal("PointerEvent", MouseEvent);
+    const view = render(<DirtyGuardProvider><AdminMasterItemsSection allBomRows={[]} /></DirtyGuardProvider>);
+    try {
+      const grip = screen.getAllByTestId("item-reorder-grip")[0];
+      const target = screen.getByRole("row", { name: /두 번째 품목/ });
+      Object.defineProperty(grip, "setPointerCapture", { configurable: true, value: vi.fn() });
+      Object.defineProperty(document, "elementFromPoint", { configurable: true, value: vi.fn(() => target) });
+      fireEvent.pointerDown(grip, { clientX: 10, clientY: 10, pointerId: 1 });
+      fireEvent.pointerMove(grip, { clientX: 10, clientY: 30, pointerId: 1 });
+      fireEvent.pointerUp(grip, { clientX: 10, clientY: 30, pointerId: 1 });
+      expect(context.reorderItems).toHaveBeenCalledWith([second, item]);
+    } finally {
+      view.unmount();
+      vi.unstubAllGlobals();
+      if (originalPoint) Object.defineProperty(document, "elementFromPoint", originalPoint);
+      else Reflect.deleteProperty(document, "elementFromPoint");
+    }
+  });
+
   it("places the add-form close button in the card header without repeating the title", () => {
     context.addMode = true;
     context.addForm = {
@@ -139,7 +167,7 @@ describe("AdminMasterItemsSection", () => {
     );
 
     const closeButton = screen.getByRole("button", { name: "새 품목 추가 닫기" });
-    expect(closeButton).toHaveClass("h-8", "w-8", "!rounded-full");
+    expect(closeButton).toHaveClass("h-11", "w-11", "!rounded-full");
     expect(screen.getAllByText("새 품목 추가")).toHaveLength(1);
   });
 
@@ -188,7 +216,7 @@ describe("AdminMasterItemsSection", () => {
     const text = row.textContent ?? "";
 
     expect(text.indexOf("주 품목명")).toBeLessThan(text.indexOf("MES-001"));
-    expect(row).toHaveClass("border-l-[3px]");
+    expect(row).toHaveClass(styles.tableRow);
     expect(within(row).getByText(item.item_name)).toHaveClass("truncate");
     expect(within(row).getAllByRole("gridcell")).toHaveLength(3);
   });
@@ -204,7 +232,7 @@ describe("AdminMasterItemsSection", () => {
     const grid = screen.getByRole("grid", { name: "품목 목록" });
     const row = within(grid).getByRole("row", { name: /주 품목명/ });
     expect(row).toHaveAttribute("aria-selected", "true");
-    expect(row).toHaveStyle({ borderLeftColor: "var(--c-blue)" });
+    expect(row).toHaveClass(styles.tableRow);
   });
 
   it("keeps active item deletion controls beside the detail tabs", async () => {
