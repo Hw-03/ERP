@@ -18,6 +18,12 @@ HERE = Path(__file__).resolve().parent
 EVENTS = ('tcp/tcp_send_reset', 'tcp/tcp_receive_reset', 'sock/inet_sock_set_state',
           'signal/signal_generate', 'signal/signal_deliver', 'oom/mark_victim', 'sched/sched_process_fork')
 
+def is_intentional_missing_key(value: dict[str, Any]) -> bool:
+    """Only these observed missing-filter lookups are benign; other helper failures remain errors."""
+    return (value.get('type') == 'helper_error' and value.get('helper') == 'map_lookup_elem'
+        and value.get('retcode') == 0 and value.get('msg') in (
+            'Success', "Can't lookup map element because it does not exist."))
+
 def reset_probes(formats: dict[str, str]) -> str:
     """Bind observed fields; new kernels store sockaddr bytes and an explicit reset reason."""
     blocks = []
@@ -121,6 +127,7 @@ def main() -> None:
     errors = 0
     missing_map_keys = 0
     compiler_lines = 0
+    separator_lines = 0
     attached = False
     ready = False
     count = 0
@@ -147,10 +154,13 @@ def main() -> None:
         try:
             for line in child.stdout:
                 raw.write(line)
+                if not line.strip():
+                    separator_lines += 1
+                    continue
                 try:
                     value = json.loads(line)
                     attached = attached or value.get('type') == 'attached_probes'
-                    if value.get('type') == 'helper_error' and value.get('helper') == 'map_lookup_elem' and value.get('retcode') == 0 and value.get('msg') == 'Success':
+                    if is_intentional_missing_key(value):
                         # Missing PID/socket map keys are intentional filters, not lost events.
                         missing_map_keys += 1
                         continue
@@ -165,6 +175,12 @@ def main() -> None:
                     errors += 1
                     continue
                 if event is not None:
+                    if event['event'] == 'ready' and event.get('pid') != child.pid:
+                        # 0.20 exposes init PIDs in nested namespaces, unlike newer builds.
+                        # Refuse that runtime before the parent can admit a business replay.
+                        errors += 1
+                        event['event'] = 'pid_namespace_unsupported'
+                        child.send_signal(signal.SIGINT)
                     ready = ready or event['event'] == 'ready'
                     count += 1
                     normalized.write(json.dumps(event) + '\n')
@@ -180,6 +196,7 @@ def main() -> None:
     receipt = {'ready': ready, 'events': count, 'decode_errors': errors, 'loss_or_error_reported': loss,
                'effective_program_sha256': hashlib.sha256(program.read_bytes()).hexdigest(),
                'intentional_missing_map_keys': missing_map_keys, 'compiler_output_lines': compiler_lines,
+               'empty_separator_lines': separator_lines,
                'exit_code': code, 'stopped_by_owner': stopped, 'finished_mono_ns': time.monotonic_ns()}
     receipt['usable'] = ready and errors == 0 and not loss and code == 0 and stopped
     output.with_name('kernel-result.json').write_text(json.dumps(receipt, indent=2))

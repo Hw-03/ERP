@@ -6,6 +6,15 @@ import unittest
 PATH = Path(__file__).parent / 'io/kernel-capture.py'
 
 class KernelEvidenceTests(unittest.TestCase):
+    def test_only_known_missing_filter_lookup_is_benign(self):
+        tool = self.tool()
+        for message in ('Success', "Can't lookup map element because it does not exist."):
+            event = {'type': 'helper_error', 'helper': 'map_lookup_elem', 'retcode': 0, 'msg': message}
+            self.assertTrue(tool.is_intentional_missing_key(event))
+            self.assertFalse(tool.is_intentional_missing_key({**event, 'retcode': -14}))
+            self.assertFalse(tool.is_intentional_missing_key({**event, 'helper': 'probe_read'}))
+        self.assertFalse(tool.is_intentional_missing_key({**event, 'msg': 'unknown failure'}))
+
     def tool(self):
         self.assertTrue(PATH.exists(), 'kernel failure recorder is not implemented')
         spec = importlib.util.spec_from_file_location('kernel_capture', PATH)

@@ -50,6 +50,14 @@
 
 후보 `948a3789`의 [CI39194178641](https://github.com/Hw-03/ERP/actions/runs/39194178641)도 원 업무 시작 전 중단했다. bpftrace0.20.2가 tracepoint byte array를 sockaddr 포인터로 cast하는 문법을 지원하지 않는다는 컴파일 원문을 확보했다. 배열의 family 두 바이트는 실제 호스트 byte order로, port 두 바이트는 network order로 읽도록 한 경계만 수정했다. 새 커널 자체 검사에서 진단 포트3154의 자연스러운 거부와 `NO_SOCKET` raw reason1까지 일치해야 통과시킨다. 국소 형식 검사4건은 통과했고 새 CI 실제 기동은 아직 확인 전이다. 원문은 후보 `_attic/runtime/flaky-capture-20261019/ci-39194178641`. 같은 SHA 일반 CI39194178648는 취소 완료했다. 원 일반 E2E 실행 횟수는 여전히0이다.
 
+### 도구 버전 일치 후 국소 대조
+
+후보 `1d64cf46`의 [CI39194509253](https://github.com/Hw-03/ERP/actions/runs/39194509253)는 bpftrace0.20에서 `probe`와 문자열 비교가 거부되어 업무 전 중단했다. 원문은 후보 `_attic/runtime/flaky-capture-20261019/ci-39194509253`이며 같은 SHA 일반 CI39194509380는 취소 완료했다. [공식 bpftrace0.20.2](https://github.com/bpftrace/bpftrace/releases/tag/v0.20.2)를 별도 로컬 경로로 받아 kernel-selftest11에서 같은 컴파일 오류를 재현했다. close와 active reset을 각 probe의 고정 kind로 기록하도록 보완해 컴파일을 통과했다.
+
+국소12에서는 WSL의 중첩 PID namespace에서0.20이 init PID를 반환해 부모 추적이 성립하지 않는 차이와 빈 필터 lookup의 기존 버전 메시지·빈 구분행을 관찰했다. 이 실행은 정상으로 세지 않았다. 관측 PID와 실제 자식 PID가 다르면 준비 완료를 거부하는 가드를 추가했고 `kernel-namespace-rejection-15/guard-result.json`에서 거부를 확인했다. CI는 기록된 init namespace이며 그 실제 가드는 다시 확인해야 한다. 알려진 빈 lookup 두 형식만 별도 집계하고 다른 helper 오류는 계속 실패로 처리한다. 빈 owner를 삭제하는 호출도 피했다.
+
+현재 국소 형식/오류 분류5건과 WSL0.25의 kernel-selftest14(정상 종료·signal·소켓 owner·close/reset 수신, decode/loss0)는 통과했다.0.20과 WSL 중첩 namespace의 조합은 지원한다고 주장하지 않는다. 원 일반 업무 묶음은 아직 시작 전이며 제품 원인은 두 건 모두 미확정이다.
+
 일반 E2E만1회, worker1/retry0/repeat1/first failure stop, job 준비 포함90분이다. 최초 실패 전후를 `failure.frozen`, `failure.collection.finished`, `cleanup.begin`, `global-cleanup-start.json`으로 구분한다. browser trace는 실패 전 chunk와 cleanup chunk를 분리하고 독립 APIRequestContext trace는 최종 원문과 cutoff를 연결한다. collector는 종료까지 drain해 늦게 flush된 실패 직전 기록을 빠뜨리지 않는다.
 
 원인 판정에는 기록 손실 여부·실제 입력/요청 경계·소켓 owner·원 오류 서명까지 필요하다. 자료가 부분이거나 원 실패와 다른 사건이면 그 범위를 명시한다. 모두 정상이면 같은 전체 묶음을 반복하지 않는다. 기존 전체 통과를 새 통합판 PASS로 승격하지 않는다.

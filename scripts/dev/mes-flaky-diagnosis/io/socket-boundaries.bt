@@ -31,21 +31,34 @@ kretprobe:inet_csk_accept /retval > 4096/ {
 }
 tracepoint:sock:inet_sock_set_state /args->family == 2 && args->protocol == 6 && (args->sport == $1 || args->dport == $1)/ {
   if (args->newstate == 2 || args->newstate == 3 || (args->oldstate == 3 && args->newstate == 1)) {
-    $deleted = delete(@owner[(uint64)args->skaddr]);
+    if (@owner[(uint64)args->skaddr]) { $deleted = delete(@owner[(uint64)args->skaddr]); }
   }
   printf("MESK event=state mono_ns=%llu pid=%d tid=%d sk=%llu owner=%d sport=%d dport=%d old=%d new=%d\n",
     nsecs(monotonic), pid, tid, (uint64)args->skaddr, @owner[(uint64)args->skaddr],
     args->sport, args->dport, args->oldstate, args->newstate);
 }
-kprobe:tcp_close, kprobe:tcp_send_active_reset {
+kprobe:tcp_close {
   $sk = (struct sock *)arg0;
   $sport = $sk->__sk_common.skc_num;
   $dport = bswap((uint16)$sk->__sk_common.skc_dport);
   if ($sk->__sk_common.skc_family == 2 && ($sport == $1 || $dport == $1)) {
     $tcp = (struct tcp_sock *)$sk;
-    $kind = probe == "kprobe:tcp_close" ? 1 : 2;
-    printf("MESK event=close_or_active_reset mono_ns=%llu pid=%d tid=%d init_pid=%d boundary_kind=%d sk=%llu owner=%d sport=%d dport=%d rcv_nxt=%u copied_seq=%u queue_length=%u state=%d flags=%llu linger=%llu cookie=%llu local_addr_raw=%u remote_addr_raw=%u stack=%s\n",
-      nsecs(monotonic), pid, tid, curtask->tgid, $kind, (uint64)$sk, @owner[(uint64)$sk], $sport, $dport,
+    printf("MESK event=close_or_active_reset mono_ns=%llu pid=%d tid=%d init_pid=%d boundary_kind=1 sk=%llu owner=%d sport=%d dport=%d rcv_nxt=%u copied_seq=%u queue_length=%u state=%d flags=%llu linger=%llu cookie=%llu local_addr_raw=%u remote_addr_raw=%u stack=%s\n",
+      nsecs(monotonic), pid, tid, curtask->tgid, (uint64)$sk, @owner[(uint64)$sk], $sport, $dport,
+      $tcp->rcv_nxt, $tcp->copied_seq, $sk->sk_receive_queue.qlen,
+      $sk->__sk_common.skc_state, $sk->__sk_common.skc_flags, $sk->sk_lingertime,
+      $sk->__sk_common.skc_cookie.counter, $sk->__sk_common.skc_rcv_saddr, $sk->__sk_common.skc_daddr, kstack(16));
+  }
+}
+// Keep the probe kind literal: bpftrace 0.20's probe value is not a comparable string.
+kprobe:tcp_send_active_reset {
+  $sk = (struct sock *)arg0;
+  $sport = $sk->__sk_common.skc_num;
+  $dport = bswap((uint16)$sk->__sk_common.skc_dport);
+  if ($sk->__sk_common.skc_family == 2 && ($sport == $1 || $dport == $1)) {
+    $tcp = (struct tcp_sock *)$sk;
+    printf("MESK event=close_or_active_reset mono_ns=%llu pid=%d tid=%d init_pid=%d boundary_kind=2 sk=%llu owner=%d sport=%d dport=%d rcv_nxt=%u copied_seq=%u queue_length=%u state=%d flags=%llu linger=%llu cookie=%llu local_addr_raw=%u remote_addr_raw=%u stack=%s\n",
+      nsecs(monotonic), pid, tid, curtask->tgid, (uint64)$sk, @owner[(uint64)$sk], $sport, $dport,
       $tcp->rcv_nxt, $tcp->copied_seq, $sk->sk_receive_queue.qlen,
       $sk->__sk_common.skc_state, $sk->__sk_common.skc_flags, $sk->sk_lingertime,
       $sk->__sk_common.skc_cookie.counter, $sk->__sk_common.skc_rcv_saddr, $sk->__sk_common.skc_daddr, kstack(16));
