@@ -38,7 +38,7 @@ describe("ItemFormFields", () => {
       />,
     );
 
-    const labels = ["품목명", "부서", "공정 단계", "사용 제품", "자재분류", "단위", "품목 코드"]
+    const labels = ["품목명", "사용 제품", "부서", "공정 단계", "자재분류", "단위", "품목 코드"]
       .map((label) => screen.getByText(label, { selector: "div" }));
 
     for (let index = 0; index < labels.length - 1; index += 1) {

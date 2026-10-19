@@ -194,23 +194,6 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
         </div>
       ))}
 
-      {/* 카테고리: 부서와 공정 단계 */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="min-w-0">
-          <FieldLabel label="부서" badge="필수" />
-          <AppSelect value={categoryDepartment} onChange={(value) => changeCategory("department", value)}
-            size="lg" triggerStyle={{ background: LEGACY_COLORS.s1 }} triggerAriaLabel="부서"
-            placeholder="부서 선택" options={CATEGORY_DEPARTMENT_OPTIONS} />
-        </div>
-        <div className="min-w-0">
-          <FieldLabel label="공정 단계" badge="필수" />
-          <AppSelect value={processStage} onChange={(value) => changeCategory("stage", value)}
-            size="lg" triggerStyle={{ background: LEGACY_COLORS.s1 }} triggerAriaLabel="공정 단계"
-            placeholder="공정 단계 선택" options={PROCESS_STAGE_OPTIONS}
-            disabled={!CATEGORY_DEPARTMENT_OPTIONS.some((option) => option.value === categoryDepartment)} />
-        </div>
-      </div>
-
       {/* 사용 제품 (모델 슬롯) */}
       <div>
         <div className="flex flex-wrap items-center gap-x-2">
@@ -248,6 +231,23 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
               </button>
             );
           })}
+        </div>
+      </div>
+
+      {/* 카테고리: 부서와 공정 단계 */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="min-w-0">
+          <FieldLabel label="부서" badge="필수" />
+          <AppSelect value={categoryDepartment} onChange={(value) => changeCategory("department", value)}
+            size="lg" triggerStyle={{ background: LEGACY_COLORS.s1 }} triggerAriaLabel="부서"
+            placeholder="부서 선택" options={CATEGORY_DEPARTMENT_OPTIONS} />
+        </div>
+        <div className="min-w-0">
+          <FieldLabel label="공정 단계" badge="필수" />
+          <AppSelect value={processStage} onChange={(value) => changeCategory("stage", value)}
+            size="lg" triggerStyle={{ background: LEGACY_COLORS.s1 }} triggerAriaLabel="공정 단계"
+            placeholder="공정 단계 선택" options={PROCESS_STAGE_OPTIONS}
+            disabled={!CATEGORY_DEPARTMENT_OPTIONS.some((option) => option.value === categoryDepartment)} />
         </div>
       </div>
 
