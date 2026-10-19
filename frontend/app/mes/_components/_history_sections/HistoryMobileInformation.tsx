@@ -10,6 +10,7 @@ import { buildHistoryDetailSummary, type HistoryDetailSummary } from "./historyD
 import { formatHistoryDateTimeLong } from "./historyFormat";
 import styles from "./HistoryMobileDetail.module.css";
 import { HistoryItemStockCard } from "./HistoryItemStockCard";
+import { isInitialStockOperation } from "./historyOperationSource";
 
 /** PC의 요청 순 재고와 실제 영향을 거래별로 보존한다. */
 export function HistoryMobileStockDetails({ logs, batch = null, onSelectLog }: {
@@ -119,15 +120,20 @@ export function HistoryMobileLogStock({ log, variant = "card", showRequestOrderS
   </div>;
 }
 
-/** 기존 헤더에 없는 상태·참여자·품목 전환만 보완한다. */
-export function HistoryMobileContext({ summary, omitParticipantNames = [], omitCancelledStatus = false }: {
+/** 기존 헤더에 없는 초기 등록 위치·상태·참여자·품목 전환을 보완한다. */
+export function HistoryMobileContext({ summary, operation, omitParticipantNames = [], omitCancelledStatus = false }: {
   summary: HistoryDetailSummary;
+  operation?: Pick<TransactionLog, "operation_domain" | "operation_action">;
   omitParticipantNames?: string[];
   omitCancelledStatus?: boolean;
 }) {
   const participants = (summary.participants ?? [summary.requester]).filter((person) => !omitParticipantNames.includes(person.name)
     || (person.label !== "승인자" && formatHistoryDateTimeLong(person.at) !== formatHistoryDateTimeLong(summary.requester.at)));
   return <div className="space-y-2">
+    {operation && isInitialStockOperation(operation) && summary.flow && <div className="rounded-[16px] border p-3 text-sm" style={{ borderColor: LEGACY_COLORS.border }}>
+      <div className="mb-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>재고 이동</div>
+      <div className="break-words">{summary.flow.label}</div>
+    </div>}
     {summary.status.label !== "완료" && !(omitCancelledStatus && summary.status.label === "취소됨") && <div className="text-sm font-bold" style={{color:summary.status.tone === "danger" ? LEGACY_COLORS.red : LEGACY_COLORS.yellow}}>
       {summary.status.label}{summary.status.reason && ` · ${summary.status.reason}`}
     </div>}

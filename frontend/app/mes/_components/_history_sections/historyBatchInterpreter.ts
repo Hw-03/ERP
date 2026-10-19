@@ -8,7 +8,7 @@ import type { Department, TransactionType } from "@/lib/api/types/shared";
 import type { IoBatch, IoBundle, IoLine } from "@/lib/api/types/io";
 import type { TransactionLog } from "@/lib/api/types/production";
 import { formatQty } from "@/lib/mes/format";
-import { isStocktakeOperation } from "./historyOperationSource";
+import { getInitialStockFlow, isInitialStockOperation, isStocktakeOperation } from "./historyOperationSource";
 import {
   SUB_TYPE_LABEL as _SUB_LABEL,
   TRANSACTION_TYPE_LABEL as _TX_LABEL,
@@ -516,6 +516,7 @@ export function getHistoryOperationLabel(
   batch?: IoBatch | null,
 ): string {
   if (isStocktakeOperation(log)) return log.operation_kind === "CANCELLATION" ? "재고 전수조사 취소" : "재고 전수조사";
+  if (isInitialStockOperation(log)) return log.operation_kind === "CANCELLATION" ? "초기 재고 등록 취소" : "초기 재고 등록";
   const batchContext = getHistoryChildResultBatchOperationLabel(log, batch);
   if (batchContext) return batchContext;
   if (log.transaction_type === "DEFECT_SCRAP") {
@@ -568,9 +569,14 @@ export function getHistoryDisplaySubLabel(
     supplier_name_snapshot?: string | null;
     reverses_log_id?: string | null;
     operation_kind?: string | null;
+    operation_domain?: string | null;
+    operation_action?: string | null;
+    inventory_effect?: TransactionLog["inventory_effect"];
   },
   batch?: IoBatch | null,
 ): string | undefined {
+  const initialFlow = getInitialStockFlow([log]);
+  if (initialFlow) return initialFlow.label;
   const supplierName = log.supplier_name_snapshot?.trim();
   if (log.transaction_type === "MATERIAL_OUT" || (log.transaction_type === "SUPPLIER_RETURN" && supplierName)) {
     return getHistoryFlowLabel(log, batch);
@@ -603,9 +609,14 @@ export function getHistoryFlowLabel(
     supplier_name_snapshot?: string | null;
     reverses_log_id?: string | null;
     operation_kind?: string | null;
+    operation_domain?: string | null;
+    operation_action?: string | null;
+    inventory_effect?: TransactionLog["inventory_effect"];
   },
   batch?: IoBatch | null,
 ): string {
+  const initialFlow = getInitialStockFlow([log]);
+  if (initialFlow) return initialFlow.label;
   const supplierName = log.supplier_name_snapshot?.trim();
   if (log.transaction_type === "MATERIAL_OUT") {
     const destination = supplierName || batch?.supplier_name_snapshot?.trim() || "공급업체";

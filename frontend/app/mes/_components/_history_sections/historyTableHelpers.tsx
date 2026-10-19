@@ -30,7 +30,7 @@ import {
   type MovementTone,
 } from "./historyBatchInterpreter";
 import { isReworkOperation } from "./transactionTaxonomy";
-import { historyOperationColor, isStocktakeOperation } from "./historyOperationSource";
+import { getInitialStockEffect, historyOperationColor, isStocktakeOperation } from "./historyOperationSource";
 import { getHistoryListOperationLabel, getHistoryRowPresentation, getReferenceBatchLinePresentation, getReferenceBatchPresentation, getShippingPhaseFlowLabel, isDepartmentCorrectionLog } from "./historyPresentation";
 import { formatHistoryDate } from "./historyFormat";
 import type { HistorySelection } from "./historyConstants";
@@ -91,6 +91,17 @@ const REQUEST_ORDER_STOCK_REASON: Record<RequestOrderStockUnavailableReason, str
 
 /** 목록 셀과 열 너비가 같은 기준의 재고 스냅샷을 사용하도록 단일 경계에서 선택한다. */
 export function resolveStockSnapshot(log: TransactionLog): ResolvedStockSnapshot {
+  const initialEffect = getInitialStockEffect(log);
+  if (initialEffect) {
+    const before = initialEffect.quantity_before;
+    const after = initialEffect.quantity_after;
+    if (before == null || after == null) return { status: "missing" };
+    return { status: "available",
+      warehouseBefore: initialEffect.scope === "warehouse" ? before : log.warehouse_qty_before ?? 0,
+      warehouseAfter: initialEffect.scope === "warehouse" ? after : log.warehouse_qty_after ?? 0,
+      departmentBefore: initialEffect.scope === "location" ? before : 0,
+      departmentAfter: initialEffect.scope === "location" ? after : 0 };
+  }
   const projected = log.request_order_stock;
   if (projected?.status === "unavailable") {
     return {

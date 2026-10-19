@@ -106,6 +106,37 @@ function render(view: React.ReactElement) {
   return renderView(view, { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
 }
 
+it.each([
+  ["default", "single"], ["desktop", "single"], ["default", "batch"], ["desktop", "batch"],
+] as const)("%s %s 초기 등록 상세는 자동 기록과 사용자 메모를 구분한다", async (variant, kind) => {
+  const selected = makeLog({ transaction_type: "RECEIVE", operation_domain: "item", operation_action: "initial_stock",
+    operation_display_label: "초기 재고 등록", department: "진공", notes: "초기 재고 등록", reason_memo: "직접 확인한 수량",
+    inventory_effect: [{ scope: "location", department: "진공", delta: 2, quantity_before: 0, quantity_after: 2 }] });
+  await act(async () => { render(kind === "single"
+    ? <HistoryDetailPanel panelOpen mobilePresentation selected={selected} onSelectLog={() => {}} onLogUpdated={() => {}} variant={variant} />
+    : <HistoryBatchDetailPanel panelOpen mobilePresentation variant={variant} batchId="initial-operation" logs={[selected]} batchCache={new Map()} setBatchCache={() => {}} onBatchCancelled={() => {}} />); });
+  expect(screen.getByText("자동 기록")).toBeInTheDocument();
+  expect(screen.getByText("사용자 메모")).toBeInTheDocument();
+  expect(screen.getByText("직접 확인한 수량")).toBeInTheDocument();
+  expect(screen.queryByText("공급사 → 창고")).not.toBeInTheDocument();
+  if (variant === "default") expect(screen.getByText("초기 등록 → 진공 부서")).toBeInTheDocument();
+});
+
+it("초기 등록에 자동 기록만 있으면 사용자 메모 영역을 만들지 않는다", () => {
+  render(<HistoryDetailMemo systemNote="초기 재고 등록" notes={null} />);
+  expect(screen.getByText("자동 기록")).toBeInTheDocument();
+  expect(screen.queryByText("사용자 메모")).not.toBeInTheDocument();
+});
+
+it("모바일 초기 등록 목록은 사용자 메모 배지 없이 올바른 작업명을 표시한다", () => {
+  const log = makeLog({ transaction_type: "RECEIVE", operation_domain: "item", operation_action: "initial_stock",
+    notes: "초기 재고 등록", department: "진공", department_qty_before: 40, department_qty_after: 42,
+    inventory_effect: [{ scope: "location", department: "진공", delta: 2, quantity_before: 0, quantity_after: 2 }] });
+  render(<MobileHistoryList loading={false} error={null} displayGroups={[{ type: "solo", log }]} batchCache={new Map()} setBatchCache={() => {}} selectedKey={null} onSelectLog={() => {}} onSelectBatch={() => {}} onRetry={() => {}} canLoadMore={false} loadingMore={false} onLoadMore={() => {}} />);
+  expect(screen.getByText("초기 재고 등록")).toBeInTheDocument();
+  expect(screen.queryByText("메모")).not.toBeInTheDocument();
+});
+
 it.each(["default", "desktop"] as const)("%s observation work never requests cancellation scope", async (variant) => {
   vi.mocked(productionApi.getTransactions).mockClear();
   vi.mocked(productionApi.previewInventoryOperationCancellation).mockClear();
