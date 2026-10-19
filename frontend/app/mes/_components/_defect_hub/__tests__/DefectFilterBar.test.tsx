@@ -176,7 +176,24 @@ describe("DefectFilterBar", () => {
     expect(baseProps.onSortChange).not.toHaveBeenCalled();
   });
 
-  it("renders the filter lock checkbox after the sort select and reports changes", () => {
+  it.each([false, true])("정렬 버튼은 선택 상태와 변경 콜백을 유지한다 (mobile=%s)", (mobilePresentation) => {
+    const onSortChange = vi.fn();
+    const view = (sort: "oldest" | "newest") => <DefectFilterBar {...baseProps} mobilePresentation={mobilePresentation} sort={sort} onSortChange={onSortChange} />;
+    const { rerender } = render(view("newest"));
+    fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
+    expect(screen.getByRole("button", { name: "최신 순", exact: true })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "오래된 순", exact: true })).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(screen.getByRole("button", { name: "오래된 순", exact: true }));
+    expect(onSortChange).toHaveBeenLastCalledWith("oldest");
+    rerender(view("oldest"));
+    expect(screen.getByRole("button", { name: "오래된 순", exact: true })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "최신 순", exact: true })).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(screen.getByRole("button", { name: "최신 순", exact: true }));
+    expect(onSortChange).toHaveBeenLastCalledWith("newest");
+    expect(screen.queryByRole("combobox", { name: "정렬" })).not.toBeInTheDocument();
+  });
+
+  it("renders the filter lock checkbox after the sort buttons and reports changes", () => {
     const onFilterLockedChange = vi.fn();
     const { rerender } = render(
       <DefectFilterBar
@@ -193,9 +210,9 @@ describe("DefectFilterBar", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
-    const sortSelect = screen.getByRole("combobox");
+    const sortButton = screen.getByRole("button", { name: "최신 순", exact: true });
     const checkbox = screen.getByRole("checkbox", { name: "필터 고정" });
-    expect(sortSelect.compareDocumentPosition(checkbox) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(sortButton.compareDocumentPosition(checkbox) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(checkbox).not.toBeChecked();
 
     fireEvent.click(checkbox);
