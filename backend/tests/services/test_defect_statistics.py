@@ -347,7 +347,7 @@ def _add_record(
     *,
     quantity: int,
     at: datetime,
-    department: str = "조립",
+    department: str | None = "조립",
     reason: str | None = "외관",
     is_legacy: bool = False,
     management_category: str = "DEFECT",
@@ -1188,3 +1188,69 @@ def test_leap_month_includes_february_29_and_excludes_march_1(
     assert result.timeline[-1].bucket == "2024-02-29"
     assert result.timeline[-1].record_count == 1
     assert result.timeline[-1].quantity == 2
+
+
+@pytest.mark.parametrize("period", ["week", "month", "year"])
+@pytest.mark.parametrize("action", ["scrap_normal", "rework_normal"])
+def test_direct_warehouse_department_is_used_in_reports_and_filters(
+    db_session, make_item, period: str, action: str,
+) -> None:
+    item = make_item(name="창고 직접 불량", process_type_code="HR")
+    previous_at = {
+        "week": _kst_naive(2026, 8, 31),
+        "month": _kst_naive(2026, 8, 8),
+        "year": _kst_naive(2025, 9, 8),
+    }[period]
+    for at, quantity, department in [
+        (previous_at, 2, None),
+        (_kst_naive(2026, 9, 8), 3, " "),
+        (_kst_naive(2026, 9, 8), 4, "조립"),
+        (_kst_naive(2026, 9, 8), 1, None),
+    ]:
+        operation = _add_operation(db_session, action=action, at=at)
+        log = _add_log(
+            db_session, item, operation,
+            tx_type=TransactionTypeEnum.DEFECT_SCRAP if action == "scrap_normal" else TransactionTypeEnum.DISASSEMBLE,
+            role=InventoryOperationRoleEnum.PRIMARY if action == "scrap_normal" else InventoryOperationRoleEnum.REWORK_PARENT_NORMAL,
+            quantity=-quantity, department=department,
+        )
+        if quantity in (2, 3):
+            log.inventory_effect = [{"scope": "warehouse", "delta": -quantity}]
+    db_session.flush()
+
+    report = get_defect_statistics_report(
+        db_session, period=period, anchor=date(2026, 9, 8),
+        filters=DefectStatisticsFilters(departments=("창고",)),
+        now=datetime(2026, 10, 19, tzinfo=UTC),
+    )
+    assert report.summary.quantity == 3
+    assert report.summary.record_count == 1
+    assert [(entry.label, entry.quantity) for entry in report.departments] == [("창고", 3)]
+    assert report.comparison is not None
+    assert report.comparison.summary.quantity == 2
+    assert report.comparison.departments[0].label == "창고"
+
+    all_departments = get_defect_statistics(
+        db_session, period=period, anchor=date(2026, 9, 8),
+    )
+    assert {entry.label: entry.quantity for entry in all_departments.departments} == {
+        "창고": 3, "조립": 4, "미분류": 1,
+    }
+
+
+
+@pytest.mark.parametrize("department,effects,expected", [
+    ("조립", [{"scope": "warehouse", "delta": -2}], "조립"),
+    (None, [{"scope": "warehouse", "delta": -2}], "창고"),
+    (" ", [{"scope": "warehouse", "delta": "-2"}], "창고"),
+    (None, [{"scope": "warehouse", "delta": 2}], "미분류"),
+    (None, [{"scope": "warehouse", "delta": "invalid"}], "미분류"),
+    (None, [{"scope": "location", "delta": -2}], "미분류"),
+    (None, [None], "미분류"),
+    (None, None, "미분류"),
+])
+def test_direct_department_requires_warehouse_deduction_evidence(
+    department: str | None, effects: object, expected: str,
+) -> None:
+    log = TransactionLog(department=department, inventory_effect=effects)
+    assert statistics_service._direct_log_department(log) == expected

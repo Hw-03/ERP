@@ -380,6 +380,26 @@ def _load_quarantine_occurrences(
     return occurrences, excluded_legacy_times, excluded_category_times
 
 
+def _direct_log_department(log: TransactionLog) -> str:
+    """부서가 비어 있는 직접 처리 로그는 실제 창고 차감 효과로 출처를 확인한다."""
+
+    department = (log.department or "").strip()
+    if department:
+        return department
+    if isinstance(log.inventory_effect, list):
+        for effect in log.inventory_effect:
+            if not isinstance(effect, dict) or effect.get("scope") != "warehouse":
+                continue
+            try:
+                delta = int(effect.get("delta", 0))
+            except (TypeError, ValueError):
+                continue
+            if delta < 0:
+                return "창고"
+    return UNCLASSIFIED_LABEL
+
+
+
 def _occurrence_from_direct_log(
     log: TransactionLog,
     operation: InventoryOperation,
@@ -394,7 +414,7 @@ def _occurrence_from_direct_log(
         mes_code=item.mes_code,
         model_symbol=item.model_symbol or "",
         process_type_code=item.process_type_code or "",
-        department=(log.department or UNCLASSIFIED_LABEL).strip() or UNCLASSIFIED_LABEL,
+        department=_direct_log_department(log),
         reason=(log.reason_category or UNCLASSIFIED_LABEL).strip() or UNCLASSIFIED_LABEL,
         quantity=abs(int(log.quantity_change)),
         is_disused=item.legacy_item_type == "불용",
