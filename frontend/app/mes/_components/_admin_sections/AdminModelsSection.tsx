@@ -17,6 +17,8 @@ import {
 import { useAdminModelsContext } from "./AdminModelsContext";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import styles from "./_admin_primitives/AdminMasterData.module.css";
+import { AdminReadBoundary, useAdminReadState } from "./_admin_primitives/AdminReadState";
+import { AdminDetailSkeleton, AdminTableSkeleton } from "./_admin_primitives/AdminSkeleton";
 
 interface Props {
   items: Item[];
@@ -24,6 +26,8 @@ interface Props {
 }
 
 export function AdminModelsSection({ items, allBomRows }: Props) {
+  const read = useAdminReadState("models");
+  const detailRead = useAdminReadState("models", "items", "bom");
   const ctx = useAdminModelsContext();
   const {
     productModels,
@@ -186,6 +190,7 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
         title="모델 관리"
         summary={
           <AdminKpiBar
+            loading={read.loading} unavailable={!!read.error}
             placement="header"
             items={[
               { key: "total", label: "전체 모델", value: productModels.length, hint: "등록된 모델", tone: LEGACY_COLORS.blue },
@@ -194,11 +199,12 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
             ]}
           />
         }
-        actions={<Button variant="primary" size="md" className="min-h-11" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>모델 추가</Button>}
+        actions={<Button disabled={detailRead.loading || !!detailRead.error} variant="primary" size="md" className="min-h-11" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>모델 추가</Button>}
       />
 
       <div className="flex min-h-0 flex-1 gap-4">
         <AdminListPanel
+          read={read} skeleton={<AdminTableSkeleton columns="32px minmax(0,1fr) 84px 76px" count={4} />}
           title="모델 목록"
           countLabel={`${productModels.length}건`}
           width="clamp(360px, 28vw, 440px)"
@@ -292,7 +298,7 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
               ? "새 모델 추가"
               : selected
                 ? undefined
-                : "모델을 선택하세요"
+                : detailRead.loading || detailRead.error || productModels.length > 0 ? undefined : "모델을 선택하세요"
           }
           subtitle={
             addMode
@@ -312,6 +318,7 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
             ) : null
           }
         >
+          <AdminReadBoundary read={{ ...detailRead, loading: detailRead.loading || (!!detailRead.managed && !detailRead.error && !selected && !addMode && productModels.length > 0) }} skeleton={<AdminDetailSkeleton variant="models" />} label="모델 상세">
           {addMode ? (
             <ModelAddForm
               modelAddName={modelAddName}
@@ -340,6 +347,7 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
               />
             </div>
           )}
+          </AdminReadBoundary>
         </AdminDetailCard>
       </div>
     </div>

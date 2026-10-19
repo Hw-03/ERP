@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { describe, expect, it, vi } from "vitest";
 import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
 import { AdminModelsSection } from "../AdminModelsSection";
+import { AdminReadProvider, INITIAL_ADMIN_READ_STATES } from "../_admin_primitives/AdminReadState";
 
 const context = {
   productModels: [{ slot: 1, symbol: "A", model_name: "DX3000", is_reserved: false }],
@@ -31,6 +32,20 @@ function findByClasses(container: HTMLElement, ...classes: string[]) {
 }
 
 describe("AdminModelsSection", () => {
+  it("예약된 목록 열과 상세 필드를 보여 주고 최초 조회 후 실제 내용으로 전환한다", async () => {
+    const retry = vi.fn();
+    const view = (ready: boolean) => <AdminReadProvider value={{ states: Object.fromEntries(Object.keys(INITIAL_ADMIN_READ_STATES).map((key) => [key, { status: ready ? "ready" : "pending" }])) as typeof INITIAL_ADMIN_READ_STATES, retry }}>
+      <DirtyGuardProvider><AdminModelsSection items={[]} allBomRows={[]} /></DirtyGuardProvider>
+    </AdminReadProvider>;
+    const { rerender } = render(view(false));
+    expect(screen.getByTestId("admin-table-skeleton")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-detail-skeleton")).toBeInTheDocument();
+    expect(screen.queryByText(/좌측에서 모델을 선택/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "모델 추가" })).toBeDisabled();
+    rerender(view(true));
+    await screen.findByDisplayValue("DX3000");
+    expect(screen.queryByTestId("admin-detail-skeleton")).not.toBeInTheDocument();
+  });
   it("API 모델 슬롯으로 여러 글자 기호의 연결 품목과 BOM 수를 집계한다", async () => {
     const originalModels = context.productModels;
     context.productModels = [{ slot: 7, symbol: "QA", model_name: "QA 모델", is_reserved: false }];
