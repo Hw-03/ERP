@@ -11,7 +11,8 @@ interface AuditFileFixture {
 const state = vi.hoisted(() => ({
   downloadAuditFile: vi.fn(),
   queryResult: {
-    data: [] as AuditFileFixture[],
+    data: [] as AuditFileFixture[] | undefined,
+    refetch: vi.fn(),
     isLoading: false,
     error: null as Error | null,
   },
@@ -70,12 +71,14 @@ describe("AdminAuditCsvControls", () => {
   });
 
   it("목록을 불러오는 동안 진행 상태를 표시한다", () => {
-    state.queryResult.data = [];
+    state.queryResult.data = undefined;
     state.queryResult.isLoading = true;
 
     render(<AdminAuditCsvControls />);
 
-    expect(screen.getByRole("status")).toHaveTextContent("원본 로그를 불러오는 중입니다.");
+    expect(screen.getByRole("status", { name: "파일 목록 불러오는 중" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.queryByText("원본 로그를 불러오는 중입니다.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /다운로드/ })).not.toBeInTheDocument();
   });
 
   it("파일이 없으면 빈 상태를 표시하고 다운로드를 막는다", () => {
@@ -88,11 +91,23 @@ describe("AdminAuditCsvControls", () => {
   });
 
   it("목록 조회 오류를 제어 영역 안에 표시한다", () => {
+    state.queryResult.data = undefined;
     state.queryResult.error = new Error("목록 조회 실패");
 
     render(<AdminAuditCsvControls />);
 
     expect(screen.getByRole("alert")).toHaveTextContent("목록 조회 실패");
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(state.queryResult.refetch).toHaveBeenCalled();
+  });
+
+  it("재조회 실패에도 선택한 월과 형식을 유지한다", () => {
+    const { rerender } = render(<AdminAuditCsvControls />);
+    fireEvent.click(screen.getByRole("button", { name: "Excel" }));
+    state.queryResult.error = new Error("재조회 실패");
+    rerender(<AdminAuditCsvControls />);
+    expect(screen.getByRole("button", { name: "2026년 7월 Excel 다운로드" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("다운로드 오류를 제어 영역 안에 표시한다", async () => {
