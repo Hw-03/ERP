@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
 import { AdminMasterItemsSection } from "../AdminMasterItemsSection";
 import styles from "../_admin_primitives/AdminMasterData.module.css";
+import { AdminReadProvider, INITIAL_ADMIN_READ_STATES } from "../_admin_primitives/AdminReadState";
 
 const item = {
   item_id: "item-1",
@@ -93,6 +94,15 @@ describe("AdminMasterItemsSection", () => {
     expect(screen.getByText("삭제", { exact: true }).parentElement).toHaveTextContent("2");
   });
 
+  it("최초 조회에서는 품목 안내 대신 실제 열과 기본 정보 자리를 예약한다", () => {
+    render(<AdminReadProvider value={{ states: INITIAL_ADMIN_READ_STATES, retry: vi.fn() }}>
+      <DirtyGuardProvider><AdminMasterItemsSection allBomRows={[]} /></DirtyGuardProvider>
+    </AdminReadProvider>);
+    expect(screen.getByTestId("admin-table-skeleton")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-detail-skeleton")).toBeInTheDocument();
+    expect(screen.queryByText(/품목을 선택하거나 추가/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "품목 추가" })).toBeDisabled();
+  });
   it("[8.19-04] 1050개 visibleItems의 KPI·상태 합·목록·끝행이 같은 모집단을 사용한다", () => {
     context.visibleItems = Array.from({ length: 1050 }, (_, index) => ({
       ...item,

@@ -21,6 +21,9 @@ import { AddItemForm } from "./_master_items_parts/AddItemForm";
 import { EditItemForm } from "./_master_items_parts/EditItemForm";
 import { EMPTY_ADD_FORM } from "./adminShared";
 import { useRegisterDirty, useLocalDirtyGuard } from "@/lib/ui/dirty-guard";
+import { AdminReadBoundary, useAdminReadState } from "./_admin_primitives/AdminReadState";
+import { AdminDetailSkeleton, AdminTableSkeleton } from "./_admin_primitives/AdminSkeleton";
+import { SkeletonBlock } from "../common/LoadingSkeleton";
 
 type DetailTab = "info" | "stock" | "bom";
 
@@ -35,6 +38,8 @@ interface Props {
 }
 
 export function AdminMasterItemsSection({ allBomRows }: Props) {
+  const read = useAdminReadState("items");
+  const detailRead = useAdminReadState("items", "models");
   const {
     visibleItems,
     selectedItem,
@@ -201,6 +206,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
         title="품목 관리"
         summary={
           <AdminKpiBar
+            loading={read.loading} unavailable={!!read.error}
             placement="header"
             items={[
               { key: "all", label: "전체 품목", value: visibleItems.length, hint: "필터·검색 적용 결과", tone: LEGACY_COLORS.blue },
@@ -211,11 +217,12 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
             ]}
           />
         }
-        actions={<Button variant="primary" size="md" className="min-h-11" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>품목 추가</Button>}
+        actions={<Button disabled={detailRead.loading || !!detailRead.error} variant="primary" size="md" className="min-h-11" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>품목 추가</Button>}
       />
 
       <div className="grid min-h-0 flex-1 gap-4" style={{ gridTemplateColumns: "minmax(420px, 0.92fr) minmax(460px, 1.08fr)", gridTemplateRows: "1fr" }}>
         <AdminListPanel
+          read={read} skeleton={<AdminTableSkeleton columns="minmax(0,1fr) 110px 80px" count={3} />}
           title="품목 목록"
           countLabel={`${formatQty(visibleItems.length)}건`}
           width="100%"
@@ -341,7 +348,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
               ? "새 품목 추가"
               : selectedItem
                 ? undefined
-                : "품목을 선택하세요"
+                : detailRead.loading || detailRead.error || visibleItems.length > 0 ? undefined : "품목을 선택하세요"
           }
           subtitle={
             addMode
@@ -366,7 +373,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
             ) : undefined
           }
           tabActions={
-            !addMode &&
+            !detailRead.loading && !detailRead.error && !addMode &&
             selectedItem &&
             !selectedItem.deleted_at ? (
               deleteConfirm ? (
@@ -420,11 +427,12 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
               )
             ) : null
           }
-          tabs={!addMode && selectedItem ? DETAIL_TABS : undefined}
+          tabs={!addMode && (selectedItem || detailRead.loading) ? DETAIL_TABS : undefined}
+          tabsDisabled={detailRead.loading || !!detailRead.error}
           activeTab={tab}
           onTabChange={(id) => setTab(id as DetailTab)}
           footer={
-            !addMode && selectedItem ? (
+            detailRead.loading ? <SkeletonBlock className="h-11 w-full rounded-[12px]" /> : !detailRead.error && !addMode && selectedItem ? (
               selectedItem.deleted_at ? (
                 <button
                   type="button"
@@ -448,6 +456,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
             ) : null
           }
         >
+          <AdminReadBoundary read={{ ...detailRead, loading: detailRead.loading || (!!detailRead.managed && !detailRead.error && !selectedItem && !addMode && visibleItems.length > 0) }} skeleton={<AdminDetailSkeleton variant="items" />} label="품목 상세">
           {addMode ? (
             <AddItemForm />
           ) : selectedItem ? (
@@ -455,6 +464,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
           ) : (
             <ItemEmptyHint onAdd={handleStartAdd} />
           )}
+          </AdminReadBoundary>
         </AdminDetailCard>
       </div>
     </div>
@@ -488,6 +498,7 @@ function ItemBomTab({
   item: Item;
   allBomRows: BOMDetailEntry[];
 }) {
+  const read = useAdminReadState("bom");
   const composition = useMemo(
     () => allBomRows.filter((row) => row.parent_item_id === item.item_id),
     [allBomRows, item.item_id],
@@ -498,7 +509,7 @@ function ItemBomTab({
   );
 
   return (
-    <div className="flex h-full min-h-[12rem] flex-col gap-5">
+    <AdminReadBoundary read={read} label="품목 BOM" skeleton={<AdminTableSkeleton columns="minmax(0,1fr) 110px 80px" count={3} />}><div className="flex h-full min-h-[12rem] flex-col gap-5">
       <BomList
         title="구성품 (이 품목이 부모인 BOM)"
         rows={composition.map((r) => ({
@@ -519,7 +530,7 @@ function ItemBomTab({
         }))}
         emptyHint="이 품목을 사용하는 부모 BOM이 없습니다."
       />
-    </div>
+    </div></AdminReadBoundary>
   );
 }
 function BomList({
