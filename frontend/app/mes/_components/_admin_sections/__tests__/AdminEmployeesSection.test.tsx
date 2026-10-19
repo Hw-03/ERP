@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { AdminEmployeesSection } from "../AdminEmployeesSection";
 import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
 
@@ -73,7 +73,24 @@ vi.mock("@/lib/queries/useModelsQuery", () => ({
 }));
 
 describe("AdminEmployeesSection", () => {
+  it.each(["ㄱㄱㅎ", "ㄱㄱㅎ ㅈㄹ", "ㅈㅇㅈ", "김건호 조립"])("직원 이름·부서·직급을 초성과 조합 검색으로 찾는다: %s", (query) => {
+    context.employees = [defaultEmployee, { ...defaultEmployee, employee_id: "emp-2", name: "박서연", department: "출하", role: "대리" }];
+    const { container } = render(<DirtyGuardProvider><AdminEmployeesSection /></DirtyGuardProvider>);
+    fireEvent.change(screen.getByPlaceholderText("이름·부서·직급 검색"), { target: { value: query } });
+    expect(container.querySelector("[data-admin-employee-row='emp-1']")).toBeInTheDocument();
+    expect(container.querySelector("[data-admin-employee-row='emp-2']")).toBeNull();
+  });
 
+  it("초성 검색과 부서 필터를 함께 적용한다", async () => {
+    context.employees = [defaultEmployee, { ...defaultEmployee, employee_id: "emp-2", name: "김건하", department: "출하" }];
+    const { container } = render(<DirtyGuardProvider><AdminEmployeesSection /></DirtyGuardProvider>);
+    fireEvent.change(screen.getByPlaceholderText("이름·부서·직급 검색"), { target: { value: "ㄱㄱㅎ" } });
+    expect(container.querySelectorAll("[data-admin-employee-row]")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("combobox", { name: "부서 필터" }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "출하", exact: true }));
+    await waitFor(() => expect(container.querySelector("[data-admin-employee-row='emp-1']")).toBeNull());
+    expect(container.querySelector("[data-admin-employee-row='emp-2']")).toBeInTheDocument();
+  });
 
   it("직원 목록을 이름·부서 직급·상태 열의 평평한 표 행으로 표시한다", () => {
     const inactiveEmployee = {

@@ -23,7 +23,8 @@ import { useRegisterDirty, useLocalDirtyGuard } from "@/lib/ui/dirty-guard";
 import { EmployeeAddInline } from "./_employee_parts/EmployeeAddInline";
 import { EmployeeDetailGrid } from "./_employee_parts/EmployeeDetailGrid";
 import { normalizeEmployeePosition } from "./_employee_parts/employeeRoleLabels";
-import { matchesSearchText } from "@/lib/searchText";
+import { matchesSearchFields } from "@/lib/searchText";
+import { toChosung } from "@/lib/hangul";
 import styles from "./_admin_primitives/AdminMasterData.module.css";
 
 export function AdminEmployeesSection() {
@@ -83,12 +84,10 @@ export function AdminEmployeesSection() {
   const filteredEmployees = useMemo(() => {
     return employees
       .filter((e) => deptFilter === "ALL" || normalizeDepartment(e.department) === deptFilter)
-      .filter(
-        (e) =>
-          matchesSearchText(e.name, search) ||
-          matchesSearchText(normalizeDepartment(e.department), search) ||
-          matchesSearchText(e.role, search),
-      )
+      .filter((e) => {
+        const fields = [e.name, normalizeDepartment(e.department), e.role];
+        return matchesSearchFields([...fields, ...fields.map(toChosung)], search);
+      })
       .sort((a, b) => a.name.localeCompare(b.name, "ko"));
   }, [employees, search, deptFilter]);
 
