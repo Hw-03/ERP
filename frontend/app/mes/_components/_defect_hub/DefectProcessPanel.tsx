@@ -21,6 +21,7 @@ import { makeClientRequestId } from "@/lib/uuid";
 import { ApiError } from "@/lib/api-core";
 import type { Supplier } from "@/lib/api";
 import { SupplierPickerStep } from "../_warehouse_v2/SupplierPickerStep";
+import { DefectQuantitySummary } from "./DefectQuantitySummary";
 
 type ProcessAction = "unquarantine" | "scrap" | "return" | "disassemble";
 
@@ -264,6 +265,9 @@ export function DefectProcessPanel({
   }
 
   const formatDate = (iso: string | null) => (iso ? iso.slice(0, 10) : "-");
+  const quantitySummary = <DefectQuantitySummary availableLabel="격리 가용 재고"
+    available={processingLocations.reduce((total, current) => total + (Number(current.available_quantity) || 0), 0)}
+    total={boundedProcessQty} count={processingLocations.length} countLabel="격리 기록" unit="개" />;
 
   if (step === 3) {
     return (
@@ -284,6 +288,13 @@ export function DefectProcessPanel({
               {isBatch ? `${processingLocations.length}건 · ` : ""}{formatQty(boundedProcessQty)}개 · {location.department} 불량 격리
             </p>
           </div>
+        </div>
+        <div className="mb-3 flex shrink-0 flex-wrap items-center gap-3">
+          <div className="min-w-0 flex-1 basis-[240px]">
+            <div className="break-words text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>{location.item_name}</div>
+            <div className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{location.mes_code}</div>
+          </div>
+          {quantitySummary}
         </div>
         <div className="min-h-0 flex-1">
           {mixedSupplierScopes ? <InlineErrorNote>{mixedScopeMessage}</InlineErrorNote> : <SupplierPickerStep
@@ -355,6 +366,7 @@ export function DefectProcessPanel({
         {/* 스크롤 영역 */}
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
           {/* 요약 박스 */}
+          {quantitySummary}
           <div
             className="flex shrink-0 flex-wrap items-center gap-5 rounded-[16px] border px-6 py-4"
             style={{ background: tint(LEGACY_COLORS.blue, 7), borderColor: tint(LEGACY_COLORS.blue, 25) }}
@@ -489,42 +501,43 @@ export function DefectProcessPanel({
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
         {/* 품목 정보 */}
         <div
-          className="flex flex-col gap-2 rounded-[16px] border px-6 py-5"
+          className="flex flex-wrap items-center gap-3 rounded-[16px] border px-6 py-5"
           style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
         >
-          <div className="flex items-baseline gap-3">
-            <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{location.mes_code}</span>
-            <span className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>{location.item_name}</span>
+          <div className="flex min-w-0 flex-1 basis-[240px] flex-col gap-2">
+            <div className="flex min-w-0 flex-col gap-1">
+              <span className="break-words text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>{location.item_name}</span>
+            </div>
+            <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
+              {isBatch && <span style={{ color: LEGACY_COLORS.blue }}>선택한 격리 기록 {processingLocations.length}건</span>}
+              <span style={{ color: LEGACY_COLORS.muted2 }}>{location.mes_code}</span>
+              <span>부서 <span style={{ color: LEGACY_COLORS.text }}>{location.department}</span></span>
+              <span>격리일 <span style={{ color: LEGACY_COLORS.text }}>{formatDate(location.defective_at)}</span></span>
+            </div>
           </div>
-          <div className="flex gap-6 text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
-            {isBatch && <span style={{ color: LEGACY_COLORS.blue }}>선택한 격리 기록 {processingLocations.length}건</span>}
-            <span>남은 수량 <span style={{ color: LEGACY_COLORS.text }}>{formatQty(isBatch ? boundedProcessQty : location.quantity)}개</span></span>
-            <span>처리 가능 <span style={{ color: LEGACY_COLORS.green }}>{formatQty(maxQty)}개</span></span>
-            <span>부서 <span style={{ color: LEGACY_COLORS.text }}>{location.department}</span></span>
-            <span>격리일 <span style={{ color: LEGACY_COLORS.text }}>{formatDate(location.defective_at)}</span></span>
+          <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-5">
+            <div className="flex min-h-11 shrink-0 items-center gap-3">
+              <span className="text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>처리 수량</span>
+              {isBatch ? (
+                <span className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>{formatQty(boundedProcessQty)}개</span>
+              ) : (
+                <QuantityInput
+                  aria-label="처리 수량"
+                  min={1}
+                  max={maxQty}
+                  value={boundedProcessQty}
+                  onChange={(e) => {
+                    const v = Math.max(1, Math.min(maxQty, Number(e.target.value) || 1));
+                    setProcessQty(v);
+                    setDecisions([]);
+                  }}
+                  className="w-28 rounded-[10px] border px-3 py-2.5 text-base font-black"
+                  style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
+                />
+              )}
+            </div>
+            {quantitySummary}
           </div>
-        </div>
-
-        {/* 처리 수량 */}
-        <div className="flex min-h-11 items-center gap-3">
-          <span className="text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>처리 수량</span>
-          {isBatch ? (
-            <span className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>{formatQty(boundedProcessQty)}개</span>
-          ) : (
-            <QuantityInput
-              min={1}
-              max={maxQty}
-              value={boundedProcessQty}
-              onChange={(e) => {
-                const v = Math.max(1, Math.min(maxQty, Number(e.target.value) || 1));
-                setProcessQty(v);
-                setDecisions([]);
-              }}
-              className="w-28 rounded-[10px] border px-3 py-2.5 text-base font-black"
-              style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
-            />
-          )}
-          <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>/ 처리 가능 {formatQty(maxQty)}개</span>
         </div>
 
         {/* 작업 선택 */}

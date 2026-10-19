@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import { DefectProcessPanel } from "../DefectProcessPanel";
@@ -36,6 +36,9 @@ describe.each([["desktop", DefectProcessPanel], ["mobile", MobileDefectProcessPa
   it("실제 격리 부서와 TR 코드로 튜브 업체를 고르고 요청한다", async () => {
     render(<Panel location={location} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />);
     chooseReturn();
+    if (_variant === "desktop") {
+      expect(within(screen.getByLabelText("품목 수량 요약")).getAllByRole("definition").map((node) => node.textContent)).toEqual(["2개", "2개", "1건"]);
+    }
     fireEvent.click(await screen.findByRole("button", { name: "반품 업체", exact: true }));
     expect(mocks.listSuppliers).toHaveBeenCalledWith("actor-1", false, "tube");
     fireEvent.click(screen.getByRole("button", { name: "반품 확인", exact: true }));

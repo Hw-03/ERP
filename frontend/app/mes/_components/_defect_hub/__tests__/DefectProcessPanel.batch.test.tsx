@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import { ApiError } from "@/lib/api-core";
@@ -62,6 +62,20 @@ const locations = [location("record-1", 2), location("record-2", 3)];
 const employee = { employee_id: "employee-1", name: "작업자", department: "조립" };
 
 describe("DefectProcessPanel batch processing", () => {
+  it.each([false, true])("기존 격리 처리와 정상 복귀에 격리 재고 요약을 표시한다 (restoreOnly=%s)", (restoreOnly) => {
+    render(<DefectProcessPanel locations={locations} restoreOnly={restoreOnly} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />);
+    const summary = screen.getByLabelText("품목 수량 요약");
+    expect(within(summary).getByText("격리 가용 재고")).toBeInTheDocument();
+    expect(within(summary).getByText("격리 기록")).toBeInTheDocument();
+    expect(within(summary).getAllByRole("definition").map((node) => node.textContent)).toEqual(["5개", "5개", "2건"]);
+  });
+
+  it("단일 격리 처리 수량을 바꾸면 요약에도 즉시 반영한다", () => {
+    render(<DefectProcessPanel location={locations[0]} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />);
+    fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "1" } });
+    expect(within(screen.getByLabelText("품목 수량 요약")).getAllByRole("definition").map((node) => node.textContent)).toEqual(["2개", "1개", "1건"]);
+  });
+
   beforeEach(() => {
     apiMocks.unquarantine.mockReset().mockResolvedValue(undefined);
     apiMocks.unquarantineBulk.mockReset().mockResolvedValue({ processed_records: 2, total_quantity: 5, message: "완료" });
@@ -224,6 +238,7 @@ describe("DefectProcessPanel batch processing", () => {
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "재작업 사유" } });
     fireEvent.click(screen.getByRole("button", { name: "다음 →" }));
     expect(screen.getByLabelText("재작업 합계")).toHaveTextContent("5");
+    expect(within(screen.getByLabelText("품목 수량 요약")).getAllByRole("definition").map((node) => node.textContent)).toEqual(["5개", "5개", "2건"]);
     fireEvent.click(screen.getByRole("button", { name: "결정 추가" }));
     fireEvent.click(screen.getByRole("button", { name: "최종 처리 →" }));
     await screen.findByRole("dialog");
