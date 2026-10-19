@@ -30,6 +30,14 @@
 
 ## 긴 실행의 판정 규칙
 
+### 첫 CI 준비 결과
+
+후보 진단 커밋 `cbd6ac2b`의 [CI39192678405](https://github.com/Hw-03/ERP/actions/runs/39192678405)는 업무 실행 전 도구 가드에서 중단했다. CI 기본 브라우저 경로를 쓰는 경우 자체 검사 설정이 `executablePath:null`을 전달해 Playwright가 `expected string, got object`로 거부했다. 원 assertion에 도달하지 못한 준비 결함이며 BOM·AS 실패 재현으로 세지 않는다. 기본 경로일 때 해당 옵션을 생략하고, 원래 의도한 assertion/timeout 오류가 실제 발생했는지도 가드에서 확인하도록 수정했다. 같은 기본 브라우저 경로의 국소 자체 검사04가 통과했다.
+
+원문은 후보 `_attic/runtime/flaky-capture-20261019/ci-39192678405`이며 checkout/export 해시 가드는 모두 불변이다. 일반 E2E는 미실행이다. 자동 시작 일반 CI39192678195는 정확한 후보 SHA 확인 후 취소 완료했다. 자체 검사에 재사용한 node_modules symlink의 내용이 artifact에 불필요하게 포함되어 이후 upload에서 그 경로만 제외한다.
+
+진단 중 main이 별도 변경 `58dca032`(초기 재고 내역 표시)로 전진한 것을 읽기 확인했다. 이 변경을 후보에 가져오거나 main을 수정하지 않았다. 사용자가 보는3038/8038의 PID도 시작 시 값과 같다.
+
 일반 E2E만1회, worker1/retry0/repeat1/first failure stop, job 준비 포함90분이다. 최초 실패 전후를 `failure.frozen`, `failure.collection.finished`, `cleanup.begin`, `global-cleanup-start.json`으로 구분한다. browser trace는 실패 전 chunk와 cleanup chunk를 분리하고 독립 APIRequestContext trace는 최종 원문과 cutoff를 연결한다. collector는 종료까지 drain해 늦게 flush된 실패 직전 기록을 빠뜨리지 않는다.
 
 원인 판정에는 기록 손실 여부·실제 입력/요청 경계·소켓 owner·원 오류 서명까지 필요하다. 자료가 부분이거나 원 실패와 다른 사건이면 그 범위를 명시한다. 모두 정상이면 같은 전체 묶음을 반복하지 않는다. 기존 전체 통과를 새 통합판 PASS로 승격하지 않는다.

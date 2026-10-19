@@ -35,7 +35,8 @@ def main() -> None:
     cleanup = toolroot / 'cleanup.py'
     cleanup.write_text('import sqlite3,sys\nwith sqlite3.connect(sys.argv[1]) as db: db.execute("UPDATE probe SET value=1")\n')
     config = {'testDir': './tests/e2e', 'workers': 1, 'retries': 0, 'maxFailures': 1, 'timeout': 30000,
-        'use': {'trace': 'on', 'headless': True, 'launchOptions': {'executablePath': os.environ.get('MES_OBSERVER_CHROMIUM')}},
+        'use': {'trace': 'on', 'headless': True, 'launchOptions':
+            ({'executablePath': os.environ['MES_OBSERVER_CHROMIUM']} if os.environ.get('MES_OBSERVER_CHROMIUM') else {})},
         'outputDir': str(args.output / 'test-results'), 'reporter': [['json', {'outputFile': str(args.output / 'report.json')}]]}
     (frontend / 'guard.config.cjs').write_text('module.exports=' + json.dumps(config))
     (tests / 'guard.spec.ts').write_text('import {test,expect} from "@playwright/test";\nimport {execFileSync} from "node:child_process";\n'
@@ -55,6 +56,9 @@ def main() -> None:
     assert result.returncode == 1, 'the intentional original assertion must still fail'
     report = json.loads((args.output / 'report.json').read_text())
     assert report['stats']['unexpected'] == 1 and report['stats']['expected'] == 0
+    original_result = report['suites'][0]['specs'][0]['tests'][0]['results'][0]
+    expected_error = 'Test timeout of 1000ms exceeded' if args.test_timeout else 'deliberate guard assertion'
+    assert expected_error in original_result['error']['message'], original_result['error']['message']
     events = [json.loads(line) for line in (args.output / 'failure-boundaries.jsonl').read_text().splitlines()]
     frozen = next(row for row in events if row['event'] == 'failure.frozen')
     complete = next(row for row in events if row['event'] == 'failure.collection.finished')

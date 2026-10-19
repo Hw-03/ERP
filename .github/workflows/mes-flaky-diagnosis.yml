@@ -118,6 +118,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mes-flaky-diagnosis-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/mes-flaky-diagnostic/artifacts
+          path: |
+            ${{ runner.temp }}/mes-flaky-diagnostic/artifacts
+            !${{ runner.temp }}/mes-flaky-diagnostic/artifacts/**/node_modules/**
           retention-days: 7
           if-no-files-found: warn
