@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement, type ReactNode, type RefObject } from "react";
-import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useDesktopQueryState } from "../DesktopTabHome";
 import { defectsApi } from "@/lib/api/defects";
@@ -118,9 +118,10 @@ function periodIdentity(anchor: string, period: DefectStatisticsPeriodKind): str
 }
 
 function periodDisplay(result: DefectStatisticsReportResponse | null, anchor: string, period: DefectStatisticsPeriodKind): string {
-  if (!result) return period === "year" ? `${anchor.slice(0, 4)}년` : period === "month" ? `${anchor.slice(0, 7)}월` : `${periodIdentity(anchor, period)} 주`;
-  if (period === "year") return `${result.period.start_date.slice(0, 4)}년`;
-  if (period === "month") return `${result.period.start_date.slice(0, 7)}월`;
+  const start = result?.period.start_date ?? anchor;
+  if (period === "year") return `${start.slice(0, 4)}년`;
+  if (period === "month") return `${start.slice(0, 4)}년 ${Number(start.slice(5, 7))}월`;
+  if (!result) return `${periodIdentity(anchor, period)} 주`;
   return `${result.period.start_date} ~ ${result.period.end_date}`;
 }
 
@@ -404,16 +405,26 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
       {(categoryCount > 0 || reason || itemId) && <button type="button" onClick={resetFilters} className="standard-hover min-h-11 rounded-[10px] px-2 text-sm font-bold focus-visible:ring-2" style={{ color: LEGACY_COLORS.blue }}>전체 초기화</button>}
   </>;
   const categoryFilters = <div id="statistics-category-filters" className={mobilePresentation ? undefined : styles.filters} hidden={!filtersOpen}>{filtersOpen && <div className={mobilePresentation ? "mt-2" : undefined}><DefectCategoryFilters departments={availableDepartments} models={modelOptions} currentDept={currentDepartment} showMyDepartment={false} selectedDepartments={selectedDepartments} selectedModels={selectedModels} selectedProcessSteps={selectedProcessSteps} onDepartmentsChange={setSelectedDepartments} onModelsChange={setSelectedModels} onProcessStepsChange={setSelectedProcessSteps} onResetCategoryFilters={resetFilters} /></div>}</div>;
+  const periodSelector = <div role="group" aria-label="집계 단위" className={mobilePresentation ? "flex gap-1" : styles.periodButtons}>
+    {(Object.keys(PERIOD_LABELS) as DefectStatisticsPeriodKind[]).map((value) => <button key={value} type="button" aria-pressed={period === value} onClick={() => { setAnchor(periodIdentity(queryAnchor, value) > periodIdentity(today, value) ? today : queryAnchor); setPeriod(value); setDetailTrend(false); }} className="min-h-11 rounded-[10px] px-2 text-sm font-bold focus-visible:ring-2" style={{ background: period === value ? tint(LEGACY_COLORS.blue, 14) : LEGACY_COLORS.s2, color: period === value ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}>{PERIOD_LABELS[value]}</button>)}
+  </div>;
+  const currentPeriodControl = <button type="button" onClick={() => setAnchor(todayInKst())} className="standard-hover min-h-11 rounded-[10px] px-2 text-sm font-bold focus-visible:ring-2" style={{ color: LEGACY_COLORS.blue }}>현재 기간</button>;
+
   return <div className={`flex min-w-0 flex-col gap-3 ${mobilePresentation ? "" : styles.desktop}`}>
-    <header className="flex min-w-0 flex-col gap-2 rounded-[20px] border px-4 py-3 lg:flex-row lg:items-center lg:justify-between" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-      <div className="flex min-w-0 items-center gap-2"><button type="button" onClick={onBack} className="standard-hover flex min-h-11 shrink-0 items-center gap-1 rounded-[12px] border px-3 text-sm font-bold" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}><ArrowLeft className="h-4 w-4" />작업 선택</button><div className="min-w-0"><h2 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>불량 통계</h2><p className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>최초 발생 기준 · 불량·B급·구형 포함</p></div></div>
-      <div className="flex min-w-0 flex-wrap items-center gap-2"><div role="group" aria-label="조회 기간" className="flex min-w-0 flex-wrap items-center gap-1">
-        {(Object.keys(PERIOD_LABELS) as DefectStatisticsPeriodKind[]).map((value) => <button key={value} type="button" aria-pressed={period === value} onClick={() => { setAnchor(periodIdentity(queryAnchor, value) > periodIdentity(today, value) ? today : queryAnchor); setPeriod(value); setDetailTrend(false); }} className="min-h-11 rounded-[10px] px-2 text-sm font-bold focus-visible:ring-2" style={{ background: period === value ? tint(LEGACY_COLORS.blue, 14) : LEGACY_COLORS.s2, color: period === value ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}>{PERIOD_LABELS[value]}</button>)}
+    <header className={mobilePresentation ? "flex min-w-0 flex-col gap-2 rounded-[20px] border px-4 py-3 lg:flex-row lg:items-center lg:justify-between" : styles.header} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+      <div className={mobilePresentation ? "contents" : styles.headerStart}>
+      <div className="flex min-w-0 items-center gap-4"><button type="button" onClick={onBack} className="standard-hover flex min-h-11 shrink-0 items-center gap-1 rounded-[12px] border px-3 text-sm font-bold" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}><ArrowLeft className="h-4 w-4" />작업 선택</button><div className="min-w-0"><h2 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>불량 통계</h2>{mobilePresentation && <p className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>최초 발생 기준 · 불량·B급·구형 포함</p>}</div></div>
+      {!mobilePresentation && periodSelector}
+      </div>
+      <div className={mobilePresentation ? "flex min-w-0 flex-wrap items-center gap-2" : styles.periodControls}><div role="group" aria-label="조회 기간" className={mobilePresentation ? "flex min-w-0 flex-wrap items-center gap-1" : styles.periodRange}>
+        {mobilePresentation && periodSelector}
+        <div className={mobilePresentation ? "contents" : styles.dateNavigation}>
         <button type="button" aria-label="이전 기간" onClick={() => setAnchor(shiftStatisticsAnchor(queryAnchor, period, -1))} className="standard-hover flex h-11 w-11 items-center justify-center rounded-[10px] focus-visible:ring-2" style={{ color: LEGACY_COLORS.muted2 }}><ChevronLeft className="h-5 w-5" /></button>
-        <p aria-live="polite" className="min-w-[110px] text-center text-sm font-bold tabular-nums" style={{ color: LEGACY_COLORS.text }}>{periodDisplay(result, queryAnchor, period)}</p>
+        <p aria-live="polite" className={`min-w-[110px] text-center text-sm font-bold tabular-nums ${mobilePresentation ? "" : styles.periodLabel}`} style={{ color: LEGACY_COLORS.text }}>{periodDisplay(result, queryAnchor, period)}</p>
         <button type="button" aria-label="다음 기간" disabled={nextDisabled} onClick={() => setAnchor(shiftStatisticsAnchor(queryAnchor, period, 1))} className="standard-hover flex h-11 w-11 items-center justify-center rounded-[10px] disabled:opacity-40 focus-visible:ring-2" style={{ color: LEGACY_COLORS.muted2 }}><ChevronRight className="h-5 w-5" /></button>
-        <button type="button" onClick={() => setAnchor(todayInKst())} className="standard-hover min-h-11 rounded-[10px] px-2 text-sm font-bold focus-visible:ring-2" style={{ color: LEGACY_COLORS.blue }}>현재 기간</button>
-      </div><button type="button" aria-label="새로고침" onClick={refresh} className="standard-hover flex h-11 w-11 items-center justify-center rounded-[10px] focus-visible:ring-2" style={{ color: LEGACY_COLORS.blue }}><RefreshCw className="h-4 w-4" /></button></div>
+        </div>
+        {mobilePresentation && currentPeriodControl}
+      </div>{mobilePresentation && result && <p className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>조회 {asOfLabel(result.as_of)} KST</p>}{!mobilePresentation && <div className={styles.headerEnd}>{currentPeriodControl}</div>}</div>
     </header>
 
     {mobilePresentation && <section className="min-w-0 rounded-[20px] border px-3 py-2" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}><div className="flex flex-wrap items-center gap-2">

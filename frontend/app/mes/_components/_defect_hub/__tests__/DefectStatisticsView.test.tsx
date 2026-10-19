@@ -109,6 +109,7 @@ describe("DefectStatisticsView report", () => {
     expect(await screen.findByText(quantityText("10개"))).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "필터 펼치기" })).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByRole("button", { name: "다음 기간" })).toBeDisabled();
+    expect(screen.getByText("2026년 10월")).toBeVisible();
     expect(screen.queryByText(/조회 2026/)).not.toBeInTheDocument();
   });
 
@@ -371,37 +372,10 @@ describe("DefectStatisticsView report", () => {
     for (const title of panelTitles) expect(await screen.findByRole("status", { name: `${title} 현재 페이지` })).toHaveTextContent("1 / 3");
   });
 
-
-
-  it("retains pages through refresh loading and clamps only after a successful smaller response", async () => {
-    let completeRefresh!: (value: typeof manyEntriesReport) => void;
-    api.getStatisticsReport.mockResolvedValueOnce(manyEntriesReport).mockImplementation(() => new Promise((resolve) => { completeRefresh = resolve; }));
-    render(<DefectStatisticsView {...props} />);
-    await screen.findByText(quantityText("130개"));
-    nextPages(); nextPages();
-    fireEvent.click(screen.getByRole("button", { name: "새로고침" }));
-    expect(screen.getByRole("status", { name: "불량 통계 불러오는 중" })).toBeInTheDocument();
-    await act(async () => { completeRefresh(manyEntriesReport); });
-    for (const title of panelTitles) expect(screen.getByRole("status", { name: `${title} 현재 페이지` })).toHaveTextContent("3 / 3");
-    fireEvent.click(screen.getByRole("button", { name: "새로고침" }));
-    await act(async () => { completeRefresh({ ...manyEntriesReport, items: manyEntriesReport.items.slice(0, 7), comparison: { ...manyEntriesReport.comparison, items: [] }, reasons: manyEntriesReport.reasons.slice(0, 3), departments: manyEntriesReport.departments.slice(0, 3) }); });
-    expect(screen.getByRole("status", { name: "품목 비교 현재 페이지" })).toHaveTextContent("2 / 2");
-    for (const title of ["부서별 집계", "사유별 집계"]) expect(screen.getByRole("status", { name: `${title} 현재 페이지` })).toHaveTextContent("1 / 1");
-    expect(screen.getByRole("button", { name: "품목 품목 7 선택" })).toBeInTheDocument();
-  });
-
-  it("ignores a refreshed old response and its page counts after a filter change", async () => {
-    let completeOld!: (value: typeof manyEntriesReport) => void;
-    api.getStatisticsReport.mockResolvedValueOnce(manyEntriesReport).mockReturnValueOnce(new Promise((resolve) => { completeOld = resolve; })).mockResolvedValue(report);
-    render(<DefectStatisticsView {...props} />);
-    await screen.findByText(quantityText("130개"));
-    nextPages(); nextPages();
-    fireEvent.click(screen.getByRole("button", { name: "새로고침" }));
-    fireEvent.click(screen.getByRole("button", { name: "이전 기간" }));
+  it.each([false, true])("omits the header refresh on desktop and mobile (mobile %s)", async (mobilePresentation) => {
+    render(<DefectStatisticsView {...props} mobilePresentation={mobilePresentation} />);
     await screen.findByText(quantityText("10개"));
-    await act(async () => { completeOld(manyEntriesReport); });
-    for (const title of panelTitles) expect(screen.getByRole("status", { name: `${title} 현재 페이지` })).toHaveTextContent("1 / 1");
-    expect(screen.queryByRole("button", { name: "품목 품목 13 선택" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "새로고침" })).not.toBeInTheDocument();
   });
 
   it("shows full labels through keyboard focus and hover without adding extra tab stops", async () => {

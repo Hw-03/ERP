@@ -1,4 +1,17 @@
 .desktop { gap: 18px; color: var(--c-text); }
+.header { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 16px; padding: 4px 0 16px; border-bottom: 1px solid var(--c-border); }
+.headerStart { display: flex; min-width: 0; grid-column: 1; grid-row: 1; align-items: center; gap: 16px; }
+.headerStart > div:first-child { flex-shrink: 0; }
+.headerEnd { display: flex; min-width: 0; grid-column: 3; grid-row: 1; align-items: center; justify-content: flex-end; gap: 12px; }
+.headerEnd > button:first-child { min-width: 112px; }
+.header h2 { font-size: 26px; line-height: 34px; letter-spacing: -.03em; }
+.header button { font-size: 16px; }
+.header .periodLabel { width: 280px; min-width: 0; font-size: 20px; line-height: 28px; }
+.periodControls { display: contents; }
+.periodRange { min-width: 0; grid-column: 2; grid-row: 1; justify-self: center; }
+.dateNavigation { display: grid; grid-template-columns: 44px 280px 44px; align-items: center; gap: 12px; }
+.periodButtons { display: flex; min-width: 156px; flex: 1; gap: 4px; padding: 4px; border-radius: 14px; background: var(--c-s2); }
+.periodButtons button { min-width: 0; flex: 1; padding-inline: 8px; white-space: nowrap; }
 .filters { min-width: 0; }
 .filters button, .filters span { font-size: 14px; }
 .filterSelection { display: flex; min-width: 0; flex: 1; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -58,5 +71,6 @@
 .leader { display: inline-block; margin-top: 3px; color: var(--c-blue); font-size: 14px; font-weight: 600; line-height: 18px; }
 @media (max-width: 1439px) { .panelGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .itemPanel { grid-column: 1 / -1; } }
 @media (max-width: 1399px) { .total { padding: 22px; } .category { padding-inline: 20px; } .panel { padding: 18px; } }
+@media (max-width: 1359px) { .header { grid-template-columns: minmax(0, 1fr) auto; } .headerEnd { grid-column: 2; } .headerStart .periodButtons { max-width: 360px; } .periodRange { grid-column: 1 / -1; grid-row: 2; } }
 @media (max-width: 1099px) { .panelGrid { grid-template-columns: minmax(0, 1fr); } .overviewMain { grid-template-columns: minmax(0, 1fr); } .category { padding-inline: 24px; } }
 @media (max-width: 639px) { .categories { padding: 8px 0; } .category { gap: 8px; padding: 10px 12px; } .categoryTitle { font-size: 14px; } .categoryValue { font-size: 24px; } .category .secondary { font-size: 12px; } }
