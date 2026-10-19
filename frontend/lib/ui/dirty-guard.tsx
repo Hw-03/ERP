@@ -374,6 +374,20 @@ export function useFlushDirtyEntries(): () => Promise<void> {
   }, [ctx]);
 }
 
+/** Access removal keeps manual saves explicit and reports failed automatic draft flushes. */
+export function useAccessRevocationLeave(): () => boolean | Promise<boolean> {
+  const ctx = useContext(DirtyGuardContext);
+  const flush = useFlushDirtyEntries();
+  return useCallback(() => {
+    const dirty = Array.from(ctx!.registryRef.current.values()).filter((entry) => entry.dirty);
+    if (!dirty.length) return true;
+    if (dirty.every((entry) => entry.autoSave)) return flush().then(() => true);
+    return new Promise<boolean>((resolve) => {
+      ctx!.openModal(flush, () => resolve(true), dirty.some((entry) => entry.confirmOnly), () => resolve(false));
+    });
+  }, [ctx, flush]);
+}
+
 /** 작성 위저드는 폐기를 확인하고, 저장 가능한 화면은 기존 전환 저장 계약을 유지한다. */
 export function useBeforeViewportSwitch(): () => Promise<void | boolean> {
   const ctx = useContext(DirtyGuardContext);

@@ -6,13 +6,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DesktopMesShell } from "../DesktopMesShell";
 import { AppearancePreferencesProvider } from "../useAppearancePreferences";
-import type { DesktopTabId } from "../tabAccess";
+import { SIDEBAR_TAB_IDS, type DesktopTabId } from "../tabAccess";
 import { sendClientEvent } from "@/lib/client-events";
 
 const setAuditScreen = vi.hoisted(() => vi.fn());
 const operatorState = vi.hoisted(() => ({ current: null as { employee_id: string; name: string; department: string; hidden_sidebar_tabs: string[]; level?: string; department_role?: string } | null }));
 const stocktakeMenuState = vi.hoisted(() => ({ data: { enabled: true, employee_visible: true, participant_departments: ["조립"], participant_count: 1 } as { enabled: boolean; employee_visible: boolean; participant_departments: string[]; participant_count: number } | undefined, isLoading: false }));
 const stocktakeFlush = vi.hoisted(() => vi.fn(async () => {}));
+const dailyAccessDraft = vi.hoisted(() => ({ dirty: false, save: vi.fn(async () => {}) }));
 vi.mock("../stocktake/useStocktakeMenuVisibility", () => ({ useStocktakeMenuVisibility: () => stocktakeMenuState }));
 
 function render(ui: ReactNode) {
@@ -235,6 +236,7 @@ vi.mock("../DesktopDailyWorkReportView", async () => {
   const { useEffect } = await import("react");
   return {
     DesktopDailyWorkReportView: ({ onTopbarControlsChange }: { onTopbarControlsChange?: (node: ReactNode | null) => void }) => {
+      useRegisterDirty("daily-access-draft", dailyAccessDraft.dirty, dailyAccessDraft.save, undefined, { mode: "auto-save" });
       useEffect(() => {
         onTopbarControlsChange?.(<span>daily topbar controls</span>);
         return () => onTopbarControlsChange?.(null);
@@ -267,6 +269,17 @@ vi.mock("../_weekly_sections/WeeklyWeekPicker", () => ({
 }));
 
 describe("DesktopMesShell tab transition", () => {
+  it("입출고 메뉴 회수 시 미저장 본문을 유지하고 조작을 막는다", async () => {
+    operatorState.current = { employee_id: "worker-a", name: "작업자", department: "조립", hidden_sidebar_tabs: [] };
+    const view = render(<DesktopMesShell />);
+    fireEvent.click(screen.getByRole("button", { name: "warehouse", exact: true }));
+    fireEvent.change(screen.getByLabelText("테스트 작업 입력"), { target: { value: "보존할 입력" } });
+    operatorState.current = { ...operatorState.current!, hidden_sidebar_tabs: ["warehouse", "defect"] };
+    view.rerender(<DesktopMesShell />);
+    expect(screen.getByLabelText("테스트 작업 입력")).toHaveValue("보존할 입력");
+    expect(screen.getByLabelText("테스트 작업 입력").closest("[inert]")).toBeInTheDocument();
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  });
   const originalStartViewTransition = document.startViewTransition;
   it.each(["manager", "visible-worker", "hidden-worker"])("preserves the stocktake URL while the operator restores on desktop remount: %s", outcome => {
     operatorState.current = null;
@@ -285,7 +298,7 @@ describe("DesktopMesShell tab transition", () => {
     if (outcome === "hidden-worker") {
       expect(screen.queryByText("stocktake content")).not.toBeInTheDocument();
       expect(screen.getByText("dashboard content")).toBeInTheDocument();
-      expect(routerReplace).toHaveBeenCalledWith("?tab=dashboard", { scroll: false });
+      expect(window.location.search).toBe("?tab=dashboard");
     } else {
       expect(routerReplace).not.toHaveBeenCalled();
       expect(screen.getByText("stocktake content")).toBeInTheDocument();
@@ -406,6 +419,17 @@ describe("DesktopMesShell tab transition", () => {
   afterEach(() => {
     document.startViewTransition = originalStartViewTransition;
     vi.unstubAllGlobals();
+  });
+
+  it("허용 메뉴가 전부 회수되면 설정으로 이동한다", async () => {
+    operatorState.current = { employee_id: "worker-a", name: "작업자", department: "조립", hidden_sidebar_tabs: [] };
+    window.history.replaceState({}, "", "/mes?tab=dashboard");
+    const view = render(<DesktopMesShell />);
+    operatorState.current.hidden_sidebar_tabs = [...SIDEBAR_TAB_IDS];
+    stocktakeMenuState.data = { enabled: false, employee_visible: false, participant_departments: [], participant_count: 0 };
+    view.rerender(<DesktopMesShell />);
+    await waitFor(() => expect(window.location.search).toBe("?tab=settings"));
+    expect(screen.getByRole("button", { name: "settings" })).toHaveAttribute("aria-current", "page");
   });
 
   it("전역 검색 진입점을 표시하지 않는다", () => {
@@ -661,6 +685,24 @@ describe("DesktopMesShell tab transition", () => {
 
     await waitFor(() => expect(defectViewStates).toHaveBeenLastCalledWith("hub"));
     expect(window.history.state).toMatchObject({ defect: "hub" });
+  });
+
+  it("일보 권한 회수 중 보존을 기다릴 때 상단 날짜·탭 조작도 제거한다", async () => {
+    let finish!: () => void;
+    dailyAccessDraft.dirty = true;
+    dailyAccessDraft.save.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = () => { dailyAccessDraft.dirty = false; resolve(); }; }));
+    operatorState.current = { employee_id: "worker-a", name: "작업자", department: "조립", hidden_sidebar_tabs: [] };
+    window.history.replaceState({}, "", "/mes?tab=dailyReport");
+    try {
+      const view = render(<DesktopMesShell />);
+      operatorState.current = { ...operatorState.current, hidden_sidebar_tabs: ["dailyReport"] };
+      view.rerender(<DesktopMesShell />);
+      await waitFor(() => expect(dailyAccessDraft.save).toHaveBeenCalledOnce());
+      expect(screen.getByText("daily report content").closest("[inert]")).toBeInTheDocument();
+      expect(screen.getByTestId("desktop-topbar-title-addon")).toBeEmptyDOMElement();
+      await act(async () => finish());
+      await waitFor(() => expect(window.location.search).toBe("?tab=dashboard"));
+    } finally { dailyAccessDraft.dirty = false; dailyAccessDraft.save.mockClear(); }
   });
 
   it("shows daily report controls in the top bar only while the daily tab is active", () => {
