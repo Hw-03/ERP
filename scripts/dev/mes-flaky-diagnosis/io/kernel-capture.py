@@ -17,6 +17,31 @@ HERE = Path(__file__).resolve().parent
 EVENTS = ('tcp/tcp_send_reset', 'tcp/tcp_receive_reset', 'sock/inet_sock_set_state',
           'signal/signal_generate', 'signal/signal_deliver', 'oom/mark_victim', 'sched/sched_process_fork')
 
+def reset_probes(formats: dict[str, str]) -> str:
+    """Bind observed fields; new kernels store sockaddr bytes and an explicit reset reason."""
+    blocks = []
+    for name, kind in (('tcp_send_reset', 3), ('tcp_receive_reset', 4)):
+        layout = formats['tcp/' + name]
+        field = lambda key: bool(re.search(r'field:[^;\n]*\b' + key + r';', layout))
+        if not field('skaddr'):
+            raise ValueError('reset event has no socket identity field')
+        if all(field(key) for key in ('family', 'sport', 'dport')):
+            variables = '$family = args->family; $sport = args->sport; $dport = args->dport;'
+        elif field(r'saddr\[28\]') and field(r'daddr\[28\]') and '%pISpc' in layout:
+            variables = ('$src = (struct sockaddr_in *)args->saddr; $dst = (struct sockaddr_in *)args->daddr; '
+                '$family = $src->sin_family; $sport = bswap((uint16)$src->sin_port); $dport = bswap((uint16)$dst->sin_port);')
+        else:
+            raise ValueError('unrecognized reset address layout')
+        reason = 'args->reason' if field('reason') else '-1'
+        blocks.append(f'''tracepoint:tcp:{name} {{
+  {variables}
+  if ($family == 2 && ($sport == $1 || $dport == $1)) {{
+    printf("MESK event=reset mono_ns=%llu pid=%d tid=%d init_pid=%d boundary_kind={kind} sk=%llu owner=%d sport=%d dport=%d reset_reason=%d stack=%s\\n",
+      nsecs(monotonic), pid, tid, curtask->tgid, (uint64)args->skaddr, @owner[(uint64)args->skaddr], $sport, $dport, {reason}, kstack(16));
+  }}
+}}''')
+    return '\n'.join(blocks)
+
 def decode_record(value: dict[str, Any]) -> dict[str, Any] | None:
     """Retain raw quantities; context PID is not the socket owner or a close reason."""
     if value.get('type') == 'attached_probes':
@@ -101,11 +126,16 @@ def main() -> None:
             raise ValueError('unknown bpftrace warning compatibility')
         modern = tuple(map(int, version_match.groups())) >= (0, 25)
         warning_flag = '-k' if modern else '-kk'
-        program = HERE / 'socket-boundaries.bt'
+        program = output.with_name('socket-boundaries-effective.bt')
+        template = (HERE / 'socket-boundaries.bt').read_text()
+        placeholder = '// RESET_PROBES: generated from this kernel\'s tracepoint format, never guessed by version.'
+        if template.count(placeholder) != 1:
+            raise ValueError('reset probe template marker changed')
+        effective = template.replace(placeholder, reset_probes(metadata['formats']))
         if not modern:
             # Older delete() returns void; only its discarded return syntax differs.
-            program = output.with_name('socket-boundaries-compatible.bt')
-            program.write_text((HERE / 'socket-boundaries.bt').read_text().replace('$deleted = delete(', 'delete('))
+            effective = effective.replace('$deleted = delete(', 'delete(')
+        program.write_text(effective)
         child = subprocess.Popen(['bpftrace', warning_flag, '-f', 'json', '-B', 'line', str(program),
                                   str(args.port), str(args.parent_pid), str(metadata['pid_namespace_inode'])], stdout=subprocess.PIPE, stderr=stderr,
                                  text=True, env={**os.environ, 'BPFTRACE_MAX_MAP_KEYS': '65536', 'BPFTRACE_PERF_RB_PAGES': '256'})
@@ -143,6 +173,7 @@ def main() -> None:
     stderr_text = output.with_name('kernel-bpf-stderr.log').read_text()
     loss = bool(re.search(r'\blost\b|\bdropped\b|ERROR|failed|helper.*error', stderr_text, re.IGNORECASE))
     receipt = {'ready': ready, 'events': count, 'decode_errors': errors, 'loss_or_error_reported': loss,
+               'effective_program_sha256': hashlib.sha256(program.read_bytes()).hexdigest(),
                'intentional_missing_map_keys': missing_map_keys, 'compiler_output_lines': compiler_lines,
                'exit_code': code, 'stopped_by_owner': stopped, 'finished_mono_ns': time.monotonic_ns()}
     receipt['usable'] = ready and errors == 0 and not loss and code == 0 and stopped

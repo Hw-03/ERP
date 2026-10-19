@@ -51,11 +51,7 @@ kprobe:tcp_close, kprobe:tcp_send_active_reset {
       $sk->__sk_common.skc_cookie.counter, $sk->__sk_common.skc_rcv_saddr, $sk->__sk_common.skc_daddr, kstack(16));
   }
 }
-tracepoint:tcp:tcp_send_reset, tracepoint:tcp:tcp_receive_reset /args->family == 2 && (args->sport == $1 || args->dport == $1)/ {
-  $kind = probe == "tracepoint:tcp:tcp_send_reset" ? 3 : 4;
-  printf("MESK event=reset mono_ns=%llu pid=%d tid=%d init_pid=%d boundary_kind=%d sk=%llu owner=%d sport=%d dport=%d stack=%s\n",
-    nsecs(monotonic), pid, tid, curtask->tgid, $kind, (uint64)args->skaddr, @owner[(uint64)args->skaddr], args->sport, args->dport, kstack(16));
-}
+// RESET_PROBES: generated from this kernel's tracepoint format, never guessed by version.
 tracepoint:signal:signal_generate /@tracked[(uint32)args->pid]/ {
   printf("MESK event=signal_generate mono_ns=%llu pid=%d tid=%d target=%d signal=%d code=%d result=%d\n",
     nsecs(monotonic), pid, tid, args->pid, args->sig, args->code, args->result);

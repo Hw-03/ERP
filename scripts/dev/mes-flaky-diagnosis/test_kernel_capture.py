@@ -39,5 +39,19 @@ class KernelEvidenceTests(unittest.TestCase):
             tool.decode_record({'type':'printf','data':'MESK event=reset pid=missing\n'})
         self.assertIsNone(tool.decode_record({'type':'attached_probes','data':{'probes':12}}))
 
+    def test_reset_layouts_are_selected_from_observed_fields_not_kernel_version(self):
+        tool = self.tool()
+        old = 'field:const void * skaddr;\nfield:__u16 family;\nfield:__u16 sport;\nfield:__u16 dport;'
+        new = 'field:const void * skaddr;\nfield:enum sk_rst_reason reason;\nfield:__u8 saddr[28];\nfield:__u8 daddr[28];\nprint fmt: %pISpc'
+        text = tool.reset_probes({'tcp/tcp_send_reset': new, 'tcp/tcp_receive_reset': old})
+        send, receive = text.split('tracepoint:tcp:tcp_receive_reset')
+        self.assertIn('struct sockaddr_in', send)
+        self.assertIn('args->reason', send)
+        self.assertNotIn('args->family', send)
+        self.assertIn('args->family', receive)
+        self.assertNotIn('args->reason', receive)
+        with self.assertRaises(ValueError):
+            tool.reset_probes({'tcp/tcp_send_reset': 'field:int mystery;'})
+
 if __name__ == '__main__':
     unittest.main()

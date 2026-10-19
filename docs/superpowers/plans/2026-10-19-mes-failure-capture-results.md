@@ -38,6 +38,14 @@
 
 진단 중 main이 별도 변경 `58dca032`(초기 재고 내역 표시)로 전진한 것을 읽기 확인했다. 이 변경을 후보에 가져오거나 main을 수정하지 않았다. 사용자가 보는3038/8038의 PID도 시작 시 값과 같다.
 
+### 두 번째 CI 준비 결과와 커널 형식 보완
+
+후보 `c414f338`의 [CI39193197093](https://github.com/Hw-03/ERP/actions/runs/39193197093)에서 실제 React 입력과 assertion/timeout 실패 전 보존 검사는 통과했다. 원 일반 E2E는 커널 수집기 컴파일 거부로 시작하지 않았다. 이 실행은 BOM·AS 제품 실패가 아니다. 같은 SHA의 자동 일반 CI39193197062는 취소 완료했다.
+
+원문은 후보 `_attic/runtime/flaky-capture-20261019/ci-39193197093`에 있다. CI의 kernel6.17.0-1022-azure / bpftrace0.20.2에서 `tcp_send_reset`은 기존 `family/sport/dport` 대신 sockaddr 배열과 `reason`을 제공하지만 `tcp_receive_reset`은 기존 필드를 유지했다. 실제 tracepoint format을 읽어 두 probe를 각각 생성하도록 보완했다. 모르는 형식은 거부하고, 종료 이유 필드가 없는 커널은 -1로 남긴다. 생성된 BPF 소스와 해시도 보존한다.
+
+국소 형식 선택 검사4건과 Linux kernel 자체 검사10은 통과했다. 자체 검사10의 decode 오류·손실 보고는 0이다. 자체 검사08은 구 커널의 socket 없는 reset 송신 이벤트를 기대해 실패했고, 09는 이전 도구 실행의 포트 재사용 준비 단계에서 멈췄다. 각각 원문을 남기고 실제 제공되는 reset 수신 경계, 새 커널에서만 제공되는 송신 이유, 기존 listener를 허용하지 않는 자체 검사 포트 재사용을 구분했다. 이 자연스러운 닫힌 합성 포트의 reset 검사는 수집기 확인이며 원 MES 오류 재현이 아니다. 새 커널 형식의 실제 기동은 다음 CI 준비 검사에서 확인한다.
+
 일반 E2E만1회, worker1/retry0/repeat1/first failure stop, job 준비 포함90분이다. 최초 실패 전후를 `failure.frozen`, `failure.collection.finished`, `cleanup.begin`, `global-cleanup-start.json`으로 구분한다. browser trace는 실패 전 chunk와 cleanup chunk를 분리하고 독립 APIRequestContext trace는 최종 원문과 cutoff를 연결한다. collector는 종료까지 drain해 늦게 flush된 실패 직전 기록을 빠뜨리지 않는다.
 
 원인 판정에는 기록 손실 여부·실제 입력/요청 경계·소켓 owner·원 오류 서명까지 필요하다. 자료가 부분이거나 원 실패와 다른 사건이면 그 범위를 명시한다. 모두 정상이면 같은 전체 묶음을 반복하지 않는다. 기존 전체 통과를 새 통합판 PASS로 승격하지 않는다.

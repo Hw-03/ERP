@@ -16,6 +16,7 @@ def main() -> None:
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
     with socket.socket() as guard:
+        guard.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         guard.bind(('127.0.0.1', 3154))
     tool = Path(__file__).resolve().parent / 'io/kernel-capture.py'
     destination = args.output / 'kernel-events.jsonl'
@@ -30,13 +31,17 @@ def main() -> None:
                 raise RuntimeError('kernel collector did not become ready')
             time.sleep(0.05)
         server = subprocess.Popen([sys.executable, '-u', '-c',
-            'import socket,sys\ns=socket.socket();s.bind(("127.0.0.1",3154));s.listen(1);print("ready",flush=True)\n'
+            'import socket,sys\ns=socket.socket();s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1);s.bind(("127.0.0.1",3154));s.listen(1);print("ready",flush=True)\n'
             'c,a=s.accept();assert c.recv(1)==b"x";c.sendall(b"ok");c.close();s.close();sys.exit(7)'], stdout=subprocess.PIPE, text=True)
         assert server.stdout.readline().strip() == 'ready'
         with socket.create_connection(('127.0.0.1', 3154)) as connection:
             connection.sendall(b'x')
             assert connection.recv(2) == b'ok'
         assert server.wait(timeout=10) == 7
+        # Collector contract only: a genuinely closed synthetic port emits a natural no-socket RST.
+        # This is not a reproduction of the MES connection failure.
+        with socket.socket() as refused:
+            assert refused.connect_ex(('127.0.0.1', 3154)) != 0
         victim = subprocess.Popen([sys.executable, '-u', '-c', 'import signal;print("ready",flush=True);signal.pause()'], stdout=subprocess.PIPE, text=True)
         assert victim.stdout.readline().strip() == 'ready'
         victim.terminate()
@@ -60,6 +65,12 @@ def main() -> None:
         victim_exit = next(row for row in events if row['event'] == 'exit' and row.get('pid') == victim.pid)
         assert any(row['event'] == 'signal_generate' and row.get('target') == victim_exit['init_pid'] for row in events)
         assert any(row['event'] == 'close_or_active_reset' and row.get('queue_length') == 0 for row in events)
+        assert any(row['event'] == 'close_or_active_reset' and row.get('boundary_kind') == 1 for row in events)
+        resets = [row for row in events if row['event'] == 'reset']
+        assert any(row.get('boundary_kind') == 4 and row['dport'] == 3154 for row in resets)
+        formats = json.loads((args.output / 'kernel-capabilities.json').read_text())['formats']
+        if ' reason;' in formats['tcp/tcp_send_reset']:
+            assert any(row.get('boundary_kind') == 3 and row.get('sport') == 3154 and row.get('reset_reason') == 1 for row in resets), 'expected diagnostic-port NO_SOCKET reason from this kernel'
         result.update(passed=True, server_pid=server.pid, terminated_pid=victim.pid, events=len(events))
     finally:
         for process in (server, victim, collector):
