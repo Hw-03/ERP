@@ -31,14 +31,14 @@ vi.mock("../../DepartmentsContext", () => ({
 }));
 
 describe("AdminDepartmentsSection", () => {
-  it("uses fixed list and status widths so full department statuses fit", () => {
+  it("uses a responsive list width and fixed status width so department statuses fit", () => {
     const { container } = render(
       <DirtyGuardProvider>
         <AdminDepartmentsSection employees={[]} items={[]} adminPin="0000" setDepartments={vi.fn()} onStatusChange={vi.fn()} onError={vi.fn()} />
       </DirtyGuardProvider>,
     );
 
-    expect(container.querySelector("div[style*='width: 336px']")).toBeInTheDocument();
+    expect(container.querySelector("div[style*='width: clamp(360px, 28vw, 440px)']")).toBeInTheDocument();
     expect(container.querySelector("[data-admin-list-header='departments']")).toHaveClass("grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_88px]");
     expect(container.querySelector("[data-admin-department-row='1']")).toHaveClass("grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_88px]");
     expect(container.querySelector("[data-admin-department-row='1'] span[title]")).toHaveStyle({ maxWidth: "84px" });
