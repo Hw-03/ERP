@@ -9,6 +9,7 @@ import { useDepartments } from "../../DepartmentsContext";
 import type { ProductModel } from "@/lib/api";
 import { modelSlotsToSymbolPrefix, sortModelsBySymbol } from "@/lib/mes/item-code";
 import { PROCESS_TO_DEPT } from "@/lib/mes/process";
+import styles from "../_admin_primitives/AdminMasterData.module.css";
 
 export type ItemFormData = {
   item_name: string;
@@ -45,7 +46,7 @@ interface Props {
 function FieldLabel({ label, badge }: { label: string; badge?: "필수" | "선택" }) {
   return (
     <div
-      className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em]"
+      className="mb-2 flex items-center gap-2 text-sm font-bold"
       style={{ color: LEGACY_COLORS.muted2 }}
     >
       {label}
@@ -175,7 +176,7 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
   }
 
   return (
-    <>
+    <div className={styles.itemForm}>
       {/* 텍스트/숫자 필드 */}
       {([
         { key: "item_name", label: "품목명", badge: "필수" as const, type: "text", placeholder: "예: 텅스텐 필라멘트" },
@@ -236,7 +237,7 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
                       : [...f.model_slots, slot].sort(),
                   }))
                 }
-                className="rounded-full border px-3 py-1.5 text-sm font-bold transition-colors"
+                className="min-h-11 rounded-full border px-3 py-1.5 text-sm font-bold transition-colors"
                 style={{
                   background: checked ? LEGACY_COLORS.purple : LEGACY_COLORS.s1,
                   borderColor: checked ? LEGACY_COLORS.purple : LEGACY_COLORS.border,
@@ -414,6 +415,6 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
           </span>
         </span>
       </label>
-    </>
+    </div>
   );
 }
