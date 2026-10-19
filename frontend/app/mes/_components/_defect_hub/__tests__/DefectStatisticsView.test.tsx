@@ -113,7 +113,22 @@ describe("DefectStatisticsView report", () => {
     expect(screen.queryByText(/조회 2026/)).not.toBeInTheDocument();
   });
 
+  it.each([
+    ["주간", "이번 주로", "2026-10-05"],
+    ["월간", "이번 달로", "2026-10-01"],
+    ["연간", "올해로", "2026-01-01"],
+  ].flatMap(([unit, label, anchor]) => [false, true].map((mobile) => ({ unit, label, anchor, mobile }))))("disables $unit return within the current period and enables it for past periods (mobile $mobile)", async ({ unit, label, anchor, mobile }) => {
+    window.sessionStorage.setItem("mes-defect-statistics-date", JSON.stringify(anchor));
+    render(<DefectStatisticsView {...props} mobilePresentation={mobile} />);
+    fireEvent.click(screen.getByRole("button", { name: unit, exact: true }));
+    expect(screen.getByRole("button", { name: label })).toBeDisabled();
 
+    fireEvent.click(screen.getByRole("button", { name: "이전 기간" }));
+    expect(screen.getByRole("button", { name: label })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    expect(screen.getByRole("button", { name: label })).toBeDisabled();
+    await waitFor(() => expect(api.getStatisticsReport).toHaveBeenLastCalledWith(expect.objectContaining({ anchor: "2026-10-06" })));
+  });
 
   it("discloses comparison and collection details independently without hiding the exclusion notice", async () => {
     render(<DefectStatisticsView {...props} />);

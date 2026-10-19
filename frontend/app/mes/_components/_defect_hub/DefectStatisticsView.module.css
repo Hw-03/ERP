@@ -12,6 +12,8 @@
 .dateNavigation { display: grid; grid-template-columns: 44px 280px 44px; align-items: center; gap: 12px; }
 .periodButtons { display: flex; min-width: 156px; flex: 1; gap: 4px; padding: 4px; border-radius: 14px; background: var(--c-s2); }
 .periodButtons button { min-width: 0; flex: 1; padding-inline: 8px; white-space: nowrap; }
+.currentPeriodButton { background: color-mix(in srgb, var(--c-blue) 14%, transparent); color: var(--c-blue); }
+.currentPeriodButton:disabled { background: var(--c-s2); color: var(--c-muted2); }
 .filters { min-width: 0; }
 .filters button, .filters span { font-size: 14px; }
 .filterSelection { display: flex; min-width: 0; flex: 1; flex-wrap: wrap; align-items: center; gap: 8px; }
