@@ -122,18 +122,23 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
   // 항목 변경(트리거 a) 가드 — 같은 페이지에서 다른 품목 선택.
   const { confirmNavigation } = useLocalDirtyGuard(dirty, saveItem);
 
-  // KPI: 전체 / 정상 / 부족 / 품절 — 대시보드와 동일 4분기
+  // 삭제 품목은 재고 상태와 중복 집계하지 않는다.
   const stats = useMemo(() => {
     let ok = 0;
     let low = 0;
     let zero = 0;
+    let deleted = 0;
     for (const it of visibleItems) {
+      if (it.deleted_at) {
+        deleted += 1;
+        continue;
+      }
       const qty = Number(it.quantity);
       if (qty <= 0) zero += 1;
       else if (it.min_stock != null && qty < Number(it.min_stock)) low += 1;
       else ok += 1;
     }
-    return { ok, low, zero };
+    return { ok, low, zero, deleted };
   }, [visibleItems]);
 
   // 첫 진입 시 첫 visibleItem 자동 선택 (addMode가 아닐 때만)
@@ -202,6 +207,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
               { key: "ok", label: "정상", value: stats.ok, hint: "안전재고 충족", tone: LEGACY_COLORS.green },
               { key: "low", label: "부족", value: stats.low, hint: "안전재고 미만", tone: LEGACY_COLORS.yellow },
               { key: "zero", label: "품절", value: stats.zero, hint: "재고 0 이하", tone: LEGACY_COLORS.red },
+              { key: "deleted", label: "삭제", value: stats.deleted, hint: "삭제된 품목", tone: LEGACY_COLORS.muted2 },
             ]}
           />
         }

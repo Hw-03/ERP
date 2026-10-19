@@ -77,6 +77,21 @@ afterEach(() => {
 
 describe("AdminMasterItemsSection", () => {
 
+  it("삭제 품목을 재고 상태 집계에서 제외하고 별도 집계한다", () => {
+    context.visibleItems = [
+      item,
+      { ...item, item_id: "low", quantity: 1, min_stock: 2 },
+      { ...item, item_id: "zero", quantity: 0 },
+      { ...item, item_id: "deleted-ok", deleted_at: "2026-10-19T00:00:00Z" },
+      { ...item, item_id: "deleted-zero", quantity: 0, deleted_at: "2026-10-19T00:00:00Z" },
+    ];
+    render(<DirtyGuardProvider><AdminMasterItemsSection allBomRows={[]} /></DirtyGuardProvider>);
+    expect(screen.getByText("전체 품목").parentElement).toHaveTextContent("5");
+    expect(screen.getAllByText("정상")[0].parentElement).toHaveTextContent("1");
+    expect(screen.getAllByText("부족")[0].parentElement).toHaveTextContent("1");
+    expect(screen.getAllByText("품절")[0].parentElement).toHaveTextContent("1");
+    expect(screen.getByText("삭제", { exact: true }).parentElement).toHaveTextContent("2");
+  });
 
   it("[8.19-04] 1050개 visibleItems의 KPI·상태 합·목록·끝행이 같은 모집단을 사용한다", () => {
     context.visibleItems = Array.from({ length: 1050 }, (_, index) => ({
