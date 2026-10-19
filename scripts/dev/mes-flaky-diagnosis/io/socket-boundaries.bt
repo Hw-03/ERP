@@ -1,0 +1,74 @@
+// Opt-in collector: numeric TCP/process metadata only. No payload or command lines.
+BEGIN {
+  printf("MESK event=ready mono_ns=%llu pid=%d tid=%d init_pid=%d init_tid=%d port=%d parent=%d\n", nsecs(monotonic), pid, tid, curtask->tgid, curtask->pid, $1, $2);
+}
+// Tracepoint target IDs are in the init namespace; pid/tid can be namespaced.
+tracepoint:sched:sched_process_fork /@tracked[(uint32)curtask->tgid] || @tracked[(uint32)curtask->pid] ||
+  (curtask->nsproxy != 0 && curtask->nsproxy->pid_ns_for_children->ns.inum == $3 && pid == (uint32)$2)/ {
+  @tracked[(uint32)args->parent_pid] = 1;
+  @tracked[(uint32)args->child_pid] = 1;
+  printf("MESK event=fork mono_ns=%llu pid=%d tid=%d init_pid=%d init_tid=%d parent=%d child=%d\n",
+    nsecs(monotonic), pid, tid, curtask->tgid, curtask->pid, args->parent_pid, args->child_pid);
+}
+kprobe:tcp_v4_connect { @connecting[(uint32)curtask->pid] = (uint64)arg0; }
+kretprobe:tcp_v4_connect /@connecting[(uint32)curtask->pid]/ {
+  $sk = (struct sock *)@connecting[(uint32)curtask->pid];
+  $dport = bswap((uint16)$sk->__sk_common.skc_dport);
+  if ($dport == $1) {
+    @owner[(uint64)$sk] = pid;
+    printf("MESK event=connect mono_ns=%llu pid=%d tid=%d init_pid=%d sk=%llu owner=%d sport=%d dport=%d result=%d\n",
+      nsecs(monotonic), pid, tid, curtask->tgid, (uint64)$sk, pid, $sk->__sk_common.skc_num, $dport, retval);
+  }
+  $deleted = delete(@connecting[(uint32)curtask->pid]);
+}
+kretprobe:inet_csk_accept /retval > 4096/ {
+  $sk = (struct sock *)retval;
+  if ($sk->__sk_common.skc_family == 2 && $sk->__sk_common.skc_num == $1) {
+    @owner[(uint64)$sk] = pid;
+    printf("MESK event=accept mono_ns=%llu pid=%d tid=%d init_pid=%d sk=%llu owner=%d sport=%d dport=%d\n",
+      nsecs(monotonic), pid, tid, curtask->tgid, (uint64)$sk, pid, $sk->__sk_common.skc_num, bswap((uint16)$sk->__sk_common.skc_dport));
+  }
+}
+tracepoint:sock:inet_sock_set_state /args->family == 2 && args->protocol == 6 && (args->sport == $1 || args->dport == $1)/ {
+  if (args->newstate == 2 || args->newstate == 3 || (args->oldstate == 3 && args->newstate == 1)) {
+    $deleted = delete(@owner[(uint64)args->skaddr]);
+  }
+  printf("MESK event=state mono_ns=%llu pid=%d tid=%d sk=%llu owner=%d sport=%d dport=%d old=%d new=%d\n",
+    nsecs(monotonic), pid, tid, (uint64)args->skaddr, @owner[(uint64)args->skaddr],
+    args->sport, args->dport, args->oldstate, args->newstate);
+}
+kprobe:tcp_close, kprobe:tcp_send_active_reset {
+  $sk = (struct sock *)arg0;
+  $sport = $sk->__sk_common.skc_num;
+  $dport = bswap((uint16)$sk->__sk_common.skc_dport);
+  if ($sk->__sk_common.skc_family == 2 && ($sport == $1 || $dport == $1)) {
+    $tcp = (struct tcp_sock *)$sk;
+    $kind = probe == "kprobe:tcp_close" ? 1 : 2;
+    printf("MESK event=close_or_active_reset mono_ns=%llu pid=%d tid=%d init_pid=%d boundary_kind=%d sk=%llu owner=%d sport=%d dport=%d rcv_nxt=%u copied_seq=%u queue_length=%u state=%d flags=%llu linger=%llu cookie=%llu local_addr_raw=%u remote_addr_raw=%u stack=%s\n",
+      nsecs(monotonic), pid, tid, curtask->tgid, $kind, (uint64)$sk, @owner[(uint64)$sk], $sport, $dport,
+      $tcp->rcv_nxt, $tcp->copied_seq, $sk->sk_receive_queue.qlen,
+      $sk->__sk_common.skc_state, $sk->__sk_common.skc_flags, $sk->sk_lingertime,
+      $sk->__sk_common.skc_cookie.counter, $sk->__sk_common.skc_rcv_saddr, $sk->__sk_common.skc_daddr, kstack(16));
+  }
+}
+tracepoint:tcp:tcp_send_reset, tracepoint:tcp:tcp_receive_reset /args->family == 2 && (args->sport == $1 || args->dport == $1)/ {
+  $kind = probe == "tracepoint:tcp:tcp_send_reset" ? 3 : 4;
+  printf("MESK event=reset mono_ns=%llu pid=%d tid=%d init_pid=%d boundary_kind=%d sk=%llu owner=%d sport=%d dport=%d stack=%s\n",
+    nsecs(monotonic), pid, tid, curtask->tgid, $kind, (uint64)args->skaddr, @owner[(uint64)args->skaddr], args->sport, args->dport, kstack(16));
+}
+tracepoint:signal:signal_generate /@tracked[(uint32)args->pid]/ {
+  printf("MESK event=signal_generate mono_ns=%llu pid=%d tid=%d target=%d signal=%d code=%d result=%d\n",
+    nsecs(monotonic), pid, tid, args->pid, args->sig, args->code, args->result);
+}
+tracepoint:signal:signal_deliver /@tracked[(uint32)curtask->tgid] || @tracked[(uint32)curtask->pid]/ {
+  printf("MESK event=signal_deliver mono_ns=%llu pid=%d tid=%d init_pid=%d init_tid=%d signal=%d code=%d\n",
+    nsecs(monotonic), pid, tid, curtask->tgid, curtask->pid, args->sig, args->code);
+}
+tracepoint:oom:mark_victim /@tracked[(uint32)args->pid]/ {
+  printf("MESK event=oom_victim mono_ns=%llu pid=%d tid=%d target=%d\n", nsecs(monotonic), pid, tid, args->pid);
+}
+kprobe:do_exit /@tracked[(uint32)curtask->tgid] || @tracked[(uint32)curtask->pid]/ {
+  printf("MESK event=exit mono_ns=%llu pid=%d tid=%d init_pid=%d init_tid=%d wait_status=%d\n", nsecs(monotonic), pid, tid, curtask->tgid, curtask->pid, arg0);
+  $deleted = delete(@tracked[(uint32)curtask->pid]);
+}
+END { clear(@tracked); clear(@owner); clear(@connecting); }

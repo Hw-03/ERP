@@ -8,8 +8,10 @@ export default defineConfig({
   workers: 1,
   maxFailures: 1,
   globalTeardown: "../scripts/dev/mes-flaky-diagnosis/owned-teardown.ts",
+  testIgnore: ["**/mes-flaky-preflight.spec.ts", "**/000-mes-flaky-items.spec.ts"],
   outputDir: process.env.MES_DIAG_OUTPUT + "/test-results",
   reporter: [
+    ["../scripts/dev/mes-flaky-diagnosis/cohort-reporter.cjs"],
     ["list"],
     ["json", { outputFile: process.env.MES_DIAG_OUTPUT + "/report.json" }],
     ["html", { outputFolder: process.env.MES_DIAG_OUTPUT + "/playwright-report", open: "never" }],

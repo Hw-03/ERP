@@ -18,10 +18,7 @@ from typing import Any
 
 
 HERE = Path(__file__).resolve().parent
-BATCHES = (
-    ("bom-native-only-precursors", ("shipping-additional-expectations.spec.ts",),
-     "SHIP-(DISCARD|VARIANT|CANDIDATE-DRIFT|GENERATED-ROLES) ", 4),
-)
+COHORT = json.loads((HERE / 'general-cohort.json').read_text(encoding='utf-8'))
 
 
 def save(path: Path, value: Any) -> None:
@@ -111,10 +108,10 @@ def stop_helper(process: subprocess.Popen[Any] | None) -> None:
         raise RuntimeError("PID watcher did not exit cleanly")
 
 
-def capture_ready(path: Path, process: subprocess.Popen[Any]) -> None:
+def capture_ready(path: Path, process: subprocess.Popen[Any], marker: str = '"event": "capture.ready"') -> None:
     deadline = time.monotonic() + 10
     while time.monotonic() < deadline:
-        if path.exists() and any('"event": "capture.ready"' in line for line in path.read_text().splitlines()):
+        if path.exists() and any(marker in line for line in path.read_text().splitlines()):
             return
         if process.poll() is not None:
             raise RuntimeError("TCP collector exited before capture.ready")
@@ -133,6 +130,16 @@ def stop_capture(process: subprocess.Popen[Any] | None, output: Path) -> None:
                     "--output", str(output / "packets.jsonl")], check=True)
     if process.wait(timeout=10) != 0:
         raise RuntimeError("TCP collector did not exit cleanly")
+
+
+def stop_kernel(process: subprocess.Popen[Any] | None, output: Path) -> None:
+    if process is None:
+        return
+    subprocess.run(['sudo', '-n', sys.executable, '-I', str(HERE / 'stop-capture.py'),
+        '--pid-file', str(output / 'kernel-pid.json'), '--script', str(HERE / 'io/kernel-capture.py'),
+        '--output', str(output / 'kernel-events.jsonl')], check=True)
+    if process.wait(timeout=15) != 0 or not json.loads((output / 'kernel-result.json').read_text())['usable']:
+        raise RuntimeError('kernel collector reported missing/error records')
 
 
 def ports_free() -> None:
@@ -172,7 +179,7 @@ def run_batch(source: Path, artifacts: Path, name: str, specs: tuple[str, ...], 
            "MES_RUNTIME_ROOT": str(output / "runtime"), "AUDIT_CSV_DIR": str(output / "audit_csv"),
            "DATABASE_URL": "sqlite:///" + str(source / "backend/mes_e2e.db"),
            "BACKEND_INTERNAL_URL": "http://127.0.0.1:8021", "CI": "1", "APP_ENV": "development",
-           "REQUIRE_POSTGRES": "0", "NEXT_TELEMETRY_DISABLED": "1", "PYTHONUTF8": "1", "MES_BOM_DIAG": "1",
+           "REQUIRE_POSTGRES": "0", "NEXT_TELEMETRY_DISABLED": "1", "PYTHONUTF8": "1", "MES_BOM_DIAG": "1", "MES_BOM_VALUE_TRAP": "1",
            "IO_RUN_ID": name, "IO_TRACE_TARGET_PORT": "8021",
            "IO_NODE_TRACE_FILE": str(output / "next-http.jsonl"), "IO_PY_TRACE_FILE": str(output / "backend-protocol.jsonl"),
            "NODE_OPTIONS": "--require=" + str(HERE / "io/next-preload.cjs"), "PYTHONPATH": str(HERE / "io")}
@@ -181,10 +188,15 @@ def run_batch(source: Path, artifacts: Path, name: str, specs: tuple[str, ...], 
                               "started_wall_ns": time.time_ns(), "started_mono_ns": time.monotonic_ns(), "status": "infrastructure_failure",
                               "environment": {key: env[key] for key in ("CI", "APP_ENV", "REQUIRE_POSTGRES", "DATABASE_URL",
                                   "BACKEND_INTERNAL_URL", "MES_RUNTIME_ROOT", "AUDIT_CSV_DIR", "IO_RUN_ID", "IO_TRACE_TARGET_PORT", "MES_BOM_DIAG")}}
-    runner = watcher = collector = None
+    runner = watcher = collector = kernel = None
     errors = []
     try:
         ports_free()
+        with (output / 'kernel-stdout.log').open('wb') as stdout, (output / 'kernel-stderr.log').open('wb') as stderr:
+            kernel = subprocess.Popen(['sudo', '-n', sys.executable, '-I', str(HERE / 'io/kernel-capture.py'),
+                '--output', str(output / 'kernel-events.jsonl'), '--pid-file', str(output / 'kernel-pid.json'),
+                '--parent-pid', str(os.getpid()), '--port', '8021'], stdout=stdout, stderr=stderr)
+        capture_ready(output / 'kernel-events.jsonl', kernel, '"event": "ready"')
         with (output / "collector-stdout.log").open("wb") as stdout, (output / "collector-stderr.log").open("wb") as stderr:
             collector = subprocess.Popen(["sudo", "-n", "env", "IO_RUN_ID=" + name, sys.executable, "-I",
                 str(HERE / "io/capture-ipv4-tcp.py"), "--interface", "lo", "--port", "8021",
@@ -193,7 +205,7 @@ def run_batch(source: Path, artifacts: Path, name: str, specs: tuple[str, ...], 
         capture_ready(output / "packets.jsonl", collector)
         command = ["node", "node_modules/@playwright/test/cli.js", "test", "--config=mes-flaky-diagnosis.config.ts",
                    "--project=chromium", "--workers=1", "--retries=0", "--max-failures=1",
-                   "--repeat-each=1", *("tests/e2e/" + spec for spec in specs), "--grep", selector]
+                   "--repeat-each=1", "--grep-invert", selector]
         with (output / "runner-stdout.log").open("wb") as stdout, (output / "runner-stderr.log").open("wb") as stderr:
             runner = subprocess.Popen(command, cwd=source / "frontend", env=env, stdout=stdout, stderr=stderr, start_new_session=True)
         with (output / "pidwatch-stderr.log").open("wb") as stderr:
@@ -220,6 +232,7 @@ def run_batch(source: Path, artifacts: Path, name: str, specs: tuple[str, ...], 
             ("backend", lambda: stop_backend(source)),
             ("collector", lambda: stop_capture(collector, output)),
             ("pidwatch", lambda: stop_helper(watcher)),
+            ("kernel", lambda: stop_kernel(kernel, output)),
         ):
             try:
                 cleanup()
@@ -246,6 +259,10 @@ def run_batch(source: Path, artifacts: Path, name: str, specs: tuple[str, ...], 
         except Exception as exc:
             errors.append({"phase": "database_evidence", "type": type(exc).__name__, "message": str(exc)})
         result.update({"finished_wall_ns": time.time_ns(), "finished_mono_ns": time.monotonic_ns(), "diagnostic_errors": errors})
+        receipts = list((output / 'first-failures').glob('*/receipt.json'))
+        result['failure_capture_receipts'] = [{'path': str(path), **json.loads(path.read_text())} for path in receipts]
+        if result.get('exit_code') not in (0, None) and not receipts:
+            result['capture_limitation'] = 'No body failure capture; fixture/setup/timeout must not be treated as fully captured product evidence.'
         if errors:
             result["status"] = "infrastructure_failure"
         save(output / "batch-result.json", result)
@@ -267,7 +284,7 @@ def main() -> None:
         raise ValueError("approved environment was not verified")
     if not (source / ".mes-flaky-export.json").is_file() or (source / ".git").exists():
         raise ValueError("missing isolated source export")
-    code_manifest = json.loads((artifacts / "export-instrumented.json").read_text())["files"]
+    code_manifest = json.loads((artifacts / "export-capture-instrumented.json").read_text())["files"]
     next_env = source / "frontend/next-env.d.ts"
     generated = {"path": "frontend/next-env.d.ts", "guarded_tracked_input": "frontend/next-env.d.ts" in code_manifest,
                  "existed_before_app": next_env.exists(),
@@ -281,23 +298,27 @@ def main() -> None:
 
     signal.signal(signal.SIGTERM, interrupt)
     try:
-        preflight = run_batch(source, artifacts, "preflight", ("mes-flaky-preflight.spec.ts",), "MES-DIAG-APP-READY", 1)
-        batches.append(preflight)
-        if preflight["status"] != "passed":
-            summary["status"] = "environment_readiness_failed"
+        admission = artifacts / 'cohort-admission'
+        admission.mkdir()
+        command = ['node', 'node_modules/@playwright/test/cli.js', 'test', '--config=mes-flaky-diagnosis.config.ts',
+            '--project=chromium', '--workers=1', '--retries=0', '--repeat-each=1', '--list',
+            '--grep-invert', COHORT['selection']['grep_invert']]
+        with (admission / 'collection.log').open('w') as log:
+            subprocess.run(command, cwd=source / 'frontend', env={**os.environ, 'MES_DIAG_OUTPUT': str(admission)},
+                stdout=log, stderr=subprocess.STDOUT, check=True)
+        if not json.loads((admission / 'cohort-collection.json').read_text())['matches']:
+            raise ValueError('original first-attempt order was not admitted')
+        current = run_batch(source, artifacts, 'original-general-once', (), COHORT['selection']['grep_invert'], len(COHORT['first_attempt_order']))
+        batches.append(current)
+        if current['status'] != 'passed':
+            summary['status'] = 'first_failure_stopped'
             raise SystemExit(1)
-        for name, specs, selector, expected in BATCHES:
-            current = run_batch(source, artifacts, name, specs, selector, expected)
-            batches.append(current)
-            if current["status"] != "passed":
-                summary["status"] = "first_failure_stopped"
-                raise SystemExit(1)
         summary["status"] = "no_failure_observed_root_cause_unresolved"
     finally:
         save(artifacts / "run-summary.json", summary)
         generated["after_sha256"] = hashlib.sha256(next_env.read_bytes()).hexdigest() if next_env.exists() else None
         save(artifacts / "next-generated-file.json", generated)
-        exporter.verify(source, artifacts / "export-instrumented.json", artifacts / "export-after-run.json")
+        exporter.verify(source, artifacts / "export-capture-instrumented.json", artifacts / "export-after-run.json")
     if summary["status"] != "no_failure_observed_root_cause_unresolved":
         raise SystemExit(1)
 

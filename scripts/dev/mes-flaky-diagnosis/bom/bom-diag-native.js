@@ -17,6 +17,9 @@
   let instanceSerial = 0;
   let sequence = 0;
   let currentStep = null;
+  const incidents = [];
+  const writerTrap = { requested: window.__MES_BOM_VALUE_TRAP__ === true, installed: false,
+    errors: 0, incidentOverflow: 0, stackTruncated: 0, stackUnparsed: 0 };
 
   const numeric = (value) => {
     if (value === "") return "";
@@ -40,7 +43,7 @@
       if (key) reactPropKeys.set(node, key);
     }
     // Read the current props object each time: React replaces it on commit.
-    // Do not walk fibers, invoke callbacks, retain props or wrap a value setter.
+    // Do not walk fibers, invoke callbacks or retain props.
     return key ? node[key] : undefined;
   };
   const token = (map, value) => {
@@ -102,6 +105,7 @@
       active: describe(document.activeElement), ...detail,
     };
     ring[(sequence - 1) % CAPACITY] = item;
+    for (const incident of incidents) if (incident.after.length < 64) incident.after.push(item);
     return sequence;
   };
   const exportSnapshot = () => {
@@ -110,6 +114,9 @@
     return {
       document: performance.timeOrigin, sequence, capacity: CAPACITY, dropped: start,
       events: Array.from({ length: count }, (_, index) => ring[(start + index) % CAPACITY]),
+      writerTrap: { ...writerTrap }, incidents: incidents.map((incident) => ({
+        ...incident, afterComplete: incident.after.length === 64,
+      })),
     };
   };
   const validLabels = new Set(["onChange", "updateDraftLine:call", "draft:set:call", "draft:set:apply", "commit"]);
@@ -118,7 +125,7 @@
     "loadDefaultBom:empty", "loadDefaultBom:loaded", "updateDraftLine", "addDraftLine", "removeDraftLine",
   ]);
   window.__mesBomDiag = {
-    version: 3,
+    version: 4,
     export: exportSnapshot,
     recordReact: (label, payload) => {
       if (!validLabels.has(label)) return sequence;
@@ -146,6 +153,62 @@
       return record("react:" + label, detail);
     },
   };
+
+  const writerStack = () => {
+    // Never retain raw stacks: they may contain URL queries, paths or arbitrary function names.
+    const frames = [];
+    let unparsed = 0;
+    let truncated = 0;
+    for (const line of (new Error().stack ?? "").split("\n").slice(1)) {
+      const match = line.match(/\/_next\/static\/chunks\/((?:[A-Za-z0-9_.-]|%[0-9A-Fa-f]{2})+\.js)(?:\?[^)]*)?:(\d+):(\d+)\)?$/);
+      if (!match) { unparsed += 1; continue; }
+      if (frames.length === 12) { truncated += 1; continue; }
+      frames.push({ file: match[1], line: Number(match[2]), column: Number(match[3]) });
+    }
+    writerTrap.stackUnparsed += unparsed;
+    writerTrap.stackTruncated += truncated;
+    return { frames, unparsed, truncated, engineLimit: typeof Error.stackTraceLimit === "number" ? Error.stackTraceLimit : null };
+  };
+  if (writerTrap.requested) {
+    // AddInitScript installs before React captures the native prototype descriptor.
+    // Only forward to the original setter; never normalize its argument or schedule work.
+    try {
+      const prototypes = [HTMLInputElement.prototype, HTMLTextAreaElement.prototype];
+      const descriptors = prototypes.map((prototype) => Object.getOwnPropertyDescriptor(prototype, "value"));
+      if (descriptors.some((descriptor) => !descriptor?.configurable || !descriptor.get || !descriptor.set)) {
+        throw new Error("unsupported value descriptor");
+      }
+      prototypes.forEach((prototype, index) => {
+        const descriptor = descriptors[index];
+        Object.defineProperty(prototype, "value", { ...descriptor, set: function (value) {
+          let before = null;
+          try {
+            if (this instanceof Element && (this.matches(SELECTOR) || this.matches(NOTE_SELECTOR))) before = describe(this);
+          } catch { writerTrap.errors += 1; }
+          const result = Reflect.apply(descriptor.set, this, [value]);
+          if (before) {
+            try {
+              const after = describe(this);
+              const destructive = before.quantity ? (before.value === 2 || before.value === 3) && after.value === 1
+                : before.value?.empty === false && after.value?.empty === true;
+              if (destructive) {
+                if (incidents.length === 8) writerTrap.incidentOverflow += 1;
+                else {
+                  const start = Math.max(0, sequence - 128);
+                  const preceding = Array.from({ length: sequence - start }, (_, offset) => ring[(start + offset) % CAPACITY]);
+                  record("writer:destructive", { before, after,
+                    event: window.event instanceof Event ? eventId(window.event) : null, stack: writerStack() });
+                  incidents.push({ trigger: ring[(sequence - 1) % CAPACITY], before: preceding, after: [] });
+                }
+              }
+            } catch { writerTrap.errors += 1; }
+          }
+          return result;
+        } });
+      });
+      writerTrap.installed = true;
+    } catch { writerTrap.errors += 1; }
+  }
 
   for (const type of ["focusin", "focusout", "beforeinput", "input", "change"]) {
     const details = (event) => {

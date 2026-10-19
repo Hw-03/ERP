@@ -141,6 +141,14 @@ def prepare(checkout: Path, root: Path) -> None:
     content = content.replace(old,
         '      stdio: ["ignore", fs.openSync(path.join(process.env.MES_DIAG_OUTPUT!, "backend-stdout.log"), "a"), '
         'fs.openSync(path.join(process.env.MES_DIAG_OUTPUT!, "backend-stderr.log"), "a")],', 1)
+    exit_anchor = '  backend.unref();'
+    if content.count(exit_anchor) != 1:
+        raise ValueError('backend exit capture anchor changed')
+    content = content.replace(exit_anchor,
+        '  backend.once("exit", (code, signal) => fs.writeFileSync(path.join(process.env.MES_DIAG_OUTPUT!, "backend-exit.json"), '
+        'JSON.stringify({ pid: backend.pid, code, signal, wall_ms: Date.now(), mono_ns: process.hrtime.bigint().toString() })));\n'
+        '  backend.once("error", (error: NodeJS.ErrnoException) => fs.writeFileSync(path.join(process.env.MES_DIAG_OUTPUT!, "backend-spawn-error.json"), '
+        'JSON.stringify({ code: error.code, wall_ms: Date.now(), mono_ns: process.hrtime.bigint().toString() })));\n' + exit_anchor, 1)
     setup.write_text(content, encoding="utf-8", newline="\n")
     generated = {
         "frontend/mes-flaky-diagnosis.config.ts": (HERE / "diagnosis.config.ts").read_text(encoding="utf-8"),
@@ -161,12 +169,27 @@ def prepare(checkout: Path, root: Path) -> None:
                       "dependency_strategy": "install once in native export; no node_modules or venv copies"}))
 
 
+def instrument_tests(root: Path) -> None:
+    """After npm ci, add AST-selected failure barriers only to the exported tests."""
+    ci_guard()
+    root = checked_root(root, Path(os.environ['GITHUB_WORKSPACE']))
+    source, artifacts = root / 'source', root / 'artifacts'
+    original = artifacts / 'export-instrumented.json'
+    verify(source, original, artifacts / 'export-before-failure-patch.json')
+    subprocess.run(['node', str(HERE / 'instrument-failure.cjs'), str(source), str(artifacts / 'failure-patch.json')], check=True)
+    files = set(json.loads(original.read_text())['files']) | {'frontend/tests/e2e/_failure-boundary.ts'}
+    save(artifacts / 'export-capture-instrumented.json', {'root': str(source), 'files': manifest(source, sorted(files)),
+        'parent_manifest_sha256': digest(original), 'failure_patch_sha256': digest(artifacts / 'failure-patch.json')})
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
     export = commands.add_parser("prepare")
     export.add_argument("--checkout", required=True, type=Path)
     export.add_argument("--root", required=True, type=Path)
+    capture = commands.add_parser('instrument-tests')
+    capture.add_argument('--root', required=True, type=Path)
     guard = commands.add_parser("verify")
     guard.add_argument("--checkout", required=True, type=Path)
     guard.add_argument("--manifest", required=True, type=Path)
@@ -174,6 +197,8 @@ def main() -> None:
     args = parser.parse_args()
     if args.command == "prepare":
         prepare(args.checkout, args.root)
+    elif args.command == 'instrument-tests':
+        instrument_tests(args.root)
     else:
         verify(args.checkout, args.manifest, args.output)
 

@@ -1,5 +1,15 @@
 # main·후보 비교 — 현재 재개 지점
 
+## 현재 재개 지점: 2026-10-19 실패 순간 보존 계획 실행
+
+- 브랜치 `codex/mes-main-candidate-comparison-20261016`, 시작 HEAD121706c3. 사용자 검토3038/8038·BOM 초안·연구 요청 보존. 새 synthetic 진단3100/8021만 허용. main·직원 DB/서비스·예약 변경 금지.
+- 새 [계획](../../../docs/superpowers/plans/2026-10-19-mes-failure-capture.md)과 [진행 결과](../../../docs/superpowers/plans/2026-10-19-mes-failure-capture-results.md)를 따른다. 아래11:10 차단 기록은 새 실행 승인 이전 기록이다.
+- 현재 단계: CP1 도구 안전성·정적 검사 완료, 후보 진단 푸시 준비. Python22·Node12·actionlint·diff check 및 최종 kernel-selftest07 통과. 실제 React 입력 off/on 보존, namespace가 다른 kernel PID 연결, 원 assertion/timeout 전 DB0→cleanup 후1과 trace 보존을 확인. 이 검사는 원 제품 실패 재현이 아니다.
+- 원 일반 보고서의 첫 시도301개/64파일과 현재 수집 순서 일치. 일반 E2E는 아직 실행하지 않았다. 다음 행동은 도구 최종 검사 → 후보 진단 커밋/푸시 → 해당 SHA 일반 CI만 취소 → 일반 cohort1회 관찰이다.
+- 새 원문: 후보 `_attic/runtime/flaky-capture-20261019`, WSL `/home/hw/mes-flaky-capture-20261019`. 기존 원문·실패·사용자 DB는 그대로다. preflight.json과 starting-working-changes.patch가 현재 실행 시작 기준이다.
+- 기존에 미커밋이던 AS 완료 문구·기록은 섞어 커밋하지 않는다. 이번 문서 상단 추가분만 분리한다. 도구 검사는 관련 소스가 동일한 근거를 재사용한다. 제품 코드·전체 기대값·복구·성능 검사를 반복하지 않는다.
+- 한계: fixture 준비 단계에서 자체 정리가 먼저 수행되는 실패는 before-cleanup 전체 보존으로 인정하지 않는다. capture partial·kernel 기록 누락·순서 불일치면 진단 한계를 기록하고 제품 원인 확정에 쓰지 않는다.
+
 **2026-10-16 20:35 KST:** 후보 `eddd08118fb8c0e02bb794ffdc19adceacf63c72`까지9커밋 푸시, [CI38886739485](https://github.com/Hw-03/ERP/actions/runs/38886739485)는8/8 job 성공이다. 일반 E2E는299건 첫 통과·2건 재시도 통과다. 원본 읽기 조사 결과 연결 reset 원인과 BOM 입력2→1 처리 순서가 미확정이어서 병합 판단은 보류한다. 업무 비교·production 핵심·상세 기록은 완료했고 종료 문서3개를 별도 커밋/푸시할 단계다. main 반영·직원 배포는 하지 않는다.
 
 먼저 [첫 비교표·업무별8항목 상세](../../../docs/superpowers/plans/2026-10-16-mes-main-candidate-comparison-report.md), [활성 TODO](2026-10-16-mes-main-candidate-comparison-todo.md), [승인 계획](../../../docs/superpowers/plans/2026-10-16-mes-main-candidate-comparison.md)를 읽는다. 과거 중간 인계는 Git의 `eddd0811` 이전 판과 로컬 `R/resume-20261016-1845.md`, `resume-20261016-1925.md`에 보존돼 있다. 과거의 ‘다음 행동’을 현재 지시로 실행하지 않는다.

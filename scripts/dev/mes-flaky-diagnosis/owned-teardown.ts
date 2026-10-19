@@ -3,6 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 export default async function teardown(): Promise<void> {
+  fs.writeFileSync(path.join(process.env.MES_DIAG_OUTPUT!, "global-cleanup-start.json"),
+    JSON.stringify({ wall_ms: Date.now(), mono_ns: process.hrtime.bigint().toString() }));
   const root = fs.realpathSync(process.env.MES_DIAG_SOURCE!);
   const marker = JSON.parse(fs.readFileSync(path.join(root, ".mes-flaky-export.json"), "utf8"));
   if (marker.source !== root || fs.existsSync(path.join(root, ".git"))) throw Error("export ownership mismatch");

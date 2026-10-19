@@ -19,7 +19,7 @@ jobs:
       (github.event_name == 'workflow_dispatch' ||
        (github.event_name == 'push' && contains(github.event.head_commit.message, '[mes-flaky-diagnostic]')))
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 90
     env:
       CI: "true"
       NEXT_TELEMETRY_DISABLED: "1"
@@ -64,14 +64,34 @@ jobs:
           npm ci > "$MES_DIAG_ROOT/artifacts/npm-ci.log" 2>&1
           node node_modules/playwright/cli.js install --with-deps chromium > "$MES_DIAG_ROOT/artifacts/playwright-install.log" 2>&1
 
+      - name: Add failure barriers only after locked TypeScript is available
+        run: >-
+          python scripts/dev/mes-flaky-diagnosis/export-source.py instrument-tests
+          --root "$MES_DIAG_ROOT"
+
       - name: Verify approved runtime versions and record environment
         run: >-
           "$MES_DIAG_ROOT/venv/bin/python" "$MES_DIAG_ROOT/source/scripts/dev/mes-flaky-diagnosis/environment.py"
           --source "$MES_DIAG_ROOT/source" --output "$MES_DIAG_ROOT/artifacts/environment.json"
 
-      - name: App readiness then evidenced precursors with no retry
-        # Original test/expect timeout, bootstrap and seed remain intact.
-        # Each cohort runs once; batches run sequentially and stop on first failure.
+      - name: Verify observers before admitting the original cohort
+        shell: bash
+        run: |
+          set -euo pipefail
+          tool="$MES_DIAG_ROOT/source/scripts/dev/mes-flaky-diagnosis"
+          export MES_TOOL_FRONTEND="$MES_DIAG_ROOT/source/frontend"
+          python -m unittest discover -s "$tool" -p 'test_*.py' > "$MES_DIAG_ROOT/artifacts/tool-python.log" 2>&1
+          node --test "$tool/test_bom_observer.cjs" "$tool/test_bom_writer.cjs" "$tool/test_failure_boundary.cjs" > "$MES_DIAG_ROOT/artifacts/tool-node.log" 2>&1
+          node "$tool/bom-observer-browser.cjs" "$MES_TOOL_FRONTEND" "$MES_DIAG_ROOT/artifacts/bom-observer-browser.json"
+          python "$tool/failure-selftest.py" --frontend "$MES_TOOL_FRONTEND" --output "$MES_DIAG_ROOT/artifacts/failure-selftest"
+          python "$tool/failure-selftest.py" --frontend "$MES_TOOL_FRONTEND" --output "$MES_DIAG_ROOT/artifacts/timeout-selftest" --test-timeout
+          sudo apt-get update > "$MES_DIAG_ROOT/artifacts/bpftrace-install.log" 2>&1
+          sudo apt-get install -y --no-install-recommends bpftrace >> "$MES_DIAG_ROOT/artifacts/bpftrace-install.log" 2>&1
+          sudo -n "$(command -v python)" "$tool/kernel-selftest.py" --output "$MES_DIAG_ROOT/artifacts/kernel-selftest"
+
+      - name: Admit original first-attempt order and run the general cohort once
+        # No per-test/API/readiness timeout changes. No retries or repeat loops.
+        # A first failure stops this one cohort; AS-only and other CI jobs are excluded.
         run: >-
           "$MES_DIAG_ROOT/venv/bin/python" "$MES_DIAG_ROOT/source/scripts/dev/mes-flaky-diagnosis/run.py"
           --root "$MES_DIAG_ROOT"
@@ -86,7 +106,9 @@ jobs:
           if test -f "$MES_DIAG_ROOT/artifacts/checkout-before.json"; then
             python "$tool" verify --checkout "$GITHUB_WORKSPACE" --manifest "$MES_DIAG_ROOT/artifacts/checkout-before.json" --output "$MES_DIAG_ROOT/artifacts/checkout-final.json" || status=1
           fi
-          if test -f "$MES_DIAG_ROOT/artifacts/export-instrumented.json"; then
+          if test -f "$MES_DIAG_ROOT/artifacts/export-capture-instrumented.json"; then
+            python "$tool" verify --checkout "$MES_DIAG_ROOT/source" --manifest "$MES_DIAG_ROOT/artifacts/export-capture-instrumented.json" --output "$MES_DIAG_ROOT/artifacts/export-final.json" || status=1
+          elif test -f "$MES_DIAG_ROOT/artifacts/export-instrumented.json"; then
             python "$tool" verify --checkout "$MES_DIAG_ROOT/source" --manifest "$MES_DIAG_ROOT/artifacts/export-instrumented.json" --output "$MES_DIAG_ROOT/artifacts/export-final.json" || status=1
           fi
           exit "$status"

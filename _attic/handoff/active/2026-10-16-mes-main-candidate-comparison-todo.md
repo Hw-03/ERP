@@ -1,5 +1,17 @@
 # 개발서버·병합 후보 비교 검증
 
+## 2026-10-19 실패 순간 보존 재개: 완료 2 / 전체 5
+
+새 승인 범위: [실행 계획](../../../docs/superpowers/plans/2026-10-19-mes-failure-capture.md). [단계별 결과](../../../docs/superpowers/plans/2026-10-19-mes-failure-capture-results.md). 아래 이전 진단의 미확정 판정과 원문은 보존한다.
+
+- [x] CP0: 후보121706c3·기존 미커밋·검토 서버·DB 해시 보존. 별도 synthetic Linux/3100·8021만 사용. main·직원·3038/8038 미변경.
+- [x] CP1 (2026-10-19): native setter/React 입력·kernel 종료·실패 전 DB/trace 보존 자체 검사 완료. Python22건·Node12건·actionlint·diff check 통과. kernel 최종 selftest07 통과. CI에서도 실제 kernel capability와 도구 가드를 통과해야 CP2를 시작한다. namespace 오류는 도구 결함이며 원 AS 원인이 아니다.
+- [ ] CP2: 원 일반301개 첫 시도 선택·순서 수집 검증 완료. 일반 E2E 실제1회 실행은 아직 시작하지 않음.
+- [ ] CP3: 포착한 실패의 경계 대조·확정 원인 최소 수정·관련 검사. 새 제품 패치 없음.
+- [ ] CP4: 보고서·첫 표·인계를 각 단계와 함께 갱신 중. 두 원인이 미확정인 동안 해결/병합 가능 표시 금지.
+
+긴 실행 전 guard가 실패하면 준비 문제를 고치되 일반 cohort를 반복하지 않는다. 모든 본문이 통과하고 새 단서가 없으면 미확정으로 종료한다.
+
 기준: [승인 실행 계획](../../../docs/superpowers/plans/2026-10-16-mes-main-candidate-comparison.md).
 
 현황: 완료 4 / 전체 5, 남음 1(CP4의 병합 판단 보류 사유 2건). `eddd0811`까지9커밋을 후보에 푸시했고 CI38886739485는8/8 job 성공이다. 일반 E2E는299건 첫 통과·2건 재시도 통과이며 실패 원문 읽기 조사를 마쳤다. 연결 reset 원인과 BOM2→1 입력 처리 순서는 미확정이다. 프론트4,601·빌드와 backend pytest/PostgreSQL/OpenAPI는 성공했다. CP2 지정 대표 업무와 CP3 상세 기록은 완료했다. 종료 문서 후속 커밋/CI는 로컬 최종 영수증과 최종 응답에 기록하며 이 문서 자체 해시를 미리 단정하지 않는다. main 병합·직원 배포 금지.
