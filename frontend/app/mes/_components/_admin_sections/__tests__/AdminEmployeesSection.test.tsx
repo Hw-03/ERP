@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { AdminEmployeesSection } from "../AdminEmployeesSection";
 import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
+import { AdminReadProvider, INITIAL_ADMIN_READ_STATES } from "../_admin_primitives/AdminReadState";
 
 const setSelectedEmployee = vi.fn();
 const context: any = {
@@ -73,6 +74,15 @@ vi.mock("@/lib/queries/useModelsQuery", () => ({
 }));
 
 describe("AdminEmployeesSection", () => {
+  it("최초 조회에서는 미선택 안내 대신 직원 목록과 상세 자리를 표시한다", () => {
+    render(<AdminReadProvider value={{ states: INITIAL_ADMIN_READ_STATES, retry: vi.fn() }}>
+      <DirtyGuardProvider><AdminEmployeesSection /></DirtyGuardProvider>
+    </AdminReadProvider>);
+    expect(screen.getByTestId("admin-table-skeleton")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-detail-skeleton")).toBeInTheDocument();
+    expect(screen.queryByText(/직원을 선택하세요/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "직원 추가" })).toBeDisabled();
+  });
   it.each(["ㄱㄱㅎ", "ㄱㄱㅎ ㅈㄹ", "ㅈㅇㅈ", "김건호 조립"])("직원 이름·부서·직급을 초성과 조합 검색으로 찾는다: %s", (query) => {
     context.employees = [defaultEmployee, { ...defaultEmployee, employee_id: "emp-2", name: "박서연", department: "출하", role: "대리" }];
     const { container } = render(<DirtyGuardProvider><AdminEmployeesSection /></DirtyGuardProvider>);

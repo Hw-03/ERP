@@ -26,8 +26,12 @@ import { normalizeEmployeePosition } from "./_employee_parts/employeeRoleLabels"
 import { matchesSearchFields } from "@/lib/searchText";
 import { toChosung } from "@/lib/hangul";
 import styles from "./_admin_primitives/AdminMasterData.module.css";
+import { AdminReadBoundary, useAdminReadState } from "./_admin_primitives/AdminReadState";
+import { AdminDetailSkeleton, AdminTableSkeleton } from "./_admin_primitives/AdminSkeleton";
 
 export function AdminEmployeesSection() {
+  const read = useAdminReadState("employees", "departments");
+  const detailRead = useAdminReadState("employees", "departments", "models");
   const ctx = useAdminEmployeesContext();
   const {
     employees,
@@ -135,6 +139,7 @@ export function AdminEmployeesSection() {
           title="직원 관리"
           summary={
             <AdminKpiBar
+              loading={read.loading} unavailable={!!read.error}
               placement="header"
               items={[
                 { key: "all", label: "전체 직원", value: employees.length, hint: "등록된 모든 직원", tone: LEGACY_COLORS.blue },
@@ -144,7 +149,7 @@ export function AdminEmployeesSection() {
             />
           }
           actions={
-            <Button variant="primary" size="md" className="min-h-11" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>
+            <Button disabled={detailRead.loading || !!detailRead.error} variant="primary" size="md" className="min-h-11" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>
               직원 추가
             </Button>
           }
@@ -152,6 +157,7 @@ export function AdminEmployeesSection() {
 
         <div className="flex min-h-0 flex-1 gap-4">
           <AdminListPanel
+            read={read} skeleton={<AdminTableSkeleton columns="minmax(0,0.9fr) minmax(0,1fr) 76px" count={3} />}
             title="직원 목록"
             countLabel={`${filteredEmployees.length}명`}
             width="clamp(360px, 28vw, 440px)"
@@ -260,7 +266,7 @@ export function AdminEmployeesSection() {
                 ? "직원 추가"
                 : selectedEmployee
                   ? undefined
-                  : "직원을 선택하세요"
+                  : detailRead.loading || detailRead.error || filteredEmployees.length > 0 ? undefined : "직원을 선택하세요"
             }
             actions={
               empAddMode ? (
@@ -270,6 +276,7 @@ export function AdminEmployeesSection() {
               ) : null
             }
           >
+            <AdminReadBoundary read={{ ...detailRead, loading: detailRead.loading || (!!detailRead.managed && !detailRead.error && !selectedEmployee && !empAddMode && filteredEmployees.length > 0) }} skeleton={<AdminDetailSkeleton variant="employees" />} label="직원 상세">
             {empAddMode ? (
               <EmployeeAddInline
                 form={empAddForm}
@@ -300,6 +307,7 @@ export function AdminEmployeesSection() {
                 />
               </div>
             )}
+            </AdminReadBoundary>
           </AdminDetailCard>
         </div>
       </div>
