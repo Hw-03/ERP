@@ -1,0 +1,97 @@
+name: DEXCOWIN MES flaky diagnosis
+
+on:
+  push:
+    branches: [codex/mes-main-candidate-comparison-20261016]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mes-flaky-diagnosis-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    if: >-
+      github.ref == 'refs/heads/codex/mes-main-candidate-comparison-20261016' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'push' && contains(github.event.head_commit.message, '[mes-flaky-diagnostic]')))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+      PYTHONUTF8: "1"
+      MES_DIAG_ROOT: ${{ runner.temp }}/mes-flaky-diagnostic
+      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/mes-flaky-diagnostic/browsers
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.17"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.20.2"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Export tracked source once and instrument only runner.temp copy
+        run: >-
+          python scripts/dev/mes-flaky-diagnosis/export-source.py prepare
+          --checkout "$GITHUB_WORKSPACE" --root "$MES_DIAG_ROOT"
+
+      - name: Install locked dependencies in the native export
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv "$MES_DIAG_ROOT/venv"
+          "$MES_DIAG_ROOT/venv/bin/python" -m pip install -r "$MES_DIAG_ROOT/source/backend/requirements.txt" certifi==2026.7.22 portalocker==4.4.0 SQLAlchemy==2.0.54 > "$MES_DIAG_ROOT/artifacts/pip-install.log" 2>&1
+          "$MES_DIAG_ROOT/venv/bin/python" -m pip check > "$MES_DIAG_ROOT/artifacts/pip-check.log" 2>&1
+          echo "$MES_DIAG_ROOT/venv/bin" >> "$GITHUB_PATH"
+          cd "$MES_DIAG_ROOT/source/frontend"
+          npm ci > "$MES_DIAG_ROOT/artifacts/npm-ci.log" 2>&1
+          node node_modules/playwright/cli.js install --with-deps chromium > "$MES_DIAG_ROOT/artifacts/playwright-install.log" 2>&1
+
+      - name: Verify approved runtime versions and record environment
+        run: >-
+          "$MES_DIAG_ROOT/venv/bin/python" "$MES_DIAG_ROOT/source/scripts/dev/mes-flaky-diagnosis/environment.py"
+          --source "$MES_DIAG_ROOT/source" --output "$MES_DIAG_ROOT/artifacts/environment.json"
+
+      - name: App readiness then three original selectors with no retry
+        # Original test/expect timeout, bootstrap and seed remain intact.
+        # Each selector has at most 3 repetitions; batches run sequentially and stop on first failure.
+        run: >-
+          "$MES_DIAG_ROOT/venv/bin/python" "$MES_DIAG_ROOT/source/scripts/dev/mes-flaky-diagnosis/run.py"
+          --root "$MES_DIAG_ROOT"
+
+      - name: Always verify checkout and disposable source hashes
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          status=0
+          tool="$GITHUB_WORKSPACE/scripts/dev/mes-flaky-diagnosis/export-source.py"
+          if test -f "$MES_DIAG_ROOT/artifacts/checkout-before.json"; then
+            python "$tool" verify --checkout "$GITHUB_WORKSPACE" --manifest "$MES_DIAG_ROOT/artifacts/checkout-before.json" --output "$MES_DIAG_ROOT/artifacts/checkout-final.json" || status=1
+          fi
+          if test -f "$MES_DIAG_ROOT/artifacts/export-instrumented.json"; then
+            python "$tool" verify --checkout "$MES_DIAG_ROOT/source" --manifest "$MES_DIAG_ROOT/artifacts/export-instrumented.json" --output "$MES_DIAG_ROOT/artifacts/export-final.json" || status=1
+          fi
+          exit "$status"
+
+      - name: Always preserve trace, server logs, buffers, packet headers, PID and hash evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mes-flaky-diagnosis-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/mes-flaky-diagnostic/artifacts
+          retention-days: 7
+          if-no-files-found: warn
