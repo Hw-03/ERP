@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -37,30 +36,6 @@ export function bomRowSurfaceStyle({
   };
 }
 
-function useBomNameOverflow(itemName: string) {
-  const nameRef = useRef<HTMLSpanElement>(null);
-  const [isOverflow, setIsOverflow] = useState(false);
-
-  useLayoutEffect(() => {
-    const element = nameRef.current;
-    if (!element) return;
-
-    const check = () => setIsOverflow(element.scrollWidth > element.clientWidth);
-    check();
-
-    try {
-      const observer = new ResizeObserver(check);
-      observer.observe(element);
-      return () => observer.disconnect();
-    } catch {
-      window.addEventListener("resize", check);
-      return () => window.removeEventListener("resize", check);
-    }
-  }, [itemName]);
-
-  return { nameRef, isOverflow };
-}
-
 interface BomRowTooltipProps {
   itemName: string;
   children: (props: {
@@ -71,7 +46,7 @@ interface BomRowTooltipProps {
 }
 
 export function BomRowTooltip({ itemName, children }: BomRowTooltipProps) {
-  const { nameRef, isOverflow } = useBomNameOverflow(itemName);
+  const nameRef = useRef<HTMLSpanElement>(null);
   const [isActionActive, setIsActionActive] = useState(false);
   const actionTooltipProps: Pick<DOMAttributes<HTMLElement>,
     "onMouseEnter" | "onMouseLeave" | "onMouseOverCapture" | "onMouseOutCapture" | "onFocusCapture" | "onBlurCapture"> = {
@@ -92,7 +67,8 @@ export function BomRowTooltip({ itemName, children }: BomRowTooltipProps) {
   return (
     <Tooltip
       content={itemName}
-      disabled={!isOverflow || isActionActive}
+      disabled={isActionActive}
+      shouldShow={() => !!nameRef.current && nameRef.current.scrollWidth > nameRef.current.clientWidth}
       multiline
       triggerClassName="relative block min-w-0 w-full"
     >

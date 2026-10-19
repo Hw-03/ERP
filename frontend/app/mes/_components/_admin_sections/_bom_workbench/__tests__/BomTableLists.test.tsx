@@ -87,6 +87,23 @@ function setNameOverflow(element: HTMLElement, overflow: boolean) {
 }
 
 describe("BOM 편집 표형 목록", () => {
+  it("does not measure every item name at mount or resize before the user opens a tooltip", () => {
+    const width = vi.spyOn(Element.prototype, "scrollWidth", "get").mockReturnValue(240);
+    const clientWidth = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(120);
+    try {
+      const { container } = render(<BomParentList dept="ALL" items={Array.from({ length: 60 }, (_, i) => item({ item_id: `item-${i}` }))} allBomRows={[]} completedSet={new Set()} statusFilter="ALL" selectedId="" onSelect={vi.fn()} mode="edit" />);
+      expect(width).not.toHaveBeenCalled();
+      fireEvent(window, new Event("resize"));
+      expect(width).not.toHaveBeenCalled();
+      fireEvent.mouseEnter(container.querySelector("[data-bom-row-surface]")!.parentElement!);
+      expect(width).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole("tooltip")).toHaveTextContent("아주 긴 이름의 BOM 품목입니다");
+    } finally {
+      width.mockRestore();
+      clientWidth.mockRestore();
+    }
+  });
+
   it("상위 품목 목록에 선택 제목을 표시한다", () => {
     render(
       <BomParentList
