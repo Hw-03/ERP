@@ -380,6 +380,25 @@ def _load_quarantine_occurrences(
     return occurrences, excluded_legacy_times, excluded_category_times
 
 
+def _direct_log_department(log: TransactionLog) -> str:
+    """부서가 비어 있는 직접 처리 로그는 실제 창고 차감 효과로 출처를 확인한다."""
+
+    department = (log.department or "").strip()
+    if department:
+        return department
+    if isinstance(log.inventory_effect, list):
+        for effect in log.inventory_effect:
+            if not isinstance(effect, dict) or effect.get("scope") != "warehouse":
+                continue
+            try:
+                delta = int(effect.get("delta", 0))
+            except (TypeError, ValueError):
+                continue
+            if delta < 0:
+                return "창고"
+    return UNCLASSIFIED_LABEL
+
+
 def _occurrence_from_direct_log(
     log: TransactionLog,
     operation: InventoryOperation,
@@ -394,7 +413,7 @@ def _occurrence_from_direct_log(
         mes_code=item.mes_code,
         model_symbol=item.model_symbol or "",
         process_type_code=item.process_type_code or "",
-        department=(log.department or UNCLASSIFIED_LABEL).strip() or UNCLASSIFIED_LABEL,
+        department=_direct_log_department(log),
         reason=(log.reason_category or UNCLASSIFIED_LABEL).strip() or UNCLASSIFIED_LABEL,
         quantity=abs(int(log.quantity_change)),
         is_disused=item.legacy_item_type == "불용",
@@ -523,6 +542,11 @@ def _sort_breakdowns(
     )
 
 
+def _select_initial_category(occurrences: list[_Occurrence], category: str | None) -> list[_Occurrence]:
+    """기존 필터가 적용된 모수에서 최초 분류만 선택하며 원본은 유지한다."""
+    return [entry for entry in occurrences if category is None or entry.initial_category == category]
+
+
 def _build_breakdowns(
     occurrences: list[_Occurrence],
 ) -> tuple[
@@ -533,6 +557,7 @@ def _build_breakdowns(
     """정규화 발생을 품목·사유·부서별 건수와 수량으로 집계한다."""
 
     item_totals: dict[uuid.UUID, _Totals] = {}
+    item_occurrences: dict[uuid.UUID, list[_Occurrence]] = {}
     items_by_id: dict[uuid.UUID, _Occurrence] = {}
     reason_totals: dict[str, _Totals] = {}
     reason_labels: dict[str, str] = {}
@@ -541,6 +566,7 @@ def _build_breakdowns(
         item_total = item_totals.setdefault(occurrence.item_id, _Totals())
         item_total.record_count += 1
         item_total.quantity += occurrence.quantity
+        item_occurrences.setdefault(occurrence.item_id, []).append(occurrence)
         items_by_id.setdefault(occurrence.item_id, occurrence)
 
         reason_key = str(occurrence.reason_category_id) if occurrence.reason_category_id else occurrence.reason
@@ -561,6 +587,7 @@ def _build_breakdowns(
             mes_code=items_by_id[item_id].mes_code,
             record_count=totals.record_count,
             quantity=totals.quantity,
+            categories=_build_category_breakdown(item_occurrences[item_id]),
         )
         for item_id, totals in item_totals.items()
     ]
@@ -616,6 +643,7 @@ def _build_timeline(
         buckets = [value.isoformat() for value in dates]
         labels = {value.isoformat(): f"{value.month}/{value.day}" for value in dates}
     totals = {bucket: _Totals() for bucket in buckets}
+    bucket_occurrences: dict[str, list[_Occurrence]] = {bucket: [] for bucket in buckets}
     for occurrence in occurrences:
         occurred_date = _to_kst_date(occurrence.occurred_at)
         bucket = (
@@ -628,12 +656,14 @@ def _build_timeline(
             continue
         total.record_count += 1
         total.quantity += occurrence.quantity
+        bucket_occurrences[bucket].append(occurrence)
     return [
         DefectStatisticsTimelineEntry(
             bucket=bucket,
             label=labels[bucket],
             record_count=totals[bucket].record_count,
             quantity=totals[bucket].quantity,
+            categories=_build_category_breakdown(bucket_occurrences[bucket]),
         )
         for bucket in buckets
     ]
@@ -669,7 +699,9 @@ def get_defect_statistics(
         end_utc=end_utc,
         filters=resolved_filters,
     )
-    occurrences = quarantine_occurrences + direct_occurrences
+    source_occurrences = quarantine_occurrences + direct_occurrences
+    category_totals = _build_category_breakdown(source_occurrences)
+    occurrences = _select_initial_category(source_occurrences, filters.initial_category if filters else None)
     items, reasons, departments = _build_breakdowns(occurrences)
     return DefectStatisticsResponse(
         period=calculated_period,
@@ -684,6 +716,7 @@ def get_defect_statistics(
         reasons=reasons,
         departments=departments,
         categories=_build_category_breakdown(occurrences),
+        category_totals=category_totals,
         excluded_legacy_count=len(excluded_legacy_times),
         excluded_category_count=len(excluded_category_times),
     )
@@ -788,7 +821,7 @@ def get_defect_statistics_report(
         return DefectStatisticsReportResponse(
             period=selected, summary=empty_summary, timeline=[], items=empty_items,
             reasons=empty_reasons, departments=empty_departments,
-            categories=_build_category_breakdown([]), excluded_category_count=0,
+            categories=_build_category_breakdown([]), category_totals=_build_category_breakdown([]), excluded_category_count=0,
             excluded_legacy_count=0, as_of=as_of, observed_until=None,
             is_partial=False, comparison=None, trend=[],
         )
@@ -820,6 +853,11 @@ def get_defect_statistics_report(
     def in_range(value: datetime, start: datetime, end: datetime) -> bool:
         return start <= _utc_naive(value) < end
 
+    category_totals = _build_category_breakdown([
+        occurrence for occurrence in all_occurrences
+        if in_range(occurrence.occurred_at, selected_start, _utc_naive(observed_until))
+    ])
+    all_occurrences = _select_initial_category(all_occurrences, filters.initial_category if filters else None)
     selected_occurrences = [
         occurrence for occurrence in all_occurrences
         if in_range(occurrence.occurred_at, selected_start, _utc_naive(observed_until))
@@ -862,6 +900,7 @@ def get_defect_statistics_report(
                    if period == "month" else str(trend_period.start_date.year)),
             record_count=len(occurrences),
             quantity=sum(occurrence.quantity for occurrence in occurrences),
+            categories=_build_category_breakdown(occurrences),
             start_date=trend_period.start_date, end_date=trend_period.end_date,
             is_partial=trend_end > trend_until,
         ))
@@ -869,6 +908,7 @@ def get_defect_statistics_report(
         period=selected, summary=summary, timeline=timeline, items=items,
         reasons=reasons, departments=departments,
         categories=_build_category_breakdown(selected_occurrences),
+        category_totals=category_totals,
         excluded_category_count=sum(
             in_range(value, selected_start, _utc_naive(observed_until))
             for value in excluded_category_times

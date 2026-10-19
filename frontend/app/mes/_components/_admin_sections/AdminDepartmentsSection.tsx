@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Building2, Plus, Save, X } from "lucide-react";
+import { Building2, Plus, Save, Users, X } from "lucide-react";
 import {
   api,
   type DepartmentMaster,
@@ -29,6 +29,10 @@ import { useRegisterDirty, useLocalDirtyGuard } from "@/lib/ui/dirty-guard";
 import { deptColor } from "./_department_parts/departmentColors";
 import { DeptAddForm } from "./_department_parts/DeptAddForm";
 import { DeptDetailView } from "./_department_parts/DeptDetailView";
+import styles from "./AdminDepartmentsSection.module.css";
+import masterStyles from "./_admin_primitives/AdminMasterData.module.css";
+import { AdminReadBoundary, useAdminReadState } from "./_admin_primitives/AdminReadState";
+import { AdminDetailSkeleton, AdminTableSkeleton } from "./_admin_primitives/AdminSkeleton";
 
 interface Props {
   employees: Employee[];
@@ -47,6 +51,8 @@ export function AdminDepartmentsSection({
   onStatusChange,
   onError,
 }: Props) {
+  const read = useAdminReadState("departments", "employees");
+  const detailRead = useAdminReadState("departments", "employees", "items");
   const {
     departments,
     addName,
@@ -180,6 +186,7 @@ export function AdminDepartmentsSection({
           title="부서 관리"
           summary={
             <AdminKpiBar
+              loading={read.loading} unavailable={!!read.error}
               placement="header"
               items={[
                 { key: "all", label: "전체 부서", value: departments.length, hint: "등록된 부서 수", tone: LEGACY_COLORS.blue },
@@ -189,36 +196,37 @@ export function AdminDepartmentsSection({
             />
           }
           actions={
-            <Button variant="primary" size="md" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>
+            <Button disabled={detailRead.loading || !!detailRead.error} variant="primary" size="md" className="min-h-11" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>
               부서 추가
             </Button>
           }
         />
 
-        <div className="flex min-h-0 flex-1 gap-4">
+        <div className={`flex min-h-0 flex-1 gap-4 ${styles.workspace}`}>
           <AdminListPanel
+            read={read} skeleton={<AdminTableSkeleton columns="minmax(0,0.9fr) minmax(0,1fr) 88px" count={3} />}
             title="부서 목록"
             countLabel={`${filteredDepartments.length}개`}
-            width={336}
+            width="clamp(360px, 28vw, 440px)"
             searchValue={search}
             searchPlaceholder="부서명 검색"
             onSearchChange={setSearch}
             filters={
               <>
-                <FilterChip active={statusFilter === "all"} label="전체" onClick={() => setStatusFilter("all")} size="sm" />
-                <FilterChip active={statusFilter === "active"} label="사용 중" onClick={() => setStatusFilter("active")} size="sm" tone={LEGACY_COLORS.green} />
-                <FilterChip active={statusFilter === "inactive"} label="비활성" onClick={() => setStatusFilter("inactive")} size="sm" />
+                <FilterChip active={statusFilter === "all"} label="전체" onClick={() => setStatusFilter("all")} size="sm" className="min-h-11 flex-1" />
+                <FilterChip active={statusFilter === "active"} label="사용 중" onClick={() => setStatusFilter("active")} size="sm" className="min-h-11 flex-1" tone={LEGACY_COLORS.green} />
+                <FilterChip active={statusFilter === "inactive"} label="비활성" onClick={() => setStatusFilter("inactive")} size="sm" className="min-h-11 flex-1" />
               </>
             }
             listRole="grid"
             listAriaLabel="부서 목록"
-            listClassName="flex min-h-0 flex-1 flex-col overflow-y-auto pr-0.5"
+            externalScrollbar
             listHeader={
               <div
                 data-admin-list-header="departments"
                 role="row"
-                className="sticky top-0 z-10 grid grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_88px] border-b px-3 py-2 text-[11px] font-bold tracking-[0.08em]"
-                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+                className={`sticky top-0 z-10 grid grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_88px] border-b px-3 py-2 text-[12px] font-bold ${masterStyles.tableHeader}`}
+                style={{ background: "var(--c-inventory-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
               >
                 <span role="columnheader">부서명</span>
                 <span role="columnheader">코드·소속 직원</span>
@@ -251,11 +259,8 @@ export function AdminDepartmentsSection({
                   }}
                   aria-selected={active}
                   tabIndex={0}
-                  className="grid w-full grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_88px] items-center border-b px-3 py-2 text-left transition-colors duration-150 hover:bg-[var(--c-s4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30"
+                  className={`grid w-full grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_88px] items-center border-b px-3 py-2 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[color:var(--c-blue)]/30 ${masterStyles.tableRow}`}
                   style={{
-                    background: active
-                      ? `color-mix(in srgb, ${color} 14%, transparent)`
-                      : undefined,
                     borderColor: LEGACY_COLORS.border,
                     opacity: dept.is_active ? 1 : 0.65,
                   }}
@@ -269,8 +274,9 @@ export function AdminDepartmentsSection({
                       {dept.display_name ?? dept.name}
                     </div>
                   </div>
-                  <div role="gridcell" className="truncate text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                    DPT-{String(dept.id).padStart(2, "0")} · {empCount}명
+                  <div role="gridcell" className="min-w-0 text-[12px] leading-4" style={{ color: LEGACY_COLORS.muted2 }}>
+                    <div className="tabular-nums">DPT-{String(dept.id).padStart(2, "0")}</div>
+                    <div className="mt-0.5 flex items-center gap-1"><Users size={12} aria-hidden="true" />{empCount}명</div>
                   </div>
                   <div role="gridcell" className="flex justify-center">
                     <StatusPill label={dept.is_active ? "사용 중" : "비활성"} tone={dept.is_active ? "success" : "neutral"} showDot maxWidth={84} />
@@ -281,42 +287,34 @@ export function AdminDepartmentsSection({
           />
 
           <AdminDetailCard
+            selectionKey={detailRead.loading ? undefined : addMode ? "add" : selectedDept?.id}
             title={
               addMode
                 ? "새 부서 추가"
                 : selectedDept
-                  ? selectedDept.display_name ?? selectedDept.name
-                  : "부서를 선택하세요"
-            }
-            subtitle={
-              !addMode && selectedDept ? `DPT-${String(selectedDept.id).padStart(2, "0")}` : undefined
-            }
-            status={
-              !addMode && selectedDept ? (
-                <StatusPill
-                  label={selectedDept.is_active ? "사용 중" : "비활성"}
-                  tone={selectedDept.is_active ? "success" : "neutral"}
-                />
-              ) : null
+                  ? undefined
+                  : detailRead.loading || detailRead.error || filteredDepartments.length > 0 ? undefined : "부서를 선택하세요"
             }
             actions={
               addMode ? (
                 <Button variant="secondary" size="sm" iconLeft={<X className="h-3.5 w-3.5" />} onClick={() => setAddMode(false)}>
                   취소
                 </Button>
-              ) : selectedDept ? (
-                <Button variant="primary" size="md" className="h-11 min-w-[88px]" iconLeft={<Save className="h-4 w-4" />} onClick={() => deptSaveRef.current?.()}>
-                  저장
-                </Button>
               ) : null
             }
           >
+            <AdminReadBoundary read={{ ...detailRead, loading: detailRead.loading || (!!detailRead.managed && !detailRead.error && !selectedDept && !addMode && filteredDepartments.length > 0) }} skeleton={<AdminDetailSkeleton variant="departments" />} label="부서 상세">
             {addMode ? (
               <DeptAddForm value={addName} onChange={setAddName} onSubmit={handleSubmitAdd} />
             ) : selectedDept ? (
               <DeptDetailView
                 key={selectedDept.id}
                 dept={selectedDept}
+                headerActions={
+                  <Button variant="primary" size="md" className="h-11 min-w-[88px]" iconLeft={<Save className="h-4 w-4" />} onClick={() => deptSaveRef.current?.()}>
+                    저장
+                  </Button>
+                }
                 adminPin={adminPin}
                 empCount={empCountByDept.get(normalizeDepartment(selectedDept.name)) ?? 0}
                 itemCount={itemCountByDept.get(normalizeDepartment(selectedDept.name)) ?? 0}
@@ -342,6 +340,7 @@ export function AdminDepartmentsSection({
                 />
               </div>
             )}
+            </AdminReadBoundary>
           </AdminDetailCard>
         </div>
       </div>

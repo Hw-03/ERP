@@ -32,6 +32,7 @@ import { useStocktakeMenuVisibility } from "./stocktake/useStocktakeMenuVisibili
 import { StocktakeLoadingSkeleton } from "./stocktake/StocktakeLoadingSkeleton";
 import { useAppearancePreferences } from "./useAppearancePreferences";
 import { useCurrentOperator } from "./login/useCurrentOperator";
+import { AccessRevocationGuard } from "./common/AccessRevocationGuard";
 import {
   WeeklyWeekPicker,
   getWeekStartMonday,
@@ -130,7 +131,7 @@ function DesktopMesShellInner({
     () => filterVisibleSidebarTabs(SIDEBAR_TAB_IDS, operator, stocktakeMenu),
     [operator, stocktakeMenu],
   );
-  const fallbackTab = visibleTabs[0] ?? "dashboard";
+  const fallbackTab: DesktopTabId = visibleTabs[0] ?? "settings";
   const canOpenTab = useCallback(
     (tab: DesktopTabId) => tab === "settings" || visibleTabs.includes(tab),
     [visibleTabs],
@@ -303,7 +304,7 @@ function DesktopMesShellInner({
   useEffect(() => {
     // A menu change must not unmount an admitted draft before its save/receipt guard completes.
     if (activeTab === "stocktake" && stocktakeAccessPending) return;
-    if (activeTab === "stocktake" && retainStocktake && !canOpenStocktake) return;
+    if (operator && !canOpenTab(activeTab)) return;
     // A responsive remount can briefly see the previous shell's App Router snapshot.
     // The address-bar URL is authoritative for restoring the active desktop tab.
     const currentParams = new URLSearchParams(window.location.search);
@@ -348,16 +349,7 @@ function DesktopMesShellInner({
     }
 
     setDefectDeptFilter(canOpenTab("defect") ? dept : null);
-  }, [searchParams, activeTab, canOpenTab, fallbackTab, router, commitDesktopTab, confirmAdminNavigation, retainStocktake, canOpenStocktake, stocktakeAccessPending]);
-
-  useEffect(() => {
-    if (activeTab !== "stocktake" || !retainStocktake || canOpenStocktake || stocktakeAccessPending) return;
-    let live = true;
-    void flushDirtyEntries().then(() => {
-      if (live) commitDesktopTab(fallbackTab, { navigation: "replace" });
-    }).catch(() => {});
-    return () => { live = false; };
-  }, [activeTab, retainStocktake, canOpenStocktake, flushDirtyEntries, commitDesktopTab, fallbackTab, stocktakeAccessPending]);
+  }, [searchParams, activeTab, canOpenTab, fallbackTab, router, commitDesktopTab, confirmAdminNavigation, operator, stocktakeAccessPending]);
 
   useEffect(() => {
     if (activeTab !== "warehouseMap" && warehouseMapFullscreen) {
@@ -600,6 +592,7 @@ function DesktopMesShellInner({
               icon={activeMeta.icon}
               iconColor={DESKTOP_TAB_ICON_COLORS[activeTab]}
               onRefresh={() => {
+                if (!canOpenTab(activeTab)) return;
                 confirmAdminNavigation(() => {
                   setRefreshNonce((current) => current + 1);
                   void refetchCapacity();
@@ -609,7 +602,7 @@ function DesktopMesShellInner({
               status={status}
               statusNonce={statusNonce}
               titleAddon={
-                activeTab === "weekly" ? (
+                !canOpenTab(activeTab) ? undefined : activeTab === "weekly" ? (
                   <WeeklyWeekPicker weekMon={weekMon} onChange={setWeekMon} />
                 ) : activeTab === "dailyReport" ? dailyReportTopbarControls : undefined
               }
@@ -625,11 +618,13 @@ function DesktopMesShellInner({
                 data-active-tab={activeTab}
                 className="animate-desktop-navigation-enter flex min-h-0 min-w-0 flex-1"
               >
+                <AccessRevocationGuard allowed={!operator || canOpenTab(activeTab) || (activeTab === "stocktake" && stocktakeAccessPending)} onLeave={() => commitDesktopTab(fallbackTab, { navigation: "replace" })}>
                 {activeTab === "dashboard" || activeTab === "history" ? (
                   <DesktopDataTransition ready={activeTab === contentTab} tab={activeTab}>
                     {content}
                   </DesktopDataTransition>
                 ) : content}
+                </AccessRevocationGuard>
               </div>
             </div>
           </div>

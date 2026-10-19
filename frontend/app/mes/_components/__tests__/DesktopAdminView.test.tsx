@@ -8,10 +8,7 @@ const state = vi.hoisted(() => ({
   searchString: "tab=admin",
   selectSection: vi.fn(),
   routerReplace: vi.fn(),
-  loading: false,
-  hasData: true,
-  loadError: null as string | null,
-  loadData: vi.fn().mockResolvedValue(undefined),
+  confirmNavigation: vi.fn((next: () => void) => next()),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -23,7 +20,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/ui/dirty-guard", () => ({
-  useConfirmNavigation: () => (next: () => void) => next(),
+  useConfirmNavigation: () => state.confirmNavigation,
 }));
 
 vi.mock("../_admin_hooks/useAdminViewState", () => ({
@@ -81,32 +78,7 @@ describe("DesktopAdminView", () => {
     state.searchString = "tab=admin";
     state.selectSection.mockReset();
     state.routerReplace.mockReset();
-    state.loading = false;
-    state.hasData = true;
-    state.loadError = null;
-    state.loadData.mockClear();
-  });
-
-  it("최초 관리자 조회 중에는 로딩을 표시하고 빈 본문을 숨긴다", () => {
-    state.loading = true;
-    state.hasData = false;
-    render(<DesktopAdminView globalSearch="" onStatusChange={vi.fn()} />);
-    expect(screen.getByRole("status", { name: "관리자 데이터를 불러오는 중" })).toBeInTheDocument();
-    expect(screen.queryByText("관리자 본문")).not.toBeInTheDocument();
-  });
-
-  it("첫 오류는 본문 없이 재시도하며 성공한 기존 본문은 갱신 오류에도 유지한다", () => {
-    state.hasData = false;
-    state.loadError = "직원 조회 실패";
-    const { rerender } = render(<DesktopAdminView globalSearch="" onStatusChange={vi.fn()} />);
-    expect(screen.getByText(/직원 조회 실패/)).toBeInTheDocument();
-    expect(screen.queryByText("관리자 본문")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
-    expect(state.loadData).toHaveBeenCalledTimes(1);
-    state.hasData = true;
-    rerender(<DesktopAdminView globalSearch="" onStatusChange={vi.fn()} />);
-    expect(screen.getByText("관리자 본문")).toBeInTheDocument();
-    expect(screen.getByText(/기존 내용을 표시합니다/)).toBeInTheDocument();
+    state.confirmNavigation.mockReset().mockImplementation((next: () => void) => next());
   });
 
   it("고정 관리자 사이드 메뉴 대신 상단 섹션 탭을 렌더링한다", () => {
@@ -114,6 +86,16 @@ describe("DesktopAdminView", () => {
 
     expect(screen.getByRole("navigation", { name: "관리자 섹션" })).toBeInTheDocument();
     expect(screen.getByText("관리자 본문")).toBeInTheDocument();
+  });
+
+  it("keeps the current screen when the unsaved-change guard does not authorize entry", () => {
+    state.confirmNavigation.mockImplementation(() => {});
+    render(<DesktopAdminView globalSearch="" onStatusChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "품목 관리", exact: true }));
+    expect(state.confirmNavigation).toHaveBeenCalledOnce();
+    expect(state.selectSection).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("admin-section-entry-cover")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "모델 관리", exact: true })).toHaveAttribute("aria-current", "page");
   });
 
   it("요약 바의 상단 여백을 16px로 유지하도록 작업 영역에 4px 패딩을 적용한다", () => {

@@ -15,13 +15,13 @@ export function DetailCardSlot({
 }) {
   return (
     <div
-      className={`rounded-[14px] border p-4 ${className ?? ""}`}
-      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+      className={`flex min-w-0 flex-col rounded-[16px] border p-5 ${className ?? ""}`}
+      style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}
     >
       <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
         <span
-          className="text-[12px] font-black tracking-[0.12em]"
-          style={{ color: LEGACY_COLORS.muted2 }}
+          className="text-[16px] font-bold"
+          style={{ color: LEGACY_COLORS.text }}
         >
           {title}
         </span>
@@ -80,7 +80,7 @@ export function TextInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full rounded-[10px] border px-3 py-2 text-[14px] outline-none focus-visible:border-[var(--c-blue)] focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/20"
+      className="min-h-11 w-full rounded-[12px] border px-3 py-2 text-[14px] outline-none focus-visible:border-[var(--c-blue)] focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/20"
       style={{
         background: LEGACY_COLORS.s1,
         borderColor: LEGACY_COLORS.border,
@@ -107,6 +107,7 @@ export function SelectInput({
       onChange={onChange}
       options={options}
       size="md"
+      triggerClassName="min-h-11"
       triggerAriaLabel={triggerAriaLabel}
       triggerStyle={{ background: LEGACY_COLORS.s1 }}
     />

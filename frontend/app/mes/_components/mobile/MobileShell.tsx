@@ -33,6 +33,7 @@ import { sendClientEvent } from "@/lib/client-events";
 import { setAuditScreen } from "@/lib/activity-audit-context";
 import { CapacityDetailModal } from "../CapacityDetailModal";
 import { useCurrentOperator } from "../login/useCurrentOperator";
+import { AccessRevocationGuard } from "../common/AccessRevocationGuard";
 import { useNotificationController } from "../notifications/useNotificationController";
 import { NotificationDialog } from "../notifications/NotificationDialog";
 import { canSeeWorkType } from "../_warehouse_v2/ioWorkType";
@@ -321,7 +322,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange, recoveryContent, onRec
     () => TAB_BAR_IDS.filter((tab) => canOpenMobileTab(tab)),
     [canOpenMobileTab],
   );
-  const fallbackTab = visibleTabs[0] ?? "dashboard";
+  const fallbackTab = visibleTabs[0] ?? "more";
   const admittedStocktakeEmployee = useRef<string | null>(null);
   const canOpenStocktake = canOpenMobileTab("stocktake");
   const stocktakeAccessPending = stocktakeMenuQuery.isLoading && !!operator && !canOpenStocktake;
@@ -336,20 +337,6 @@ function MobileShellInner({ onBeforeViewportSwitchChange, recoveryContent, onRec
     ],
     [operator, stocktakeMenu],
   );
-
-  useEffect(() => {
-    if (!operator) return;
-    if (activeTab === "stocktake" && stocktakeAccessPending) return;
-    if (!canOpenMobileTab(activeTab)) {
-      if (activeTab === "stocktake" && retainStocktake) {
-        let live = true;
-        void flushStocktake().then(() => { if (live) commitMobileTab(fallbackTab); }).catch(() => {});
-        return () => { live = false; };
-      }
-      commitMobileTab(fallbackTab);
-      if (activeTab === "defect") setDefectDeptFilter(null);
-    }
-  }, [activeTab, canOpenMobileTab, commitMobileTab, fallbackTab, operator, retainStocktake, flushStocktake, stocktakeAccessPending]);
 
   const handleTabChange = useCallback((tab: MobileTabId, notification?: NotificationNavigationTarget) => {
     if (activeTab === "shipping" && shippingBusyRef.current) return;
@@ -543,7 +530,6 @@ function MobileShellInner({ onBeforeViewportSwitchChange, recoveryContent, onRec
     if (recoveryContent) return recoveryContent;
     const key = `${activeTab}-${refreshNonce}`;
     if (activeTab === "stocktake" && stocktakeAccessPending && !retainStocktake) return <StocktakeLoadingSkeleton variant="mobile" />;
-    if (!canOpenMobileTab(activeTab) && !retainStocktake) return null;
     if (activeTab === "dashboard") {
       return (
         <MobileDashboardScreen
@@ -674,7 +660,14 @@ function MobileShellInner({ onBeforeViewportSwitchChange, recoveryContent, onRec
 
         <main className={`relative min-h-0 min-w-0 flex-1 overflow-hidden flex pt-5 ${activeTab === "weekly" || activeTab === "warehouseMap" ? "" : presentation.scope}`} data-testid="screen-root">
           <h1 className="sr-only">{TAB_META[activeTab].label} — DEXCOWIN MES</h1>
-          {content}
+          <AccessRevocationGuard key={activeTab} allowed={!operator || canOpenMobileTab(activeTab) || (activeTab === "stocktake" && stocktakeAccessPending)} beforeLeave={activeTab === "warehouse" || activeTab === "dailyReport" ? async () => {
+            if (activeTab === "warehouse") {
+              if (warehouseDirtyRef.current && !warehouseFlushRef.current) throw new Error("작성 중인 내용을 보존할 수 없습니다.");
+              await warehouseFlushRef.current?.();
+            } else if (activeTab === "dailyReport") await dailyReportFlushRef.current?.();
+          } : undefined} onLeave={() => { commitMobileTab(fallbackTab); if (activeTab === "defect") setDefectDeptFilter(null); }}>
+            {content}
+          </AccessRevocationGuard>
         </main>
 
         <nav

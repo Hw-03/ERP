@@ -1,0 +1,84 @@
+.workspace {
+  min-width: 0;
+}
+
+.detailHeader {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.metaGrid {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.nameField,
+.metaCell {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--c-border);
+  border-radius: 16px;
+  background: var(--c-bg);
+}
+
+.detailSection {
+  flex-basis: auto;
+  flex-shrink: 0;
+  border-radius: 16px;
+  background: var(--c-bg);
+}
+
+.detailSectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--c-text);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.detailSectionTitle svg {
+  width: 20px;
+  height: 20px;
+  color: var(--c-blue);
+}
+
+.employees {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.employee {
+  padding: 10px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  background: var(--c-s1);
+}
+
+.dangerActions {
+  padding-top: 12px;
+  border-top: 1px solid var(--c-border);
+}
+
+.dangerActions button {
+  min-height: 44px;
+  font-size: 14px;
+}
+
+.palette {
+  grid-template-columns: repeat(9, 44px);
+}
+
+@media (max-width: 1279px) {
+  .metaGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 1199px) {
+  .palette { grid-template-columns: repeat(6, 44px); }
+}

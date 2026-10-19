@@ -105,6 +105,14 @@ afterEach(() => {
 });
 
 describe("invalidateOperationalQueries", () => {
+  it("검색 설정 실패와 관계없이 로그인 직원 정보부터 갱신한다", async () => {
+    const client = makeClient();
+    client.setQueryData(queryKeys.itemSearch.config(), { version: "v1", synonym_groups: [], item_aliases: {} });
+    vi.mocked(itemSearchApi.getConfig).mockRejectedValueOnce(new Error("검색 설정 실패"));
+    const refresh = vi.spyOn(client, "refetchQueries").mockResolvedValue();
+    expect(await invalidateOperationalQueries(client)).toBe(false);
+    expect(refresh).toHaveBeenCalledWith({ queryKey: queryKeys.employees.all, type: "active" });
+  });
   it("검색 설정을 먼저 갱신한 뒤 운영 결과를 무효화한다", async () => {
     const client = makeClient();
     client.setQueryData(queryKeys.itemSearch.config(), { version: "v1", synonym_groups: [], item_aliases: {} });

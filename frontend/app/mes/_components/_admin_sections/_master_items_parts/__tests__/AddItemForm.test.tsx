@@ -9,7 +9,7 @@ vi.mock("../../AdminMasterItemsContext", () => ({
     setAddMode: vi.fn(),
     addForm: {
       item_name: "",
-      process_type_code: "TR",
+      process_type_code: "TF",
       unit: "EA",
       model_slots: [],
       sales_review_required: false,
@@ -52,14 +52,14 @@ describe("AddItemForm", () => {
   it("selecting AF defaults sales review to required", () => {
     render(<AddItemForm />);
 
-    fireEvent.click(screen.getAllByRole("combobox")[0]);
-    fireEvent.mouseDown(screen.getByRole("option", { name: "AF — 조립 공정완료" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "부서" }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "조립 (A)", exact: true }));
 
     const updater = setAddForm.mock.calls[0][0] as (form: {
       process_type_code: string;
       sales_review_required: boolean;
     }) => { process_type_code: string; sales_review_required: boolean };
-    expect(updater({ process_type_code: "TR", sales_review_required: false })).toEqual({
+    expect(updater({ process_type_code: "TF", sales_review_required: false })).toEqual({
       process_type_code: "AF",
       sales_review_required: true,
     });

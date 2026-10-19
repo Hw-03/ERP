@@ -4,8 +4,8 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { DEPT_LETTERS, DEPT_LETTER_TO_NAME, deptColor, type BomDeptFilter } from "./bomDept";
 
 /**
- * 부서탭 7개 — 전체 + 튜브/고압/진공/튜닝/조립/출하. 활성탭은 부서 색상으로 채워짐.
- * "전체"는 muted2 색상 사용.
+ * 상위 품목의 단계 필터 옆에 놓는 부서 필터. 활성 버튼은 부서 색상으로 채운다.
+ * "전체"는 공통 선택 색상을 사용한다.
  */
 interface Props {
   value: BomDeptFilter;
@@ -19,28 +19,24 @@ export function BomDeptTabs({ value, onChange }: Props) {
   ];
 
   return (
-    <div data-testid="bom-department-filters" className="flex min-h-[58px] flex-wrap items-center gap-2">
+    <div role="group" aria-label="상위 품목 부서 필터" data-testid="bom-department-filters" className="ml-1.5 flex shrink-0 items-center gap-1.5 border-l pl-3" style={{ borderColor: LEGACY_COLORS.border }}>
       {chips.map((chip) => {
         const active = chip.letter === value;
         const isAll = chip.letter === "ALL";
-        const color = isAll ? LEGACY_COLORS.muted2 : deptColor(chip.letter as Exclude<BomDeptFilter, "ALL">);
+        const color = isAll ? LEGACY_COLORS.blue : deptColor(chip.letter as Exclude<BomDeptFilter, "ALL">);
         return (
           <button
             key={chip.letter}
             type="button"
             onClick={() => onChange(chip.letter)}
             aria-pressed={active}
-            className="flex h-11 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors"
+            className="whitespace-nowrap rounded-md border px-2 py-1 text-xs font-semibold transition-colors"
             style={{
               background: active ? color : LEGACY_COLORS.s1,
-              color: active ? LEGACY_COLORS.white : LEGACY_COLORS.text,
-              borderColor: active ? color : LEGACY_COLORS.border,
+              color: active ? LEGACY_COLORS.white : isAll ? LEGACY_COLORS.text : color,
+              borderColor: active ? color : isAll ? LEGACY_COLORS.border : `color-mix(in srgb, ${color} 35%, transparent)`,
             }}
           >
-            <span
-              className="inline-block h-1.5 w-1.5 rounded-full"
-              style={{ background: active ? LEGACY_COLORS.white : color, opacity: active ? 0.8 : 1 }}
-            />
             {chip.name}
           </button>
         );

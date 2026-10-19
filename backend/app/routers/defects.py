@@ -49,6 +49,7 @@ from app._evt import emit as _evt_emit
 from app._actor import set_actor
 from app.repositories import item_repository
 from app.schemas.defect_statistics import (
+    DefectStatisticsCategory,
     DefectStatisticsFilters,
     DefectStatisticsPeriodKind,
     DefectStatisticsResponse,
@@ -659,6 +660,7 @@ def get_statistics(
     process_step: Optional[List[str]] = Query(None),
     reason: str | None = Query(None),
     reason_category_id: uuid.UUID | None = Query(None),
+    initial_category: DefectStatisticsCategory | None = Query(None),
     db: Session = Depends(get_db),
 ):
     """KST 달력 기준 불량 발생 통계를 주간·월간·연간으로 반환한다."""
@@ -672,6 +674,7 @@ def get_statistics(
             process_steps=tuple(process_step or ()),
             reason=reason,
             reason_category_id=reason_category_id,
+            initial_category=initial_category,
         ),
     )
 
@@ -686,6 +689,7 @@ def get_statistics_report(
     reason: str | None = Query(None),
     reason_category_id: uuid.UUID | None = Query(None),
     item_id: uuid.UUID | None = Query(None),
+    initial_category: DefectStatisticsCategory | None = Query(None),
     db: Session = Depends(get_db),
 ) -> DefectStatisticsReportResponse:
     """KST 관측 범위·직전 기간·추세가 포함된 불량 발생 보고서를 반환한다."""
@@ -701,6 +705,7 @@ def get_statistics_report(
             reason=reason,
             reason_category_id=reason_category_id,
             item_id=item_id,
+            initial_category=initial_category,
         ),
     )
 

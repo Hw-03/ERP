@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import type { AppNotification } from "@/lib/api/types";
-import { useRegisterDirty } from "@/lib/ui/dirty-guard";
+import { SIDEBAR_TAB_IDS } from "../../tabAccess";
 import { useShippingNavigation } from "../shipping/useShippingNavigation";
 
 const setAuditScreen = vi.hoisted(() => vi.fn());
@@ -527,6 +527,29 @@ describe("MobileShell layout", () => {
     flushWarehouseDraft.mockReset().mockResolvedValue(undefined);
     vi.mocked(sendClientEvent).mockClear();
     setAuditScreen.mockClear();
+  });
+
+  it("입출고 메뉴 회수 시 모바일 임시저장이 끝날 때까지 본문을 유지한다", async () => {
+    let finish!: () => void;
+    flushWarehouseDraft.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
+    const view = render(<MobileShell />);
+    fireEvent.click(screen.getByRole("button", { name: "입출고", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "mark warehouse dirty" }));
+    state.operator.hidden_sidebar_tabs = ["warehouse", "defect"];
+    view.rerender(<MobileShell />);
+    expect(screen.getByText("warehouse screen").closest("[inert]")).toBeInTheDocument();
+    await waitFor(() => expect(flushWarehouseDraft).toHaveBeenCalledOnce());
+    await act(async () => finish());
+    await waitFor(() => expect(screen.getByText("dashboard screen")).toBeInTheDocument());
+  });
+
+  it("허용 메뉴가 전부 회수되면 더보기로 이동한다", async () => {
+    const view = render(<MobileShell />);
+    state.operator.hidden_sidebar_tabs = [...SIDEBAR_TAB_IDS];
+    stocktakeMenuState.data = { enabled: false, employee_visible: false, participant_departments: [], participant_count: 0 };
+    view.rerender(<MobileShell />);
+    await waitFor(() => expect(screen.getByTestId("more-entry-order")).toBeInTheDocument());
+    expect(screen.queryByText("dashboard screen")).not.toBeInTheDocument();
   });
 
   it("does not render the old mobile top header controls", () => {

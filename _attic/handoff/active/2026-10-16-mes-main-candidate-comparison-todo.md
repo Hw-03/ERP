@@ -1,16 +1,16 @@
 # 개발서버·병합 후보 비교 검증
 
-## 2026-10-19 최신 main → 후보 통합: 완료 0 / 전체 5
+## 2026-10-19 최신 main → 후보 통합: 완료 4 / 전체 5
 
 승인 계획: [후보 통합 실행](../../../docs/superpowers/plans/2026-10-19-mes-candidate-main-integration.md). 기존 미확정 원인의 추가 진단은 중단하고 아래 통합을 진행한다. 과거 미확정 기록은 해결로 승격하지 않는다.
 
-- [ ] CP0 기존 변경·후보 DB 보존과 선행 커밋, 후보 서버 중지.
-- [ ] CP1 최신 main을 후보에 병합하고 양쪽 계약 보존.
-- [ ] CP2 관련 자동 검사·DB 사본·타입·정적·production 빌드.
-- [ ] CP3 격리 브라우저 확인·사용자 자료 보존·후보 서버 복원.
+- [x] CP0 (2026-10-19) 기존 변경·후보 DB 보존과 선행 커밋76133d5e/b34ae8ac/217c6ce0/e9f98f19, 후보 서버 중지.
+- [x] CP1 (2026-10-19) main9824903e의 충돌 통합·읽기 전용 계약 리뷰. merge commit은 검증 후 작성.
+- [x] CP2 (2026-10-20) 관련 자동 검사·DB 사본·타입·정적·production 빌드·승인3.30MiB 번들 게이트 통과. bundle-approved.log.
+- [x] CP3 (2026-10-19) 격리 production에서 OR 검색·창고 격리/복귀/취소·관리자 BOM 저장/취소 확인. 사용자 원 DB 해시 불변·3038 production 복원.
 - [ ] CP4 후보 브랜치 푸시·최종 CI·결과 기록.
 
-현재 후보63d4ed59, 통합 main9824903e. 원문 `_attic/runtime/integration-main-20261019/preflight.json`. main·직원·예약은 변경하지 않는다.
+2026-10-20 사용자 승인으로3.30MiB 한도 적용, 실제3.271MiB 게이트 통과. CP4 병합 커밋·후보 push·CI 진행. 원문 `_attic/runtime/integration-main-20261019/`. 백엔드375·관련 프론트·타입/ESLint/production 빌드/DB 사본 보존 통과. 원 사용자3038/8038은 기존 DB로 production 복원했고 임시 QA3039는 종료했다. main·직원·예약은 변경하지 않는다. 상세: [통합 결과](../../../docs/superpowers/plans/2026-10-19-mes-candidate-main-integration-results.md).
 
 ## 2026-10-19 관측 신뢰성 보완: 완료 5 / 전체 5, 과거 제품 원인 미확정
 

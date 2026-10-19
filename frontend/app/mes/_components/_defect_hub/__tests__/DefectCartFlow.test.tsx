@@ -125,8 +125,8 @@ afterEach(() => {
 
 describe("DefectCartFlow", () => {
   it.each([
-    ["production", "부서 가용", "4EA"],
-    ["warehouse", "창고 가용", "7EA"],
+    ["production", "부서 가용 재고", "4EA"],
+    ["warehouse", "창고 가용 재고", "7EA"],
   ] as const)("격리 요약은 %s 출처의 예약을 뺀 가용과 사유 합계를 구분한다", (source, label, available) => {
     const item = makeItem({ item_id: "summary-stock", mes_code: "3-AR-9001", item_name: "요약 품목", warehouse_qty: 10, pending_quantity: 3,
       locations: [{ department: "조립", status: "PRODUCTION", quantity: 5, pending_quantity: 1, available_quantity: 4 }] });
@@ -139,6 +139,8 @@ describe("DefectCartFlow", () => {
     fireEvent.change(screen.getByRole("spinbutton", { name: "수량", exact: true }), { target: { value: "2" } });
     fireEvent.click(screen.getByRole("button", { name: "다른 사유 추가", exact: true }));
     expect(within(summary).getAllByRole("definition").map((node) => node.textContent)).toEqual([available, "3EA", "2건"]);
+    fireEvent.click(screen.getByRole("button", { name: "요약 품목 사유 2 삭제", exact: true }));
+    expect(within(summary).getAllByRole("definition").map((node) => node.textContent)).toEqual([available, "2EA", "1건"]);
   });
 
   it.each(["scrap", "rework"] as const)("%s는 같은 품목에 다른 사유를 추가하고 삭제·단계 왕복에도 나머지 입력을 보존한다", async (action) => {
@@ -150,6 +152,8 @@ describe("DefectCartFlow", () => {
     await selectReasonCategory();
     fireEvent.change(screen.getByRole("textbox", { name: "메모" }), { target: { value: "첫 사유 보존" } });
     fireEvent.click(screen.getByRole("button", { name: "다른 사유 추가", exact: true }));
+    expect(screen.getAllByLabelText("품목 수량 요약")).toHaveLength(1);
+    expect(within(screen.getByLabelText("품목 수량 요약")).getAllByRole("definition").map((node) => node.textContent)).toEqual(["100EA", "3EA", "2건"]);
     expect(screen.getAllByRole("spinbutton", { name: "수량", exact: true }).map((e) => (e as HTMLInputElement).value)).toEqual(["2", "1"]);
     expect(screen.getAllByRole("textbox", { name: "메모" }).map((e) => (e as HTMLTextAreaElement).value)).toEqual(["첫 사유 보존", ""]);
     expect(screen.getAllByRole("spinbutton", { name: "수량", exact: true })[1]).toHaveFocus();
@@ -225,6 +229,7 @@ describe("DefectCartFlow", () => {
     fireEvent.click(screen.getByRole("button", { name: "BOM 확인 →", exact: true }));
     const firstBom = screen.getByRole("group", { name: "완제품 사유 1 BOM", exact: true });
     const secondBom = screen.getByRole("group", { name: "완제품 사유 2 BOM", exact: true });
+    expect(within(screen.getByLabelText("품목 수량 요약")).getAllByRole("definition").map((node) => node.textContent)).toEqual(["100EA", "2EA", "2건"]);
     fireEvent.change(await within(firstBom).findByLabelText("하위 품목 격리 수량"), { target: { value: "1" } });
     fireEvent.change(await within(secondBom).findByLabelText("하위 품목 폐기 수량"), { target: { value: "2" } });
     expect(screen.getByRole("button", { name: "즉시 재작업 (2건) →", exact: true })).toBeDisabled();
@@ -1206,7 +1211,7 @@ describe("DefectCartFlow", () => {
     );
 
 
-    expect(screen.getByRole("columnheader", { name: "부서 가용" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "부서 가용 재고" })).toBeInTheDocument();
     const row = screen.getByTestId("defect-picker-row-tube-stock");
     expect(row).toHaveTextContent("튜브");
     expect(row).toHaveTextContent("보유 5");
@@ -1229,12 +1234,30 @@ describe("DefectCartFlow", () => {
 
 
 
-    expect(screen.getByRole("columnheader", { name: "창고 가용" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "창고 가용 재고" })).toBeInTheDocument();
     const row = screen.getByTestId("defect-picker-row-warehouse-stock");
     expect(row).toHaveTextContent("창고");
     expect(row).toHaveTextContent("보유 10");
     expect(row).toHaveTextContent("예약 3");
     expect(row).toHaveTextContent("가용 7");
+  });
+
+  it.each([
+    { mode: "add" as const, initialAction: undefined },
+    { mode: "scrap" as const, initialAction: "scrap" as const },
+    { mode: "scrap" as const, initialAction: "rework" as const },
+  ])("기타 메모 안내는 한 번만 표시하고 입력하면 해제한다 ($mode/$initialAction)", async ({ mode, initialAction }) => {
+    render(<DefectCartFlow mode={mode} initialAction={initialAction} items={[{ ...fItem, has_bom: true }]} productModels={[]} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "완제품 장바구니에 추가" }));
+    fireEvent.click(screen.getByRole("button", { name: "수량·처리 정보 →", exact: true }));
+    await selectReasonCategory("기타");
+    expect(screen.getAllByText("기타 사유를 메모에 입력해 주세요.")).toHaveLength(1);
+    expect(screen.queryByText(/자동 부서/)).not.toBeInTheDocument();
+    const proceed = screen.getByRole("button", { name: initialAction === "rework" ? "BOM 확인 →" : mode === "add" ? /격리하기/ : /^즉시 폐기 \(/ });
+    expect(proceed).toBeDisabled();
+    fireEvent.change(screen.getByRole("textbox", { name: "메모" }), { target: { value: "분류되지 않은 불량 사유" } });
+    expect(screen.queryByText("기타 사유를 메모에 입력해 주세요.")).not.toBeInTheDocument();
+    expect(proceed).toBeEnabled();
   });
 
   it("카테고리 미선택은 메모가 있어도 막고 기타는 메모도 요구한다", async () => {

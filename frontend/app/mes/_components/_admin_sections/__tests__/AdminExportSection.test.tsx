@@ -118,6 +118,43 @@ describe("AdminExportSection", () => {
     expect(csv.split("\n")).toHaveLength(3);
   });
 
+  it("유형과 로그 종류의 본문만 페이드하며 형식·기간·같은 유형 재선택은 다시 재생하지 않는다", () => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
+    render(<AdminExportSection />);
+    const modeBody = screen.getByTestId("general-export-controls");
+    modeBody.style.setProperty("--admin-fade-duration", "350ms");
+    const modeAnimate = vi.fn(() => ({ cancel: vi.fn() }));
+    Object.defineProperty(modeBody, "animate", { value: modeAnimate });
+    const modeButtons = screen.getByRole("group", { name: "내보내기 유형" });
+    expect(modeBody).not.toContainElement(modeButtons);
+
+    fireEvent.click(within(modeButtons).getByRole("button", { name: "통합 작업" }));
+    expect(modeAnimate).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "오늘" }));
+    fireEvent.click(screen.getByRole("button", { name: "Excel", exact: true }));
+    fireEvent.click(within(modeButtons).getByRole("button", { name: "통합 작업" }));
+    expect(modeAnimate).toHaveBeenCalledOnce();
+
+    fireEvent.click(within(modeButtons).getByRole("button", { name: "내부 원본 로그" }));
+    expect(modeAnimate).toHaveBeenCalledTimes(2);
+    const auditBody = screen.getByTestId("audit-csv-controls").parentElement!;
+    auditBody.style.setProperty("--admin-fade-duration", "350ms");
+    const auditAnimate = vi.fn(() => ({ cancel: vi.fn() }));
+    Object.defineProperty(auditBody, "animate", { value: auditAnimate });
+    const auditButtons = screen.getByRole("group", { name: "원본 로그 종류" });
+    expect(auditBody).not.toContainElement(auditButtons);
+    fireEvent.click(within(auditButtons).getByRole("button", { name: "작업 감사 로그" }));
+    expect(auditAnimate).toHaveBeenCalledOnce();
+    expect(modeAnimate).toHaveBeenCalledTimes(2);
+    fireEvent.click(within(screen.getByRole("group", { name: "작업 감사 파일 형식" })).getByRole("button", { name: "Excel" }));
+    expect(auditAnimate).toHaveBeenCalledOnce();
+
+    fireEvent.click(within(modeButtons).getByRole("button", { name: "일반 데이터" }));
+    fireEvent.click(within(modeButtons).getByRole("button", { name: "통합 작업" }));
+    expect(screen.getByRole("button", { name: "Excel", exact: true })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "오늘" })).toHaveAttribute("aria-pressed", "true");
+  });
+
   beforeEach(() => {
     Object.values(state).forEach((mock) => mock.mockReset());
     state.getItems.mockResolvedValue([]);

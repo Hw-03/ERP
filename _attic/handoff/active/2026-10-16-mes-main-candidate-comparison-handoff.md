@@ -1,5 +1,20 @@
 # main·후보 비교 — 현재 재개 지점
 
+## 2026-10-20 승인 후 재개
+
+사용자가3.30MiB 조정을 승인했다. bundle-approved.log의 도구3검사·실제3.271MiB 게이트 통과. fetch 후 origin/main9824903e 동일, 병합 충돌 없음. 제품 소스/빌드 입력 불변으로 기존 검사·production 빌드를 재사용한다. 아래 번들 차단은 해제됐다. 다음은 병합 커밋·후보 push·최종 CI이며 main·직원 변경은 계속 금지한다.
+
+## 최신 진행 — 2026-10-19 main을 후보에 통합, 번들 결정 대기
+
+- 아래 과거 종료 기록의 커밋/푸시 금지는 당시 진단 범위다. 이번 승인 범위는 후보에 main 결합·후보 push·최종 CI이며 main/직원 변경은 금지한다.
+- W=`C:/Users/user/.codex/worktrees/mes-main-candidate-comparison/ERP`, 후보 `codex/mes-main-candidate-comparison-20261016`, HEAD=e9f98f19, MERGE_HEAD=9824903eee733e352b90bdf381bd08b8373271ef. 충돌20파일 해결·stage, merge commit 전.
+- R=`W/_attic/runtime/integration-main-20261019`. 기존 변경53개·DB 온라인 백업은 preflight.json/working-files/review-before.db. 새 권한/BOM 경합 RED→GREEN, 백엔드375·관련 프론트·타입/ESLint·복제 DB·production 빌드 통과. 정확한 근거와 범위는 [결과](../../../docs/superpowers/plans/2026-10-19-mes-candidate-main-integration-results.md).
+- 브라우저 QA3039 종료. 사용자3038/8038은 원래B/qa.db로 production 재기동. 원 DB SHA256 bddc1c4f61c04fa2ecf3479b6e8d737886cb18f399ee24a005e1cd97a7716376 불변, 기동 전후 행 동일. 원래 사용자 탭·BOM 초안·연구 요청 유지.
+- 현재 단계: 변경된 기대값 테스트의 hash/line 연결 갱신 및 마지막 check 통과(ledger-final.log). 추가 불량 장바구니68검사도 통과(defect-cart-final.log). 과거 binding/실행 기록은 보존하고 전체 NOT_RUN 상태를 임의 PASS로 바꾸지 않았다.
+- 차단: 번들3,430,232바이트(3.271MiB)가3.25MiB 초과. 3.30MiB 승인 질문 답변 대기. 답변 전 상한 변경 금지.
+- 다음: 원장 check 확인 → 번들 답변 반영 후 해당 검사만 → 날짜/cached check/merge commit → main 최신 여부 확인 → 후보만 push·최종 CI. main과 직원 배포 금지. 과거 BOM/AS 원인 조사는 재개하지 않는다.
+- 재사용: R의 유효한 국소 실행들, 이전 관측 도구 검사. 전체 백엔드/E2E/성능/복구를 다시 실행하지 않는다. 변경된 검증 입력을 과거 전체 PASS로 승격하지 않는다.
+
 ## 최신 종료 — 2026-10-19 17:34 관측 도구 신뢰성 보완 완료
 
 - [계획](../../../docs/superpowers/plans/2026-10-19-mes-observation-reliability.md)·[결과](../../../docs/superpowers/plans/2026-10-19-mes-observation-reliability-results.md). 후보 HEAD63d4ed59·기존 미커밋 변경 보존. R=`W/_attic/runtime/flaky-observation-reliability-20261019-165811`.

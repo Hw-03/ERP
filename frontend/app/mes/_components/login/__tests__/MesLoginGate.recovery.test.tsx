@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Operator } from "../useCurrentOperator";
+vi.mock("../OperatorAccessSync", () => ({ OperatorAccessSync: () => null }));
 
 const state = vi.hoisted(() => ({
   getAppSession: vi.fn(),
@@ -28,6 +29,10 @@ vi.mock("../useCurrentOperator", () => ({
   clearCurrentOperator: state.clearCurrentOperator,
   getStoredBootId: state.getStoredBootId,
   readCurrentOperator: state.readCurrentOperator,
+  getOperatorAccessContext: () => {
+    const current = state.readCurrentOperator();
+    return current ? { employeeId: current.employee_id, login: 1, version: 1 } : null;
+  },
   updateCurrentOperatorIdentity: vi.fn(),
 }));
 vi.mock("../OperatorLoginCard", () => ({ OperatorLoginCard: ({ onLogin }: { onLogin: () => void }) => <button onClick={onLogin}>Login form</button> }));

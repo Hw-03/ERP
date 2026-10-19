@@ -6,10 +6,15 @@ import json
 import re
 from collections.abc import Sequence
 
-from sqlalchemy import ColumnElement, and_, case, exists, or_
+from sqlalchemy import ColumnElement, and_, case, exists, false, or_
 from sqlalchemy.orm import Session
 
 from app.utils.search import NormalizedSearchText, SearchBoundaryText, _SEARCH_WHITESPACE, normalize_search_boundary_text, normalize_search_text
+
+
+def _search_queries(search: str | None) -> list[str]:
+    """Ignore empty comma branches so a trailing comma cannot match every item."""
+    return [query for query in (search or "").split(",") if normalize_search_text(query)]
 
 
 def search_clauses(search: str, groups: Sequence[Sequence[str]]) -> list[tuple[str, list[str]]]:
@@ -46,23 +51,27 @@ def _pattern(term: str) -> str:
 def matches_item_search(search: str | None, *, name_fields: Sequence[str | None],
                         literal_fields: Sequence[str | None] = (), aliases: Sequence[str] = (),
                         groups: Sequence[Sequence[str]] = ()) -> bool:
-    """Match snapshots and current names independently, with unexpanded metadata."""
-    term = normalize_search_text(search or "")
-    if not term:
+    """OR comma-separated queries, preserving snapshot and metadata field scopes."""
+    if not normalize_search_text(search or ""):
         return True
+    queries = _search_queries(search)
     names = [normalize_search_text(value or "") for value in [*name_fields, *aliases]]
     boundary_names = [normalize_search_boundary_text(value or "") for value in [*name_fields, *aliases]]
     literals = [normalize_search_text(value or "") for value in literal_fields]
-    if any(term in value for value in [*names, *literals]):
-        return True
-    for original, alternatives in search_clauses(search or "", groups):
-        if any(original in value for value in [*names, *literals]):
-            continue
-        if not any(any(re.search(_pattern(alt), value) for value in boundary_names)
-                   if re.fullmatch(r"[a-z]{1,3}", alt) else any(alt in value for value in names)
-                   for alt in alternatives if alt != original):
-            return False
-    return True
+    for query in queries:
+        term = normalize_search_text(query)
+        if any(term in value for value in [*names, *literals]):
+            return True
+        for original, alternatives in search_clauses(query, groups):
+            if any(original in value for value in [*names, *literals]):
+                continue
+            if not any(any(re.search(_pattern(alt), value) for value in boundary_names)
+                       if re.fullmatch(r"[a-z]{1,3}", alt) else any(alt in value for value in names)
+                       for alt in alternatives if alt != original):
+                break
+        else:
+            return True
+    return False
 
 
 def _normalized_column(column: ColumnElement[str]) -> ColumnElement[str]:
@@ -116,9 +125,9 @@ def build_item_search_filter(db: Session | None, search: str | None, *,
                              item_id_column: ColumnElement | None = None,
                              groups: Sequence[Sequence[str]] | None = None) -> ColumnElement[bool] | None:
     """Correlated alias EXISTS prevents duplicated rows before count and paging."""
-    term = normalize_search_text(search or "")
-    if not term:
+    if not normalize_search_text(search or ""):
         return None
+    queries = _search_queries(search)
     if groups is None:
         groups = load_synonym_groups(db) if db is not None else []
 
@@ -140,5 +149,5 @@ def build_item_search_filter(db: Session | None, search: str | None, *,
             conditions.append(exists().where(ItemAlias.item_id == item_id_column, name_match(ItemAlias.alias)))
         return or_(*conditions)
 
-    return or_(membership(term), and_(*[membership(original, alternatives)
-        for original, alternatives in search_clauses(search or "", groups)]))
+    return or_(false(), *(or_(membership(normalize_search_text(query)), and_(*[membership(original, alternatives)
+        for original, alternatives in search_clauses(query, groups)])) for query in queries))

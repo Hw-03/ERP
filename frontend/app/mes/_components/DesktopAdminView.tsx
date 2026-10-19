@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DesktopPinLock } from "./DesktopPinLock";
 import { AdminSectionTabs } from "./_admin_sections/AdminSectionTabs";
-import { AdminSectionContent } from "./_admin_sections/AdminSectionContent";
+import { AdminSectionTransition } from "./_admin_sections/AdminSectionTransition";
 import { useAdminBootstrap } from "./_admin_hooks/useAdminBootstrap";
 import { useAdminSettings } from "./_admin_hooks/useAdminSettings";
 import { useAdminViewState, type AdminSection } from "./_admin_hooks/useAdminViewState";
 import { useConfirmNavigation } from "@/lib/ui/dirty-guard";
 import { StatusTargetNotice, useStatusTargetNotice } from "./common/StatusTargetNotice";
-import { ReadFailure, ReadLoading } from "./common/ReadState";
+import { AdminReadProvider } from "./_admin_sections/_admin_primitives/AdminReadState";
 
 /**
  * 섹션 헤더와 KPI는 각 섹션이 직접 그린다 (AdminPageHeader / AdminKpiBar 사용).
@@ -66,12 +66,13 @@ export function DesktopAdminView({
     refreshItems,
     refreshEmployees,
     loadData,
-    loading, hasData, loadError,
+    readStates, retryRead,
   } = useAdminBootstrap({
     unlocked,
     globalSearch,
     onError: setMessage,
   });
+  const readContext = useMemo(() => ({ states: readStates, retry: retryRead }), [readStates, retryRead]);
 
   const {
     pinForm, setPinForm,
@@ -112,35 +113,16 @@ export function DesktopAdminView({
         {/* 워크스페이스 */}
         <section className="flex min-h-0 flex-1 flex-col overflow-auto pt-1 lg:overflow-hidden">
           {/* 섹션별 콘텐츠 */}
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            {loadError && <ReadFailure message={loadError} refresh={hasData} onRetry={() => { void loadData().catch(() => {}); }} />}
-            {!hasData && loading ? <ReadLoading label="관리자 데이터를 불러오는 중" /> : (!loadError || hasData) && <AdminSectionContent
+          <AdminReadProvider value={readContext}><AdminSectionTransition
               section={section}
-              globalSearch={globalSearch}
-              onStatusChange={onStatusChange}
-              setMessage={setMessage}
-              showSave={showSave}
-              items={items}
-              setItems={setItems}
-              employees={employees}
-              setEmployees={setEmployees}
-              productModels={productModels}
-              setProductModels={setProductModels}
-              departments={departments}
-              setDepartments={setDepartments}
-              selectedDept={selectedDept}
-              setSelectedDept={setSelectedDept}
-              allBomRows={allBomRows}
-              refreshAllBom={refreshAllBom}
-              refreshItems={refreshItems}
-              refreshEmployees={refreshEmployees}
-              pinForm={pinForm}
-              setPinForm={setPinForm}
-              isSaving={isSaving}
-              changePin={changePin}
-              adminPin={adminPin}
-            />}
-          </div>
+              contentProps={{
+                globalSearch, onStatusChange, setMessage, showSave,
+                items, setItems, employees, setEmployees, productModels, setProductModels,
+                departments, setDepartments, selectedDept, setSelectedDept,
+                allBomRows, refreshAllBom, refreshItems, refreshEmployees,
+                pinForm, setPinForm, isSaving, changePin, adminPin,
+              }}
+            /></AdminReadProvider>
         </section>
       </div>
 

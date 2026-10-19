@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sendClientEvent } from "@/lib/client-events";
 import type { Employee } from "@/lib/api";
-import { clearCurrentOperator, readCurrentOperator, setCurrentOperator, useCurrentOperator, type Operator } from "../useCurrentOperator";
+import { clearCurrentOperator, readCurrentOperator, setCurrentOperator, updateCurrentOperatorAccess, useCurrentOperator, type Operator } from "../useCurrentOperator";
 
 const state = vi.hoisted(() => ({ getAppSession: vi.fn(), getEmployees: vi.fn(), getWeeklyReport: vi.fn(), getMap: vi.fn() }));
 vi.mock("next/image", () => ({ default: ({ alt = "", ...props }: Record<string, unknown>) => <img alt={String(alt)} {...props} /> }));
@@ -43,6 +43,23 @@ describe("MesLoginGate focus session refresh", () => {
     setCurrentOperator(operator, "boot-1");
   });
   afterEach(() => vi.restoreAllMocks());
+
+  it.each(["boot", "employees"])("초기 %s 조회 중 계정이 바뀌면 옛 응답으로 새 로그인을 지우지 않는다", async (stage) => {
+    const boot = deferred<{ boot_id: string }>();
+    const employees = deferred<Employee[]>();
+    if (stage === "boot") state.getAppSession.mockReturnValueOnce(boot.promise);
+    else state.getEmployees.mockReturnValueOnce(employees.promise);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><MesLoginGate><Content /></MesLoginGate></QueryClientProvider>);
+    await waitFor(() => expect(stage === "boot" ? state.getAppSession : state.getEmployees).toHaveBeenCalled());
+    act(() => setCurrentOperator({ ...operator, employee_id: "emp-2", warehouse_role: "none" }, "boot-2"));
+    state.getAppSession.mockResolvedValue({ boot_id: "boot-2" });
+    state.getEmployees.mockResolvedValue([employee({ employee_id: "emp-2", warehouse_role: "none" })]);
+    await act(async () => { if (stage === "boot") boot.resolve({ boot_id: "boot-1" }); else employees.resolve([]); });
+    expect(await screen.findByLabelText("작성 수량")).toBeVisible();
+    expect(readCurrentOperator()).toMatchObject({ employee_id: "emp-2", warehouse_role: "none" });
+    expect(screen.queryByText("Login form")).not.toBeInTheDocument();
+  });
 
   it("focus 반영은 회수된 역할·숨김 탭만 갱신하고 입력·appearance·audit를 보존한다", async () => {
     await openGate();
@@ -113,6 +130,19 @@ describe("MesLoginGate focus session refresh", () => {
     await waitFor(() => expect(readCurrentOperator()?.warehouse_role).toBe("none"));
     await act(async () => old.resolve([employee()]));
     expect(readCurrentOperator()?.warehouse_role).toBe("none");
+  });
+
+  it.each(["none", "primary"] as const)("본인 권한을 %s로 저장한 뒤 옛 focus 응답이 와도 저장값을 유지한다", async (savedRole) => {
+    await openGate();
+    const old = deferred<Employee[]>();
+    state.getEmployees.mockReturnValueOnce(old.promise);
+    await focus();
+    const audit = sessionStorage.getItem("dexcowin_mes_audit_session");
+    act(() => { updateCurrentOperatorAccess(employee({ warehouse_role: savedRole })); });
+    await act(async () => old.resolve([employee({ warehouse_role: savedRole === "none" ? "primary" : "none" })]));
+    expect(readCurrentOperator()).toMatchObject({ warehouse_role: savedRole, theme: "dark", sidebar_mode: "expanded" });
+    expect(sessionStorage.getItem("dexcowin_mes_audit_session")).toBe(audit);
+    expect(screen.getByLabelText("작성 수량")).toHaveValue("7");
   });
 
   it.each(["emp-1", "emp-2"])("로그아웃 뒤 %s로 재로그인하면 이전 focus 응답을 적용하지 않는다", async (id) => {

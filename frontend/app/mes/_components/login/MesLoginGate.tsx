@@ -9,10 +9,11 @@ import { warehouseMapApi } from "@/lib/api/warehouse-map";
 import { formatKstDate } from "@/lib/mes/date";
 import { queryKeys } from "@/lib/queries/keys";
 import { OperatorLoginCard } from "./OperatorLoginCard";
-import { clearCurrentOperator, getStoredBootId, readCurrentOperator, updateCurrentOperatorIdentity } from "./useCurrentOperator";
+import { clearCurrentOperator, getOperatorAccessContext, getStoredBootId, readCurrentOperator, updateCurrentOperatorIdentity } from "./useCurrentOperator";
 import { runLoginReadWithRetry, validateActiveEmployees, validateAppSession } from "./loginReadRetry";
 import { useIdleOperatorConfirmation } from "./useIdleOperatorConfirmation";
 import { OperatorConfirmationDialog } from "./OperatorConfirmationDialog";
+import { OperatorAccessSync } from "./OperatorAccessSync";
 import { OPERATOR_LOGIN_REQUIRED } from "@/lib/auth/login-recovery";
 
 type GatePhase = "loading" | "intro" | "form" | "recovery" | "authed";
@@ -96,7 +97,8 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
     };
 
     const stored = readCurrentOperator();
-    if (!stored) {
+    const requestedAccess = getOperatorAccessContext();
+    if (!stored || !requestedAccess) {
       goToLogin();
       return () => { cancelled = true; };
     }
@@ -114,6 +116,13 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
     });
 
     const controller = new AbortController();
+    const restartForChangedLogin = (): boolean => {
+      const current = getOperatorAccessContext();
+      if (current?.employeeId === requestedAccess.employeeId && current.login === requestedAccess.login) return false;
+      if (current) setRecoveryAttempt((attempt) => attempt + 1);
+      else goToLogin();
+      return true;
+    };
     void (async () => {
       // boot_id 불일치 시 서버 재시작 감지 → 재로그인 강제
       try {
@@ -121,7 +130,7 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
           (readSignal) => api.getAppSession(readSignal),
           { stage: "app_session", signal: controller.signal, validate: validateAppSession },
         );
-        if (cancelled) return;
+        if (cancelled || restartForChangedLogin()) return;
         const storedBootId = getStoredBootId();
         if (storedBootId !== session.boot_id) {
           clearCurrentOperator();
@@ -129,7 +138,7 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
           return;
         }
       } catch {
-        if (cancelled) return;
+        if (cancelled || restartForChangedLogin()) return;
         setPhase("recovery");
         return;
       }
@@ -140,10 +149,10 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
           (readSignal) => api.getEmployees({ activeOnly: true }, readSignal),
           { stage: "active_employees", signal: controller.signal, validate: validateActiveEmployees },
         );
-        if (cancelled) return;
+        if (cancelled || restartForChangedLogin()) return;
         const employee = list.find((e) => e.employee_id === stored.employee_id);
         if (employee) {
-          updateCurrentOperatorIdentity(employee, stored.employee_id);
+          updateCurrentOperatorIdentity(employee, requestedAccess);
           setWorkspaceOwner(stored.employee_id);
           setPhase("authed");
         } else {
@@ -151,7 +160,7 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
           goToLogin();
         }
       } catch {
-        if (cancelled) return;
+        if (cancelled || restartForChangedLogin()) return;
         setPhase("recovery");
       }
     })();
@@ -168,7 +177,8 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
     let controller: AbortController | null = null;
     const refresh = async (): Promise<void> => {
       const operator = readCurrentOperator();
-      if (!operator) return;
+      const requestedAccess = getOperatorAccessContext();
+      if (!operator || !requestedAccess) return;
       const auditSession = sessionStorage.getItem("dexcowin_mes_audit_session");
       const requestSequence = ++sequence;
       controller?.abort();
@@ -177,6 +187,7 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
       const stillCurrent = () => !requestController.signal.aborted
         && requestSequence === sequence
         && readCurrentOperator()?.employee_id === operator.employee_id
+        && getOperatorAccessContext()?.login === requestedAccess.login
         && sessionStorage.getItem("dexcowin_mes_audit_session") === auditSession;
       try {
         const session = await runLoginReadWithRetry((signal) => api.getAppSession(signal),
@@ -190,7 +201,7 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
           setPhase("form");
           return;
         }
-        updateCurrentOperatorIdentity(employee, operator.employee_id);
+        updateCurrentOperatorIdentity(employee, requestedAccess);
         setRefreshFailed(false);
       } catch {
         if (stillCurrent()) setRefreshFailed(true);
@@ -246,6 +257,7 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
 
   // 로그인 완료 → 메인 화면
   return <>
+    {phase === "authed" && workspaceOwner && <OperatorAccessSync employeeId={workspaceOwner} />}
     {workspaceOwner && <div key={workspaceOwner} style={{ display: phase === "authed" ? "contents" : "none" }} inert={phase !== "authed"}>
       {children}
     </div>}

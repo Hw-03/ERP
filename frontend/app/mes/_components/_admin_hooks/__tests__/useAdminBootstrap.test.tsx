@@ -48,34 +48,56 @@ describe("useAdminBootstrap realtime refresh", () => {
     mocks.getAllBOM.mockReset().mockResolvedValue([]);
   });
 
-  it("최초 응답 전에는 빈 목록과 구별되는 로딩 상태를 유지한다", async () => {
-    const pending = deferred<unknown[]>();
-    mocks.getEmployees.mockReturnValue(pending.promise);
+  it("distinguishes an initial pending response from a successfully empty list and keeps data during refresh", async () => {
+    const first = deferred<unknown[]>();
+    const refresh = deferred<unknown[]>();
+    mocks.getItems.mockReturnValueOnce(first.promise).mockReturnValueOnce(refresh.promise);
     const onError = vi.fn();
     const { result } = renderHook(() => useAdminBootstrap({ unlocked: true, globalSearch: "", onError }));
-    expect(result.current.loading).toBe(true);
-    expect(result.current.hasData).toBe(false);
-    await act(async () => { pending.resolve([]); await pending.promise; });
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.hasData).toBe(true);
-    expect(result.current.loadError).toBeNull();
+    expect(result.current.readStates.items.status).toBe("pending");
+    await act(async () => { first.resolve([]); await first.promise; });
+    await waitFor(() => expect(result.current.readStates.items.status).toBe("ready"));
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.refreshItems(); });
+    expect(result.current.readStates.items.status).toBe("ready");
+    await act(async () => { refresh.resolve([]); await pending; });
   });
 
-  it("첫 오류는 빈 성공이 아니며 명시적 재시도 뒤 빈 성공으로 복구한다", async () => {
-    mocks.getEmployees.mockRejectedValueOnce(new Error("직원 조회 실패"));
+  it("ends the initial skeleton on failure and retries without treating an empty success as loading", async () => {
+    mocks.getAllBOM.mockRejectedValueOnce(new Error("BOM read failed")).mockResolvedValueOnce([]);
     const onError = vi.fn();
     const { result } = renderHook(() => useAdminBootstrap({ unlocked: true, globalSearch: "", onError }));
-    await waitFor(() => expect(result.current.loadError).toBe("직원 조회 실패"));
-    expect(result.current.hasData).toBe(false);
-    expect(result.current.loading).toBe(false);
-    await act(async () => { await result.current.loadData(); });
-    expect(result.current.loadError).toBeNull();
-    expect(result.current.hasData).toBe(true);
-    expect(result.current.employees).toEqual([]);
-    expect(mocks.getEmployees).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(result.current.readStates.bom).toEqual({ status: "error", error: "BOM read failed" }));
+    act(() => result.current.retryRead("bom"));
+    await waitFor(() => expect(result.current.readStates.bom.status).toBe("ready"));
+    expect(result.current.allBomRows).toEqual([]);
   });
 
-  it("refreshes items, employees, department candidates and all BOM rows when the database revision changes", async () => {
+  it.each(["items", "employees", "departments"] as const)("retries initial %s failures and keeps the ready state on a later refresh failure", async (domain) => {
+    const read = { items: mocks.getItems, employees: mocks.getEmployees, departments: mocks.getDepartments }[domain];
+    read.mockRejectedValueOnce(new Error("initial failure")).mockResolvedValueOnce([]);
+    const onError = vi.fn();
+    const { result } = renderHook(() => useAdminBootstrap({ unlocked: true, globalSearch: "", onError }));
+    await waitFor(() => expect(result.current.readStates[domain].status).toBe("error"));
+    act(() => result.current.retryRead(domain));
+    await waitFor(() => expect(result.current.readStates[domain].status).toBe("ready"));
+    expect(result.current[domain]).toEqual([]);
+    onError.mockClear();
+    read.mockRejectedValueOnce(new Error("refresh failure"));
+    act(() => result.current.retryRead(domain));
+    await waitFor(() => expect(onError).toHaveBeenCalledWith("refresh failure"));
+    expect(result.current.readStates[domain].status).toBe("ready");
+  });
+
+  it("accepts cached empty models as a completed read", async () => {
+    const onError = vi.fn();
+    const { result } = renderHook(() => useAdminBootstrap({ unlocked: true, globalSearch: "", onError }));
+    expect(result.current.productModels).toEqual([]);
+    expect(result.current.readStates.models.status).toBe("ready");
+    await waitFor(() => expect(Object.values(result.current.readStates).every((read) => read.status === "ready")).toBe(true));
+  });
+
+  it("refreshes items, employees and BOM rows and departments on revision changes", async () => {
     const onError = vi.fn();
     const { rerender } = renderHook(
       () => useAdminBootstrap({ unlocked: true, globalSearch: "", onError }),
@@ -126,7 +148,7 @@ describe("useAdminBootstrap realtime refresh", () => {
     await waitFor(() => expect(result.current.departments).toEqual(current));
     await act(async () => { older.resolve(original); await older.promise; });
     expect(result.current.departments).toEqual(current);
-    expect(result.current.hasData).toBe(true);
+    expect(result.current.readStates.departments.status).toBe("ready");
   });
 
   it("부서 갱신 실패는 이전 후보와 기존 편집자 목록을 보존한다", async () => {

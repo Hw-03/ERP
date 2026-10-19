@@ -4,6 +4,8 @@ import { itemDepartment } from "../_warehouse_v2/itemPickerShared";
 
 export type DefectSourceKind = "warehouse" | "production";
 
+export const OTHER_REASON_MEMO_REQUIRED_MESSAGE = "기타 사유를 메모에 입력해 주세요.";
+
 export interface DefectSourceStock {
   locationLabel: string;
   current: number;
@@ -71,7 +73,7 @@ export function defectCartLineErrors({
     }
   }
   if (!hasDefectReason(category, memo)) {
-    errors.push(category.trim() === "기타" ? "기타를 선택하면 메모를 입력하세요." : "사유 카테고리를 선택하세요.");
+    errors.push(category.trim() === "기타" ? OTHER_REASON_MEMO_REQUIRED_MESSAGE : "사유 카테고리를 선택하세요.");
   }
   return errors;
 }

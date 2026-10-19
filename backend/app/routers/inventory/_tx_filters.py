@@ -647,6 +647,14 @@ def _history_list_operation_label_expr() -> ColumnElement[str]:
         TransactionLog.reference_no.like("DEPT-CORRECTION-%"),
     )
     base_label = case(
+        (
+            select(InventoryOperation.operation_id).where(
+                InventoryOperation.operation_id == TransactionLog.operation_id,
+                InventoryOperation.domain == "item",
+                InventoryOperation.action == "initial_stock",
+            ).correlate(TransactionLog).exists(),
+            "초기 재고 등록",
+        ),
         (_stocktake_operation_filter(), "재고 전수조사"),
         (department_correction, "부서 위치 조정"),
         (TransactionLog.transaction_type == TransactionTypeEnum.UNMARK_DEFECTIVE, "불량 정상 복귀"),

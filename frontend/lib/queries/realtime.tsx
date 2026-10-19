@@ -33,6 +33,12 @@ type RevisionSnapshot = {
 
 const RealtimeRevisionContext = createContext<number | null>(null);
 
+/** Cancel even an initial access read so a newer revision cannot reuse its old response. */
+async function refreshEmployeeQueries(queryClient: QueryClient): Promise<void> {
+  await queryClient.cancelQueries({ queryKey: queryKeys.employees.accessAll });
+  await queryClient.refetchQueries({ queryKey: queryKeys.employees.all, type: "active" });
+}
+
 function parseRevisionSnapshot(value: unknown): RevisionSnapshot | null {
   if (typeof value !== "object" || value === null) return null;
   const snapshot = value as Partial<RevisionSnapshot>;
@@ -45,6 +51,7 @@ function parseRevisionSnapshot(value: unknown): RevisionSnapshot | null {
 
 /** Return false when metadata must recover before publishing new search results. */
 export async function invalidateOperationalQueries(queryClient: QueryClient, onMetadataReady?: () => void): Promise<boolean> {
+  void refreshEmployeeQueries(queryClient);
   if (queryClient.getQueryState(queryKeys.itemSearch.config())) {
     try { await queryClient.fetchQuery({ ...itemSearchConfigOptions, staleTime: 0, retry: false }); }
     catch { return false; }
@@ -183,9 +190,11 @@ export function RealtimeSyncProvider({ children }: { children: ReactNode }) {
         // Ignore malformed SSE payloads and wait for the next snapshot.
       }
     };
-    const onOnline = () => void checkRevision();
+    const refreshEmployees = () => void refreshEmployeeQueries(queryClient);
+    const onOnline = () => { refreshEmployees(); void checkRevision(); };
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
+        refreshEmployees();
         flushPendingRevisionImmediately();
         void checkRevision();
       } else if (flushTimer !== null) {
@@ -201,7 +210,7 @@ export function RealtimeSyncProvider({ children }: { children: ReactNode }) {
       source = new EventSource(STREAM_URL);
       source.addEventListener("revision", onRevision);
       source.onerror = () => startFallback();
-      source.onopen = stopFallback;
+      source.onopen = () => { stopFallback(); refreshEmployees(); };
     } else {
       startFallback(true);
     }

@@ -10,7 +10,7 @@ import type { IoBatch } from "@/lib/api/types/io";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { historyOperationColor, historyUserNotes, isStocktakeOperation } from "./historyOperationSource";
+import { historyOperationColor, historySystemNote, historyUserNotes, isStocktakeOperation } from "./historyOperationSource";
 import { formatQty } from "@/lib/mes/format";
 import { PROCESS_TYPE_META } from "./historyTheme";
 import { formatHistoryDateTimeLong } from "./historyFormat";
@@ -325,6 +325,7 @@ export function HistoryDetailPanel({
           <HistoryRelatedWork panelOpen={panelOpen} log={selected} onSelectLog={onSelectLog} />
           <HistoryDetailReason log={selected} />
           <HistoryDetailMemo
+            systemNote={historySystemNote(selected)}
             notes={historyUserNotes(selected)}
             reasonMemo={selected.reason_memo}
             transactionType={selected.transaction_type}
@@ -334,7 +335,7 @@ export function HistoryDetailPanel({
 
       {variant !== "desktop" && (
         mobilePresentation ? <>
-          <HistoryMobileContext summary={summary} omitCancelledStatus omitParticipantNames={[getHistoryActor(selected),selected.approver_name ?? ""]} />
+          <HistoryMobileContext summary={summary} operation={selected} omitCancelledStatus omitParticipantNames={[getHistoryActor(selected),selected.approver_name ?? ""]} />
           <HistoryMobileStockDetails logs={[selected]} batch={batch} onSelectLog={onSelectLog} />
         </> : <HistoryInventoryEffectPanel log={selected} />
       )}
@@ -718,6 +719,7 @@ export function HistoryDetailReason({ log }: { log: TransactionLog }) {
 }
 export function HistoryDetailMemo({
   notes,
+  systemNote,
   reasonMemo,
   transactionType,
   variant = "card",
@@ -725,12 +727,23 @@ export function HistoryDetailMemo({
   excludeMemo,
 }: {
   notes: string | null | undefined;
+  systemNote?: string | null;
   reasonMemo?: string | null;
   transactionType?: TransactionLog["transaction_type"];
   variant?: "card" | "plain";
   label?: string;
   excludeMemo?: string | null;
 }) {
+  if (systemNote) return <>
+    <div className={variant === "plain" ? "mt-2 space-y-1" : "rounded-[20px] border p-4"}
+      style={{ background: variant === "plain" ? undefined : LEGACY_COLORS.s3, borderColor: LEGACY_COLORS.border }}>
+      <div className="mb-2 flex items-center gap-1.5 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+        <History className="h-4 w-4" />자동 기록
+      </div>
+      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>{systemNote}</p>
+    </div>
+    <HistoryDetailMemo notes={notes} reasonMemo={reasonMemo} transactionType={transactionType} variant={variant} label="사용자 메모" excludeMemo={excludeMemo} />
+  </>;
   const parsedMemo = parseTransactionNotes(notes, transactionType).userMemo;
   const userMemo = reasonMemo?.trim() || parsedMemo;
   const normalize = (value: string): string => value.trim().replace(/\s+/g, " ");

@@ -12,7 +12,7 @@ import {
   type WarehouseSectionTab,
 } from "../../_warehouse_sections/WarehouseSectionTabs";
 import { WarehouseDraftPanelTabs } from "../../_warehouse_sections/WarehouseDraftPanelTabs";
-import { readCurrentOperator } from "../../login/useCurrentOperator";
+import { readCurrentOperator, useCurrentOperator } from "../../login/useCurrentOperator";
 import type { IoEntryIntent } from "../../_warehouse_v2/types";
 import {
   clearWarehouseDraftRestore,
@@ -74,7 +74,7 @@ export function MobileWarehouseScreen({
     onStatusChange,
   });
 
-  const operator = typeof window !== "undefined" ? readCurrentOperator() : null;
+  const operator = useCurrentOperator() ?? readCurrentOperator();
   const resolveNotificationSection = (section: string | null | undefined): WarehouseSectionTab => {
     if (section === "queue") {
       const role = operator?.warehouse_role ?? "none";
@@ -473,6 +473,8 @@ export function MobileWarehouseScreen({
             <WarehouseDraftPanelTabs
               layout="mobile"
               sectionTab={sectionTab}
+              accessAllowed={resolveNotificationSection(sectionTab) === sectionTab}
+              onAccessRevoked={() => handleSectionChange("compose")}
               canSeeQueue={canSeeQueue}
               canSeeDeptQueue={canSeeDeptQueue}
               canSeeAsResearchQueue={canSeeAsResearchQueue}

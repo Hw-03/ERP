@@ -3,7 +3,7 @@ import type { TransactionReferenceSummary } from "@/lib/api/production";
 import type { IoBatch } from "@/lib/api/types/io";
 import { formatQty } from "@/lib/mes/format";
 import { toInventoryEffectRows } from "./historyInventoryEffect";
-import { historyUserNotes, isStocktakeOperation } from "./historyOperationSource";
+import { getInitialStockEffect, getInitialStockFlow, historyUserNotes, isInitialStockOperation, isStocktakeOperation } from "./historyOperationSource";
 import {
   getBatchFlowEndpoints,
   getHistoryActor,
@@ -191,6 +191,7 @@ export function getReferenceBatchLinePresentation(
   log: TransactionLog,
   kind: ReferenceBatchKind,
 ): ReferenceBatchLinePresentation {
+  if (isInitialStockOperation(log)) return { label: getHistoryDisplayLabel(log), tone: "success" };
   if (isStocktakeOperation(log)) return { label: getHistoryDisplayLabel(log), tone: "success" };
   if (isDepartmentCorrectionLog(log)) return { label: "이동", tone: "info" };
   if (kind === "shipment") {
@@ -528,6 +529,8 @@ function getFlowPresentation(
   batch: IoBatch | null | undefined,
   hint?: string,
 ): HistoryFlowPresentation {
+  const initialFlow = getInitialStockFlow([log]);
+  if (initialFlow) return initialFlow;
   const phaseFlowLabel = getShippingPhaseFlowLabel(log.shipping_phase);
   if (phaseFlowLabel) return { label: phaseFlowLabel };
   const batchContext = getHistoryChildResultBatchOperationLabel(log, batch);
@@ -584,6 +587,15 @@ function getInternalUseInventoryEffectFlow(
 }
 
 function getStockPresentation(log: TransactionLog, batch?: IoBatch | null): HistoryStockPresentation | null {
+  if (isInitialStockOperation(log)) {
+    const cell = getInitialStockEffect(log);
+    if (!cell) return null;
+    const scopeLabel = cell.scope === "warehouse" ? "창고" : cell.department?.trim() || log.department?.trim() || "부서";
+    const unit = log.item_unit?.trim() ?? "";
+    const after = cell.quantity_after ?? null;
+    return { label: `${scopeLabel} ${after == null ? "-" : formatQty(after)}${unit ? ` ${unit}` : ""}`,
+      scopeLabel, before: cell.quantity_before ?? null, after, unit };
+  }
   const tubeMaterialStock = (log.transaction_type === "RECEIVE" || log.transaction_type === "MATERIAL_OUT") && (
     batch?.work_type === "tube_material" ||
     log.history_batch?.work_type === "tube_material" ||
@@ -672,6 +684,7 @@ export function getHistoryListOperationLabel(
   log: TransactionLog,
   batch?: IoBatch | null,
 ): string {
+  if (isInitialStockOperation(log)) return getHistoryDisplayLabel(log, batch);
   if (isStocktakeOperation(log)) return getHistoryDisplayLabel(log, batch);
   if (isDepartmentCorrectionLog(log)) {
     return log.operation_kind === "CANCELLATION" ? "부서 위치 조정 취소" : "부서 위치 조정";

@@ -1,0 +1,26 @@
+.tableHeader { flex-shrink: 0; align-items: center; min-height: 44px; }
+.tableRow { flex-shrink: 0; min-height: 51px; cursor: pointer; }
+.tableRow:hover { background: var(--c-s4); box-shadow: inset 3px 0 0 color-mix(in srgb, var(--c-blue) 45%, transparent); }
+.tableRow[aria-selected="true"] { background: color-mix(in srgb, var(--c-blue) 10%, var(--c-s1)); box-shadow: inset 3px 0 0 var(--c-blue); }
+.tableRow[aria-selected="true"]:hover { background: color-mix(in srgb, var(--c-blue) 16%, var(--c-s1)); }
+.stickyHeader { position: sticky; top: 0; z-index: 10; background: var(--c-inventory-table-header); }
+.detailHeader { display: flex; flex-shrink: 0; align-items: center; gap: 16px; }
+.employeeFields, .modelFields { display: grid; flex: 1; min-width: 0; gap: 12px; }
+.employeeWorkspace [data-admin-detail-content] { padding: 12px; }
+.employeeFields { grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 1px 8px; border: 1px solid var(--c-border); border-radius: 16px; background: var(--c-bg); }
+.modelFields { grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr)); }
+.employeeFields > div { min-width: 0; flex-direction: row; align-items: center; gap: 8px; }
+.employeeFields > div > label { flex-shrink: 0; white-space: nowrap; }
+.employeeFields > div > :last-child { min-width: 0; flex: 1; }
+.fieldCard { min-width: 0; padding: 12px; border: 1px solid var(--c-border); border-radius: 16px; background: var(--c-bg); }
+.panel { min-width: 0; border: 1px solid var(--c-border); border-radius: 16px; padding: 16px; background: var(--c-bg); }
+.preview { display: flex; min-height: 160px; flex: 1; flex-direction: column; gap: 8px; overflow-y: auto; }
+.previewRow { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--c-border); border-radius: 12px; background: var(--c-s1); }
+.itemForm { display: flex; flex-direction: column; gap: 16px; }
+.itemForm > div { min-width: 0; border: 1px solid var(--c-border); border-radius: 16px; padding: 16px; background: var(--c-bg); }
+.itemForm input:not([type="checkbox"]), .itemForm select, .itemForm button { min-height: 44px; }
+.itemForm button { min-width: 44px; }
+.workspace button { min-height: 44px; min-width: 44px; }
+.employeeCards button { min-height: 48px; }
+@media (max-width: 1599px) { .employeeFields { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 1399px) { .employeeFields, .modelFields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

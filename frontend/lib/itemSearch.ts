@@ -52,14 +52,14 @@ function matchesAlternative(value: string, term: string): boolean {
   return new RegExp(`(^|[^a-z0-9])${spacedTerm}($|[^a-z0-9])`).test(boundaryText);
 }
 
-/** Share item semantics while keeping each screen's extra fields literal and explicitly scoped. */
+/** OR comma-separated queries while keeping each query's AND and synonym rules. */
 export function matchesItemSearchFields(
   fields: ItemSearchFields,
   keyword: string,
   config: ItemSearchConfig = EMPTY_ITEM_SEARCH_CONFIG,
 ): boolean {
-  const fullQuery = normalizeSearchText(keyword);
-  if (!fullQuery) return true;
+  if (!normalizeSearchText(keyword)) return true;
+  const queries = keyword.split(",").filter((query) => normalizeSearchText(query));
   const aliases = [
     ...(fields.aliases ?? []),
     ...(fields.itemId ? (config.item_aliases[fields.itemId] ?? []).map((entry) => entry.alias) : []),
@@ -67,11 +67,14 @@ export function matchesItemSearchFields(
   const semanticFields = [...fields.nameFields, ...aliases].filter((value): value is string => typeof value === "string");
   const literalFields = [...semanticFields, ...(fields.literalFields ?? [])].filter((value): value is string => typeof value === "string");
   const normalizedFields = literalFields.map(normalizeSearchText);
-  if (normalizedFields.some((value) => value.includes(fullQuery))) return true;
-  return searchClauses(keyword, config).every(({ literal, alternatives }) =>
-    normalizedFields.some((value) => value.includes(literal)) ||
-    alternatives.some((term) => semanticFields.some((value) => matchesAlternative(value, term))),
-  );
+  return queries.some((query) => {
+    const fullQuery = normalizeSearchText(query);
+    if (normalizedFields.some((value) => value.includes(fullQuery))) return true;
+    return searchClauses(query, config).every(({ literal, alternatives }) =>
+      normalizedFields.some((value) => value.includes(literal)) ||
+      alternatives.some((term) => semanticFields.some((value) => matchesAlternative(value, term))),
+    );
+  });
 }
 
 /** Match only the item name, code, and aliases; unrelated location/supplier fields stay excluded. */

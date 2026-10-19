@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { FlaskConical } from "lucide-react";
 import { ApiError } from "@/lib/api-core";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -40,6 +41,9 @@ export function AsResearchQueuePanel({ approverEmployeeId, refreshNonce, onChang
   const [approvePinFor, setApprovePinFor] = useState<string | null>(null);
   const [approvePin, setApprovePin] = useState("");
   const [approveError, setApproveError] = useState<string | null>(null);
+  useRegisterDirty("as-research-queue-approval", !!busyId || !!showRejectFor || !!approvePinFor,
+    async () => { throw new Error("진행 중인 결재 결과를 확인한 뒤 이동해 주세요."); }, undefined,
+    { mode: busyId ? "auto-save" : "confirm-only" });
 
   useEffect(() => {
     onEmptyStateChange?.(loading || (items.length === 0 && !error));

@@ -19,7 +19,8 @@ import { DefectManagementCategoryControl } from "./DefectManagementCategoryContr
 import type { DefectManagementCategory } from "@/lib/api/types/defects";
 import { makeClientRequestId } from "@/lib/uuid";
 import { queryKeys } from "@/lib/queries/keys";
-import { defectCartLineErrors, defectSourceStock } from "./defectCartValidation";
+import { defectCartLineErrors, defectSourceStock, OTHER_REASON_MEMO_REQUIRED_MESSAGE } from "./defectCartValidation";
+import { DefectQuantitySummary } from "./DefectQuantitySummary";
 import { formatQty } from "@/lib/mes/format";
 import { MAX_QUARANTINE_LINES, groupDefectCartLines, insertDefectCartLine, defectCartGroupErrors } from "./defectCartGroups";
 import quarantineConfirmStyles from "./DefectQuarantineConfirm.module.css";
@@ -207,7 +208,7 @@ export function DefectCartFlow({
   }
 
   function addItem(item: Item): void {
-    if (selectedIds.has(item.item_id)) return;
+    if (selectedIds.has(item.item_id) || defectSourceStock(item, source).available <= 0) return;
     addReason(item);
   }
 
@@ -465,20 +466,8 @@ export function DefectCartFlow({
                           <div className="break-words text-2xl font-black leading-snug" style={{ color: LEGACY_COLORS.text }}>{group.item.item_name}</div>
                           <div className="mt-1 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{group.item.mes_code ?? "(코드 없음)"} · {source === "warehouse" ? "창고" : itemDepartment(group.item) ?? "부서 미지정"}</div>
                         </div>
-                        <dl aria-label="품목 수량 요약" className="flex max-w-full shrink-0 flex-wrap items-center gap-x-4 gap-y-2 rounded-[10px] px-3 py-2" style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}>
-                          <div className="flex flex-col gap-0.5">
-                            <dt className="text-xs font-bold">{source === "warehouse" ? "창고 가용" : "부서 가용"}</dt>
-                            <dd className="m-0 flex items-baseline gap-1 whitespace-nowrap"><span className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>{formatQty(defectSourceStock(group.item, source).available)}</span><span className="text-xs font-bold">{group.item.unit || "EA"}</span></dd>
-                          </div>
-                          <div className="flex flex-col gap-0.5 border-l pl-4" style={{ borderColor: LEGACY_COLORS.border }}>
-                            <dt className="text-xs font-bold">총 처리 수량</dt>
-                            <dd className="m-0 flex items-baseline gap-1 whitespace-nowrap"><span className="text-lg font-black" style={{ color: LEGACY_COLORS.red }}>{group.totalQuantity === null ? "—" : formatQty(group.totalQuantity)}</span><span className="text-xs font-bold">{group.item.unit || "EA"}</span></dd>
-                          </div>
-                          <div className="flex flex-col gap-0.5 border-l pl-4" style={{ borderColor: LEGACY_COLORS.border }}>
-                            <dt className="text-xs font-bold">사유</dt>
-                            <dd className="m-0 flex items-baseline gap-1 whitespace-nowrap"><span className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>{formatQty(group.lines.length)}</span><span className="text-xs font-bold">건</span></dd>
-                          </div>
-                        </dl>
+                        <DefectQuantitySummary availableLabel={source === "warehouse" ? "창고 가용 재고" : "부서 가용 재고"}
+                          available={defectSourceStock(group.item, source).available} total={group.totalQuantity} count={group.lines.length} unit={group.item.unit || "EA"} />
                       </div>
                       {groupErrors.has(group.item.item_id) && <p className="px-3 pb-2 text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>{groupErrors.get(group.item.item_id)}</p>}
                       {group.lines.map((line, index) => {
@@ -501,7 +490,7 @@ export function DefectCartFlow({
                               remove: <button type="button" disabled={busy} onClick={() => removeLine(line.key)} aria-label={`${group.item.item_name} 사유 ${index + 1} 삭제`}
                                 className="standard-hover no-btn-inset flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] disabled:opacity-50" style={{ color: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 10) }}><Trash2 className="h-4 w-4" /></button>,
                             }} />
-                          {validationErrors.filter((message) => message !== "사유 카테고리를 선택하세요.").map((message) => <div key={message} className="text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>{message}</div>)}
+                          {validationErrors.filter((message) => message !== "사유 카테고리를 선택하세요." && message !== OTHER_REASON_MEMO_REQUIRED_MESSAGE).map((message) => <div key={message} className="text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>{message}</div>)}
                         </fieldset>;
                       })}
                     </div>
@@ -510,14 +499,17 @@ export function DefectCartFlow({
                     const validationErrors = lineErrorsByKey.get(line.key) ?? [];
                     const reasonIndex = lines.slice(0, idx).filter((entry) => entry.item.item_id === line.item.item_id).length;
                     const lastReason = lines[idx + 1]?.item.item_id !== line.item.item_id;
+                    const group = groups.find((entry) => entry.item.item_id === line.item.item_id)!;
                     return (
                       <div key={line.key} className="flex flex-col gap-2 rounded-[12px] border px-3 py-2" style={{ background: LEGACY_COLORS.s1, borderColor: fail || validationErrors.length > 0 ? tint(LEGACY_COLORS.red, 30) : LEGACY_COLORS.border }}>
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="min-w-0 flex-1 basis-[240px]">
                             <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{line.item.mes_code ?? "(코드 없음)"}</div>
-                            <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{line.item.item_name}</div>
-                            <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>자동 부서 · {source === "warehouse" ? "창고" : itemDepartment(line.item) ?? "부서 미지정"}</div>
+                            <div className="break-words text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>{line.item.item_name}</div>
+                            <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>부서 · {source === "warehouse" ? "창고" : itemDepartment(line.item) ?? "부서 미지정"}</div>
                           </div>
+                          {reasonIndex === 0 && <DefectQuantitySummary availableLabel={source === "warehouse" ? "창고 가용 재고" : "부서 가용 재고"}
+                            available={defectSourceStock(line.item, source).available} total={group.totalQuantity} count={group.lines.length} unit={line.item.unit || "EA"} />}
                         </div>
 
                         <ReasonFormFields employeeId={currentEmployee.employee_id} category={line.category} categoryId={line.categoryId} memo={line.memo} onCategoryChange={(name, id) => updateLine(line.key, { category: name, categoryId: id ?? null })} onMemoChange={(m) => updateLine(line.key, { memo: m })} categoryPlaceholder="사유 카테고리를 선택하세요." required
@@ -540,7 +532,7 @@ export function DefectCartFlow({
 
                         {fail && <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>실패: {fail.message}</div>}
                         {lastReason && groupErrors.has(line.item.item_id) && <div className="text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>{groupErrors.get(line.item.item_id)}</div>}
-                        {validationErrors.filter((message) => message !== "사유 카테고리를 선택하세요.").map((message) => (
+                        {validationErrors.filter((message) => message !== "사유 카테고리를 선택하세요." && message !== OTHER_REASON_MEMO_REQUIRED_MESSAGE).map((message) => (
                           <div key={message} className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>{message}</div>
                         ))}
                       </div>
@@ -572,6 +564,13 @@ export function DefectCartFlow({
       {step === 4 && isRework && lines.length > 0 && (
         <div key="step4" className="animate-desktop-navigation-enter flex min-h-0 flex-1 flex-col gap-3">
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+          {groups.map((group) => <div key={group.item.item_id} className="flex shrink-0 flex-wrap items-center gap-3 rounded-[16px] border px-5 py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+            <div className="min-w-0 flex-1 basis-[240px]">
+              <div className="break-words text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>{group.item.item_name}</div>
+              <div className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{group.item.mes_code}</div>
+            </div>
+            <DefectQuantitySummary availableLabel="부서 가용 재고" available={defectSourceStock(group.item, source).available} total={group.totalQuantity} count={group.lines.length} unit={group.item.unit || "EA"} />
+          </div>)}
           {lines.map((line, index) => <section key={line.key} className={`flex min-w-0 flex-col gap-3 ${lines.length === 1 ? "min-h-0 flex-1" : "shrink-0"}`}>
           <div className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-stretch rounded-[16px] border px-5 py-4" style={{ background: tint(LEGACY_COLORS.blue, 8), borderColor: tint(LEGACY_COLORS.blue, 35) }}>
             <div className="min-w-0">

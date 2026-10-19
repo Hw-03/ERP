@@ -57,7 +57,8 @@ def test_absent_optional_evidence_skips_its_normalization(search_session: Sessio
     assert len(calls) <= 8 * 9
 
 
-@pytest.mark.parametrize("search", ["old-name", "O.L/D 007", "Current.Master", "Operation/Label"])
+@pytest.mark.parametrize("search", ["old-name", "O.L/D 007", "Current.Master", "Operation/Label",
+                                    "unmatched,old-name", "unmatched,O.L/D 007", "unmatched,Operation/Label"])
 def test_guard_preserves_snapshot_current_master_and_operation_search(search_session: Session, search: str) -> None:
     operation = InventoryOperation(kind=InventoryOperationKindEnum.BUSINESS, domain="inventory",
                                    action="receive", display_label="Operation Label", actor_name="Tester")

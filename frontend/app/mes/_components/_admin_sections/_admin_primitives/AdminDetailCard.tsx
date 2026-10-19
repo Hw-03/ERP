@@ -2,6 +2,8 @@
 
 import { useId, type KeyboardEvent, type ReactNode } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { useAdminSelectionFade } from "../useAdminSelectionFade";
+import transitions from "../AdminTransitions.module.css";
 
 export interface AdminDetailTab {
   id: string;
@@ -9,11 +11,13 @@ export interface AdminDetailTab {
 }
 
 export interface AdminDetailCardProps {
+  selectionKey?: string | number;
   title?: ReactNode;
   subtitle?: ReactNode;
   status?: ReactNode;
   actions?: ReactNode;
   tabs?: AdminDetailTab[];
+  tabsDisabled?: boolean;
   tabActions?: ReactNode;
   activeTab?: string;
   onTabChange?: (id: string) => void;
@@ -22,17 +26,20 @@ export interface AdminDetailCardProps {
 }
 
 export function AdminDetailCard({
+  selectionKey,
   title,
   subtitle,
   status,
   actions,
   tabs,
+  tabsDisabled = false,
   tabActions,
   activeTab,
   onTabChange,
   children,
   footer,
 }: AdminDetailCardProps) {
+  const fadeRef = useAdminSelectionFade(selectionKey === undefined ? undefined : JSON.stringify([selectionKey, activeTab]));
   const tabInstanceId = useId();
   const hasTabs = Boolean(tabs?.length);
   const activeTabIndex = tabs?.findIndex((tab) => tab.id === activeTab) ?? -1;
@@ -41,7 +48,7 @@ export function AdminDetailCard({
   const hasHeaderContent = Boolean(title || subtitle || status);
 
   function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    if (!tabs || tabs.length === 0) return;
+    if (tabsDisabled || !tabs || tabs.length === 0) return;
 
     let nextIndex: number | null = null;
     if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
@@ -111,6 +118,7 @@ export function AdminDetailCard({
                   id={tabId}
                   type="button"
                   role="tab"
+                  disabled={tabsDisabled}
                   aria-selected={active}
                   aria-controls={tabPanelId}
                   tabIndex={active ? 0 : -1}
@@ -136,11 +144,12 @@ export function AdminDetailCard({
         </div>
       )}
       <div
+        ref={fadeRef}
         data-admin-detail-content
         role={hasTabs ? "tabpanel" : undefined}
         id={hasTabs ? tabPanelId : undefined}
         aria-labelledby={hasTabs ? `${tabInstanceId}-tab-${selectedTabIndex}` : undefined}
-        className="min-h-0 flex-1 overflow-y-auto p-5 [scrollbar-gutter:stable]"
+        className={`min-h-0 flex-1 overflow-y-auto p-5 [scrollbar-gutter:stable] ${transitions.selection}`}
       >
         {children}
       </div>

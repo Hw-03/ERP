@@ -36,6 +36,8 @@ interface Props {
   side?: "top" | "bottom";
   /** true 면 툴팁 표시 자체를 끔. content 가 비어도 자동으로 안 뜸. */
   disabled?: boolean;
+  /** 표시 직전에만 검사할 조건. 대량 목록의 폭 측정을 진입 시 실행하지 않는다. */
+  shouldShow?: () => boolean;
   /** true 면 multi-line content 허용 (whitespace-normal + max-width). 기본 false (한 줄 nowrap). */
   multiline?: boolean;
   /**
@@ -54,6 +56,7 @@ export function Tooltip({
   children,
   side = "top",
   disabled = false,
+  shouldShow,
   multiline = false,
   triggerClassName = "relative inline-flex",
   triggerId,
@@ -78,13 +81,13 @@ export function Tooltip({
     setDescribesFocusedChild(false);
   };
 
-  const handleShow = () => {
-    if (disabled) return;
-    if (!triggerRef.current) return;
+  const handleShow = (): boolean => {
+    if (disabled || !triggerRef.current || (shouldShow && !shouldShow())) return false;
     const rect = triggerRef.current.getBoundingClientRect();
     const left = rect.left + rect.width / 2;
     const top = side === "top" ? rect.top - 6 : rect.bottom + 6;
     setPos({ left, top });
+    return true;
   };
   const handleMouseLeave = () => {
     if (!pointerFocusRef.current && triggerRef.current?.contains(document.activeElement)) return;
@@ -92,7 +95,7 @@ export function Tooltip({
     setPos(null);
   };
   const handleFocus = (event: FocusEvent<HTMLSpanElement>) => {
-    if (disabled || !Boolean(content)) return;
+    if (!Boolean(content) || !handleShow()) return;
     const target = event.target instanceof HTMLElement ? event.target : event.currentTarget;
     if (focusedTargetRef.current && focusedTargetRef.current !== target) {
       removeDescription(focusedTargetRef.current, tooltipId);
@@ -105,7 +108,6 @@ export function Tooltip({
       focusedTargetRef.current = target;
       setDescribesFocusedChild(true);
     }
-    handleShow();
   };
   const handleBlur = (event: FocusEvent<HTMLSpanElement>) => {
     if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;

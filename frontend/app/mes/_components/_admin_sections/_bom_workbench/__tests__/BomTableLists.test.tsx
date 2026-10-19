@@ -87,6 +87,23 @@ function setNameOverflow(element: HTMLElement, overflow: boolean) {
 }
 
 describe("BOM 편집 표형 목록", () => {
+  it("does not measure every item name at mount or resize before the user opens a tooltip", () => {
+    const width = vi.spyOn(Element.prototype, "scrollWidth", "get").mockReturnValue(240);
+    const clientWidth = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(120);
+    try {
+      const { container } = render(<BomParentList dept="ALL" items={Array.from({ length: 60 }, (_, i) => item({ item_id: `item-${i}` }))} allBomRows={[]} completedSet={new Set()} statusFilter="ALL" selectedId="" onSelect={vi.fn()} mode="edit" />);
+      expect(width).not.toHaveBeenCalled();
+      fireEvent(window, new Event("resize"));
+      expect(width).not.toHaveBeenCalled();
+      fireEvent.mouseEnter(container.querySelector("[data-bom-row-surface]")!.parentElement!);
+      expect(width).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole("tooltip")).toHaveTextContent("아주 긴 이름의 BOM 품목입니다");
+    } finally {
+      width.mockRestore();
+      clientWidth.mockRestore();
+    }
+  });
+
   it("상위 품목 목록에 선택 제목을 표시한다", () => {
     render(
       <BomParentList
@@ -256,7 +273,7 @@ describe("BOM 편집 표형 목록", () => {
       />,
     );
 
-    const gridTemplateColumns = "52px minmax(0, 1fr) 78px 44px";
+    const gridTemplateColumns = "40px minmax(0, 1fr) clamp(78px, 5.75vw, 110px) 64px";
     expectStickyTableHeader(container, gridTemplateColumns);
     const row = findTableRow(container, gridTemplateColumns);
     expect(row?.style.gridTemplateColumns).toBe(gridTemplateColumns);
@@ -264,9 +281,9 @@ describe("BOM 편집 표형 목록", () => {
       (element) => element.classList.contains("sticky") && element.style.gridTemplateColumns === gridTemplateColumns,
     );
     expect(header?.children.item(0)).toHaveClass("justify-self-center");
-    expect(header?.children.item(3)).toHaveClass("justify-self-end");
+    expect(header?.children.item(3)).toHaveClass("justify-self-center");
     expect(row?.children.item(0)).toHaveClass("justify-self-center");
-    expect(row?.children.item(3)).toHaveClass("justify-self-end");
+    expect(row?.children.item(3)).toHaveClass("justify-self-center");
     expect(row).toHaveClass("no-btn-inset", "h-[37px]", "px-3", "hover:bg-[var(--c-s4)]");
     expect(row).not.toHaveClass("py-2");
     expect(row).toHaveClass("border-b");
@@ -292,7 +309,7 @@ describe("BOM 편집 표형 목록", () => {
       />,
     );
 
-    const selectedRow = findTableRow(container, "52px minmax(0, 1fr) 78px 44px")!;
+    const selectedRow = findTableRow(container, "40px minmax(0, 1fr) clamp(78px, 5.75vw, 110px) 64px")!;
     expect(selectedRow).toHaveClass("border-b");
     expect(selectedRow).not.toHaveClass("border-l-[3px]", "border-l-[var(--c-blue)]");
     expect(selectedRow.style.background).toBe("color-mix(in srgb, var(--c-blue) 14%, transparent)");
@@ -309,15 +326,15 @@ describe("BOM 편집 표형 목록", () => {
       />,
     );
 
-    const gridTemplateColumns = "52px minmax(0, 1fr) 78px 44px";
+    const gridTemplateColumns = "40px minmax(0, 1fr) clamp(78px, 5.75vw, 110px) 64px";
     expectStickyTableHeader(container, gridTemplateColumns);
     const row = findTableRow(container, gridTemplateColumns);
     expect(row?.style.gridTemplateColumns).toBe(gridTemplateColumns);
-    expect(row?.children.item(3)).toHaveClass("justify-self-end");
+    expect(row?.children.item(3)).toHaveClass("justify-self-center");
     const candidateHeader = [...container.querySelectorAll<HTMLElement>("div")].find(
       (element) => element.classList.contains("sticky") && element.style.gridTemplateColumns === gridTemplateColumns,
     );
-    expect(candidateHeader?.children.item(3)).toHaveClass("justify-self-end");
+    expect(candidateHeader?.children.item(3)).toHaveClass("justify-self-center");
     expect(row).toHaveClass("h-[37px]", "px-3", "hover:bg-[var(--c-s4)]");
     expect(row).not.toHaveClass("py-2");
     expect(row?.querySelector("[data-bom-row-label]")).not.toHaveAttribute("title");
@@ -336,7 +353,7 @@ describe("BOM 편집 표형 목록", () => {
       />,
     );
 
-    expect(BOM_CURRENT_ROW_GRID_TEMPLATE).toBe("52px minmax(0, 1fr) 78px 72px 28px");
+    expect(BOM_CURRENT_ROW_GRID_TEMPLATE).toBe("40px minmax(0, 1fr) clamp(78px, 5.75vw, 110px) 72px 28px");
     expectStickyTableHeader(container, BOM_CURRENT_ROW_GRID_TEMPLATE);
     expect(screen.getByText("CHILD-001")).toHaveClass("truncate");
     expect(screen.getByText("등록된 품목")).not.toHaveAttribute("title");
@@ -349,7 +366,7 @@ describe("BOM 편집 표형 목록", () => {
     const currentHeader = [...container.querySelectorAll<HTMLElement>("div")].find(
       (element) => element.classList.contains("sticky") && element.style.gridTemplateColumns === BOM_CURRENT_ROW_GRID_TEMPLATE,
     );
-    expect(currentHeader).toHaveClass("text-sm", "tracking-[0.5px]");
+    expect(currentHeader).toHaveClass("text-xs", "tracking-[0.5px]");
     expect(currentHeader).not.toHaveClass("text-[11px]");
     expect(currentHeader).not.toHaveClass("tracking-[1.5px]");
     expect(currentHeader?.children.item(3)).toHaveClass("justify-self-center");
@@ -452,7 +469,7 @@ describe("BOM 편집 표형 목록", () => {
       />,
     );
 
-    const row = findTableRow(container, "52px minmax(0, 1fr) 78px 44px")!;
+    const row = findTableRow(container, "40px minmax(0, 1fr) clamp(78px, 5.75vw, 110px) 64px")!;
     setNameOverflow(row.querySelector("[data-bom-row-label]")!, true);
     fireEvent.mouseEnter(row.parentElement!);
     expect(await screen.findByRole("tooltip")).toHaveTextContent("아주 긴 이름의 BOM 품목입니다");
@@ -472,7 +489,7 @@ describe("BOM 편집 표형 목록", () => {
       />,
     );
 
-    const row = findTableRow(container, "52px minmax(0, 1fr) 78px 44px")!;
+    const row = findTableRow(container, "40px minmax(0, 1fr) clamp(78px, 5.75vw, 110px) 64px")!;
     setNameOverflow(row.querySelector("[data-bom-row-label]")!, false);
     fireEvent.mouseEnter(row.parentElement!);
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
@@ -589,11 +606,11 @@ describe("BOM 레이아웃 높이 계약", () => {
     const filterGroup = screen.getAllByRole("button", { name: "전체" })[0].parentElement!;
     const filterSection = filterGroup.parentElement?.parentElement?.parentElement!;
 
-    expect(titleSection).toHaveClass("flex", "items-center", "gap-3", "px-4", "py-3");
+    expect(titleSection).toHaveClass("flex", "h-12", "shrink-0", "items-center", "gap-3", "px-4");
     expect(titleSection).toContainElement(search);
     expect(titleSection.style.borderBottom).toBe("1px solid var(--c-border)");
     expect(search.parentElement).toHaveStyle({ background: "var(--c-s1)" });
-    expect(filterSection).toHaveClass("px-4", "py-3");
+    expect(filterSection).toHaveClass("flex", "h-10", "shrink-0", "items-center", "px-4");
     expect(filterGroup).toHaveClass("flex", "shrink-0", "gap-1.5");
     expect(filterGroup.parentElement).toHaveClass("flex", "w-max", "min-w-full", "gap-1");
     expect(filterGroup.parentElement?.parentElement).toHaveClass("overflow-x-auto");
@@ -601,7 +618,7 @@ describe("BOM 레이아웃 높이 계약", () => {
     expect(screen.queryByText(/^\d+건$/)).not.toBeInTheDocument();
   });
 
-  it("현재 구성 제목과 전용 열 머리글에만 고정 높이를 둔다", () => {
+  it("세 패널의 제어부와 열 머리글 높이를 맞춘다", () => {
     const { container } = render(
       <BomEditPanel
         parent={item()}
@@ -616,9 +633,9 @@ describe("BOM 레이아웃 높이 계약", () => {
       (element) => element.classList.contains("sticky") && element.style.gridTemplateColumns === BOM_CURRENT_ROW_GRID_TEMPLATE,
     );
     const currentTitle = screen.getByText(/현재 구성/);
-    expect(currentTitle).toHaveClass("h-[58px]", "flex", "items-center", "text-sm", "font-black");
+    expect(currentTitle).toHaveClass("h-[88px]", "flex", "items-center", "text-sm", "font-black");
     expect(currentTitle).not.toHaveClass("uppercase", "tracking-widest");
-    expect(currentHeader).toHaveClass("h-[50px]");
+    expect(currentHeader).toHaveClass("h-9");
 
     const { container: parentContainer } = render(
       <BomParentList
@@ -633,9 +650,9 @@ describe("BOM 레이아웃 높이 계약", () => {
       />,
     );
     const parentHeader = [...parentContainer.querySelectorAll<HTMLElement>("div")].find(
-      (element) => element.classList.contains("sticky") && element.style.gridTemplateColumns === "52px minmax(0, 1fr) 78px 44px",
+      (element) => element.classList.contains("sticky") && element.style.gridTemplateColumns === "40px minmax(0, 1fr) clamp(78px, 5.75vw, 110px) 64px",
     );
-    expect(parentHeader).not.toHaveClass("h-[50px]");
+    expect(parentHeader).toHaveClass("h-9");
   });
 });
 
@@ -653,7 +670,7 @@ describe("BOM normal data row height", () => {
         mode="edit"
       />,
     );
-    const selectedParentRow = findTableRow(parentContainer, "52px minmax(0, 1fr) 78px 44px")!;
+    const selectedParentRow = findTableRow(parentContainer, "40px minmax(0, 1fr) clamp(78px, 5.75vw, 110px) 64px")!;
     expect(selectedParentRow).toHaveAttribute("aria-pressed", "true");
     expect(selectedParentRow).toHaveClass("h-[37px]");
 

@@ -184,7 +184,7 @@ describe("데스크톱 불량 작업·출처 통합 선택", async () => {
     finishExit();
     expect(push).toHaveBeenCalledTimes(1);
     expect(window.history.state).toMatchObject({ defect: "cart", source: "warehouse", step: 2 });
-    expect(screen.getByRole("columnheader", { name: "창고 가용" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "창고 가용 재고" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: label === "격리 등록" ? "불량 격리" : "즉시 폐기" })).toHaveFocus();
     push.mockRestore();
   });

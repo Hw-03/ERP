@@ -45,11 +45,17 @@ describe("defectsApi management category", () => {
 });
 
 describe("defectsApi report statistics", () => {
+  it("passes the initial category to the basic endpoint and omits it for all categories", () => {
+    defectsApi.getStatistics({ period: "week", anchor: "2026-10-06", departments: [], models: [], process_steps: [], initial_category: "B_GRADE" });
+    expect(fetcher).toHaveBeenLastCalledWith(expect.stringContaining("initial_category=B_GRADE"));
+    defectsApi.getStatistics({ period: "week", anchor: "2026-10-06", departments: [], models: [], process_steps: [] });
+    expect(fetcher).toHaveBeenLastCalledWith(expect.not.stringContaining("initial_category"));
+  });
   it("encodes the report URL with repeated category filters and single drilldowns", () => {
     defectsApi.getStatisticsReport({
       period: "month", anchor: "2026-10-06",
       departments: ["조립", "품질 관리"], models: ["DX 100", "SOLO"],
-      process_steps: ["A", "F"], reason: "조립/외관", item_id: "item #1",
+      process_steps: ["A", "F"], reason: "조립/외관", item_id: "item #1", initial_category: "OBSOLETE",
     });
 
     const url = vi.mocked(fetcher).mock.calls.at(-1)?.[0] as string;
@@ -63,5 +69,6 @@ describe("defectsApi report statistics", () => {
     expect(params.getAll("process_step")).toEqual(["A", "F"]);
     expect(params.getAll("reason")).toEqual(["조립/외관"]);
     expect(params.getAll("item_id")).toEqual(["item #1"]);
+    expect(params.get("initial_category")).toBe("OBSOLETE");
   });
 });

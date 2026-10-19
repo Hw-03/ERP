@@ -15,6 +15,7 @@ import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import styles from "./ReasonFormFields.module.css";
 import { SearchInput } from "../common/SearchInput";
+import { OTHER_REASON_MEMO_REQUIRED_MESSAGE } from "./defectCartValidation";
 
 export interface ReasonFormFieldsProps {
   employeeId: string;
@@ -192,7 +193,7 @@ export function ReasonFormFields({
       <textarea aria-label="메모" value={memo} onChange={(event) => onMemoChange(event.target.value)} placeholder="예: 스크래치 다수 / 우측 끝단" rows={2}
         className="w-full resize-none rounded-[10px] border px-3 py-2 text-sm outline-none focus-visible:ring-2"
         style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text, borderColor: otherMissingMemo ? LEGACY_COLORS.red : LEGACY_COLORS.border }} />
-      {otherMissingMemo && <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>기타를 선택하면 메모를 입력하세요.</span>}
+      {otherMissingMemo && <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>{OTHER_REASON_MEMO_REQUIRED_MESSAGE}</span>}
     </div>;
 
   return <div className={`flex min-w-0 flex-col ${animateCategory && !quarantineControls ? "gap-0" : "gap-3"}`}>

@@ -37,6 +37,7 @@ def test_statistics_route_passes_repeated_filters(monkeypatch, client):
             "departments": [],
             "excluded_legacy_count": 0,
             "categories": EMPTY_CATEGORIES,
+            "category_totals": EMPTY_CATEGORIES,
             "excluded_category_count": 0,
         }
 
@@ -51,6 +52,7 @@ def test_statistics_route_passes_repeated_filters(monkeypatch, client):
             ("department", "진공"),
             ("model", "DX3000"),
             ("process_step", "A"),
+            ("initial_category", "B_GRADE"),
         ],
     )
 
@@ -60,7 +62,9 @@ def test_statistics_route_passes_repeated_filters(monkeypatch, client):
     assert captured["filters"].departments == ("조립", "진공")
     assert captured["filters"].models == ("DX3000",)
     assert captured["filters"].process_steps == ("A",)
+    assert captured["filters"].initial_category == "B_GRADE"
     assert response.json()["categories"] == EMPTY_CATEGORIES
+    assert response.json()["category_totals"] == EMPTY_CATEGORIES
     assert response.json()["excluded_category_count"] == 0
 
 
@@ -74,7 +78,7 @@ def test_report_route_defaults_month_and_passes_all_filters(monkeypatch, client)
             "period": {"kind": period, "anchor": anchor, "start_date": date(2026, 9, 1), "end_date": date(2026, 9, 30)},
             "summary": {"record_count": 0, "quantity": 0},
             "timeline": [], "items": [], "reasons": [], "departments": [], "excluded_legacy_count": 0,
-            "categories": EMPTY_CATEGORIES, "excluded_category_count": 0,
+            "categories": EMPTY_CATEGORIES, "category_totals": EMPTY_CATEGORIES, "excluded_category_count": 0,
             "as_of": datetime(2026, 9, 3, tzinfo=ZoneInfo("Asia/Seoul")),
             "observed_until": None, "is_partial": False, "comparison": None, "trend": [],
         }
@@ -82,7 +86,7 @@ def test_report_route_defaults_month_and_passes_all_filters(monkeypatch, client)
     monkeypatch.setattr(defects_router, "get_defect_statistics_report", fake_report, raising=False)
     response = client.get("/api/defects/statistics/report", params=[
         ("anchor", "2026-09-03"), ("department", "조립"), ("department", "진공"),
-        ("model", "DX3000"), ("process_step", "A"), ("reason", "외관"), ("item_id", item_id),
+        ("model", "DX3000"), ("process_step", "A"), ("reason", "외관"), ("item_id", item_id), ("initial_category", "OBSOLETE"),
     ])
     assert response.status_code == 200, response.text
     assert captured["period"] == "month"
@@ -92,7 +96,10 @@ def test_report_route_defaults_month_and_passes_all_filters(monkeypatch, client)
     assert captured["filters"].process_steps == ("A",)
     assert captured["filters"].reason == "외관"
     assert str(captured["filters"].item_id) == item_id
+    assert captured["filters"].initial_category == "OBSOLETE"
     assert client.get("/api/defects/statistics/report").status_code == 422
+    for path in ("/api/defects/statistics", "/api/defects/statistics/report"):
+        assert client.get(path, params={"anchor": "2026-09-03", "initial_category": "invalid"}).status_code == 422
 
 
 def test_both_statistics_routes_return_original_categories_and_quantities(db_session, client, make_item):
@@ -125,6 +132,7 @@ def test_both_statistics_routes_return_original_categories_and_quantities(db_ses
             ("DEFECT", 4), ("B_GRADE", 5), ("OBSOLETE", 6),
         ]
         assert result["excluded_category_count"] == 0
+        assert result["category_totals"] == result["categories"]
         assert result["reasons"] == [{"key": str(reason_category.category_id), "label": "HTTP 현재 사유",
                                       "record_count": 3, "quantity": 15}]
         assert record.reason_category == "HTTP 과거 사유"

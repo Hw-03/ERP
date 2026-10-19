@@ -6,8 +6,7 @@
  */
 
 import { useEffect, useState } from "react";
-import type { Employee } from "@/lib/api/types/employees";
-import type { Department, DepartmentRole, WarehouseRole } from "@/lib/api";
+import type { Department, DepartmentRole, Employee, WarehouseRole } from "@/lib/api";
 import { sendClientEvent } from "@/lib/client-events";
 import { clearAuditSession, startAuditSession } from "@/lib/activity-audit-context";
 import { getClientEventSource } from "@/lib/operator-log-context";
@@ -46,6 +45,40 @@ const LOGIN_NOTIFICATION_POPUP_PENDING_KEY = "dexcowin_mes_login_popup_pending";
 // 같은 탭에서 setCurrentOperator 가 호출되면 useCurrentOperator 구독자들을 깨우기 위한 이벤트.
 // storage 이벤트는 변경을 일으킨 탭에 발화하지 않으므로 별도 CustomEvent가 필요하다.
 export const OPERATOR_CHANGE_EVENT = "dexcowin_operator_change";
+let accessLoginGeneration = 0;
+let accessVersion = 0;
+
+export type OperatorAccessProfile = Pick<Employee,
+  "employee_id" | "department" | "warehouse_role" | "department_role" |
+  "as_research_approver" | "io_enabled" | "hidden_sidebar_tabs">;
+export type OperatorAccessContext = { employeeId: string; login: number; version: number };
+
+/** Captures the login and local save boundary before an asynchronous profile read. */
+export function getOperatorAccessContext(): OperatorAccessContext | null {
+  const operator = readOperator();
+  return operator ? { employeeId: operator.employee_id, login: accessLoginGeneration, version: accessVersion } : null;
+}
+
+/** Merge access fields only; a save without an expected context supersedes outstanding reads. */
+export function updateCurrentOperatorAccess(profile: OperatorAccessProfile, expected?: OperatorAccessContext): boolean {
+  const operator = readOperator();
+  if (!operator || operator.employee_id !== profile.employee_id) return false;
+  if (expected && (expected.employeeId !== operator.employee_id || expected.login !== accessLoginGeneration || expected.version !== accessVersion)) return false;
+  if (!expected) accessVersion += 1;
+  const patch = {
+    department: profile.department,
+    warehouse_role: profile.warehouse_role,
+    department_role: profile.department_role,
+    as_research_approver: profile.as_research_approver,
+    io_enabled: profile.io_enabled ?? true,
+    hidden_sidebar_tabs: profile.hidden_sidebar_tabs ?? [],
+  };
+  if (Object.entries(patch).every(([key, value]) => JSON.stringify(operator[key as keyof Operator]) === JSON.stringify(value))) return false;
+  if (expected) accessVersion += 1;
+  window.sessionStorage.setItem(OPERATOR_KEY, JSON.stringify({ ...operator, ...patch }));
+  window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));
+  return true;
+}
 
 function clearLegacyPersistentOperator(): void {
   window.localStorage.removeItem(OPERATOR_KEY);
@@ -112,6 +145,8 @@ export function setCurrentOperator(op: Operator, bootId?: string): void {
   if (typeof window === "undefined") return;
   // PIN login supplies bootId; same-employee appearance updates do not.
   if (bootId || readOperator()?.employee_id !== op.employee_id) {
+    accessLoginGeneration += 1;
+    accessVersion = 0;
     writeOperatorActivity({ employeeId: op.employee_id, lastActivityAt: Date.now(), confirmationRequired: false });
   }
   clearLegacyPersistentOperator();
@@ -136,9 +171,10 @@ export function updateCurrentOperatorPreferences(patch: {
 }
 
 /** Refresh identity and access without restarting login audit or overwriting appearance drafts. */
-export function updateCurrentOperatorIdentity(employee: Employee, expectedEmployeeId: string): void {
+export function updateCurrentOperatorIdentity(employee: Employee, expected: OperatorAccessContext): void {
   const operator = readOperator();
-  if (!operator || operator.employee_id !== expectedEmployeeId || employee.employee_id !== expectedEmployeeId) return;
+  if (!operator || operator.employee_id !== expected.employeeId || employee.employee_id !== expected.employeeId
+    || expected.login !== accessLoginGeneration || expected.version !== accessVersion) return;
   const next: Operator = {
     ...operator,
     name: employee.name ?? operator.name,
@@ -152,6 +188,8 @@ export function updateCurrentOperatorIdentity(employee: Employee, expectedEmploy
     io_enabled: employee.io_enabled ?? operator.io_enabled,
     hidden_sidebar_tabs: employee.hidden_sidebar_tabs ?? operator.hidden_sidebar_tabs,
   };
+  if (JSON.stringify(next) === JSON.stringify(operator)) return;
+  accessVersion += 1;
   window.sessionStorage.setItem(OPERATOR_KEY, JSON.stringify(next));
   window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));
 }
@@ -159,6 +197,8 @@ export function updateCurrentOperatorIdentity(employee: Employee, expectedEmploy
 /** Clear local identity immediately; reload callers await the server revocation result. */
 export function clearCurrentOperator(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
+  accessLoginGeneration += 1;
+  accessVersion = 0;
   // Preserve uncertainty until the server acknowledges revocation, including network failures.
   window.sessionStorage.setItem("dexcowin_mes_logout_warning", "이전 서버 세션의 해제를 아직 확인하지 못했습니다. 이 탭의 로그인 정보는 지웠습니다.");
   const revocation = revokeOperatorSession().then((result) => {

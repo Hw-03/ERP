@@ -51,12 +51,12 @@ describe("EmployeeDetailGrid", () => {
     for (const tab of SIDEBAR_TAB_IDS) {
       const checkbox = screen.getByRole("checkbox", { name: SIDEBAR_TAB_META[tab].label });
       const card = checkbox.closest("label")!;
-      expect(card).toHaveClass("min-h-11", "border", "focus-within:ring-2");
+      expect(card).toHaveClass("min-h-12", "border", "has-[:focus-visible]:ring-2");
       expect(card.querySelector('svg[aria-hidden="true"]')).toBeInTheDocument();
       expect(checkbox).toHaveProperty("checked", tab !== "stocktake");
     }
-    expect(screen.getByText(/전수조사 일괄 표시를 바꾸면 이 설정도 함께 바뀌며, 여기서 다시 개별 조정할 수 있습니다/)).toBeInTheDocument();
-    expect(screen.getByText(/부서 결재 정·부는 일괄 변경에서 제외됩니다\./)).toBeInTheDocument();
+    expect(screen.queryByText(/직원별 메뉴 표시를 설정합니다/)).not.toBeInTheDocument();
+    expect(screen.getByText("직원에게 보이는 메뉴")).toHaveClass("text-[16px]", "font-bold");
     expect(screen.queryByText(/관리자·회차 담당자는 일괄 변경에서 제외/)).not.toBeInTheDocument();
   });
 
@@ -75,8 +75,8 @@ describe("EmployeeDetailGrid", () => {
     const checkbox = screen.getByRole("checkbox", { name: "재고 전수조사" });
     const card = checkbox.closest("label")!;
     const selectedStyle = {
-      background: "color-mix(in srgb, var(--c-blue) 10%, var(--c-s1))",
-      borderColor: "color-mix(in srgb, var(--c-blue) 35%, var(--c-border))",
+      background: "var(--c-s1)",
+      borderColor: "color-mix(in srgb, var(--c-blue) 24%, var(--c-border))",
     };
     expect(card).toHaveStyle(selectedStyle);
     fireEvent.click(checkbox);
@@ -84,7 +84,7 @@ describe("EmployeeDetailGrid", () => {
     expect(hidden).toEqual({ ...form, hidden_sidebar_tabs: ["stocktake"] });
     rerender(<EmployeeDetailGrid {...props} form={hidden} />);
     expect(screen.getByRole("checkbox", { name: "재고 전수조사" })).not.toBeChecked();
-    expect(card).toHaveStyle({ background: "var(--c-s1)", borderColor: "var(--c-border)" });
+    expect(card).toHaveStyle({ background: "color-mix(in srgb, var(--c-blue) 4%, var(--c-s1))", borderColor: "var(--c-border)" });
     fireEvent.click(screen.getByRole("checkbox", { name: "재고 전수조사" }));
     const shown = setForm.mock.calls[1][0](hidden) as EmployeeEditForm;
     expect(shown).toEqual(form);
@@ -135,20 +135,21 @@ describe("EmployeeDetailGrid", () => {
     const departmentField = screen.getByText("부서 결재 역할").parentElement!;
     const warehouseSelect = within(warehouseField).getByRole("combobox");
     const departmentSelect = within(departmentField).getByRole("combobox");
-    expect(warehouseSelect).toHaveTextContent("정");
-    expect(departmentSelect).toHaveTextContent("부");
+    expect(warehouseSelect).toHaveTextContent("정 · 창고 주담당 결재");
+    expect(departmentSelect).toHaveTextContent("부 · 보조 결재 가능");
+    expect(screen.getByText("AR·AA 출고 승인")).toHaveClass("truncate");
     expect(screen.getByRole("checkbox", { name: "AS·연구 승인 권한" })).toBeChecked();
 
     fireEvent.click(warehouseSelect);
-    expect(screen.getByRole("option", { name: "없음", exact: true })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "정", exact: true })).toBeInTheDocument();
-    fireEvent.mouseDown(screen.getByRole("option", { name: "부", exact: true }));
+    expect(screen.getByRole("option", { name: "없음 · 기본 작업만 수행", exact: true })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "정 · 창고 주담당 결재", exact: true })).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole("option", { name: "부 · 보조 결재 가능", exact: true }));
     expect(setForm.mock.calls[0][0](selectedForm)).toEqual({ ...selectedForm, warehouse_role: "deputy" });
 
     fireEvent.click(departmentSelect);
-    expect(screen.getByRole("option", { name: "없음", exact: true })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "부", exact: true })).toBeInTheDocument();
-    fireEvent.mouseDown(screen.getByRole("option", { name: "정", exact: true }));
+    expect(screen.getByRole("option", { name: "없음 · 기본 작업만 수행", exact: true })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "부 · 보조 결재 가능", exact: true })).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole("option", { name: "정 · 부서 주담당 결재", exact: true }));
     expect(setForm.mock.calls[1][0](selectedForm)).toEqual({ ...selectedForm, department_role: "primary" });
 
     fireEvent.click(screen.getByRole("checkbox", { name: "AS·연구 승인 권한" }));
@@ -206,20 +207,20 @@ describe("EmployeeDetailGrid", () => {
       />,
     );
 
-    const layout = screen.getByText("기본 정보").parentElement?.parentElement?.parentElement;
-    const basicCard = screen.getByText("기본 정보").parentElement?.parentElement;
     const permissionsCard = screen.getByText("결재 권한").parentElement?.parentElement;
-    const menuCard = screen.getByText("메뉴 및 추가 권한").parentElement?.parentElement;
+    const layout = permissionsCard?.parentElement;
+    const basicFields = screen.getByRole("group", { name: "직원 기본 정보" });
+    const menuCard = screen.getByText("직원에게 보이는 메뉴").parentElement?.parentElement;
     const assignedModelsCard = screen.getByText("담당 모델 (우선순위 순)").parentElement?.parentElement;
     const dangerCard = screen.getByText("계정 상태 및 위험 작업").parentElement?.parentElement;
     const actionArea = dangerCard?.parentElement;
 
-    expect(layout).toHaveClass("xl:grid-cols-3");
-    expect(basicCard?.parentElement).toBe(layout);
+    expect(basicFields.parentElement?.nextElementSibling).toBe(layout);
+    expect(basicFields).toContainElement(screen.getByRole("textbox", { name: "이름" }));
     expect(permissionsCard?.parentElement).toBe(layout);
     expect(menuCard?.parentElement).toBe(layout);
-    expect(within(permissionsCard!).queryByRole("checkbox")).not.toBeInTheDocument();
-    expect(within(menuCard!).getByRole("checkbox", { name: "AS·연구 승인 권한" })).toBeInTheDocument();
+    expect(within(permissionsCard!).getByRole("checkbox", { name: "AS·연구 승인 권한" })).toBeInTheDocument();
+    expect(within(menuCard!).getAllByRole("checkbox")).toHaveLength(SIDEBAR_TAB_IDS.length);
     expect(actionArea?.parentElement).toBe(layout);
     expect(actionArea).toBe(layout?.lastElementChild);
     expect(assignedModelsCard?.parentElement?.nextElementSibling).toBe(actionArea);
@@ -240,7 +241,7 @@ describe("EmployeeDetailGrid", () => {
     );
 
     const assignedModelsCard = screen.getByText("담당 모델 (우선순위 순)").parentElement?.parentElement;
-    expect(assignedModelsCard?.parentElement).toHaveClass("xl:col-span-3");
+    expect(assignedModelsCard?.parentElement).toHaveClass("lg:col-span-2");
   });
   it("직급 정규화는 raw role 하나만 받는다", () => {
     expect(normalizeEmployeePosition).toHaveLength(1);
@@ -301,17 +302,16 @@ describe("EmployeeDetailGrid", () => {
       />,
     );
 
-    const layout = screen.getByText("기본 정보").parentElement?.parentElement?.parentElement;
-    const basicCard = screen.getByText("기본 정보").parentElement?.parentElement;
     const permissionsCard = screen.getByText("결재 권한").parentElement?.parentElement;
+    const layout = permissionsCard?.parentElement;
     const dangerCard = screen.getByText("계정 상태 및 위험 작업").parentElement?.parentElement;
     const actionArea = dangerCard?.parentElement;
 
     expect(layout).toHaveClass("min-h-0", "xl:items-stretch");
     expect(layout).not.toHaveClass("h-full");
-    expect(basicCard).toHaveClass("h-full");
+    expect(screen.getByRole("group", { name: "직원 기본 정보" })).toBeInTheDocument();
     expect(permissionsCard).toHaveClass("h-full");
-    expect(actionArea).toHaveClass("grid", "lg:grid-cols-2", "xl:col-span-3");
+    expect(actionArea).toHaveClass("grid", "lg:grid-cols-2", "lg:col-span-2");
     expect(actionArea).not.toHaveClass("h-full", "grid-rows-[auto_minmax(0,1fr)]");
     expect(dangerCard).not.toHaveClass("h-full");
   });
@@ -332,8 +332,7 @@ describe("EmployeeDetailGrid", () => {
     );
 
     const toggle = screen.getByRole("checkbox", { name: "AS·연구 승인 권한" });
-    expect(screen.getByText(/부서 재고의 AS·연구용 출고를 승인할 수 있습니다/)).toBeInTheDocument();
-    expect(screen.getByText(/저장 후 다음 로그인부터 승인함이 표시됩니다/)).toBeInTheDocument();
+    expect(screen.getByText("AR·AA 출고 승인")).toBeInTheDocument();
     fireEvent.click(toggle);
     expect(setForm.mock.calls[0][0]({ ...form, as_research_approver: false }).as_research_approver).toBe(true);
   });

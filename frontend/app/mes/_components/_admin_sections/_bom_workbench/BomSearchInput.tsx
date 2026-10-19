@@ -9,5 +9,5 @@ export function BomSearchInput({ value, onChange, placeholder = "품목명 / 코
   placeholder?: string;
   bg?: string;
 }) {
-  return <SearchInput value={value} onChange={onChange} placeholder={placeholder} className="rounded-lg" style={{ background: bg }} />;
+  return <SearchInput value={value} onChange={onChange} placeholder={placeholder} className="h-9 !min-h-9 rounded-lg" inputProps={{ className: "!h-8" }} style={{ background: bg }} />;
 }

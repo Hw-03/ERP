@@ -55,7 +55,7 @@ describe("EmployeeAddInline", () => {
 
     const toggle = screen.getByRole("checkbox", { name: "AS·연구 승인 권한" });
     expect(screen.getByText(/AS·연구 사용출고 중 부서 재고의 AR·AA 품목 승인/)).toBeInTheDocument();
-    expect(screen.getByText(/대상 직원은 다음 로그인부터 승인함 탭 반영/)).toBeInTheDocument();
+    expect(screen.getByText(/저장 후 즉시 적용/)).toBeInTheDocument();
     expect(toggle).not.toBeChecked();
     fireEvent.click(toggle);
     expect(setForm).toHaveBeenCalledOnce();

@@ -8,6 +8,7 @@ import { Button } from "@/lib/ui/Button";
 import { useAuditCsvListQuery } from "@/lib/queries/useSettingsQuery";
 import { AppSelect } from "../common/AppSelect";
 import { EmptyState } from "../common";
+import { AdminDownloadSkeleton } from "./_admin_primitives/AdminSkeleton";
 import { FilterChip } from "../common/FilterChip";
 
 type AuditFormat = "csv" | "xlsx";
@@ -36,7 +37,8 @@ function downloadBlob(blob: Blob, fileName: string): void {
 
 /** 단일 데이터 내보내기 카드에서 월별 원본 로그 선택과 다운로드만 담당한다. */
 export function AdminAuditCsvControls(): ReactNode {
-  const { data: files = [], isLoading, error: queryError } = useAuditCsvListQuery();
+  const { data: loadedFiles, isLoading, error: queryError, refetch } = useAuditCsvListQuery();
+  const files = useMemo(() => loadedFiles ?? [], [loadedFiles]);
   const [selectedMonth, setSelectedMonth] = useState("");
   const [format, setFormat] = useState<AuditFormat>("csv");
   const [downloading, setDownloading] = useState(false);
@@ -74,19 +76,11 @@ export function AdminAuditCsvControls(): ReactNode {
     }
   }
 
-  if (isLoading) {
-    return (
-      <div
-        role="status"
-        className="rounded-[12px] border px-3 py-4 text-[14px] font-bold"
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-      >
-        원본 로그를 불러오는 중입니다.
-      </div>
-    );
+  if (isLoading && loadedFiles === undefined) {
+    return <AdminDownloadSkeleton />;
   }
 
-  if (queryError) {
+  if (queryError && loadedFiles === undefined) {
     return (
       <div
         role="alert"
@@ -94,6 +88,7 @@ export function AdminAuditCsvControls(): ReactNode {
         style={{ background: LEGACY_COLORS.errorBg, borderColor: LEGACY_COLORS.red, color: LEGACY_COLORS.red }}
       >
         {queryError instanceof Error ? queryError.message : "파일 목록 조회에 실패했습니다."}
+        <Button size="sm" onClick={() => void refetch()} className="ml-3">다시 시도</Button>
       </div>
     );
   }

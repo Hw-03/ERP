@@ -10,7 +10,7 @@ import type { IoBatch, IoBundle, IoLine } from "@/lib/api/types/io";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { historyOperationColor, historyUserNotes, isStocktakeOperation } from "./historyOperationSource";
+import { historyOperationColor, historySystemNote, historyUserNotes, isStocktakeOperation } from "./historyOperationSource";
 import { formatQty } from "@/lib/mes/format";
 import { TruncatedText } from "@/lib/ui/TruncatedText";
 import {
@@ -291,6 +291,7 @@ export function HistoryBatchDetailPanel({
               </div>
             )}
             <HistoryDetailMemo
+              systemNote={historySystemNote(first)}
               notes={historyUserNotes(first)}
               reasonMemo={first.reason_memo}
               transactionType={first.transaction_type}
@@ -348,7 +349,7 @@ export function HistoryBatchDetailPanel({
             onCancelClick={controller.openConfirmation}
             mobilePresentation={mobilePresentation}
           />
-          {mobilePresentation && <HistoryMobileContext summary={visibleSummary} omitCancelledStatus
+          {mobilePresentation && <HistoryMobileContext summary={visibleSummary} operation={first} omitCancelledStatus
             omitParticipantNames={[batch?.requester_name ?? getHistoryActor(first), batch?.approver_name ?? first.approver_name ?? ""]} />}
           {mobilePresentation && isStocktakeOperation(first) && !operationBatchId && (
             <section aria-label="재고 변화" className="space-y-2">
@@ -425,6 +426,7 @@ export function HistoryBatchDetailPanel({
 
           {mobilePresentation && <HistoryDetailReason log={first} />}
           <HistoryDetailMemo
+            systemNote={historySystemNote(first)}
             notes={historyUserNotes(first)}
             reasonMemo={first.reason_memo}
             transactionType={first.transaction_type}

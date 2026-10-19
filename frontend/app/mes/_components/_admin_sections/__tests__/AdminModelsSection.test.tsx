@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { describe, expect, it, vi } from "vitest";
 import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
 import { AdminModelsSection } from "../AdminModelsSection";
+import { AdminReadProvider, INITIAL_ADMIN_READ_STATES } from "../_admin_primitives/AdminReadState";
 
 const context = {
   productModels: [{ slot: 1, symbol: "A", model_name: "DX3000", is_reserved: false }],
@@ -31,6 +32,20 @@ function findByClasses(container: HTMLElement, ...classes: string[]) {
 }
 
 describe("AdminModelsSection", () => {
+  it("예약된 목록 열과 상세 필드를 보여 주고 최초 조회 후 실제 내용으로 전환한다", async () => {
+    const retry = vi.fn();
+    const view = (ready: boolean) => <AdminReadProvider value={{ states: Object.fromEntries(Object.keys(INITIAL_ADMIN_READ_STATES).map((key) => [key, { status: ready ? "ready" : "pending" }])) as typeof INITIAL_ADMIN_READ_STATES, retry }}>
+      <DirtyGuardProvider><AdminModelsSection items={[]} allBomRows={[]} /></DirtyGuardProvider>
+    </AdminReadProvider>;
+    const { rerender } = render(view(false));
+    expect(screen.getByTestId("admin-table-skeleton")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-detail-skeleton")).toBeInTheDocument();
+    expect(screen.queryByText(/좌측에서 모델을 선택/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "모델 추가" })).toBeDisabled();
+    rerender(view(true));
+    await screen.findByDisplayValue("DX3000");
+    expect(screen.queryByTestId("admin-detail-skeleton")).not.toBeInTheDocument();
+  });
   it("API 모델 슬롯으로 여러 글자 기호의 연결 품목과 BOM 수를 집계한다", async () => {
     const originalModels = context.productModels;
     context.productModels = [{ slot: 7, symbol: "QA", model_name: "QA 모델", is_reserved: false }];
@@ -52,7 +67,7 @@ describe("AdminModelsSection", () => {
     }
   });
 
-  it("keeps the narrow layout and uses a 2:8 list-detail split at xl", async () => {
+  it("uses the shared department list width and external scrollbar", async () => {
     const { container } = render(
       <DirtyGuardProvider>
         <AdminModelsSection items={[]} allBomRows={[]} />
@@ -61,16 +76,12 @@ describe("AdminModelsSection", () => {
 
     await screen.findByDisplayValue("DX3000");
 
-    expect(findByClasses(container, "xl:grid-cols-[minmax(0,1fr)_minmax(0,4fr)]")).toHaveClass(
-      "flex",
-      "gap-4",
-      "xl:grid",
-      "xl:grid-cols-[minmax(0,1fr)_minmax(0,4fr)]",
-    );
-    expect(findByClasses(container, "w-[288px]", "xl:w-auto")).toHaveClass("w-[288px]", "xl:w-auto");
+    expect(container.querySelector("div[style*='width: clamp(360px, 28vw, 440px)']")).toBeInTheDocument();
+    expect(screen.getByRole("grid", { name: "모델 목록" })).toHaveAttribute("data-scrollbar-rail-viewport");
+    expect(screen.getByRole("button", { name: "모델 추가" })).toBeInTheDocument();
   });
 
-  it("가용 높이를 채우며 통계는 세로 스택, 삭제는 하단에 정렬한다", async () => {
+  it("가용 높이를 채우며 통계는 상단 입력 영역, 삭제는 하단에 정렬한다", async () => {
     const linkedItems = Array.from({ length: 7 }, (_, index) => ({
       item_id: `item-${index + 1}`,
       item_name: `linked item ${index + 1}`,
@@ -86,14 +97,19 @@ describe("AdminModelsSection", () => {
     await screen.findByText("linked item 1");
 
     expect(findByClasses(container, "h-full", "min-h-0", "flex-1", "flex-col", "gap-3")).toHaveClass("min-h-0", "flex-1", "gap-3");
-    expect(findByClasses(container, "p-3", "rounded-[14px]", "border")).toHaveClass("p-3");
-    expect(findByClasses(container, "xl:grid", "xl:items-stretch", "xl:gap-3")).toHaveClass("min-h-0", "flex-1", "xl:grid", "xl:gap-3");
-    expect(findByClasses(container, "shrink-0", "flex-col", "gap-3")).toHaveClass("min-h-0", "flex", "flex-col", "gap-3");
-    expect(screen.getByText("연결 품목 수").parentElement).toHaveClass("flex-1");
-    expect(screen.getByText("연결 BOM 수").parentElement).toHaveClass("flex-1");
+    const fields = screen.getByRole("group", { name: "모델 기본 정보" });
+    expect(within(fields).getByText("연결 품목 수")).toBeInTheDocument();
+    expect(within(fields).getByText("연결 BOM 수")).toBeInTheDocument();
+    expect(fields.parentElement).toContainElement(screen.getByRole("button", { name: "저장" }));
     expect(findByClasses(container, "min-h-0", "flex-1", "flex-col")).toHaveClass("flex", "min-h-0", "flex-1", "flex-col");
     expect(screen.getAllByText(/linked item [1-6]$/)).toHaveLength(6);
     expect(screen.queryByText("linked item 7")).not.toBeInTheDocument();
+    const preview = screen.getByRole("region", { name: "연결 품목 미리보기" });
+    expect(preview).toHaveAttribute("data-scrollbar-rail-viewport");
+    expect(preview).toHaveClass("lg:-right-2.5", "lg:[scrollbar-gutter:stable]");
+    expect(preview.parentElement).toHaveClass("min-h-0", "flex-1");
+    expect(screen.getByRole("heading", { name: "연결 품목 미리보기" }).parentElement).toContainElement(screen.getByText("외 1건"));
+    expect(preview).not.toContainElement(screen.getByText("외 1건"));
     expect(screen.getByRole("button", { name: "이 모델 삭제" })).toHaveClass("mt-auto");
   });
 
@@ -125,7 +141,8 @@ describe("AdminModelsSection", () => {
     await screen.findByDisplayValue("DX3000");
 
     expect(screen.getByRole("columnheader", { name: "모델 기호" })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getAllByText("A")).toHaveLength(2));
+    await waitFor(() => expect(screen.getAllByText("A")).toHaveLength(1));
+    expect(screen.getByDisplayValue("A")).toBeInTheDocument();
     expect(screen.queryByText(/M-\d{4}/)).not.toBeInTheDocument();
     expect(screen.getByRole("row", { name: "DX3000 A 사용 중" })).toBeInTheDocument();
   });
@@ -158,9 +175,10 @@ describe("AdminModelsSection", () => {
 
     const name = await screen.findByDisplayValue("DX3000");
     const symbol = screen.getByDisplayValue("A");
-    const fields = findByClasses(container, "grid-cols-1", "sm:grid-cols-[minmax(0,1fr)_7rem]");
+    const fields = screen.getByRole("group", { name: "모델 기본 정보" });
 
-    expect(fields).toHaveClass("grid-cols-1", "sm:grid-cols-[minmax(0,1fr)_7rem]");
+    expect(fields).toContainElement(name);
+    expect(fields).toContainElement(symbol);
 
     fireEvent.change(symbol, { target: { value: "ABCDEF" } });
     expect(savedEditForm).toEqual({
@@ -206,13 +224,54 @@ describe("AdminModelsSection", () => {
           "true",
         );
       });
-      expect(screen.getAllByText("미등록 모델")).toHaveLength(2);
+      expect(screen.getAllByText("미등록 모델")).toHaveLength(1);
       fireEvent.click(screen.getByRole("button", { name: "이 모델 삭제" }));
       expect(screen.getByText("'미등록 모델' 모델을 삭제하시겠습니까?")).toBeInTheDocument();
       expect(screen.queryByText("슬롯 2")).not.toBeInTheDocument();
     } finally {
       unmount();
       context.productModels.splice(1, 1);
+    }
+  });
+
+  it("상단 저장 버튼은 선택 모델을 저장하고 저장 중에는 비활성화한다", async () => {
+    context.editDirty = true;
+    context.saveModel.mockClear();
+    const view = render(<DirtyGuardProvider><AdminModelsSection items={[]} allBomRows={[]} /></DirtyGuardProvider>);
+    try {
+      const save = await screen.findByRole("button", { name: "저장" });
+      fireEvent.click(save);
+      expect(context.saveModel).toHaveBeenCalledWith(1);
+      context.editSaving = true;
+      view.rerender(<DirtyGuardProvider><AdminModelsSection items={[]} allBomRows={[]} /></DirtyGuardProvider>);
+      expect(save).toBeDisabled();
+      context.editSaving = false;
+      context.editDirty = false;
+      view.rerender(<DirtyGuardProvider><AdminModelsSection items={[]} allBomRows={[]} /></DirtyGuardProvider>);
+      expect(save).toBeDisabled();
+    } finally {
+      context.editDirty = false;
+      context.editSaving = false;
+      view.unmount();
+    }
+  });
+
+  it("바깥 스크롤 목록의 모델 드래그는 기존 순서 저장에 연결된다", () => {
+    const original = context.productModels;
+    context.productModels = [...original, { slot: 2, symbol: "B", model_name: "COCOON", is_reserved: false }];
+    context.reorderModels.mockClear();
+    const view = render(<DirtyGuardProvider><AdminModelsSection items={[]} allBomRows={[]} /></DirtyGuardProvider>);
+    try {
+      const first = screen.getByRole("row", { name: "DX3000 A 사용 중" });
+      const second = screen.getByRole("row", { name: "COCOON B 사용 중" });
+      const dataTransfer = { setData: vi.fn(), effectAllowed: "", dropEffect: "" };
+      fireEvent.dragStart(first, { dataTransfer });
+      fireEvent.dragOver(second, { dataTransfer });
+      fireEvent.drop(second, { dataTransfer });
+      expect(context.reorderModels).toHaveBeenCalledWith([context.productModels[1], context.productModels[0]]);
+    } finally {
+      view.unmount();
+      context.productModels = original;
     }
   });
 });

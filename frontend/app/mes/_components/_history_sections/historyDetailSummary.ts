@@ -1,6 +1,7 @@
 import type { TransactionLog } from "@/lib/api";
 import type { IoBatch, IoLine } from "@/lib/api/types/io";
 import { normalizeDepartment } from "@/lib/mes/department";
+import { getInitialStockFlow, isInitialStockOperation } from "./historyOperationSource";
 import {
   toInventoryEffectRows,
   type InventoryEffectRow,
@@ -319,6 +320,7 @@ function getStatus(logs: TransactionLog[], batch: IoBatch | null): HistoryDetail
 }
 
 function getActualProcessingStock(log: TransactionLog): HistoryDetailSummary["actualStock"] {
+  if (isInitialStockOperation(log)) return null;
   if (log.request_order_stock == null) return null;
   if (
     log.warehouse_qty_before == null
@@ -371,6 +373,7 @@ export function buildHistoryDetailSummary(
   const primary = getPrimaryLog(logs, batch);
   const presentation = getHistoryRowPresentation(primary, batch);
   const reworkFlow = getLegacyReworkFlow(logs);
+  const initialFlow = getInitialStockFlow(logs);
   const isCancellationOperation = primary.operation_kind === "CANCELLATION"
     || primary.operation_effective_status === "cancellation";
   const requester: HistoryDetailSummary["requester"] = {
@@ -429,7 +432,7 @@ export function buildHistoryDetailSummary(
     requester,
     participants: compactParticipants(participants, batch?.work_type === "process"),
     actualStock: getActualProcessingStock(primary),
-    flow: reworkFlow ?? (detailFlow.label
+    flow: initialFlow ? { label: initialFlow.label, from: initialFlow.from ?? null, to: initialFlow.to ?? null } : reworkFlow ?? (detailFlow.label
       ? {
         label: detailFlow.label,
         from: detailFlow.from ?? null,
