@@ -45,7 +45,9 @@ class KernelEvidenceTests(unittest.TestCase):
         new = 'field:const void * skaddr;\nfield:enum sk_rst_reason reason;\nfield:__u8 saddr[28];\nfield:__u8 daddr[28];\nprint fmt: %pISpc'
         text = tool.reset_probes({'tcp/tcp_send_reset': new, 'tcp/tcp_receive_reset': old})
         send, receive = text.split('tracepoint:tcp:tcp_receive_reset')
-        self.assertIn('struct sockaddr_in', send)
+        self.assertIn('(uint16)args->saddr[2] << 8', send)
+        self.assertIn('(uint16)args->daddr[2] << 8', send)
+        self.assertNotIn('struct sockaddr_in', send)
         self.assertIn('args->reason', send)
         self.assertNotIn('args->family', send)
         self.assertIn('args->family', receive)

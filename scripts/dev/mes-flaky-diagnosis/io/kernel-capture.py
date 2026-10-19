@@ -10,6 +10,7 @@ import platform
 import re
 import signal
 import subprocess
+import sys
 import time
 from typing import Any
 
@@ -28,8 +29,12 @@ def reset_probes(formats: dict[str, str]) -> str:
         if all(field(key) for key in ('family', 'sport', 'dport')):
             variables = '$family = args->family; $sport = args->sport; $dport = args->dport;'
         elif field(r'saddr\[28\]') and field(r'daddr\[28\]') and '%pISpc' in layout:
-            variables = ('$src = (struct sockaddr_in *)args->saddr; $dst = (struct sockaddr_in *)args->daddr; '
-                '$family = $src->sin_family; $sport = bswap((uint16)$src->sin_port); $dport = bswap((uint16)$dst->sin_port);')
+            # bpftrace 0.20 cannot cast a tracepoint byte array to a pointer.
+            # sockaddr's family is native-endian; its port bytes are network-endian.
+            low, high = (0, 1) if sys.byteorder == 'little' else (1, 0)
+            variables = (f'$family = args->saddr[{low}] | ((uint16)args->saddr[{high}] << 8); '
+                '$sport = ((uint16)args->saddr[2] << 8) | args->saddr[3]; '
+                '$dport = ((uint16)args->daddr[2] << 8) | args->daddr[3];')
         else:
             raise ValueError('unrecognized reset address layout')
         reason = 'args->reason' if field('reason') else '-1'
