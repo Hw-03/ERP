@@ -23,9 +23,15 @@ import { useRegisterDirty, useLocalDirtyGuard } from "@/lib/ui/dirty-guard";
 import { EmployeeAddInline } from "./_employee_parts/EmployeeAddInline";
 import { EmployeeDetailGrid } from "./_employee_parts/EmployeeDetailGrid";
 import { normalizeEmployeePosition } from "./_employee_parts/employeeRoleLabels";
-import { matchesSearchText } from "@/lib/searchText";
+import { matchesSearchFields } from "@/lib/searchText";
+import { toChosung } from "@/lib/hangul";
+import styles from "./_admin_primitives/AdminMasterData.module.css";
+import { AdminReadBoundary, useAdminReadState } from "./_admin_primitives/AdminReadState";
+import { AdminDetailSkeleton, AdminTableSkeleton } from "./_admin_primitives/AdminSkeleton";
 
 export function AdminEmployeesSection() {
+  const read = useAdminReadState("employees", "departments");
+  const detailRead = useAdminReadState("employees", "departments", "models");
   const ctx = useAdminEmployeesContext();
   const {
     employees,
@@ -82,12 +88,10 @@ export function AdminEmployeesSection() {
   const filteredEmployees = useMemo(() => {
     return employees
       .filter((e) => deptFilter === "ALL" || normalizeDepartment(e.department) === deptFilter)
-      .filter(
-        (e) =>
-          matchesSearchText(e.name, search) ||
-          matchesSearchText(normalizeDepartment(e.department), search) ||
-          matchesSearchText(e.role, search),
-      )
+      .filter((e) => {
+        const fields = [e.name, normalizeDepartment(e.department), e.role];
+        return matchesSearchFields([...fields, ...fields.map(toChosung)], search);
+      })
       .sort((a, b) => a.name.localeCompare(b.name, "ko"));
   }, [employees, search, deptFilter]);
 
@@ -129,12 +133,13 @@ export function AdminEmployeesSection() {
 
   return (
     <>
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className={`flex min-h-0 flex-1 flex-col ${styles.workspace} ${styles.employeeWorkspace}`}>
         <AdminPageHeader
           icon={Users}
           title="직원 관리"
           summary={
             <AdminKpiBar
+              loading={read.loading} unavailable={!!read.error}
               placement="header"
               items={[
                 { key: "all", label: "전체 직원", value: employees.length, hint: "등록된 모든 직원", tone: LEGACY_COLORS.blue },
@@ -144,7 +149,7 @@ export function AdminEmployeesSection() {
             />
           }
           actions={
-            <Button variant="primary" size="md" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>
+            <Button disabled={detailRead.loading || !!detailRead.error} variant="primary" size="md" className="min-h-11" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>
               직원 추가
             </Button>
           }
@@ -152,9 +157,10 @@ export function AdminEmployeesSection() {
 
         <div className="flex min-h-0 flex-1 gap-4">
           <AdminListPanel
+            read={read} skeleton={<AdminTableSkeleton columns="minmax(0,0.9fr) minmax(0,1fr) 76px" count={3} />}
             title="직원 목록"
             countLabel={`${filteredEmployees.length}명`}
-            width={288}
+            width="clamp(360px, 28vw, 440px)"
             searchValue={search}
             searchPlaceholder="이름·부서·직급 검색"
             onSearchChange={setSearch}
@@ -163,22 +169,22 @@ export function AdminEmployeesSection() {
                 value={deptFilter}
                 onChange={setDeptFilter}
                 options={deptOptions.map((d) => ({ value: d, label: d === "ALL" ? "전체 부서" : d }))}
-                size="sm"
-                className="w-[144px] shrink-0"
-                triggerClassName="whitespace-nowrap"
+                size="md"
+                className="w-[48%] min-w-[144px] shrink-0"
+                triggerClassName="min-h-11 whitespace-nowrap"
                 triggerAriaLabel="부서 필터"
                 triggerStyle={{ background: LEGACY_COLORS.s2 }}
               />
             }
             listRole="grid"
             listAriaLabel="직원 목록"
-            listClassName="flex min-h-0 flex-1 flex-col overflow-y-auto pr-0.5"
+            externalScrollbar
             listHeader={
               <div
                 data-admin-list-header="employees"
                 role="row"
-                className="sticky top-0 z-10 grid grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_76px] border-b px-3 py-2 text-[11px] font-bold tracking-[0.08em]"
-                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+                className={`sticky top-0 z-10 grid grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_76px] border-b px-3 py-2 text-[12px] font-bold ${styles.tableHeader}`}
+                style={{ background: "var(--c-inventory-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
               >
                 <span role="columnheader">이름</span>
                 <span role="columnheader">부서·직급</span>
@@ -216,11 +222,8 @@ export function AdminEmployeesSection() {
                   }}
                   aria-selected={active}
                   tabIndex={0}
-                  className="grid w-full grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_76px] items-center border-b px-3 py-2 text-left transition-colors duration-150 hover:bg-[var(--c-s4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30"
+                  className={`grid w-full grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_76px] items-center border-b px-3 py-2 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[color:var(--c-blue)]/30 ${styles.tableRow}`}
                   style={{
-                    background: active
-                      ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
-                      : undefined,
                     borderColor: LEGACY_COLORS.border,
                   }}
                 >
@@ -258,40 +261,23 @@ export function AdminEmployeesSection() {
           />
 
           <AdminDetailCard
+            selectionKey={detailRead.loading ? undefined : empAddMode ? "add" : selectedEmployee?.employee_id}
             title={
               empAddMode
                 ? "직원 추가"
                 : selectedEmployee
-                  ? selectedEmployee.name
-                  : "직원을 선택하세요"
-            }
-            subtitle={
-              !empAddMode && selectedEmployee
-                ? `${normalizeDepartment(editForm.department)}${
-                    editForm.role ? ` · ${normalizeEmployeePosition(editForm.role)}` : ""
-                  }`
-                : undefined
-            }
-            status={
-              !empAddMode && selectedEmployee ? (
-                <StatusPill
-                  label={selectedEmployee.is_active ? "활성" : "비활성"}
-                  tone={selectedEmployee.is_active ? "success" : "neutral"}
-                />
-              ) : null
+                  ? undefined
+                  : detailRead.loading || detailRead.error || filteredEmployees.length > 0 ? undefined : "직원을 선택하세요"
             }
             actions={
               empAddMode ? (
                 <Button variant="secondary" size="sm" iconLeft={<X className="h-3.5 w-3.5" />} onClick={() => setEmpAddMode(false)}>
                   취소
                 </Button>
-              ) : selectedEmployee ? (
-                <Button variant="primary" size="md" className="h-11 min-w-[88px]" iconLeft={<Save className="h-4 w-4" />} onClick={saveEmployee}>
-                  저장
-                </Button>
               ) : null
             }
           >
+            <AdminReadBoundary read={{ ...detailRead, loading: detailRead.loading || (!!detailRead.managed && !detailRead.error && !selectedEmployee && !empAddMode && filteredEmployees.length > 0) }} skeleton={<AdminDetailSkeleton variant="employees" />} label="직원 상세">
             {empAddMode ? (
               <EmployeeAddInline
                 form={empAddForm}
@@ -303,6 +289,7 @@ export function AdminEmployeesSection() {
             ) : selectedEmployee ? (
               <EmployeeDetailGrid
                 employee={selectedEmployee}
+                headerActions={<Button variant="primary" size="md" className="h-11 min-w-[88px]" iconLeft={<Save className="h-4 w-4" />} onClick={saveEmployee}>저장</Button>}
                 form={editForm}
                 setForm={setEditForm}
                 departments={departments}
@@ -321,6 +308,7 @@ export function AdminEmployeesSection() {
                 />
               </div>
             )}
+            </AdminReadBoundary>
           </AdminDetailCard>
         </div>
       </div>

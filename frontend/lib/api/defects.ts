@@ -109,6 +109,7 @@ export const defectsApi = {
 
   getStatistics: (query: DefectStatisticsQuery): Promise<DefectStatisticsResponse> => {
     const params = new URLSearchParams({ period: query.period, anchor: query.anchor });
+    if (query.initial_category) params.set("initial_category", query.initial_category);
     query.departments.forEach((value) => params.append("department", value));
     query.models.forEach((value) => params.append("model", value));
     query.process_steps.forEach((value) => params.append("process_step", value));
@@ -118,6 +119,7 @@ export const defectsApi = {
   },
   getStatisticsReport: (query: DefectStatisticsReportQuery): Promise<DefectStatisticsReportResponse> => {
     const params = new URLSearchParams({ period: query.period, anchor: query.anchor });
+    if (query.initial_category) params.set("initial_category", query.initial_category);
     query.departments.forEach((value) => params.append("department", value));
     query.models.forEach((value) => params.append("model", value));
     query.process_steps.forEach((value) => params.append("process_step", value));

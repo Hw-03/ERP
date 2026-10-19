@@ -2,7 +2,6 @@
 import { useDesktopWorkGuard } from "../DesktopTabHome";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
@@ -21,6 +20,9 @@ import { makeClientRequestId } from "@/lib/uuid";
 import { ApiError } from "@/lib/api-core";
 import type { Supplier } from "@/lib/api";
 import { SupplierPickerStep } from "../_warehouse_v2/SupplierPickerStep";
+import { DefectQuantitySummary } from "./DefectQuantitySummary";
+import stepperStyles from "./DefectFlowStepper.module.css";
+import processStyles from "./DefectProcessPanel.module.css";
 
 type ProcessAction = "unquarantine" | "scrap" | "return" | "disassemble";
 
@@ -60,6 +62,7 @@ export function DefectProcessPanel({
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [action, setAction] = useState<ProcessAction>("unquarantine");
+  const [lastFollowupLabel, setLastFollowupLabel] = useState("BOM 확인");
   const availableQty = Math.max(
     1,
     processingLocations.reduce(
@@ -264,26 +267,34 @@ export function DefectProcessPanel({
   }
 
   const formatDate = (iso: string | null) => (iso ? iso.slice(0, 10) : "-");
+  const quantitySummary = <DefectQuantitySummary availableLabel="격리 가용 재고"
+    available={processingLocations.reduce((total, current) => total + (Number(current.available_quantity) || 0), 0)}
+    total={boundedProcessQty} count={processingLocations.length} countLabel="격리 기록" unit="개" />;
+  const nextStepLabel = restoreOnly ? null : action === "return" ? "공급업체 선택" : action === "disassemble" && location.has_bom ? "BOM 확인" : null;
+  useEffect(() => {
+    if (nextStepLabel) setLastFollowupLabel(nextStepLabel);
+  }, [nextStepLabel]);
+  const processHeader = <>
+    <h2 className="sr-only">{step === 3 ? "반품 공급업체 선택" : isBatch ? "불량 여러 건 처리" : "불량 처리"}</h2>
+    <nav aria-label="불량 처리 단계" className={`iwp mb-3 shrink-0 ${stepperStyles.root} ${processStyles.stepper}`}>
+      <div className={processStyles.primaryStep}><button type="button" className={`iwpb done ${processStyles.stepButton}`} disabled={busy} onClick={onCancel}><span className="iwpl">격리 목록</span></button></div>
+      <div className={processStyles.primaryStep}><button type="button" className={`iwpb ${step === 1 ? "a" : "done"} ${processStyles.stepButton}`} disabled={busy || step === 1} aria-current={step === 1 ? "step" : undefined} onClick={() => setStep(1)}><span className="iwpl">처리 선택</span></button></div>
+      <div className={`${processStyles.followup} ${nextStepLabel ? processStyles.followupShown : ""}`} aria-hidden={!nextStepLabel} inert={!nextStepLabel}>
+        <button type="button" className={`iwpb ${step === 1 ? "locked" : "a"} ${processStyles.stepButton}`} disabled aria-current={step !== 1 && nextStepLabel ? "step" : undefined}><span className="iwpl">{nextStepLabel ?? lastFollowupLabel}</span></button>
+      </div>
+    </nav>
+  </>;
 
   if (step === 3) {
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-4">
-        <div className="flex shrink-0 items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setStep(1)}
-            disabled={busy}
-            className="standard-hover flex items-center gap-2 rounded-[12px] border px-4 py-2 text-sm font-bold disabled:opacity-50"
-            style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
-          >
-            <ArrowLeft className="h-4 w-4" /> 이전
-          </button>
-          <div>
-            <h2 className="text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>반품 공급업체 선택</h2>
-            <p className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              {isBatch ? `${processingLocations.length}건 · ` : ""}{formatQty(boundedProcessQty)}개 · {location.department} 불량 격리
-            </p>
+        {processHeader}
+        <div className="mb-3 flex shrink-0 flex-wrap items-center gap-3">
+          <div className="min-w-0 flex-1 basis-[240px]">
+            <div className="break-words text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>{location.item_name}</div>
+            <div className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{location.mes_code}</div>
           </div>
+          {quantitySummary}
         </div>
         <div className="min-h-0 flex-1">
           {mixedSupplierScopes ? <InlineErrorNote>{mixedScopeMessage}</InlineErrorNote> : <SupplierPickerStep
@@ -330,31 +341,12 @@ export function DefectProcessPanel({
   if (step === 2) {
     return (
       <div className="flex flex-1 min-h-0 flex-col">
-        {/* 헤더 */}
-        <div className="mb-5 flex shrink-0 items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setStep(1)}
-            disabled={busy}
-            className="standard-hover flex items-center gap-2 rounded-[12px] border px-4 py-2 text-sm font-bold transition-colors disabled:opacity-50"
-            style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            이전
-          </button>
-          <div>
-            <h2 className="text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>{isBatch ? "불량 여러 건 처리" : "불량 처리"}</h2>
-            <div className="flex items-center gap-2 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              <span>① 처리 선택</span>
-              <span>→</span>
-              <span style={{ color: LEGACY_COLORS.yellow }}>② BOM 확인</span>
-            </div>
-          </div>
-        </div>
+        {processHeader}
 
         {/* 스크롤 영역 */}
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
           {/* 요약 박스 */}
+          {quantitySummary}
           <div
             className="flex shrink-0 flex-wrap items-center gap-5 rounded-[16px] border px-6 py-4"
             style={{ background: tint(LEGACY_COLORS.blue, 7), borderColor: tint(LEGACY_COLORS.blue, 25) }}
@@ -461,70 +453,49 @@ export function DefectProcessPanel({
 
   return (
     <div className="flex flex-1 min-h-0 flex-col">
-      {/* 헤더 */}
-      <div className="mb-5 flex shrink-0 items-center gap-3">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={busy}
-          className="standard-hover flex items-center gap-2 rounded-[12px] border px-4 py-2 text-sm font-bold transition-colors disabled:opacity-50"
-          style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          목록
-        </button>
-        <div>
-          <h2 className="text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>{isBatch ? "불량 여러 건 처리" : "불량 처리"}</h2>
-          {!restoreOnly && location.has_bom && (
-            <div className="flex items-center gap-2 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              <span style={{ color: LEGACY_COLORS.yellow }}>① 처리 선택</span>
-              <span>→</span>
-              <span>② BOM 확인</span>
-            </div>
-          )}
-        </div>
-      </div>
+      {processHeader}
 
       {/* 스크롤 영역 */}
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
         {/* 품목 정보 */}
         <div
-          className="flex flex-col gap-2 rounded-[16px] border px-6 py-5"
+          className="flex flex-wrap items-center gap-3 rounded-[16px] border px-6 py-5"
           style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
         >
-          <div className="flex items-baseline gap-3">
-            <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{location.mes_code}</span>
-            <span className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>{location.item_name}</span>
+          <div className="flex min-w-0 flex-1 basis-[240px] flex-col gap-2">
+            <div className="flex min-w-0 flex-col gap-1">
+              <span className="break-words text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>{location.item_name}</span>
+            </div>
+            <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
+              {isBatch && <span style={{ color: LEGACY_COLORS.blue }}>선택한 격리 기록 {processingLocations.length}건</span>}
+              <span style={{ color: LEGACY_COLORS.muted2 }}>{location.mes_code}</span>
+              <span>부서 <span style={{ color: LEGACY_COLORS.text }}>{location.department}</span></span>
+              <span>격리일 <span style={{ color: LEGACY_COLORS.text }}>{formatDate(location.defective_at)}</span></span>
+            </div>
           </div>
-          <div className="flex gap-6 text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
-            {isBatch && <span style={{ color: LEGACY_COLORS.blue }}>선택한 격리 기록 {processingLocations.length}건</span>}
-            <span>남은 수량 <span style={{ color: LEGACY_COLORS.text }}>{formatQty(isBatch ? boundedProcessQty : location.quantity)}개</span></span>
-            <span>처리 가능 <span style={{ color: LEGACY_COLORS.green }}>{formatQty(maxQty)}개</span></span>
-            <span>부서 <span style={{ color: LEGACY_COLORS.text }}>{location.department}</span></span>
-            <span>격리일 <span style={{ color: LEGACY_COLORS.text }}>{formatDate(location.defective_at)}</span></span>
+          <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-5">
+            <div className="flex min-h-11 shrink-0 items-center gap-3">
+              <span className="text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>처리 수량</span>
+              {isBatch ? (
+                <span className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>{formatQty(boundedProcessQty)}개</span>
+              ) : (
+                <QuantityInput
+                  aria-label="처리 수량"
+                  min={1}
+                  max={maxQty}
+                  value={boundedProcessQty}
+                  onChange={(e) => {
+                    const v = Math.max(1, Math.min(maxQty, Number(e.target.value) || 1));
+                    setProcessQty(v);
+                    setDecisions([]);
+                  }}
+                  className="w-28 rounded-[10px] border px-3 py-2.5 text-base font-black"
+                  style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
+                />
+              )}
+            </div>
+            {quantitySummary}
           </div>
-        </div>
-
-        {/* 처리 수량 */}
-        <div className="flex min-h-11 items-center gap-3">
-          <span className="text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>처리 수량</span>
-          {isBatch ? (
-            <span className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>{formatQty(boundedProcessQty)}개</span>
-          ) : (
-            <QuantityInput
-              min={1}
-              max={maxQty}
-              value={boundedProcessQty}
-              onChange={(e) => {
-                const v = Math.max(1, Math.min(maxQty, Number(e.target.value) || 1));
-                setProcessQty(v);
-                setDecisions([]);
-              }}
-              className="w-28 rounded-[10px] border px-3 py-2.5 text-base font-black"
-              style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
-            />
-          )}
-          <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>/ 처리 가능 {formatQty(maxQty)}개</span>
         </div>
 
         {/* 작업 선택 */}

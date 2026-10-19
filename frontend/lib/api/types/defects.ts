@@ -165,6 +165,7 @@ export interface DefectStatisticsBreakdown {
 export interface DefectStatisticsItemBreakdown extends DefectStatisticsBreakdown {
   item_id: string;
   mes_code: string | null;
+  categories: DefectStatisticsBreakdown[];
 }
 
 export interface DefectStatisticsTimelineEntry {
@@ -172,6 +173,7 @@ export interface DefectStatisticsTimelineEntry {
   label: string;
   record_count: number;
   quantity: number;
+  categories: DefectStatisticsBreakdown[];
 }
 
 export interface DefectStatisticsResponse {
@@ -192,6 +194,7 @@ export interface DefectStatisticsResponse {
   reasons: DefectStatisticsBreakdown[];
   departments: DefectStatisticsBreakdown[];
   categories: DefectStatisticsBreakdown[];
+  category_totals: DefectStatisticsBreakdown[];
   excluded_legacy_count: number;
   excluded_category_count: number;
 }
@@ -202,6 +205,7 @@ export interface DefectStatisticsQuery {
   departments: string[];
   models: string[];
   process_steps: string[];
+  initial_category?: DefectManagementCategory;
 }
 
 export interface DefectStatisticsReportQuery extends DefectStatisticsQuery {

@@ -4,12 +4,15 @@ import { useEffect, useRef, type AriaRole, type ReactNode } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState } from "../../common/EmptyState";
 import { SearchInput } from "../../common/SearchInput";
+import { SkeletonBlock } from "../../common/LoadingSkeleton";
+import { AdminReadBoundary, type useAdminReadState } from "./AdminReadState";
 
 export interface AdminListPanelProps<T> {
   title?: string;
   countLabel?: string;
   searchValue?: string;
   searchPlaceholder?: string;
+  searchDisabled?: boolean;
   onSearchChange?: (value: string) => void;
   filters?: ReactNode;
   action?: ReactNode;
@@ -22,6 +25,9 @@ export interface AdminListPanelProps<T> {
   listRole?: AriaRole;
   listAriaLabel?: string;
   listClassName?: string;
+  externalScrollbar?: boolean;
+  read?: ReturnType<typeof useAdminReadState>;
+  skeleton?: ReactNode;
 }
 
 export function AdminListPanel<T>({
@@ -29,6 +35,7 @@ export function AdminListPanel<T>({
   countLabel,
   searchValue,
   searchPlaceholder = "검색...",
+  searchDisabled = false,
   onSearchChange,
   filters,
   action,
@@ -41,6 +48,9 @@ export function AdminListPanel<T>({
   listRole,
   listAriaLabel,
   listClassName,
+  externalScrollbar = false,
+  read,
+  skeleton,
 }: AdminListPanelProps<T>) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -56,6 +66,28 @@ export function AdminListPanel<T>({
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
+  const listContent = <>
+    {listHeader}
+    <AdminReadBoundary read={read ?? { loading: false, error: undefined, retry: () => {} }} skeleton={skeleton} label={listAriaLabel ?? title ?? "목록"}>
+    {items.length === 0
+      ? emptyState ?? <EmptyState variant="no-data" compact />
+      : items.map((item) => renderItem(item))}
+    </AdminReadBoundary>
+  </>;
+  const viewport = <div
+    ref={scrollRef}
+    data-scrollbar-rail-viewport={externalScrollbar ? "" : undefined}
+    role={listRole}
+    aria-label={listAriaLabel}
+    className={externalScrollbar
+      ? `absolute inset-y-0 left-0 right-0 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable] ${listClassName ?? ""}`
+      : listClassName ?? "flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-0.5"}
+  >
+    {externalScrollbar
+      ? <div className="flex min-h-full min-w-full flex-col" style={{ background: LEGACY_COLORS.s1 }}>{listContent}</div>
+      : listContent}
+  </div>;
+
   return (
     <div
       className="flex min-h-0 shrink-0 flex-col gap-3 rounded-[20px] border p-3"
@@ -66,16 +98,16 @@ export function AdminListPanel<T>({
       }}
     >
       {(title || action) && (
-        <div className="flex shrink-0 items-center justify-between gap-2 px-1 pt-1">
+        <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 px-1 pt-1">
           <div className="flex items-baseline gap-2">
             {title && (
-              <div className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
+              <div className="whitespace-nowrap text-base font-black leading-6" style={{ color: LEGACY_COLORS.text }}>
                 {title}
               </div>
             )}
             {countLabel && (
-              <div className="text-[12px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-                {countLabel}
+              <div className="whitespace-nowrap text-sm font-semibold leading-5 tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>
+                {read?.loading ? <SkeletonBlock className="h-4 w-10" /> : read?.error ? "—" : countLabel}
               </div>
             )}
           </div>
@@ -83,21 +115,24 @@ export function AdminListPanel<T>({
         </div>
       )}
       {onSearchChange && (
-        <SearchInput value={searchValue ?? ""} onChange={onSearchChange} placeholder={searchPlaceholder}
+        <SearchInput disabled={searchDisabled} value={searchValue ?? ""} onChange={onSearchChange} placeholder={searchPlaceholder}
           className="shrink-0 rounded-[12px]" inputProps={{ className: "placeholder:font-medium" }} />
       )}
       {filters && <div className="flex shrink-0 flex-wrap gap-1.5">{filters}</div>}
-      <div
-        ref={scrollRef}
-        role={listRole}
-        aria-label={listAriaLabel}
-        className={listClassName ?? "flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-0.5"}
-      >
-        {listHeader}
-        {items.length === 0
-          ? emptyState ?? <EmptyState variant="no-data" compact />
-          : items.map((item) => renderItem(item))}
-      </div>
+      {externalScrollbar ? <div data-scrollbar-rail-shell className="relative min-h-0 flex-1">
+        {viewport}
+        <div data-scrollbar-rail-frame aria-hidden className="pointer-events-none absolute inset-0 z-20 rounded-[20px] border" style={{ borderColor: LEGACY_COLORS.border }} />
+        <div data-scrollbar-rail-masks aria-hidden className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between">
+          <div className="flex justify-between">
+            <span className="h-5 w-5" style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 19px, var(--c-s1) 20px)" }} />
+            <span className="h-5 w-5" style={{ background: "radial-gradient(circle at 0 100%, transparent 0 19px, var(--c-s1) 20px)" }} />
+          </div>
+          <div className="flex justify-between">
+            <span className="h-5 w-5" style={{ background: "radial-gradient(circle at 100% 0, transparent 0 19px, var(--c-s1) 20px)" }} />
+            <span className="h-5 w-5" style={{ background: "radial-gradient(circle at 0 0, transparent 0 19px, var(--c-s1) 20px)" }} />
+          </div>
+        </div>
+      </div> : viewport}
       {footer && <div className="shrink-0 pt-1">{footer}</div>}
     </div>
   );

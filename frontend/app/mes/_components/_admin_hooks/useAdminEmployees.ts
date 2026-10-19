@@ -6,6 +6,9 @@
 
 import type { DepartmentMaster, Employee } from "@/lib/api";
 import { api } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/queries/keys";
+import { getOperatorAccessContext, updateCurrentOperatorAccess } from "../login/useCurrentOperator";
 import { useAdminEmployeesForm, type EmployeeEditForm } from "./useAdminEmployeesForm";
 import { useAdminEmployeesConfirm } from "./useAdminEmployeesConfirm";
 import { useAdminEmployeesCommands } from "./useAdminEmployeesCommands";
@@ -62,6 +65,7 @@ export function useAdminEmployees({
   onStatusChange,
   onError,
 }: UseAdminEmployeesArgs): AdminEmployeesState {
+  const queryClient = useQueryClient();
   const form = useAdminEmployeesForm(employees);
   const confirm = useAdminEmployeesConfirm();
   const commands = useAdminEmployeesCommands({ setEmployees, onStatusChange, onError });
@@ -91,6 +95,7 @@ export function useAdminEmployees({
       return;
     }
     const isAssembly = form.editForm.department === "조립";
+    const savingOperator = getOperatorAccessContext();
     try {
       const updated = await api.updateEmployee(
         form.selectedEmployee.employee_id,
@@ -105,6 +110,13 @@ export function useAdminEmployees({
           hidden_sidebar_tabs: form.editForm.hidden_sidebar_tabs,
           assigned_model_slots: isAssembly ? form.editForm.assigned_model_slots : [],
         },
+      );
+      const currentOperator = getOperatorAccessContext();
+      if (savingOperator && currentOperator?.login === savingOperator.login && currentOperator.employeeId === savingOperator.employeeId) {
+        updateCurrentOperatorAccess(updated);
+      }
+      void queryClient.cancelQueries({ queryKey: queryKeys.employees.accessAll }).then(() =>
+        queryClient.invalidateQueries({ queryKey: queryKeys.employees.all }),
       );
       setEmployees((current) =>
         current.map((e) => (e.employee_id === updated.employee_id ? updated : e)),

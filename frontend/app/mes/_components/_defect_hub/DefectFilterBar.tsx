@@ -156,18 +156,18 @@ export function DefectFilterBar({
         onResetCategoryFilters={resetCategories}
       />
 
-      <div className="flex flex-wrap items-center gap-2 rounded-[16px] border px-3 py-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-        {!poolMode && <>
-          <span className="mr-1 text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>격리자</span>
-          <FilterChip label="전체" active={actorScope === "all"} onClick={() => onActorScopeChange("all")} size="sm" className="min-h-11" />
-          <FilterChip label="내가 격리" active={actorScope === "mine"} onClick={() => onActorScopeChange("mine")} size="sm" className="min-h-11" />
-        </>}
-        <span className="ml-1 text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>정렬</span>
-        <select aria-label="정렬" value={sort} onChange={(event) => onSortChange(event.target.value as DefectSort)} className="min-h-11 rounded-[12px] border px-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] focus-visible:ring-offset-2" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
-          <option value="oldest">오래된 순</option>
-          <option value="newest">최신 순</option>
-        </select>
-        <label className="flex min-h-11 cursor-pointer select-none items-center gap-2 rounded-[12px] px-2 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+      <div className={`${mobilePresentation ? "flex flex-wrap items-center gap-2" : `grid grid-cols-1 items-center gap-4 ${poolMode ? "md:grid-cols-[minmax(0,1fr)_auto]" : "md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"}`} rounded-[16px] border px-3 py-2`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        {!poolMode && <div className="flex min-w-0 items-center gap-2">
+          <span className="shrink-0 text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>격리자</span>
+          <FilterChip label="전체" active={actorScope === "all"} onClick={() => onActorScopeChange("all")} size="sm" className={`min-h-11 ${mobilePresentation ? "" : "flex-1"}`} />
+          <FilterChip label="내가 격리" active={actorScope === "mine"} onClick={() => onActorScopeChange("mine")} size="sm" className={`min-h-11 ${mobilePresentation ? "" : "flex-1"}`} />
+        </div>}
+        <div role="group" aria-label="정렬" className="flex min-w-0 items-center gap-2">
+          <span className="shrink-0 text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>정렬</span>
+          <FilterChip label="오래된 순" active={sort === "oldest"} onClick={() => onSortChange("oldest")} size="sm" className={`min-h-11 ${mobilePresentation ? "" : "flex-1"}`} />
+          <FilterChip label="최신 순" active={sort === "newest"} onClick={() => onSortChange("newest")} size="sm" className={`min-h-11 ${mobilePresentation ? "" : "flex-1"}`} />
+        </div>
+        <label className={`flex min-h-11 cursor-pointer select-none items-center gap-2 rounded-[12px] px-3 text-sm font-bold ${mobilePresentation ? "" : "justify-center whitespace-nowrap border transition-colors hover:brightness-105 md:min-w-32"}`} style={{ color: filterLocked ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2, ...(!mobilePresentation && { background: filterLocked ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)` : LEGACY_COLORS.s1, borderColor: filterLocked ? LEGACY_COLORS.blue : LEGACY_COLORS.border }) }}>
           <input type="checkbox" checked={filterLocked} onChange={(event) => onFilterLockedChange(event.target.checked)} className="h-4 w-4 cursor-pointer rounded border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] focus-visible:ring-offset-2" style={{ accentColor: LEGACY_COLORS.blue }} />
           <span>필터 고정</span>
         </label>

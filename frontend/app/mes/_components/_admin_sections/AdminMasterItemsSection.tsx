@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import listPerformance from "./AdminListPerformance.module.css";
 import { Box, GripVertical, Plus, Save, Trash2, X } from "lucide-react";
 import type { BOMDetailEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -15,11 +16,15 @@ import {
   AdminListPanel,
   AdminPageHeader,
 } from "./_admin_primitives";
+import styles from "./_admin_primitives/AdminMasterData.module.css";
 import { useAdminMasterItemsContext } from "./AdminMasterItemsContext";
 import { AddItemForm } from "./_master_items_parts/AddItemForm";
 import { EditItemForm } from "./_master_items_parts/EditItemForm";
 import { EMPTY_ADD_FORM } from "./adminShared";
 import { useRegisterDirty, useLocalDirtyGuard } from "@/lib/ui/dirty-guard";
+import { AdminReadBoundary, useAdminReadState } from "./_admin_primitives/AdminReadState";
+import { AdminDetailSkeleton, AdminTableSkeleton } from "./_admin_primitives/AdminSkeleton";
+import { SkeletonBlock } from "../common/LoadingSkeleton";
 
 type DetailTab = "info" | "stock" | "bom";
 
@@ -34,6 +39,8 @@ interface Props {
 }
 
 export function AdminMasterItemsSection({ allBomRows }: Props) {
+  const read = useAdminReadState("items");
+  const detailRead = useAdminReadState("items", "models");
   const {
     visibleItems,
     selectedItem,
@@ -51,7 +58,10 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
     restoreItem,
   } = useAdminMasterItemsContext();
 
-  const [tab, setTab] = useState<DetailTab>("info");
+  const [tabState, setTabState] = useState({ itemId: selectedItem?.item_id, tab: "info" as DetailTab });
+  // 선택 변경과 첫 탭 복귀를 같은 화면 갱신에 반영해 중간 탭을 그리지 않는다.
+  const tab = tabState.itemId === selectedItem?.item_id ? tabState.tab : "info";
+  const setTab = (tab: DetailTab): void => setTabState({ itemId: selectedItem?.item_id, tab });
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const deleteTriggerRef = useRef<HTMLButtonElement>(null);
   const deleteCancelRef = useRef<HTMLButtonElement>(null);
@@ -121,18 +131,23 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
   // 항목 변경(트리거 a) 가드 — 같은 페이지에서 다른 품목 선택.
   const { confirmNavigation } = useLocalDirtyGuard(dirty, saveItem);
 
-  // KPI: 전체 / 정상 / 부족 / 품절 — 대시보드와 동일 4분기
+  // 삭제 품목은 재고 상태와 중복 집계하지 않는다.
   const stats = useMemo(() => {
     let ok = 0;
     let low = 0;
     let zero = 0;
+    let deleted = 0;
     for (const it of visibleItems) {
+      if (it.deleted_at) {
+        deleted += 1;
+        continue;
+      }
       const qty = Number(it.quantity);
       if (qty <= 0) zero += 1;
       else if (it.min_stock != null && qty < Number(it.min_stock)) low += 1;
       else ok += 1;
     }
-    return { ok, low, zero };
+    return { ok, low, zero, deleted };
   }, [visibleItems]);
 
   // 첫 진입 시 첫 visibleItem 자동 선택 (addMode가 아닐 때만)
@@ -146,7 +161,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
   // 선택이 바뀌면 첫 탭으로 리셋 + 삭제 확인 닫기
   useEffect(() => {
     restoreDeleteFocusRef.current = false;
-    setTab("info");
+    setTabState({ itemId: selectedItem?.item_id, tab: "info" });
     setDeleteConfirm(false);
   }, [selectedItem?.item_id]);
 
@@ -189,45 +204,44 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className={`flex min-h-0 flex-1 flex-col ${styles.workspace}`}>
       <AdminPageHeader
         icon={Box}
         title="품목 관리"
         summary={
           <AdminKpiBar
+            loading={read.loading} unavailable={!!read.error}
             placement="header"
             items={[
               { key: "all", label: "전체 품목", value: visibleItems.length, hint: "필터·검색 적용 결과", tone: LEGACY_COLORS.blue },
               { key: "ok", label: "정상", value: stats.ok, hint: "안전재고 충족", tone: LEGACY_COLORS.green },
               { key: "low", label: "부족", value: stats.low, hint: "안전재고 미만", tone: LEGACY_COLORS.yellow },
               { key: "zero", label: "품절", value: stats.zero, hint: "재고 0 이하", tone: LEGACY_COLORS.red },
+              { key: "deleted", label: "삭제", value: stats.deleted, hint: "삭제된 품목", tone: LEGACY_COLORS.muted2 },
             ]}
           />
         }
+        actions={<Button disabled={detailRead.loading || !!detailRead.error} variant="primary" size="md" className="min-h-11" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>품목 추가</Button>}
       />
 
       <div className="grid min-h-0 flex-1 gap-4" style={{ gridTemplateColumns: "minmax(420px, 0.92fr) minmax(460px, 1.08fr)", gridTemplateRows: "1fr" }}>
         <AdminListPanel
+          read={read} skeleton={<AdminTableSkeleton columns="minmax(0,1fr) 110px 80px" count={3} />}
           title="품목 목록"
           countLabel={`${formatQty(visibleItems.length)}건`}
           width="100%"
-          action={
-            <Button variant="primary" size="sm" iconLeft={<Plus className="h-3.5 w-3.5" />} onClick={handleStartAdd}>
-              추가
-            </Button>
-          }
           searchValue={itemSearch}
           searchPlaceholder="품목명, 코드 검색"
           onSearchChange={setItemSearch}
           listRole="grid"
           listAriaLabel="품목 목록"
-          listClassName="flex min-h-0 flex-1 flex-col overflow-y-auto pr-0.5"
+          externalScrollbar
           listHeader={
-            <>
+            <div className={styles.stickyHeader}>
               <div
                 role="row"
-                className="grid grid-cols-[minmax(0,1fr)_110px_80px] border-b px-3 py-2 text-[11px] font-bold tracking-[0.08em]"
-                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+                className={`grid grid-cols-[minmax(0,1fr)_110px_80px] border-b px-3 py-2 text-[12px] font-bold ${styles.tableHeader}`}
+                style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
               >
                 <span role="columnheader">품목명</span>
                 <span role="columnheader" className="text-center">품목 코드</span>
@@ -236,13 +250,13 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
               {!canReorderItems && (
                 <div
                   data-testid="item-reorder-locked-hint"
-                  className="border-b px-3 py-1.5 text-[11px] font-medium"
+                  className="border-b px-3 py-1.5 text-[12px] font-medium"
                   style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
                 >
                   전체 목록에서만 순서를 변경할 수 있습니다.
                 </div>
               )}
-            </>
+            </div>
           }
           items={visibleItems}
           emptyState={
@@ -280,14 +294,10 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                 tabIndex={0}
                 onClick={() => handleSelectItem(item, isSelected)}
                 onKeyDown={(event) => handleItemRowKeyDown(event, item, isSelected)}
-                className="relative grid w-full grid-cols-[minmax(0,1fr)_110px_80px] items-center border-b border-l-[3px] py-2 pl-2 pr-3 text-left hover:bg-[var(--c-s4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30"
+                className={`relative grid w-full grid-cols-[minmax(0,1fr)_110px_80px] items-center border-b px-3 py-2 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[color:var(--c-blue)]/30 ${styles.tableRow} ${listPerformance.itemRow}`}
                 style={{
                   opacity: isDragging ? 0.4 : isDeleted ? 0.5 : 1,
-                  background: isSelected
-                    ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
-                    : undefined,
                   borderBottomColor: LEGACY_COLORS.border,
-                  borderLeftColor: isSelected ? LEGACY_COLORS.blue : "transparent",
                 }}
               >
                 {isDropTarget && (
@@ -337,12 +347,13 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
         />
 
         <AdminDetailCard
+          selectionKey={detailRead.loading ? undefined : addMode ? "add" : selectedItem?.item_id}
           title={
             addMode
               ? "새 품목 추가"
               : selectedItem
                 ? undefined
-                : "품목을 선택하세요"
+                : detailRead.loading || detailRead.error || visibleItems.length > 0 ? undefined : "품목을 선택하세요"
           }
           subtitle={
             addMode
@@ -356,7 +367,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                 size="sm"
                 aria-label="새 품목 추가 닫기"
                 onClick={handleCancelAdd}
-                className="h-8 w-8 !rounded-full !border-0 !p-0"
+                className="h-11 w-11 !rounded-full !border-0 !p-0"
                 style={{
                   background: `color-mix(in srgb, ${LEGACY_COLORS.red} 14%, transparent)`,
                   color: LEGACY_COLORS.red,
@@ -367,7 +378,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
             ) : undefined
           }
           tabActions={
-            !addMode &&
+            !detailRead.loading && !detailRead.error && !addMode &&
             selectedItem &&
             !selectedItem.deleted_at ? (
               deleteConfirm ? (
@@ -382,7 +393,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                       restoreDeleteFocusRef.current = true;
                       setDeleteConfirm(false);
                     }}
-                    className="standard-hover rounded-[8px] px-3 py-1.5 text-[12px] font-bold transition-colors"
+                    className="standard-hover min-h-11 rounded-[12px] px-3 py-1.5 text-[14px] font-bold transition-colors"
                     style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted }}
                   >
                     취소
@@ -394,7 +405,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                       setDeleteConfirm(false);
                       void deleteItem(selectedItem.item_id);
                     }}
-                    className="standard-hover rounded-[8px] px-3 py-1.5 text-[12px] font-bold text-white transition-colors"
+                    className="standard-hover min-h-11 rounded-[12px] px-3 py-1.5 text-[14px] font-bold text-white transition-colors"
                     style={{ background: LEGACY_COLORS.redSolid }}
                   >
                     삭제 확인
@@ -408,7 +419,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                     restoreDeleteFocusRef.current = false;
                     setDeleteConfirm(true);
                   }}
-                  className="standard-hover flex items-center gap-1 rounded-[10px] px-3 py-1.5 text-[12px] font-bold transition-colors"
+                  className="standard-hover flex min-h-11 items-center gap-1 rounded-[12px] px-3 py-1.5 text-[14px] font-bold transition-colors"
                   style={{
                     background: LEGACY_COLORS.s2,
                     color: LEGACY_COLORS.red,
@@ -421,16 +432,17 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
               )
             ) : null
           }
-          tabs={!addMode && selectedItem ? DETAIL_TABS : undefined}
+          tabs={!addMode && (selectedItem || detailRead.loading) ? DETAIL_TABS : undefined}
+          tabsDisabled={detailRead.loading || !!detailRead.error}
           activeTab={tab}
           onTabChange={(id) => setTab(id as DetailTab)}
           footer={
-            !addMode && selectedItem ? (
+            detailRead.loading ? <SkeletonBlock className="h-11 w-full rounded-[12px]" /> : !detailRead.error && !addMode && selectedItem ? (
               selectedItem.deleted_at ? (
                 <button
                   type="button"
                   onClick={() => void restoreItem(selectedItem.item_id)}
-                  className="standard-hover flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2 text-[13px] font-bold text-white transition-colors"
+                  className="standard-hover flex min-h-11 w-full items-center justify-center gap-2 rounded-[12px] px-4 py-2 text-[14px] font-bold text-white transition-colors"
                   style={{ background: LEGACY_COLORS.greenSolid }}
                 >
                   복구
@@ -439,7 +451,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                 <button
                   type="button"
                   onClick={() => void saveItem()}
-                  className="standard-hover flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2 text-[13px] font-bold text-white transition-colors"
+                  className="standard-hover flex min-h-11 w-full items-center justify-center gap-2 rounded-[12px] px-4 py-2 text-[14px] font-bold text-white transition-colors"
                   style={{ background: LEGACY_COLORS.blueSolid }}
                 >
                   <Save className="h-3.5 w-3.5" />
@@ -449,6 +461,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
             ) : null
           }
         >
+          <AdminReadBoundary read={{ ...detailRead, loading: detailRead.loading || (!!detailRead.managed && !detailRead.error && !selectedItem && !addMode && visibleItems.length > 0) }} skeleton={<AdminDetailSkeleton variant="items" />} label="품목 상세">
           {addMode ? (
             <AddItemForm />
           ) : selectedItem ? (
@@ -456,6 +469,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
           ) : (
             <ItemEmptyHint onAdd={handleStartAdd} />
           )}
+          </AdminReadBoundary>
         </AdminDetailCard>
       </div>
     </div>
@@ -489,6 +503,7 @@ function ItemBomTab({
   item: Item;
   allBomRows: BOMDetailEntry[];
 }) {
+  const read = useAdminReadState("bom");
   const composition = useMemo(
     () => allBomRows.filter((row) => row.parent_item_id === item.item_id),
     [allBomRows, item.item_id],
@@ -499,7 +514,7 @@ function ItemBomTab({
   );
 
   return (
-    <div className="flex h-full min-h-[12rem] flex-col gap-5">
+    <AdminReadBoundary read={read} label="품목 BOM" skeleton={<AdminTableSkeleton columns="minmax(0,1fr) 110px 80px" count={3} />}><div className="flex h-full min-h-[12rem] flex-col gap-5">
       <BomList
         title="구성품 (이 품목이 부모인 BOM)"
         rows={composition.map((r) => ({
@@ -520,7 +535,7 @@ function ItemBomTab({
         }))}
         emptyHint="이 품목을 사용하는 부모 BOM이 없습니다."
       />
-    </div>
+    </div></AdminReadBoundary>
   );
 }
 function BomList({
@@ -554,7 +569,7 @@ function BomList({
           visible.map((row, idx) => (
             <div
               key={`${row.code}-${idx}`}
-              className="flex items-center gap-2 px-4 py-2 text-[13px]"
+              className="flex items-center gap-2 px-4 py-2 text-[14px]"
               style={{
                 borderTop: idx === 0 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
               }}

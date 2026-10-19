@@ -23,6 +23,8 @@ interface Props {
   active: StatusFilter;
   onChange: (next: StatusFilter) => void;
   placement?: "block" | "header";
+  loading?: boolean;
+  unavailable?: boolean;
 }
 
 const CARDS: { id: StatusFilter; label: string; hint: string; tone: string }[] = [
@@ -32,11 +34,12 @@ const CARDS: { id: StatusFilter; label: string; hint: string; tone: string }[] =
   { id: "todo", label: "미착수", hint: "자식 없음", tone: LEGACY_COLORS.yellow },
 ];
 
-export function BomStatsRow({ total, done, wip, todo, active, onChange, placement = "block" }: Props) {
+export function BomStatsRow({ total, done, wip, todo, active, onChange, placement = "block", loading = false, unavailable = false }: Props) {
   const values: Record<StatusFilter, number> = { ALL: total, done, wip, todo };
 
   return (
     <AdminKpiBar
+      loading={loading} unavailable={unavailable}
       placement={placement}
       items={CARDS.map((c) => {
         const isActive = active === c.id;

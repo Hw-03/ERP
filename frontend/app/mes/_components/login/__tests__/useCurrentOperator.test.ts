@@ -7,6 +7,8 @@ import {
   readCurrentOperator,
   setCurrentOperator,
   updateCurrentOperatorPreferences,
+  getOperatorAccessContext,
+  updateCurrentOperatorAccess,
   type Operator,
 } from "../useCurrentOperator";
 import { sendClientEvent } from "@/lib/client-events";
@@ -39,6 +41,37 @@ describe("useCurrentOperator storage", () => {
     window.sessionStorage.clear();
     vi.mocked(sendClientEvent).mockClear();
     vi.mocked(revokeOperatorSession).mockClear();
+  });
+
+  it("권한만 갱신하고 로그인·테마·세션·유휴 시간을 유지하며 같은 값은 알리지 않는다", () => {
+    setCurrentOperator({ ...baseOperator, theme: "dark" }, "boot-1");
+    markLoginNotificationPopupPending("emp-1");
+    const activity = window.sessionStorage.getItem("dexcowin_mes_operator_activity");
+    vi.mocked(sendClientEvent).mockClear();
+    const event = vi.fn();
+    window.addEventListener("dexcowin_operator_change", event);
+    const profile = { ...baseOperator, warehouse_role: "primary" as const, hidden_sidebar_tabs: ["shipping"] };
+    expect(updateCurrentOperatorAccess(profile)).toBe(true);
+    expect(readCurrentOperator()).toMatchObject({ warehouse_role: "primary", hidden_sidebar_tabs: ["shipping"], theme: "dark", loginPopupEnabled: false });
+    expect(getStoredBootId()).toBe("boot-1");
+    expect(window.sessionStorage.getItem("dexcowin_mes_operator_activity")).toBe(activity);
+    expect(consumeLoginNotificationPopupPending("emp-1")).toBe(true);
+    expect(sendClientEvent).not.toHaveBeenCalled();
+    expect(updateCurrentOperatorAccess(profile)).toBe(false);
+    expect(event).toHaveBeenCalledOnce();
+    window.removeEventListener("dexcowin_operator_change", event);
+  });
+
+  it("다른 직원·이전 로그인·저장 이전의 조회 응답을 거부한다", () => {
+    setCurrentOperator(baseOperator, "boot-1");
+    const beforeSave = getOperatorAccessContext();
+    expect(updateCurrentOperatorAccess({ ...baseOperator, department_role: "primary" })).toBe(true);
+    expect(updateCurrentOperatorAccess(baseOperator, beforeSave!)).toBe(false);
+    expect(readCurrentOperator()?.department_role).toBe("primary");
+    const beforeLogin = getOperatorAccessContext();
+    setCurrentOperator(baseOperator, "boot-1");
+    expect(updateCurrentOperatorAccess({ ...baseOperator, department_role: "primary" }, beforeLogin!)).toBe(false);
+    expect(updateCurrentOperatorAccess({ ...baseOperator, employee_id: "other", department_role: "primary" })).toBe(false);
   });
 
   it("revokes the current tab's server credential when logging out", () => {

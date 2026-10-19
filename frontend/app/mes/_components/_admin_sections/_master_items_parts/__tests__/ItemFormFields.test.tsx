@@ -38,12 +38,44 @@ describe("ItemFormFields", () => {
       />,
     );
 
-    const labels = ["품목명", "카테고리", "사용 제품", "자재분류", "단위", "품목 코드"]
+    const labels = ["품목명", "사용 제품", "부서", "공정 단계", "자재분류", "단위", "품목 코드"]
       .map((label) => screen.getByText(label, { selector: "div" }));
 
     for (let index = 0; index < labels.length - 1; index += 1) {
       expect(labels[index].compareDocumentPosition(labels[index + 1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
+  });
+
+  it("카테고리를 부서와 세 가지 공정 단계 선택으로 나눈다", () => {
+    render(<ItemFormFields form={baseForm({ process_type_code: "HR" })} setForm={vi.fn()} />);
+    expect(screen.getByRole("combobox", { name: "부서" })).toHaveTextContent("고압 (H)");
+    const stage = screen.getByRole("combobox", { name: "공정 단계" });
+    expect(stage).toHaveTextContent("원자재 (R)");
+    fireEvent.click(stage);
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual(["원자재 (R)", "중간공정 (A)", "공정 완료 (F)"]);
+  });
+
+  it("부서를 바꾸면 공정 단계를 유지하고 공정 단계를 바꾸면 부서를 유지한다", () => {
+    const setForm = vi.fn();
+    const initial = baseForm({ process_type_code: "HA", sales_review_required: true });
+    const view = render(<ItemFormFields form={initial} setForm={setForm} />);
+    fireEvent.click(screen.getByRole("combobox", { name: "부서" }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "진공 (V)", exact: true }));
+    const changed = setForm.mock.calls[0][0](initial) as ItemFormData;
+    expect(changed).toEqual({ ...initial, process_type_code: "VA" });
+    view.rerender(<ItemFormFields form={changed} setForm={setForm} />);
+    fireEvent.click(screen.getByRole("combobox", { name: "공정 단계" }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "공정 완료 (F)", exact: true }));
+    expect(setForm.mock.calls[1][0](changed)).toEqual({ ...changed, process_type_code: "VF" });
+  });
+
+  it.each([false, true])("AF 선택 시 신규 등록의 영업 확인 기본값만 적용한다 (신규 %s)", (isNew) => {
+    const setForm = vi.fn();
+    const initial = baseForm({ process_type_code: "AR" });
+    render(<ItemFormFields form={initial} setForm={setForm} enableAfSalesReviewDefault={isNew} />);
+    fireEvent.click(screen.getByRole("combobox", { name: "공정 단계" }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "공정 완료 (F)", exact: true }));
+    expect(setForm.mock.calls[0][0](initial)).toEqual({ ...initial, process_type_code: "AF", sales_review_required: isNew });
   });
 
   it("places the sales-review checkbox directly after the MES code preview", () => {

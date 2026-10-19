@@ -102,7 +102,7 @@ describe("managed defect reasons", () => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: "사유 카테고리 선택" }));
     fireEvent.click(await screen.findByRole("button", { name: "기타", exact: true }));
-    expect(screen.getByText("기타를 선택하면 메모를 입력하세요.")).toBeInTheDocument();
+    expect(screen.getByText("기타 사유를 메모에 입력해 주세요.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "사유 카테고리 선택" }));
     expect(screen.queryByRole("button", { name: "기타 숨김" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "기타 이름 수정" })).not.toBeInTheDocument();

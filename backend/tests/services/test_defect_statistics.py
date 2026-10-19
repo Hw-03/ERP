@@ -458,6 +458,74 @@ def test_report_categories_and_exclusions_follow_each_period_and_all_aggregates(
     assert report.trend[-1].quantity == 15
 
 
+@pytest.mark.parametrize("period", ["week", "month", "year"])
+@pytest.mark.parametrize("category,expected,previous", [(None, 518, 6), ("DEFECT", 4, 1), ("B_GRADE", 7, 2), ("OBSOLETE", 507, 3)])
+def test_category_selection_filters_every_aggregate_but_keeps_card_totals(
+    db_session, make_item, period: str, category: str | None, expected: int, previous: int,
+) -> None:
+    item = make_item(name="분류 구성 품목", process_type_code="HR")
+    prior_at = {"week": _kst_naive(2026, 8, 31), "month": _kst_naive(2026, 8, 8), "year": _kst_naive(2025, 9, 8)}[period]
+    for at, quantities in [(prior_at, [1, 2, 3]), (_kst_naive(2026, 9, 8), [4, 7, 507])]:
+        for initial, quantity in zip(("DEFECT", "B_GRADE", "OBSOLETE"), quantities):
+            record = _add_record(db_session, item, quantity=quantity, at=at, department="창고", management_category=initial)
+            record.management_category = "DEFECT"
+            record.remaining_quantity = 0
+    _add_record(db_session, item, quantity=99, at=_kst_naive(2026, 9, 8), department="조립")
+    filters = DefectStatisticsFilters(departments=("창고",), initial_category=category)
+    report = get_defect_statistics_report(db_session, period=period, anchor=date(2026, 9, 8), filters=filters, now=datetime(2026, 10, 19, tzinfo=UTC))
+    assert report.summary.quantity == expected
+    assert [entry.quantity for entry in report.category_totals] == [4, 7, 507]
+    assert report.comparison.summary.quantity == previous
+    assert report.comparison.quantity_delta == expected - previous
+    for entries in (report.items, report.timeline, report.trend, report.comparison.items):
+        for entry in entries:
+            assert [part.key for part in entry.categories] == ["DEFECT", "B_GRADE", "OBSOLETE"]
+            assert sum(part.quantity for part in entry.categories) == entry.quantity
+            assert sum(part.record_count for part in entry.categories) == entry.record_count
+            if category:
+                assert all(part.quantity == 0 for part in entry.categories if part.key != category)
+    assert sum(entry.quantity for entry in report.departments) == expected
+    assert sum(entry.quantity for entry in report.reasons) == expected
+    assert report.trend[-1].quantity == expected
+    assert sum(entry.quantity for entry in report.timeline) == expected
+    simple = get_defect_statistics(db_session, period=period, anchor=date(2026, 9, 8), filters=filters)
+    assert simple.summary.quantity == expected
+    assert [entry.quantity for entry in simple.category_totals] == [4, 7, 507]
+
+
+@pytest.mark.parametrize("category,expected,previous", [("DEFECT", 0, 0), ("B_GRADE", 7, 2), ("OBSOLETE", 507, 0)])
+def test_category_query_combines_filters_at_kst_boundary_and_preserves_zero_parts(
+    db_session, make_item, category: str, expected: int, previous: int,
+) -> None:
+    item = make_item(name="WINDOW", model_symbol="3", process_type_code="HR")
+    other = make_item(name="다른 모델", model_symbol="4", process_type_code="HR")
+    for target, quantity, at, initial, reason in [
+        (item, 9, _kst_naive(2026, 9, 30, 23, 59), "B_GRADE", "외관"),
+        (item, 7, _kst_naive(2026, 10, 1), "B_GRADE", "외관"),
+        (item, 507, _kst_naive(2026, 10, 1), "OBSOLETE", "외관"),
+        (item, 2, _kst_naive(2026, 9, 1), "B_GRADE", "외관"),
+        (item, 200, _kst_naive(2026, 10, 19, 13), "B_GRADE", "외관"),
+        (item, 100, _kst_naive(2026, 10, 1), "B_GRADE", "다른 사유"),
+        (other, 100, _kst_naive(2026, 10, 1), "B_GRADE", "외관"),
+    ]:
+        _add_record(db_session, target, quantity=quantity, at=at, management_category=initial, reason=reason, department="창고")
+    report = get_defect_statistics_report(
+        db_session, period="month", anchor=date(2026, 10, 19), now=datetime(2026, 10, 19, 12, tzinfo=KST),
+        filters=DefectStatisticsFilters(departments=("창고",), models=("3",), process_steps=("R",), reason="외관", item_id=item.item_id, initial_category=category),
+    )
+    assert report.summary.quantity == expected
+    assert [entry.quantity for entry in report.category_totals] == [0, 7, 507]
+    assert report.comparison.summary.quantity == previous
+    assert report.timeline[0].bucket == "2026-10-01"
+    assert report.timeline[0].quantity == expected
+    assert report.trend[-1].quantity == expected
+    assert len(report.categories) == 3
+    assert sum(entry.quantity for entry in report.categories) == expected
+    for bucket in report.timeline:
+        assert len(bucket.categories) == 3
+        assert sum(entry.quantity for entry in bucket.categories) == bucket.quantity
+
+
 def _add_operation(
     db_session,
     *,
@@ -487,7 +555,7 @@ def _add_log(
     tx_type: TransactionTypeEnum,
     role: InventoryOperationRoleEnum,
     quantity: int,
-    department: str = "조립",
+    department: str | None = "조립",
     reason: str | None = "기능",
     record_id=None,
 ) -> TransactionLog:
@@ -931,6 +999,71 @@ def test_direct_operation_keeps_distinct_item_lines_as_distinct_occurrences(
         "다중 폐기 A": 2,
         "다중 폐기 B": 3,
     }
+
+
+@pytest.mark.parametrize("period", ["week", "month", "year"])
+@pytest.mark.parametrize("action", ["scrap_normal", "rework_normal"])
+def test_direct_warehouse_department_is_used_in_reports_and_filters(
+    db_session, make_item, period: str, action: str,
+) -> None:
+    item = make_item(name="창고 직접 불량", process_type_code="HR")
+    previous_at = {
+        "week": _kst_naive(2026, 8, 31),
+        "month": _kst_naive(2026, 8, 8),
+        "year": _kst_naive(2025, 9, 8),
+    }[period]
+    for at, quantity, department in [
+        (previous_at, 2, None),
+        (_kst_naive(2026, 9, 8), 3, " "),
+        (_kst_naive(2026, 9, 8), 4, "조립"),
+        (_kst_naive(2026, 9, 8), 1, None),
+    ]:
+        operation = _add_operation(db_session, action=action, at=at)
+        log = _add_log(
+            db_session, item, operation,
+            tx_type=TransactionTypeEnum.DEFECT_SCRAP if action == "scrap_normal" else TransactionTypeEnum.DISASSEMBLE,
+            role=InventoryOperationRoleEnum.PRIMARY if action == "scrap_normal" else InventoryOperationRoleEnum.REWORK_PARENT_NORMAL,
+            quantity=-quantity, department=department,
+        )
+        if quantity in (2, 3):
+            log.inventory_effect = [{"scope": "warehouse", "delta": -quantity}]
+    db_session.flush()
+
+    report = get_defect_statistics_report(
+        db_session, period=period, anchor=date(2026, 9, 8),
+        filters=DefectStatisticsFilters(departments=("창고",)),
+        now=datetime(2026, 10, 19, tzinfo=UTC),
+    )
+    assert report.summary.quantity == 3
+    assert report.summary.record_count == 1
+    assert [(entry.label, entry.quantity) for entry in report.departments] == [("창고", 3)]
+    assert report.comparison is not None
+    assert report.comparison.summary.quantity == 2
+    assert report.comparison.departments[0].label == "창고"
+
+    all_departments = get_defect_statistics(
+        db_session, period=period, anchor=date(2026, 9, 8),
+    )
+    assert {entry.label: entry.quantity for entry in all_departments.departments} == {
+        "창고": 3, "조립": 4, "미분류": 1,
+    }
+
+
+@pytest.mark.parametrize("department,effects,expected", [
+    ("조립", [{"scope": "warehouse", "delta": -2}], "조립"),
+    (None, [{"scope": "warehouse", "delta": -2}], "창고"),
+    (" ", [{"scope": "warehouse", "delta": "-2"}], "창고"),
+    (None, [{"scope": "warehouse", "delta": 2}], "미분류"),
+    (None, [{"scope": "warehouse", "delta": "invalid"}], "미분류"),
+    (None, [{"scope": "location", "delta": -2}], "미분류"),
+    (None, [None], "미분류"),
+    (None, None, "미분류"),
+])
+def test_direct_department_requires_warehouse_deduction_evidence(
+    department: str | None, effects: object, expected: str,
+) -> None:
+    log = TransactionLog(department=department, inventory_effect=effects)
+    assert statistics_service._direct_log_department(log) == expected
 
 
 def test_direct_rework_in_defect_domain_is_counted(

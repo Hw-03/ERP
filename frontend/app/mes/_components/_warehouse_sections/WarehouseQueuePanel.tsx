@@ -12,6 +12,7 @@ import { WarehouseQueueRow } from "./WarehouseQueueRow";
 import { useWarehouseQueueQuery, useApproveStockRequestMutation, useRejectStockRequestMutation } from "@/lib/queries/useStockRequestsQuery";
 import { prioritizeTargetRequest } from "./prioritizeTargetRequest";
 import { WarehouseEmptyWorkArea } from "./WarehouseEmptyWorkArea";
+import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 
 interface Props {
   mobilePresentation?: boolean;
@@ -36,6 +37,9 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
   const [approvePinFor, setApprovePinFor] = useState<string | null>(null);
   const [approvePin, setApprovePin] = useState("");
   const [approveError, setApproveError] = useState<string | null>(null);
+  useRegisterDirty("warehouse-queue-approval", !!busyId || !!showRejectFor || !!approvePinFor,
+    async () => { throw new Error("진행 중인 결재 결과를 확인한 뒤 이동해 주세요."); }, undefined,
+    { mode: busyId ? "auto-save" : "confirm-only" });
 
   useEffect(() => {
     onEmptyStateChange?.(loading || (items.length === 0 && !error));

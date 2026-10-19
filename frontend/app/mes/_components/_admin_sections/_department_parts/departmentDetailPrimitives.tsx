@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import styles from "../AdminDepartmentsSection.module.css";
 
 export function MetaCell({
   label,
@@ -11,17 +12,16 @@ export function MetaCell({
   value: string;
   tone?: string;
   mono?: boolean;
-}) {
+}): ReactNode {
   return (
     <div
-      className="rounded-[12px] border px-3 py-2.5"
-      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+      className={styles.metaCell}
     >
-      <div className="text-[12px] font-bold tracking-[0.08em]" style={{ color: LEGACY_COLORS.muted2 }}>
+      <div className="text-[12px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
         {label}
       </div>
       <div
-        className={`mt-0.5 text-[14px] font-black ${mono ? "font-mono" : ""}`}
+        className={`mt-2 text-[20px] font-black ${mono ? "font-mono" : ""}`}
         style={{ color: tone ?? LEGACY_COLORS.text }}
       >
         {value}
@@ -40,16 +40,13 @@ export function DetailCardSlot({
   icon?: ReactNode;
   children: ReactNode;
   className?: string;
-}) {
+}): ReactNode {
   return (
     <div
-      className={`rounded-[14px] border p-4 ${className ?? ""}`}
-      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+      className={`border p-3 ${styles.detailSection} ${className ?? ""}`}
+      style={{ borderColor: LEGACY_COLORS.border }}
     >
-      <div
-        className="mb-3 flex items-center gap-1.5 text-[12px] font-black tracking-[0.12em]"
-        style={{ color: LEGACY_COLORS.muted2 }}
-      >
+      <div className={styles.detailSectionTitle}>
         {icon}
         {title}
       </div>

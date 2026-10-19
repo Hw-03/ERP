@@ -9,6 +9,7 @@ import { DraftCartPanel } from "./DraftCartPanel";
 import { HandoverSectionPanel } from "./HandoverSectionPanel";
 import type { WarehouseSectionTab } from "./WarehouseSectionTabs";
 import type { Operator } from "../login/useCurrentOperator";
+import { AccessRevocationGuard } from "../common/AccessRevocationGuard";
 
 /**
  * Round-13 (#1) 추출 — DesktopWarehouseView 의 cart/mine/queue 3 패널 분기.
@@ -19,6 +20,8 @@ import type { Operator } from "../login/useCurrentOperator";
 export interface WarehouseDraftPanelTabsProps {
   layout: "desktop" | "mobile";
   sectionTab: WarehouseSectionTab;
+  onAccessRevoked: () => void;
+  accessAllowed?: boolean;
   canSeeQueue: boolean;
   canSeeDeptQueue: boolean;
   canSeeAsResearchQueue: boolean;
@@ -40,12 +43,18 @@ export interface WarehouseDraftPanelTabsProps {
   targetRequestId?: string | null;
 }
 
-export function WarehouseDraftPanelTabs({
+export function WarehouseDraftPanelTabs(props: WarehouseDraftPanelTabsProps) {
+  const allowed = (props.accessAllowed ?? true) && (props.sectionTab === "queue" ? props.canSeeQueue
+    : props.sectionTab === "dept-queue" ? props.canSeeDeptQueue
+    : props.sectionTab === "as-research-queue" ? props.canSeeAsResearchQueue : true);
+  return <AccessRevocationGuard key={props.sectionTab} allowed={allowed} onLeave={props.onAccessRevoked}>
+    <WarehouseDraftPanelContent {...props} />
+  </AccessRevocationGuard>;
+}
+
+function WarehouseDraftPanelContent({
   layout,
   sectionTab,
-  canSeeQueue,
-  canSeeDeptQueue,
-  canSeeAsResearchQueue,
   operator,
   operatorEmployeeId,
   employeeId,
@@ -106,7 +115,7 @@ export function WarehouseDraftPanelTabs({
     );
   }
 
-  if (sectionTab === "queue" && canSeeQueue && operatorEmployeeId) {
+  if (sectionTab === "queue" && operatorEmployeeId) {
     return (
         <WarehouseQueuePanel
           mobilePresentation={layout === "mobile"}
@@ -144,7 +153,7 @@ export function WarehouseDraftPanelTabs({
     );
   }
 
-  if (sectionTab === "as-research-queue" && canSeeAsResearchQueue && operatorEmployeeId) {
+  if (sectionTab === "as-research-queue" && operatorEmployeeId) {
     return (
       <AsResearchQueuePanel
         mobilePresentation={layout === "mobile"}
@@ -166,7 +175,7 @@ export function WarehouseDraftPanelTabs({
     );
   }
 
-  if (sectionTab === "dept-queue" && canSeeDeptQueue && operatorEmployeeId) {
+  if (sectionTab === "dept-queue" && operatorEmployeeId) {
     return (
         <DepartmentQueuePanel
           mobilePresentation={layout === "mobile"}

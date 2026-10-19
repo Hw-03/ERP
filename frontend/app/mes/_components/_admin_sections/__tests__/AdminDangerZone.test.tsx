@@ -13,21 +13,25 @@ function AdminDangerZoneHarness({ isSaving = false }: { isSaving?: boolean }) {
 }
 
 describe("AdminDangerZone", () => {
-  it("centers the security card with a scroll-safe content structure", () => {
+  it("공통 관리자 카드 안에 PIN 입력과 장식용 덱스레이를 배치한다", () => {
     const { container } = render(<AdminDangerZoneHarness />);
 
     expect(container.firstElementChild).toHaveClass("flex", "min-h-0", "flex-1", "flex-col");
     const scrollRegion = container.querySelector(".overflow-y-auto");
     expect(scrollRegion).toHaveClass("min-h-0", "flex-1", "overflow-y-auto");
-    expect(scrollRegion?.firstElementChild).toHaveClass("grid", "min-h-full", "place-items-center");
-    expect(container.querySelector(".max-w-\\[560px\\]")).toHaveClass(
-      "mx-auto",
-      "w-full",
-    );
-    expect(container.querySelector(".max-w-\\[560px\\]")).not.toHaveClass(
-      "mb-auto",
-      "mt-[clamp(48px,8vh,80px)]",
-    );
+    expect(scrollRegion).toHaveClass("rounded-[20px]", "border");
+    expect(scrollRegion?.firstElementChild).toHaveClass("grid", "min-h-full", "items-center", "lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)_minmax(0,1fr)]");
+    expect(scrollRegion?.firstElementChild?.firstElementChild).toHaveClass("lg:col-start-2", "max-w-[560px]");
+    const mascot = container.querySelector("img");
+    expect(mascot).toHaveAttribute("alt", "");
+    expect(mascot?.parentElement).toHaveAttribute("aria-hidden", "true");
+    expect(mascot?.parentElement).toHaveClass("hidden", "lg:flex");
+    expect(mascot?.parentElement).toHaveClass("lg:col-start-3");
+    expect(mascot).toHaveClass("max-w-[240px]");
+    for (const label of ["현재 PIN", "새 PIN", "새 PIN 확인"]) {
+      expect(screen.getByLabelText(label)).toHaveClass("min-h-11");
+    }
+    expect(screen.getByRole("button", { name: "PIN 변경" })).toHaveClass("min-h-11", "w-full");
   });
 
   it("저장 중에는 세 PIN 입력과 변경 버튼을 비활성화한다", () => {

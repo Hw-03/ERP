@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
 import { AdminDepartmentsSection } from "../AdminDepartmentsSection";
+import { AdminReadProvider, INITIAL_ADMIN_READ_STATES } from "../_admin_primitives/AdminReadState";
 
 const assembly = { id: 1, name: "조립", display_order: 1, is_active: true, color_hex: "#2f74e7" };
 
@@ -31,14 +32,23 @@ vi.mock("../../DepartmentsContext", () => ({
 }));
 
 describe("AdminDepartmentsSection", () => {
-  it("uses fixed list and status widths so full department statuses fit", () => {
+  it("최초 조회에서는 부서 값과 조작 버튼을 표시하지 않고 자리를 예약한다", () => {
+    render(<AdminReadProvider value={{ states: INITIAL_ADMIN_READ_STATES, retry: vi.fn() }}>
+      <DirtyGuardProvider><AdminDepartmentsSection employees={[]} items={[]} adminPin="0000" setDepartments={vi.fn()} onStatusChange={vi.fn()} onError={vi.fn()} /></DirtyGuardProvider>
+    </AdminReadProvider>);
+    expect(screen.getByTestId("admin-table-skeleton")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-detail-skeleton")).toBeInTheDocument();
+    expect(screen.queryByText(/부서를 선택하세요/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "저장" })).not.toBeInTheDocument();
+  });
+  it("uses a responsive list width and fixed status width so department statuses fit", () => {
     const { container } = render(
       <DirtyGuardProvider>
         <AdminDepartmentsSection employees={[]} items={[]} adminPin="0000" setDepartments={vi.fn()} onStatusChange={vi.fn()} onError={vi.fn()} />
       </DirtyGuardProvider>,
     );
 
-    expect(container.querySelector("div[style*='width: 336px']")).toBeInTheDocument();
+    expect(container.querySelector("div[style*='width: clamp(360px, 28vw, 440px)']")).toBeInTheDocument();
     expect(container.querySelector("[data-admin-list-header='departments']")).toHaveClass("grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_88px]");
     expect(container.querySelector("[data-admin-department-row='1']")).toHaveClass("grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_88px]");
     expect(container.querySelector("[data-admin-department-row='1'] span[title]")).toHaveStyle({ maxWidth: "84px" });

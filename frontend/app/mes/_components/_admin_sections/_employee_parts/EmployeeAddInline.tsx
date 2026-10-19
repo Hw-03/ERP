@@ -97,7 +97,7 @@ export function EmployeeAddInline({ form, setForm, departments, productModels, o
               style={{ accentColor: LEGACY_COLORS.blue, borderColor: LEGACY_COLORS.border }}
             />
             <span className="text-[12px] leading-5" style={{ color: LEGACY_COLORS.muted2 }}>
-              AS·연구 사용출고 중 부서 재고의 AR·AA 품목 승인. 대상 직원은 다음 로그인부터 승인함 탭 반영
+              AS·연구 사용출고 중 부서 재고의 AR·AA 품목 승인. 저장 후 즉시 적용
             </span>
           </label>
         </FieldRow>

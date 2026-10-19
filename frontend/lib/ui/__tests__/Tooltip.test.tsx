@@ -4,6 +4,21 @@ import { SlidePanel } from "@/app/mes/_components/common/SlidePanel";
 import { Tooltip } from "../Tooltip";
 
 describe("Tooltip", () => {
+  it("checks a lazy display condition only on interaction and leaves blocked focus undescribed", () => {
+    const shouldShow = vi.fn(() => false);
+    render(<Tooltip content="Full item name" shouldShow={shouldShow}><button>Item</button></Tooltip>);
+    expect(shouldShow).not.toHaveBeenCalled();
+    const button = screen.getByRole("button", { name: "Item" });
+    fireEvent.focus(button);
+    expect(shouldShow).toHaveBeenCalledOnce();
+    expect(button).not.toHaveAttribute("aria-describedby");
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    shouldShow.mockReturnValue(true);
+    fireEvent.mouseEnter(button.parentElement!);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Full item name");
+  });
+
   it("closes on mouse leave after pointer focus but preserves keyboard focus", () => {
     render(<Tooltip content="Description" triggerTabIndex={0}><span>Target</span></Tooltip>);
     const trigger = screen.getByText("Target").parentElement!;

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ChevronDown, Palette, Trash2 } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { ChevronDown, Palette, Trash2, Users } from "lucide-react";
 import { api, type DepartmentMaster, type Employee } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { departmentDisplayColor } from "@/lib/mes-department";
@@ -11,9 +11,11 @@ import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { useRefreshDepartments } from "../../DepartmentsContext";
 import { deptColor, TAILWIND_PALETTE } from "./departmentColors";
 import { DetailCardSlot, MetaCell } from "./departmentDetailPrimitives";
+import styles from "../AdminDepartmentsSection.module.css";
 
 interface DeptDetailViewProps {
   dept: DepartmentMaster;
+  headerActions?: ReactNode;
   adminPin: string;
   empCount: number;
   itemCount: number;
@@ -30,6 +32,7 @@ interface DeptDetailViewProps {
 
 export function DeptDetailView({
   dept,
+  headerActions,
   adminPin,
   empCount,
   itemCount,
@@ -108,29 +111,32 @@ export function DeptDetailView({
   const colorChanged = isValidHex && previewColor.toLowerCase() !== savedColor.toLowerCase();
 
   return (
-    <div className="flex min-h-full flex-col gap-4">
+    <div className="flex min-h-full flex-col gap-3">
       {/* 메타 그리드 */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <div className="flex flex-col gap-1">
-          <label htmlFor="department-name" className="text-[12px] font-bold tracking-wide" style={{ color: LEGACY_COLORS.muted2 }}>
-            부서명
-          </label>
-          <input
-            id="department-name"
-            type="text"
-            value={editForm.name}
-            onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-            className="w-full rounded-[10px] border px-3 py-2 text-[14px] outline-none focus-visible:border-[var(--c-blue)] focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/20"
-            style={{
-              background: LEGACY_COLORS.s1,
-              borderColor: LEGACY_COLORS.border,
-              color: LEGACY_COLORS.text,
-            }}
-          />
+      <div className={styles.detailHeader}>
+        <div className={styles.metaGrid}>
+          <div className={`flex flex-col gap-1 ${styles.nameField}`}>
+            <label htmlFor="department-name" className="text-[12px] font-bold tracking-wide" style={{ color: LEGACY_COLORS.muted2 }}>
+              부서명
+            </label>
+            <input
+              id="department-name"
+              type="text"
+              value={editForm.name}
+              onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+              className="min-h-11 w-full rounded-[12px] border px-3 py-2 text-[14px] outline-none focus-visible:border-[var(--c-blue)] focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/20"
+              style={{
+                background: LEGACY_COLORS.s1,
+                borderColor: LEGACY_COLORS.border,
+                color: LEGACY_COLORS.text,
+              }}
+            />
+          </div>
+          <MetaCell label="코드" value={`DPT-${String(dept.id).padStart(2, "0")}`} mono />
+          <MetaCell label="소속 직원" value={`${empCount}명`} tone={LEGACY_COLORS.purple} />
+          <MetaCell label="관련 품목" value={`${itemCount}개`} tone={LEGACY_COLORS.blue} />
         </div>
-        <MetaCell label="코드" value={`DPT-${String(dept.id).padStart(2, "0")}`} mono />
-        <MetaCell label="소속 직원" value={`${empCount}명`} tone={LEGACY_COLORS.purple} />
-        <MetaCell label="관련 품목" value={`${itemCount}개`} tone={LEGACY_COLORS.blue} />
+        {headerActions}
       </div>
       <p className="-mt-2 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
         품목 코드 공정 기준{!isProcessMappedDepartment ? " · 공정 코드 매핑 없음" : ""}
@@ -139,12 +145,12 @@ export function DeptDetailView({
       {/* 색상 변경 */}
       <DetailCardSlot
         title="색상"
-        icon={<Palette className="h-3.5 w-3.5" />}
+        icon={<Palette />}
         className="min-h-0 flex-1"
       >
         <div className="flex flex-col gap-3">
           {/* 미리보기 + 텍스트 입력 */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div
               className="h-9 w-9 shrink-0 rounded-full border-2"
               style={{ background: savedColor, borderColor: LEGACY_COLORS.border }}
@@ -175,21 +181,21 @@ export function DeptDetailView({
                   }
                 }}
                 placeholder="#000000"
-                className="w-32 rounded-[8px] border px-2 py-1 font-mono text-[14px] outline-none focus-visible:border-[var(--c-blue)] focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/20"
+                className="min-h-11 w-36 rounded-[12px] border px-3 py-2 font-mono text-[14px] outline-none focus-visible:border-[var(--c-blue)] focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/20"
                 style={{
                   background: LEGACY_COLORS.s1,
-                  borderColor: colorInputError ? "#ef4444" : LEGACY_COLORS.border,
+                  borderColor: colorInputError ? LEGACY_COLORS.red : LEGACY_COLORS.border,
                   color: LEGACY_COLORS.text,
                 }}
               />
               {colorInputError && (
-                <span className="text-[12px]" style={{ color: "#ef4444" }}>
+                <span className="text-[12px]" style={{ color: LEGACY_COLORS.red }}>
                   {colorInputError}
                 </span>
               )}
             </div>
             <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+              <span className="text-[12px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
                 다크 모드 표시
               </span>
               <div
@@ -206,7 +212,7 @@ export function DeptDetailView({
               aria-expanded={isPaletteOpen}
               aria-controls="department-color-palette"
               onClick={() => setIsPaletteOpen((open) => !open)}
-              className="standard-hover flex h-11 w-full items-center justify-between rounded-[12px] border px-3 text-[12px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30"
+              className="standard-hover flex h-11 w-full items-center justify-between rounded-[12px] border px-3 text-[14px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30"
               style={{
                 background: isPaletteOpen
                   ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`
@@ -224,7 +230,7 @@ export function DeptDetailView({
               />
             </button>
             {isPaletteOpen && (
-              <div id="department-color-palette" className="mt-3 grid grid-cols-6 gap-2 sm:grid-cols-9">
+              <div id="department-color-palette" className={`mt-3 grid gap-2 ${styles.palette}`}>
                 {TAILWIND_PALETTE.map((swatch) => {
                   const selected = editForm.color_hex.toLowerCase() === swatch.hex.toLowerCase();
                   return (
@@ -254,16 +260,17 @@ export function DeptDetailView({
       {/* 소속 직원 미리보기 */}
       <DetailCardSlot
         title={`소속 직원 (${deptEmployees.length}명)`}
+        icon={<Users />}
         className="min-h-0 flex-1"
       >
         {deptEmployees.length === 0 ? (
-          <div className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
+          <div className="text-[14px]" style={{ color: LEGACY_COLORS.muted2 }}>
             소속된 직원이 없습니다.
           </div>
         ) : (
-          <div className="flex flex-col gap-1.5">
+          <div className={styles.employees}>
             {deptEmployees.slice(0, 5).map((e) => (
-              <div key={e.employee_id} className="flex items-center gap-2 text-[14px]">
+              <div key={e.employee_id} className={`flex items-center gap-2 text-[14px] ${styles.employee}`}>
                 <span
                   className="h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{ background: e.is_active ? LEGACY_COLORS.green : LEGACY_COLORS.muted2 }}
@@ -288,7 +295,7 @@ export function DeptDetailView({
       </DetailCardSlot>
 
       {/* 액션 */}
-      <div className="mt-auto flex gap-2">
+      <div className={`mt-auto flex gap-2 ${styles.dangerActions}`}>
         <button
           type="button"
           onClick={() => {

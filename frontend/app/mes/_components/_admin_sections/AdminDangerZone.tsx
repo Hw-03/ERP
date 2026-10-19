@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { KeyRound, ShieldCheck } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
@@ -56,68 +57,77 @@ export function AdminDangerZone({
           title="보안"
         />
 
-        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-          <div className="grid min-h-full place-items-center py-6">
-            <div className="mx-auto w-full max-w-[560px]">
-              <div
-                className="rounded-[16px] border p-5"
-                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-              >
-                <div className="flex items-start gap-3">
-                  <div
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]"
-                    style={{
-                      background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`,
-                      color: LEGACY_COLORS.blue,
-                    }}
-                  >
-                    <KeyRound className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
-                      관리자 PIN 변경
-                    </div>
-                    <div className="mt-1 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                      관리자 인증 PIN을 변경하여 계정 보안을 강화하세요.
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-5 grid gap-3">
-                  <PinField
-                    id="admin-current-pin"
-                    label="현재 PIN"
-                    value={pinForm.current_pin}
-                    onChange={(v) => setPinForm((c) => ({ ...c, current_pin: v }))}
-                    error={currentPinError}
-                    disabled={saving}
-                  />
-                  <PinField
-                    id="admin-new-pin"
-                    label="새 PIN"
-                    value={pinForm.new_pin}
-                    onChange={(v) => setPinForm((c) => ({ ...c, new_pin: v }))}
-                    error={newPinError}
-                    disabled={saving}
-                  />
-                  <PinField
-                    id="admin-confirm-pin"
-                    label="새 PIN 확인"
-                    value={pinForm.confirm_pin}
-                    onChange={(v) => setPinForm((c) => ({ ...c, confirm_pin: v }))}
-                    error={confirmPinError}
-                    disabled={saving}
-                  />
-                </div>
-                <Button
-                  variant="primary"
-                  size="md"
-                  onClick={handleChangePin}
-                  disabled={saving || !canChangePin}
-                  className="mt-5"
+        <div className="min-h-0 flex-1 overflow-y-auto rounded-[20px] border p-6" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+          <div className="grid min-h-full w-full items-center gap-6 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)_minmax(0,1fr)]">
+            <div
+              className="w-full max-w-[560px] justify-self-center rounded-[16px] border p-6 lg:col-start-2"
+              style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]"
+                  style={{
+                    background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`,
+                    color: LEGACY_COLORS.blue,
+                  }}
                 >
-                  {saving ? "변경 중..." : "PIN 변경"}
-                </Button>
+                  <KeyRound className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[16px] font-black" style={{ color: LEGACY_COLORS.text }}>
+                    관리자 PIN 변경
+                  </div>
+                  <div className="mt-1 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                    관리자 인증 PIN을 변경하여 계정 보안을 강화하세요.
+                  </div>
+                </div>
               </div>
+              <div className="mt-5 grid gap-3">
+                <PinField
+                  id="admin-current-pin"
+                  label="현재 PIN"
+                  value={pinForm.current_pin}
+                  onChange={(v) => setPinForm((c) => ({ ...c, current_pin: v }))}
+                  error={currentPinError}
+                  disabled={saving}
+                />
+                <PinField
+                  id="admin-new-pin"
+                  label="새 PIN"
+                  value={pinForm.new_pin}
+                  onChange={(v) => setPinForm((c) => ({ ...c, new_pin: v }))}
+                  error={newPinError}
+                  disabled={saving}
+                />
+                <PinField
+                  id="admin-confirm-pin"
+                  label="새 PIN 확인"
+                  value={pinForm.confirm_pin}
+                  onChange={(v) => setPinForm((c) => ({ ...c, confirm_pin: v }))}
+                  error={confirmPinError}
+                  disabled={saving}
+                />
+              </div>
+              <Button
+                variant="primary"
+                size="md"
+                onClick={handleChangePin}
+                disabled={saving || !canChangePin}
+                className="mt-5 min-h-11 w-full"
+              >
+                {saving ? "변경 중..." : "PIN 변경"}
+              </Button>
+            </div>
+            <div aria-hidden="true" className="hidden items-center pl-4 lg:col-start-3 lg:flex">
+              <Image
+                src="/images/login/dexray-pointing-left.webp"
+                alt=""
+                width={607}
+                height={640}
+                sizes="(min-width: 1600px) 240px, 20vw"
+                draggable={false}
+                className="h-auto w-full max-w-[240px] select-none"
+              />
             </div>
           </div>
         </div>
@@ -162,9 +172,9 @@ function PinField({
         placeholder="0000"
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
-        className="w-full rounded-[10px] border px-3 py-2.5 text-[14px] tracking-widest outline-none focus-visible:border-[var(--c-blue)] focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/20"
+        className="min-h-11 w-full rounded-[12px] border px-3 py-2.5 text-[14px] tracking-widest outline-none focus-visible:border-[var(--c-blue)] focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/20"
         style={{
-          background: LEGACY_COLORS.s2,
+          background: LEGACY_COLORS.s1,
           borderColor: error ? LEGACY_COLORS.red : LEGACY_COLORS.border,
           color: LEGACY_COLORS.text,
         }}

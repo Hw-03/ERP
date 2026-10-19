@@ -3,6 +3,7 @@ import { act, cleanup, render } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MesLoginGate } from "../MesLoginGate";
+vi.mock("../OperatorAccessSync", () => ({ OperatorAccessSync: () => null }));
 
 vi.mock("next/image", () => ({
   default: ({ alt = "", ...props }: Record<string, unknown>) => <img alt={String(alt)} {...props} />,

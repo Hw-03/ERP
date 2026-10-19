@@ -24,7 +24,7 @@ type Props<T extends StockPurchaseFormData> = {
   fillAvailableHeight?: boolean;
 };
 
-const INPUT_CLASS = "w-full min-w-0 rounded-[12px] border px-3 py-2 text-sm outline-none transition-colors focus-visible:border-[var(--c-blue)] focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/20";
+const INPUT_CLASS = "min-h-11 w-full min-w-0 rounded-[12px] border px-3 py-2 text-sm outline-none transition-colors focus-visible:border-[var(--c-blue)] focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/20";
 const INPUT_STYLE = {
   background: LEGACY_COLORS.s1,
   borderColor: LEGACY_COLORS.border,
@@ -64,7 +64,7 @@ function NumberField({
   return (
     <Field label={label}>
       <div
-        className="flex items-center gap-2 rounded-[12px] border px-3 py-2 transition-colors focus-within:border-[var(--c-blue)] focus-within:ring-2 focus-within:ring-[color:var(--c-blue)]/20"
+        className="flex min-h-11 items-center gap-2 rounded-[12px] border px-3 py-2 transition-colors focus-within:border-[var(--c-blue)] focus-within:ring-2 focus-within:ring-[color:var(--c-blue)]/20"
         style={INPUT_STYLE}
       >
         <input

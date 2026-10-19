@@ -596,7 +596,7 @@ describe("DefectHubPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
     expect(await screen.findByRole("checkbox", { name: "필터 고정" })).toBeChecked();
-    expect(screen.getByRole("combobox")).toHaveValue("newest");
+    expect(screen.getByRole("button", { name: "최신 순", exact: true })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "내가 격리" })).toHaveAttribute("aria-pressed", "true");
     expect(await screen.findByText("7-TR-0001")).toBeInTheDocument();
     expect(screen.queryByText("7-TR-0003")).not.toBeInTheDocument();
@@ -642,7 +642,7 @@ describe("DefectHubPanel", () => {
     expect(await screen.findByText("전극(70kV)")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "newest" } });
+    fireEvent.click(screen.getByRole("button", { name: "최신 순", exact: true }));
     const summaries = screen.getAllByTestId("defect-item-summary");
     expect(summaries[0]).toHaveTextContent("전극(70kV)");
     expect(summaries[1]).toHaveTextContent("게터");
@@ -665,12 +665,12 @@ describe("DefectHubPanel", () => {
     expect(screen.queryByText("다른 품목")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "newest" } });
+    fireEvent.click(screen.getByRole("button", { name: "최신 순", exact: true }));
     let summaries = screen.getAllByTestId("defect-item-summary");
     expect(summaries[0]).toHaveTextContent("검색 최신");
     expect(summaries[1]).toHaveTextContent("검색 오래된");
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "oldest" } });
-    await waitFor(() => expect(screen.getByRole("combobox")).toHaveValue("oldest"));
+    fireEvent.click(screen.getByRole("button", { name: "오래된 순", exact: true }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "오래된 순", exact: true })).toHaveAttribute("aria-pressed", "true"));
     summaries = screen.getAllByTestId("defect-item-summary");
     expect(summaries[0]).toHaveTextContent("검색 오래된");
     expect(summaries[1]).toHaveTextContent("검색 최신");

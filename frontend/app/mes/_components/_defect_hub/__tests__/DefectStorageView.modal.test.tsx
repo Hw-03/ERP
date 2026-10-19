@@ -130,11 +130,11 @@ describe("모바일 B급·구형 목록", () => {
     fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
     fireEvent.click(screen.getByRole("button", { name: "내가 격리" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "필터 고정" }));
-    fireEvent.change(screen.getByRole("combobox", { name: "정렬" }), { target: { value: "oldest" } });
+    fireEvent.click(screen.getByRole("button", { name: "오래된 순", exact: true }));
     fireEvent.click(screen.getByRole("button", { name: "필터 초기화" }));
     expect(screen.getByText(location.item_name)).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "필터 고정" })).toBeChecked();
-    expect(screen.getByRole("combobox", { name: "정렬" })).toHaveValue("oldest");
+    expect(screen.getByRole("button", { name: "오래된 순", exact: true })).toHaveAttribute("aria-pressed", "true");
   });
   it("조합 입력 도중에도 보관 목록을 필터링한다", () => {
     window.localStorage.clear();
@@ -159,10 +159,10 @@ describe("모바일 B급·구형 목록", () => {
     const classifications = screen.getByRole("group", { name: "보관 분류 필터" });
     expect(classifications).toHaveClass("grid-cols-3");
     expect(screen.getByRole("button", { name: "필터 펼치기" })).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByRole("combobox", { name: "정렬" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "정렬" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
     fireEvent.click(screen.getByRole("button", { name: "조립", exact: true }));
-    fireEvent.change(screen.getByRole("combobox", { name: "정렬" }), { target: { value: "oldest" } });
+    fireEvent.click(screen.getByRole("button", { name: "오래된 순", exact: true }));
     fireEvent.click(screen.getByRole("button", { name: "필터 접기" }));
     expect(screen.getByRole("button", { name: "필터 펼치기" })).toHaveTextContent("부서 조립 · 오래된 순");
     fireEvent.click(within(classifications).getByRole("button", { name: /B급/ }));
@@ -171,6 +171,6 @@ describe("모바일 B급·구형 목록", () => {
     expect(screen.getByText("ADX6000 구형 컬리메이터")).toBeInTheDocument();
     expect(screen.queryByText("튜브 구형 품목")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
-    expect(screen.getByRole("combobox", { name: "정렬" })).toHaveValue("oldest");
+    expect(screen.getByRole("button", { name: "오래된 순", exact: true })).toHaveAttribute("aria-pressed", "true");
   });
 });

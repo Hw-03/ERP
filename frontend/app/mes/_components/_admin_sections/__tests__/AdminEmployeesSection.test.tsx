@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { AdminEmployeesSection } from "../AdminEmployeesSection";
 import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
+import { AdminReadProvider, INITIAL_ADMIN_READ_STATES } from "../_admin_primitives/AdminReadState";
 
 const setSelectedEmployee = vi.fn();
 const context: any = {
@@ -73,6 +74,34 @@ vi.mock("@/lib/queries/useModelsQuery", () => ({
 }));
 
 describe("AdminEmployeesSection", () => {
+  it("최초 조회에서는 미선택 안내 대신 직원 목록과 상세 자리를 표시한다", () => {
+    render(<AdminReadProvider value={{ states: INITIAL_ADMIN_READ_STATES, retry: vi.fn() }}>
+      <DirtyGuardProvider><AdminEmployeesSection /></DirtyGuardProvider>
+    </AdminReadProvider>);
+    expect(screen.getByTestId("admin-table-skeleton")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-detail-skeleton")).toBeInTheDocument();
+    expect(screen.queryByText(/직원을 선택하세요/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "직원 추가" })).toBeDisabled();
+  });
+  it.each(["ㄱㄱㅎ", "ㄱㄱㅎ ㅈㄹ", "ㅈㅇㅈ", "김건호 조립"])("직원 이름·부서·직급을 초성과 조합 검색으로 찾는다: %s", (query) => {
+    context.employees = [defaultEmployee, { ...defaultEmployee, employee_id: "emp-2", name: "박서연", department: "출하", role: "대리" }];
+    const { container } = render(<DirtyGuardProvider><AdminEmployeesSection /></DirtyGuardProvider>);
+    fireEvent.change(screen.getByPlaceholderText("이름·부서·직급 검색"), { target: { value: query } });
+    expect(container.querySelector("[data-admin-employee-row='emp-1']")).toBeInTheDocument();
+    expect(container.querySelector("[data-admin-employee-row='emp-2']")).toBeNull();
+  });
+
+  it("초성 검색과 부서 필터를 함께 적용한다", async () => {
+    context.employees = [defaultEmployee, { ...defaultEmployee, employee_id: "emp-2", name: "김건하", department: "출하" }];
+    const { container } = render(<DirtyGuardProvider><AdminEmployeesSection /></DirtyGuardProvider>);
+    fireEvent.change(screen.getByPlaceholderText("이름·부서·직급 검색"), { target: { value: "ㄱㄱㅎ" } });
+    expect(container.querySelectorAll("[data-admin-employee-row]")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("combobox", { name: "부서 필터" }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "출하", exact: true }));
+    await waitFor(() => expect(container.querySelector("[data-admin-employee-row='emp-1']")).toBeNull());
+    expect(container.querySelector("[data-admin-employee-row='emp-2']")).toBeInTheDocument();
+  });
+
   it("직원 목록을 이름·부서 직급·상태 열의 평평한 표 행으로 표시한다", () => {
     const inactiveEmployee = {
       ...defaultEmployee,
@@ -183,6 +212,9 @@ describe("AdminEmployeesSection", () => {
 
     expect(saveButton).toHaveClass("h-11", "min-w-[88px]", "px-4", "py-2", "text-[13px]");
     expect(saveButton.querySelector("svg")).toHaveClass("h-4", "w-4");
+    context.saveEmployee.mockClear();
+    fireEvent.click(saveButton);
+    expect(context.saveEmployee).toHaveBeenCalledOnce();
   });
 
   it("legacy 부서/직급은 목록과 선택 헤더에서 표준 직급으로 표시한다", () => {
@@ -210,7 +242,8 @@ describe("AdminEmployeesSection", () => {
       </DirtyGuardProvider>,
     );
 
-    expect(screen.getAllByText("영업 · 과장")).toHaveLength(2);
+    expect(screen.getAllByText("영업 · 과장")).toHaveLength(1);
+    expect(within(screen.getByRole("group", { name: "직원 기본 정보" })).getByRole("combobox", { name: "직급" })).toHaveTextContent("과장");
   });
 
   it("비선택 legacy 직원도 목록에서 표준 직급으로 표시한다", () => {
@@ -298,7 +331,8 @@ describe("AdminEmployeesSection", () => {
       </DirtyGuardProvider>,
     );
 
-    expect(screen.getAllByText("조립 · 대리")).toHaveLength(2);
+    expect(screen.getAllByText("조립 · 대리")).toHaveLength(1);
+    expect(within(screen.getByRole("group", { name: "직원 기본 정보" })).getByRole("combobox", { name: "직급" })).toHaveTextContent("대리");
     expect(context.saveEmployee).not.toHaveBeenCalled();
   });
 
@@ -331,8 +365,8 @@ describe("AdminEmployeesSection", () => {
     );
 
     const deptFilter = screen.getByRole("combobox", { name: "부서 필터" });
-    expect(deptFilter.parentElement).toHaveClass("w-[144px]");
-    expect(screen.getByText("직원 목록").parentElement?.parentElement).toContainElement(deptFilter);
+    expect(deptFilter.parentElement).toHaveClass("w-[48%]", "min-w-[144px]");
+    expect(deptFilter.closest("div.flex.shrink-0")).toContainElement(screen.getByText("직원 목록"));
   });
 
   it("직원 추가를 시작하면 비어 있는 직급을 사원으로 채운다", () => {
