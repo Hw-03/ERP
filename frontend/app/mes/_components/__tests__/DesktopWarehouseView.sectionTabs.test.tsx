@@ -102,6 +102,7 @@ vi.mock("@/app/mes/_components/_warehouse_v2/IoComposeView", () => ({
 
 vi.mock("@/app/mes/_components/login/useCurrentOperator", () => ({
   readCurrentOperator: () => operatorState.value,
+  useCurrentOperator: () => operatorState.value,
 }));
 
 describe("DesktopWarehouseView", () => {

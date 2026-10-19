@@ -10,7 +10,7 @@ import { WarehouseHeader } from "./_warehouse_sections/WarehouseHeader";
 import { WarehouseSectionTabs, type WarehouseSectionTab } from "./_warehouse_sections/WarehouseSectionTabs";
 import { WarehouseDraftPanelTabs } from "./_warehouse_sections/WarehouseDraftPanelTabs";
 import { IoComposeView } from "./_warehouse_v2/IoComposeView";
-import { readCurrentOperator } from "./login/useCurrentOperator";
+import { readCurrentOperator, useCurrentOperator } from "./login/useCurrentOperator";
 import type { IoEntryIntent } from "./_warehouse_v2/types";
 import {
   clearWarehouseDraftRestore,
@@ -54,7 +54,7 @@ export function DesktopWarehouseView({
     onStatusChange,
   });
 
-  const operator = typeof window !== "undefined" ? readCurrentOperator() : null;
+  const operator = useCurrentOperator() ?? readCurrentOperator();
   const urlDraftId = typeof window === "undefined"
     ? null
     : new URLSearchParams(window.location.search).get("draftId");
@@ -367,6 +367,8 @@ export function DesktopWarehouseView({
             <WarehouseDraftPanelTabs
               layout="desktop"
               sectionTab={sectionTab}
+              accessAllowed={normalizeSectionTab(sectionTab) === sectionTab}
+              onAccessRevoked={() => handleSectionTabChange("compose")}
               canSeeQueue={canSeeQueue}
               canSeeDeptQueue={canSeeDeptQueue}
               canSeeAsResearchQueue={canSeeAsResearchQueue}

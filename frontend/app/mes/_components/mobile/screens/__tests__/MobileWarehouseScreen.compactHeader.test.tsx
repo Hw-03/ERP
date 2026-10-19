@@ -56,6 +56,7 @@ vi.mock("../../../_warehouse_hooks/useWarehouseData", () => ({
 
 vi.mock("../../../login/useCurrentOperator", () => ({
   readCurrentOperator: () => operatorState.value,
+  useCurrentOperator: () => operatorState.value,
 }));
 
 vi.mock("../../../_warehouse_sections/WarehouseHeader", () => ({
