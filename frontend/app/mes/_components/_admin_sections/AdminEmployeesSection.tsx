@@ -261,6 +261,7 @@ export function AdminEmployeesSection() {
           />
 
           <AdminDetailCard
+            selectionKey={detailRead.loading ? undefined : empAddMode ? "add" : selectedEmployee?.employee_id}
             title={
               empAddMode
                 ? "직원 추가"

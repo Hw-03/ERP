@@ -343,6 +343,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
         />
 
         <AdminDetailCard
+          selectionKey={detailRead.loading ? undefined : addMode ? "add" : selectedItem?.item_id}
           title={
             addMode
               ? "새 품목 추가"

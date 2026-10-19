@@ -1,0 +1,32 @@
+.fade,
+.selection,
+.entryCover {
+  --admin-fade-duration: 350ms;
+}
+
+.entryCover { background: var(--c-bg); }
+.entryExit {
+  pointer-events: none;
+  animation: adminFadeOut var(--admin-fade-duration) ease-out both;
+}
+
+@keyframes adminFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.fade {
+  animation: adminFadeIn var(--admin-fade-duration) ease-out;
+}
+
+@keyframes adminFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade {
+    animation: none;
+  }
+  .entryExit { animation: none; opacity: 0; }
+}

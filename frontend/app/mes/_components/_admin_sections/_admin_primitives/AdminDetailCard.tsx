@@ -2,6 +2,8 @@
 
 import { useId, type KeyboardEvent, type ReactNode } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { useAdminSelectionFade } from "../useAdminSelectionFade";
+import transitions from "../AdminTransitions.module.css";
 
 export interface AdminDetailTab {
   id: string;
@@ -9,6 +11,7 @@ export interface AdminDetailTab {
 }
 
 export interface AdminDetailCardProps {
+  selectionKey?: string | number;
   title?: ReactNode;
   subtitle?: ReactNode;
   status?: ReactNode;
@@ -23,6 +26,7 @@ export interface AdminDetailCardProps {
 }
 
 export function AdminDetailCard({
+  selectionKey,
   title,
   subtitle,
   status,
@@ -35,6 +39,7 @@ export function AdminDetailCard({
   children,
   footer,
 }: AdminDetailCardProps) {
+  const fadeRef = useAdminSelectionFade(selectionKey);
   const tabInstanceId = useId();
   const hasTabs = Boolean(tabs?.length);
   const activeTabIndex = tabs?.findIndex((tab) => tab.id === activeTab) ?? -1;
@@ -139,11 +144,12 @@ export function AdminDetailCard({
         </div>
       )}
       <div
+        ref={fadeRef}
         data-admin-detail-content
         role={hasTabs ? "tabpanel" : undefined}
         id={hasTabs ? tabPanelId : undefined}
         aria-labelledby={hasTabs ? `${tabInstanceId}-tab-${selectedTabIndex}` : undefined}
-        className="min-h-0 flex-1 overflow-y-auto p-5 [scrollbar-gutter:stable]"
+        className={`min-h-0 flex-1 overflow-y-auto p-5 [scrollbar-gutter:stable] ${transitions.selection}`}
       >
         {children}
       </div>

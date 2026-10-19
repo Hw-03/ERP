@@ -293,6 +293,7 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
         />
 
         <AdminDetailCard
+          selectionKey={detailRead.loading ? undefined : addMode ? "add" : selected?.slot}
           title={
             addMode
               ? "새 모델 추가"

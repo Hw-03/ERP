@@ -287,6 +287,7 @@ export function AdminDepartmentsSection({
           />
 
           <AdminDetailCard
+            selectionKey={detailRead.loading ? undefined : addMode ? "add" : selectedDept?.id}
             title={
               addMode
                 ? "새 부서 추가"
