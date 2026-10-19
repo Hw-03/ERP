@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode, useMemo, useState } from "react";
-import { Download, FileSpreadsheet, FileText } from "lucide-react";
+import { CalendarDays, Download, FileSpreadsheet, FileText } from "lucide-react";
 import { api } from "@/lib/api";
 import { fetchBlob } from "@/lib/api-core";
 import { adminApi } from "@/lib/api/admin";
@@ -381,11 +381,11 @@ export function AdminExportSection() {
           icon={<FileText className="h-5 w-5" />}
           title="데이터 내보내기"
           className="min-h-0 shrink-0 xl:flex-1 xl:overflow-hidden"
-        >
+          headerActions={
           <div
             role="group"
             aria-label="내보내기 유형"
-            className="mt-4 flex flex-wrap gap-1.5"
+            className={styles.modeSelector}
           >
             <FilterChip
               active={mode === "general"}
@@ -403,20 +403,24 @@ export function AdminExportSection() {
             />
             <FilterChip active={mode === "operations"} label="통합 작업" onClick={() => { setMode("operations"); setFeedback(null); }} size="sm" className="min-h-11" />
           </div>
+          }
+        >
 
           {mode === "operations" ? (
-            <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+            <div className={`mt-4 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto`}>
               <p className="text-sm" style={{ color: LEGACY_COLORS.muted }}>수량 기록, 차이 0 실사 관측, 업무 정정과 원업무 연결을 함께 내보냅니다.</p>
-              <div role="group" aria-label="통합 작업 기간"><Label>기간 선택</Label><p className="text-sm tabular-nums">{operationRange.start} ~ {operationRange.end}</p><div className="mt-2 flex flex-wrap gap-2">{(["today", "7d", "30d", "90d"] as RangePreset[]).map((option) => <FilterChip key={option} active={preset === option} label={option === "today" ? "오늘" : option === "7d" ? "7일" : option === "30d" ? "30일" : "90일"} onClick={() => setPreset(option)} size="sm" className="min-h-11" />)}</div></div>
-              <div role="group" aria-label="파일 형식" className="flex gap-2"><FilterChip active={format === "csv"} label="CSV" onClick={() => setFormat("csv")} className="min-h-11" /><FilterChip active={format === "xlsx"} label="Excel" onClick={() => setFormat("xlsx")} className="min-h-11" /></div>
+              <div className={styles.settingsGrid}>
+                <div role="group" aria-label="통합 작업 기간" className={styles.setting}><Label>기간 선택</Label><p className={styles.dateRange}><CalendarDays size={16} aria-hidden="true" />{operationRange.start} ~ {operationRange.end}</p><div className="mt-2 flex flex-wrap gap-2">{(["today", "7d", "30d", "90d"] as RangePreset[]).map((option) => <FilterChip key={option} active={preset === option} label={option === "today" ? "오늘" : option === "7d" ? "7일" : option === "30d" ? "30일" : "90일"} onClick={() => setPreset(option)} size="sm" className="min-h-11" />)}</div></div>
+                <div role="group" aria-label="파일 형식" className={styles.setting}><Label>파일 형식</Label><div className="flex gap-2"><FilterChip active={format === "csv"} label="CSV" onClick={() => setFormat("csv")} className="min-h-11" /><FilterChip active={format === "xlsx"} label="Excel" onClick={() => setFormat("xlsx")} className="min-h-11" /></div></div>
+              </div>
               {feedback && <p role={feedback.kind === "error" ? "alert" : "status"} className="text-sm" style={{ color: feedback.kind === "error" ? LEGACY_COLORS.red : LEGACY_COLORS.green }}>{feedback.message}</p>}
               <Button className="mt-auto min-h-11" loading={busy} iconLeft={<Download />} onClick={() => void handleOperationExport()}>통합 작업 {format === "csv" ? "CSV" : "Excel"} 다운로드</Button>
             </div>
           ) : mode === "general" ? (
-            <div data-testid="general-export-controls" className="flex min-h-0 flex-1 flex-col">
+            <div data-testid="general-export-controls" className={`flex min-h-0 flex-1 flex-col`}>
             <div data-testid="export-control-panel" className="mt-4 min-h-0 flex-1 xl:overflow-y-auto xl:pr-1">
-              <div className="flex flex-col gap-4">
-                <div role="group" aria-label="데이터 범위">
+              <div className={styles.settingsGrid}>
+                <div role="group" aria-label="데이터 범위" className={`${styles.setting} ${!supportsExcel ? styles.wideSetting : ""}`}>
                   <Label>데이터 범위</Label>
                   <div className="flex flex-wrap gap-1.5">
                     {(Object.keys(SCOPE_LABEL) as DataScope[]).map((option) => (
@@ -433,7 +437,7 @@ export function AdminExportSection() {
                 </div>
 
                 {supportsExcel && (
-                  <div data-testid="export-format-settings" role="group" aria-label="파일 형식">
+                  <div data-testid="export-format-settings" role="group" aria-label="파일 형식" className={styles.setting}>
                     <Label>파일 형식</Label>
                     <div className="flex flex-wrap gap-1.5">
                       <FilterChip active={format === "csv"} label="CSV" onClick={() => setFormat("csv")} size="sm" className="min-h-11" />
@@ -443,14 +447,14 @@ export function AdminExportSection() {
                 )}
 
                 {(includesTransactions || includesEmployees) && (
-                  <div className={`grid gap-4 ${includesTransactions && includesEmployees ? "md:grid-cols-2" : ""}`}>
+                  <div className={`${styles.wideSetting} grid gap-4 ${includesTransactions && includesEmployees ? "md:grid-cols-2" : ""}`}>
                     {includesTransactions && (
-                      <div data-testid="export-period-settings">
+                      <div data-testid="export-period-settings" className={styles.setting}>
                         <Label>기간 선택</Label>
                         <div
-                          className="rounded-[12px] border px-3 py-2 text-[14px] font-medium"
-                          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                          className={styles.dateRange}
                         >
+                          <CalendarDays size={16} aria-hidden="true" />
                           {range.start} ~ {range.end}
                         </div>
                         <div className="mt-2 flex flex-wrap gap-1.5">
@@ -469,7 +473,7 @@ export function AdminExportSection() {
                     )}
 
                     {includesEmployees && (
-                      <div data-testid="export-inactive-option">
+                      <div data-testid="export-inactive-option" className={styles.setting}>
                         <Label>추가 옵션</Label>
                         <label
                           className="flex min-h-11 items-center gap-2 rounded-[12px] border px-3 text-[14px] font-medium"
@@ -504,7 +508,7 @@ export function AdminExportSection() {
                 {feedback.message}
               </div>
             )}
-            <div data-testid="export-download-action" className="mt-auto shrink-0 pt-4">
+            <div data-testid="export-download-action" className={`mt-auto shrink-0 pt-4 ${styles.downloadAction}`}>
               <Button
                 size="md"
                 iconLeft={<Download />}
@@ -517,7 +521,7 @@ export function AdminExportSection() {
             </div>
             </div>
           ) : (
-            <div className="mt-4 flex min-h-0 flex-1 flex-col">
+            <div className={`mt-4 flex min-h-0 flex-1 flex-col`}>
               <div role="group" aria-label="원본 로그 종류" className="flex shrink-0 flex-wrap gap-1.5">
                 <FilterChip
                   active={auditKind === "inventory"}
@@ -534,7 +538,7 @@ export function AdminExportSection() {
                   className="min-h-11"
                 />
               </div>
-              <div className="mt-3 flex min-h-0 flex-1 flex-col">
+              <div className={`mt-3 flex min-h-0 flex-1 flex-col ${styles.auditControls}`}>
                 {auditKind === "inventory" ? <AdminAuditCsvControls /> : <AdminActivityAuditControls />}
               </div>
             </div>
@@ -552,34 +556,38 @@ interface ExportSurfaceProps {
   title: string;
   children: ReactNode;
   className?: string;
+  headerActions?: ReactNode;
 }
 
-function ExportSurface({ ariaLabel, tone, icon, title, children, className = "" }: ExportSurfaceProps) {
+function ExportSurface({ ariaLabel, tone, icon, title, children, className = "", headerActions }: ExportSurfaceProps): ReactNode {
   return (
     <section
       aria-label={ariaLabel}
-      className={`flex flex-col rounded-[20px] border p-4 ${className}`}
+      className={`flex flex-col rounded-[20px] border p-4 ${styles.surface} ${className}`}
       style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
     >
-      <div className="flex shrink-0 items-center gap-3">
-        <div
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]"
-          style={{ background: `color-mix(in srgb, ${tone} 14%, transparent)`, color: tone }}
-        >
-          {icon}
+      <div className={styles.surfaceHeader}>
+        <div className="flex min-w-0 items-center gap-3">
+          <div
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]"
+            style={{ background: `color-mix(in srgb, ${tone} 14%, transparent)`, color: tone }}
+          >
+            {icon}
+          </div>
+          <h3 className="min-w-0 text-[18px] font-black leading-snug" style={{ color: LEGACY_COLORS.text }}>
+            {title}
+          </h3>
         </div>
-        <h3 className="min-w-0 text-[18px] font-black leading-snug" style={{ color: LEGACY_COLORS.text }}>
-          {title}
-        </h3>
+        {headerActions}
       </div>
       {children}
     </section>
   );
 }
 
-function Label({ children }: { children: ReactNode }) {
+function Label({ children }: { children: ReactNode }): ReactNode {
   return (
-    <div className="mb-1.5 text-[12px] font-bold uppercase tracking-[0.1em]" style={{ color: LEGACY_COLORS.muted2 }}>
+    <div className="mb-2 text-[14px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
       {children}
     </div>
   );

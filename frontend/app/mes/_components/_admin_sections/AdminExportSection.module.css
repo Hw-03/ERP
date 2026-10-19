@@ -1,3 +1,16 @@
+.surface {
+  padding: 20px;
+}
+
+.surfaceHeader {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .officialControls {
   margin-top: 16px;
   padding-top: 16px;
@@ -8,4 +21,87 @@
   flex-direction: row;
   align-items: center;
   gap: 12px;
+}
+
+.modeSelector {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  min-width: 420px;
+  padding: 4px;
+  border: 1px solid var(--c-border);
+  border-radius: 16px;
+  background: var(--c-bg);
+}
+
+.modeSelector > button {
+  border-radius: 12px;
+  border-color: transparent !important;
+  font-size: 14px;
+}
+
+.modeSelector > button[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--c-blue) 30%, transparent) !important;
+  background: color-mix(in srgb, var(--c-blue) 12%, var(--c-s1)) !important;
+}
+
+.settingsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.setting {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--c-border);
+  border-radius: 16px;
+  background: var(--c-bg);
+}
+
+.setting button {
+  min-width: 72px;
+  font-size: 14px;
+}
+
+.wideSetting {
+  grid-column: 1 / -1;
+}
+
+.dateRange {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  background: var(--c-s1);
+  color: var(--c-text);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dateRange svg {
+  flex-shrink: 0;
+  color: var(--c-blue);
+}
+
+.downloadAction {
+  border-top: 1px solid var(--c-border);
+}
+
+.auditControls {
+  padding: 16px;
+  border: 1px solid var(--c-border);
+  border-radius: 16px;
+  background: var(--c-bg);
+}
+
+@media (max-width: 767px) {
+  .surface { padding: 16px; }
+  .modeSelector { min-width: 0; width: 100%; }
+  .modeSelector > button { padding-inline: 8px; }
+  .settingsGrid { grid-template-columns: minmax(0, 1fr); }
 }
