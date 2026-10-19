@@ -22,6 +22,8 @@ export const queryKeys = {
   },
   employees: {
     all: ["employees"] as const,
+    accessAll: ["employees", "access"] as const,
+    access: (employeeId: string, login: number) => ["employees", "access", employeeId, login] as const,
     list: (params?: { department?: string; activeOnly?: boolean }) =>
       ["employees", "list", params ?? {}] as const,
     detail: (employeeId: string) => ["employees", "detail", employeeId] as const,

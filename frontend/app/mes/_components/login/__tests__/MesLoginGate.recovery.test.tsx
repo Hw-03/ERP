@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Operator } from "../useCurrentOperator";
+vi.mock("../OperatorAccessSync", () => ({ OperatorAccessSync: () => null }));
 
 const state = vi.hoisted(() => ({
   getAppSession: vi.fn(),

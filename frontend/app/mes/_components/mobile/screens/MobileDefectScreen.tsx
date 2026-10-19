@@ -1,7 +1,7 @@
 "use client";
 
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { readCurrentOperator, type Operator } from "../../login/useCurrentOperator";
+import { readCurrentOperator, useCurrentOperator, type Operator } from "../../login/useCurrentOperator";
 import { useWarehouseData } from "../../_warehouse_hooks/useWarehouseData";
 import { DefectHubPanel } from "../../_defect_hub/DefectHubPanel";
 import panelStyles from "./mobileWarehousePanels.module.css";
@@ -20,7 +20,7 @@ export function MobileDefectScreen({
 }: {
   defectDeptFilter?: string | null;
 }) {
-  const operator = typeof window !== "undefined" ? readCurrentOperator() : null;
+  const operator = useCurrentOperator() ?? readCurrentOperator();
 
   if (!operator) {
     return (

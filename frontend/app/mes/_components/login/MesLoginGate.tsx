@@ -13,6 +13,7 @@ import { clearCurrentOperator, getStoredBootId, readCurrentOperator } from "./us
 import { runLoginReadWithRetry, validateActiveEmployees, validateAppSession } from "./loginReadRetry";
 import { useIdleOperatorConfirmation } from "./useIdleOperatorConfirmation";
 import { OperatorConfirmationDialog } from "./OperatorConfirmationDialog";
+import { OperatorAccessSync } from "./OperatorAccessSync";
 import { OPERATOR_LOGIN_REQUIRED } from "@/lib/auth/login-recovery";
 
 type GatePhase = "loading" | "intro" | "form" | "recovery" | "authed";
@@ -196,6 +197,7 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
 
   // 로그인 완료 → 메인 화면
   return <>
+    {phase === "authed" && workspaceOwner && <OperatorAccessSync employeeId={workspaceOwner} />}
     {workspaceOwner && <div key={workspaceOwner} style={{ display: phase === "authed" ? "contents" : "none" }} inert={phase !== "authed"}>
       {children}
     </div>}
