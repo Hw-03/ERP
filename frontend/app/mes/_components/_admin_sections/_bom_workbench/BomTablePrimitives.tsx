@@ -12,6 +12,7 @@ import type { Item } from "@/lib/api";
 import { Tooltip } from "@/lib/ui";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { BomBadge } from "./BomBadge";
+import listPerformance from "../AdminListPerformance.module.css";
 
 export const BOM_EDIT_LIST_GRID_TEMPLATE = "40px minmax(0, 1fr) clamp(78px, 5.75vw, 110px) 64px";
 export const BOM_CURRENT_ROW_GRID_TEMPLATE = "40px minmax(0, 1fr) clamp(78px, 5.75vw, 110px) 72px 28px";
@@ -70,7 +71,7 @@ export function BomRowTooltip({ itemName, children }: BomRowTooltipProps) {
       disabled={isActionActive}
       shouldShow={() => !!nameRef.current && nameRef.current.scrollWidth > nameRef.current.clientWidth}
       multiline
-      triggerClassName="relative block min-w-0 w-full"
+      triggerClassName={`relative block min-w-0 w-full ${listPerformance.bomRow}`}
     >
       {children({ nameRef, actionTooltipProps })}
     </Tooltip>

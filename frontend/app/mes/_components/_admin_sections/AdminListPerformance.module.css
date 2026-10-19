@@ -1,7 +1,9 @@
 /* 행은 DOM에 남겨 검색·키보드 이동·정렬을 유지하고 화면 밖 그리기만 미룬다. */
-.itemRow {
+.itemRow,
+.bomRow {
   content-visibility: auto;
 }
 
 /* 품목 행의 전체 51px에서 위아래 padding 16px와 경계 1px를 뺀 본문 높이. */
 .itemRow { contain-intrinsic-size: auto 34px; }
+.bomRow { contain-intrinsic-size: auto 37px; }
