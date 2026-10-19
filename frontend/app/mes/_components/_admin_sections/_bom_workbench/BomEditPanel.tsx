@@ -9,6 +9,8 @@ import { BOM_CURRENT_ROW_GRID_TEMPLATE, BomTableHeader } from "./BomTablePrimiti
 import { AdminReadBoundary, type useAdminReadState } from "../_admin_primitives/AdminReadState";
 import { AdminTableSkeleton } from "../_admin_primitives/AdminSkeleton";
 import { SkeletonBlock } from "../../common/LoadingSkeleton";
+import { useAdminSelectionFade } from "../useAdminSelectionFade";
+import transitions from "../AdminTransitions.module.css";
 
 /**
  * 우측 "현재 BOM 구성" 패널.
@@ -39,6 +41,7 @@ export function BomEditPanel({
   read,
   parentHeader,
 }: Props) {
+  const fadeRef = useAdminSelectionFade(read?.loading ? undefined : parent?.item_id);
   if (!parent && !read?.loading && !read?.error) {
     return (
       <div
@@ -58,7 +61,7 @@ export function BomEditPanel({
   const itemMap = new Map(items.map((i) => [i.item_id, i]));
 
   return (
-    <div className={`flex min-h-0 flex-1 flex-col`}>
+    <div ref={fadeRef} className={`flex min-h-0 flex-1 flex-col ${transitions.selection}`}>
       <div
         data-scrollbar-rail-shell
         className="relative flex min-h-0 flex-1 flex-col rounded-2xl"

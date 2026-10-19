@@ -9,6 +9,8 @@ import { BOM_WHERE_USED_ROW_GRID_TEMPLATE, BomTableHeader, BomTableItemRow } fro
 import { AdminReadBoundary, type useAdminReadState } from "../_admin_primitives/AdminReadState";
 import { AdminTableSkeleton } from "../_admin_primitives/AdminSkeleton";
 import { SkeletonBlock } from "../../common/LoadingSkeleton";
+import { useAdminSelectionFade } from "../useAdminSelectionFade";
+import transitions from "../AdminTransitions.module.css";
 
 /**
  * 역참조 모드 — 선택된 품목이 어느 부모의 자식으로 등장하는지 1단계 조회.
@@ -25,6 +27,7 @@ interface Props {
 }
 
 export function BomWhereUsedPanel({ selected, rows, items, onSelectParent, read, parentHeader }: Props) {
+  const fadeRef = useAdminSelectionFade(read?.loading ? undefined : selected?.item_id);
   if (!selected && !read?.loading && !read?.error) {
     return (
       <div
@@ -44,7 +47,7 @@ export function BomWhereUsedPanel({ selected, rows, items, onSelectParent, read,
   const itemMap = new Map(items.map((i) => [i.item_id, i]));
 
   return (
-    <div className={`flex min-h-0 flex-1 flex-col [&_[data-bom-row-code]]:text-center`}>
+    <div ref={fadeRef} className={`flex min-h-0 flex-1 flex-col [&_[data-bom-row-code]]:text-center ${transitions.selection}`}>
       {/* 역참조 결과 */}
       <div
         className="flex min-h-0 flex-1 flex-col rounded-2xl border"

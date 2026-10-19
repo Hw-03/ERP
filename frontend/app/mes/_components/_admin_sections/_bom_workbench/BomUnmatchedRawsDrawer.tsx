@@ -6,6 +6,7 @@ import type { BomUnmatchedStatus, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TruncatedText } from "@/lib/ui";
 import { BomBadge } from "./BomBadge";
+import transitions from "../AdminTransitions.module.css";
 
 /**
  * 미배치 원자재 패널 — 부서 R 단계 중 어느 BOM 의 자식도 아닌 항목.
@@ -98,7 +99,7 @@ export function BomUnmatchedRawsDrawer({
           id={listId}
           role="region"
           aria-label="미배치 원자재 목록"
-          className={`min-h-0 flex-1 overflow-y-auto p-3`}
+          className={`min-h-0 flex-1 overflow-y-auto p-3 ${transitions.fade}`}
           style={{ background: LEGACY_COLORS.s2, borderTop: `1px solid ${LEGACY_COLORS.border}` }}
         >
           <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-3">

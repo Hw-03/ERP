@@ -22,6 +22,8 @@ import { BomUnmatchedRawsDrawer } from "./BomUnmatchedRawsDrawer";
 import { bomStatusOf, DEPT_LETTERS, deptOf, stageOf, type BomDeptFilter } from "./bomDept";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { useAdminReadState } from "../_admin_primitives/AdminReadState";
+import transitions from "../AdminTransitions.module.css";
+import { useAdminSelectionFade } from "../useAdminSelectionFade";
 
 interface Props {
   items: Item[];
@@ -103,6 +105,7 @@ export function BomWorkbench({
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [unmatchedStatusBusyItemIds, setUnmatchedStatusBusyItemIds] = useState<Set<string>>(new Set());
   const [unmatchedOpen, setUnmatchedOpen] = useState(false);
+  const viewFadeRef = useAdminSelectionFade(`${mode}:${unmatchedOpen}`);
   const [historyReady, setHistoryReady] = useState(false);
   const [historyValidationDeferred, setHistoryValidationDeferred] = useState(false);
   const itemsRef = useRef(items);
@@ -475,8 +478,8 @@ export function BomWorkbench({
 
       {/* 메인: 좌(상위) | 중(자식추가) | 우(현재구성) */}
       <div
-
-        className={`grid min-h-0 flex-1 gap-3`}
+        ref={viewFadeRef}
+        className={`grid min-h-0 flex-1 gap-3 ${transitions.selection}`}
         data-mode={mode}
         style={{
           display: mode === "edit" && unmatchedOpen ? "none" : undefined,
