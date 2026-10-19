@@ -1,13 +1,15 @@
-/* Opt-in, quantity-only, fixed-memory recorder. No layout reads or synchronous I/O. */
+/* Opt-in, sanitized input-boundary recorder. No layout reads or synchronous I/O. */
 (() => {
   "use strict";
   if (window.__MES_BOM_DIAG_ENABLED__ !== true || window.__mesBomDiag) return;
   const SELECTOR = 'input[data-testid="shipping-bom-line-controls"]';
+  const NOTE_SELECTOR = 'textarea[aria-label="요청 메모"]';
   const CAPACITY = 8192;
   const ring = new Array(CAPACITY);
   const nodes = new WeakMap();
   const nativeEvents = new WeakMap();
   const instances = new WeakMap();
+  const reactPropKeys = new WeakMap();
   const lines = new Map();
   const children = new Map();
   let nodeSerial = 0;
@@ -24,6 +26,22 @@
       return Number.isFinite(number) ? number : null;
     }
     return null;
+  };
+  // Only fixed synthetic expectations are compared; arbitrary memo text is never retained.
+  const noteShape = (value) => typeof value === "string" ? {
+    length: value.length, empty: value === "",
+    matchesDiscard: value === "폐기 전 모든 입력",
+    matchesCandidateDrift: value === "후보 변경 후에도 초안 보존",
+  } : null;
+  const reactProps = (node) => {
+    let key = reactPropKeys.get(node);
+    if (!key) {
+      key = Object.getOwnPropertyNames(node).find((name) => name.startsWith("__reactProps$"));
+      if (key) reactPropKeys.set(node, key);
+    }
+    // Read the current props object each time: React replaces it on commit.
+    // Do not walk fibers, invoke callbacks, retain props or wrap a value setter.
+    return key ? node[key] : undefined;
   };
   const token = (map, value) => {
     if (typeof value !== "string" || !value) return null;
@@ -46,17 +64,27 @@
   const describe = (node) => {
     if (!(node instanceof Element)) return { uid: nodeId(node), tag: null, quantity: false };
     const quantity = node.matches(SELECTOR);
-    const description = { uid: nodeId(node), tag: node.tagName, quantity, connected: node.isConnected };
-    // Do not read or retain PIN, employee lookup, notes, invoice or general input values.
-    if (quantity) {
+    const requestNote = node.matches(NOTE_SELECTOR);
+    const description = { uid: nodeId(node), tag: node.tagName, quantity, requestNote, connected: node.isConnected };
+    // Do not read PIN, employee lookup, invoice or any other general input value.
+    if (quantity || requestNote) {
+      const sanitize = quantity ? numeric : noteShape;
+      const value = node.value;
+      const tracker = node._valueTracker?.getValue?.();
+      const props = reactProps(node);
+      const propValue = props?.value;
+      const comparableProp = typeof propValue === "string" || typeof propValue === "number";
       Object.assign(description, {
-        child: token(children, node.closest("[data-bom-line-child]")?.getAttribute("data-bom-line-child")),
-        value: numeric(node.value), valueAttribute: numeric(node.getAttribute("value")),
-        tracker: numeric(node._valueTracker?.getValue?.()),
+        value: sanitize(value), valueAttribute: sanitize(node.getAttribute("value")),
+        tracker: sanitize(tracker),
+        react: { found: props !== undefined, value: sanitize(propValue), hasOnChange: typeof props?.onChange === "function" },
+        valueEqualsTracker: typeof tracker === "string" ? value === tracker : null,
+        valueEqualsReact: comparableProp ? value === String(propValue) : null,
         disabled: node.disabled, readOnly: node.readOnly,
         inertAncestor: Boolean(node.closest("[inert]")), hiddenAncestor: Boolean(node.closest("[hidden]")),
         selectionStart: node.selectionStart, selectionEnd: node.selectionEnd,
       });
+      if (quantity) description.child = token(children, node.closest("[data-bom-line-child]")?.getAttribute("data-bom-line-child"));
     }
     return description;
   };
@@ -90,7 +118,7 @@
     "loadDefaultBom:empty", "loadDefaultBom:loaded", "updateDraftLine", "addDraftLine", "removeDraftLine",
   ]);
   window.__mesBomDiag = {
-    version: 2,
+    version: 3,
     export: exportSnapshot,
     recordReact: (label, payload) => {
       if (!validLabels.has(label)) return sequence;
@@ -122,11 +150,12 @@
   for (const type of ["focusin", "focusout", "beforeinput", "input", "change"]) {
     const details = (event) => {
       const isQuantity = event.target instanceof Element && event.target.matches(SELECTOR);
+      const isRequestNote = event.target instanceof Element && event.target.matches(NOTE_SELECTOR);
       return {
         event: eventId(event), target: describe(event.target), related: describe(event.relatedTarget),
         trusted: event.isTrusted, defaultPrevented: event.defaultPrevented, cancelable: event.cancelable,
-        inputType: isQuantity && typeof event.inputType === "string" ? event.inputType : null,
-        data: isQuantity ? numeric(event.data) : null,
+        inputType: (isQuantity || isRequestNote) && typeof event.inputType === "string" ? event.inputType : null,
+        data: isQuantity ? numeric(event.data) : isRequestNote ? noteShape(event.data) : null,
       };
     };
     window.addEventListener(type, (event) => {
