@@ -174,14 +174,14 @@ export function DefectItemPicker({
       (productModels.find((m) => m.model_name === model)?.slot ?? undefined);
     const filtered = items.filter(
       (item) =>
-        (source !== "warehouse" || Number(item.warehouse_qty) > 0) &&
+        (source !== "warehouse" || Number(item.warehouse_qty) > 0 || selectedIds.has(item.item_id)) &&
         matchesDept(item, dept) &&
         matchesModel(item, selectedModelSlot) &&
         matchesStage(item, stage) &&
         matchesSearch(item, keyword),
     );
     return sortItemsForPicker(filtered, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank);
-  }, [items, source, dept, model, stage, keyword, productModels, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank, matchesSearch]);
+  }, [items, source, selectedIds, dept, model, stage, keyword, productModels, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank, matchesSearch]);
 
   useEffect(() => {
     if (tableRef.current) tableRef.current.scrollTop = 0;
@@ -386,7 +386,8 @@ export function DefectItemPicker({
               const impliedDeptName = itemDepartment(item);
               const stock = defectSourceStock(item, source);
               const added = selectedIds.has(item.item_id);
-              const canAdd = source === "warehouse" || impliedDeptName !== null;
+              const canAdd = stock.available > 0 && (source === "warehouse" || impliedDeptName !== null);
+              const buttonDisabled = disabled || (!added && (!canAdd || addingDisabled));
               return (
                 <tr key={item.item_id} data-testid={`defect-picker-row-${item.item_id}`} data-added={added ? "true" : "false"} className="transition-colors duration-150 hover:bg-[var(--c-s4)]" style={{ background: added ? tint(LEGACY_COLORS.blue, 7) : undefined }}>
                   <td className="px-3 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
@@ -428,12 +429,14 @@ export function DefectItemPicker({
                     <button
                       type="button"
                       data-defect-picker-button={item.item_id}
-                      onClick={() => added ? (onSelected ?? onRemove)(item) : onAdd(item)}
-                      disabled={disabled || (!added && (!canAdd || addingDisabled))}
+                      onClick={() => { if (!buttonDisabled) { if (added) (onSelected ?? onRemove)(item); else onAdd(item); } }}
+                      disabled={buttonDisabled}
                       aria-label={added && onSelected ? `${item.item_name} 담긴 사유 ${selectedLineCounts?.get(item.item_id) ?? 1}건 보기` : mobilePresentation ? `${item.item_name} ${added ? "선택 해제" : "선택"}` : added ? `${item.item_name} 장바구니에서 제거` : `${item.item_name} 장바구니에 추가`}
                       style={onSelected && !mobilePresentation ? { width: 80 + selectedCountDigits * 8, height: 26, justifyContent: "center", paddingTop: 0, paddingBottom: 0 } : undefined}
-                      className={`standard-hover inline-flex items-center gap-1 rounded-[10px] border px-2.5 py-1 text-[12px] font-black transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 ${
-                        added
+                      className={`standard-hover inline-flex items-center gap-1 rounded-[10px] border px-2.5 py-1 text-[12px] font-black transition-colors enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${
+                        buttonDisabled
+                          ? "border-[var(--c-border)] bg-[var(--c-s3)] text-[var(--c-muted)]"
+                          : added
                           ? "border-[var(--c-blue)] bg-[color-mix(in_srgb,var(--c-blue)_12%,transparent)] text-[var(--c-blue)]"
                           : "border-[var(--c-red)] bg-[var(--c-red)] text-white"
                       } ${onSelected && mobilePresentation ? "min-h-11" : ""}`}

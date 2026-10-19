@@ -199,7 +199,7 @@ export function DefectCartFlow({
   }
 
   function addItem(item: Item): void {
-    if (selectedIds.has(item.item_id)) return;
+    if (selectedIds.has(item.item_id) || defectSourceStock(item, source).available <= 0) return;
     addReason(item);
   }
 

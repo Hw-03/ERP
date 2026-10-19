@@ -45,6 +45,39 @@ function makeItem(index: number): Item {
 }
 
 describe("DefectItemPicker mobile scroll", () => {
+  it.each([false, true])("재고가 없거나 전량 예약된 품목은 추가를 막고 담긴 품목은 제거한다 (mobile=%s)", (mobilePresentation) => {
+    const items = [
+      { ...makeItem(1), warehouse_qty: 0, available_quantity: 0 },
+      { ...makeItem(2), warehouse_qty: 10, pending_quantity: 10, available_quantity: 0 },
+      makeItem(3),
+    ];
+    const onAdd = vi.fn();
+    const onRemove = vi.fn();
+    const props = { mobilePresentation, items, productModels: [], source: "warehouse" as const, selectedIds: new Set<string>(), onAdd, onRemove };
+    const { rerender } = render(<DefectItemPicker {...props} />);
+    expect(screen.queryByTestId("defect-picker-row-item-1")).not.toBeInTheDocument();
+    for (const id of ["item-2"]) {
+      const button = within(screen.getByTestId(`defect-picker-row-${id}`)).getByRole("button");
+      expect(button).toBeDisabled();
+      fireEvent.click(button);
+    }
+    expect(onAdd).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByTestId("defect-picker-row-item-3")).getByRole("button"));
+    expect(onAdd).toHaveBeenCalledWith(items[2]);
+    rerender(<DefectItemPicker {...props} selectedIds={new Set(["item-1"])} />);
+    const remove = within(screen.getByTestId("defect-picker-row-item-1")).getByRole("button");
+    expect(remove).toBeEnabled();
+    fireEvent.click(remove);
+    expect(onRemove).toHaveBeenCalledWith(items[0]);
+  });
+
+  it("부서 재고도 예약분을 제외한 가용이 없으면 추가하지 못한다", () => {
+    const item = { ...makeItem(1), process_type_code: "AR", locations: [{ department: "조립", status: "PRODUCTION", quantity: 10, pending_quantity: 10, available_quantity: 0 }] } as Item;
+    render(<DefectItemPicker items={[item]} productModels={[]} source="production" selectedIds={new Set()} onAdd={vi.fn()} onRemove={vi.fn()} />);
+    expect(screen.getByRole("columnheader", { name: "부서 가용" })).toBeInTheDocument();
+    expect(within(screen.getByTestId("defect-picker-row-item-1")).getByRole("button")).toBeDisabled();
+  });
+
   beforeEach(() => {
     preferences.order = undefined;
     preferences.save.mockClear();
