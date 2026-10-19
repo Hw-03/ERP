@@ -462,14 +462,19 @@ describe("DefectStatisticsView report", () => {
     expect(screen.queryByText("0 / 0")).not.toBeInTheDocument();
   });
 
-  it("uses the shared desktop filter disclosure while keeping selected chips visible when collapsed", async () => {
+  it("opens filters below the overview from its footer and keeps selected chips visible when collapsed", async () => {
     render(<DefectStatisticsView {...props} />);
     await screen.findByText(quantityText("10개"));
-    fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
+    const overview = screen.getByRole("region", { name: "발생 현황" });
+    fireEvent.click(within(overview).getByRole("button", { name: "필터 펼치기" }));
+    const filters = document.getElementById("statistics-category-filters")!;
+    expect(filters).toBeVisible();
+    expect(overview).not.toContainElement(filters);
+    expect(overview.compareDocumentPosition(filters) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "DX", exact: true }));
     await waitFor(() => expect(api.getStatisticsReport).toHaveBeenCalledTimes(2));
     fireEvent.click(screen.getByRole("button", { name: "필터 접기" }));
-    expect(screen.getByRole("button", { name: "모델 DX ×" })).toBeVisible();
+    expect(within(overview).getByRole("button", { name: "모델 DX ×" })).toBeVisible();
     expect(screen.getByRole("button", { name: "전체 초기화" })).toBeVisible();
     expect(screen.getByRole("button", { name: "이전 기간" })).toBeVisible();
     expect(screen.getByRole("button", { name: "필터 펼치기" })).toHaveAttribute("aria-controls", "statistics-category-filters");

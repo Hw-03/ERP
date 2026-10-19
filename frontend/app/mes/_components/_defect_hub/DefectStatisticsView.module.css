@@ -1,4 +1,8 @@
 .desktop { gap: 18px; color: var(--c-text); }
+.filters { min-width: 0; }
+.filters button, .filters span { font-size: 14px; }
+.filterSelection { display: flex; min-width: 0; flex: 1; flex-wrap: wrap; align-items: center; gap: 8px; }
+.filterSelection button { font-size: 14px; }
 .overview { min-width: 0; overflow: hidden; border: 1px solid var(--c-border); border-radius: 22px; background: var(--c-s1); }
 .overviewMain { display: grid; grid-template-columns: minmax(320px, 1.2fr) minmax(0, 2fr); }
 .total { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: 10px; padding: 24px 28px; background: color-mix(in srgb, var(--c-blue) 5%, var(--c-s1)); }

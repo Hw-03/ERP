@@ -193,7 +193,7 @@ function StatisticsNotes({ result }: { result: DefectStatisticsReportResponse })
 }
 
 /** PC에서는 발생량을 먼저 보여 주고 비교·집계 설명은 각각 펼쳐 확인한다. */
-function StatisticsOverview({ result, loading }: { result: DefectStatisticsReportResponse | null; loading: boolean }): ReactElement {
+function StatisticsOverview({ result, loading, filterToggle, filterSelection }: { result: DefectStatisticsReportResponse | null; loading: boolean; filterToggle: ReactNode; filterSelection: ReactNode }): ReactElement {
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [basisOpen, setBasisOpen] = useState(false);
   const comparison = result?.comparison;
@@ -214,9 +214,11 @@ function StatisticsOverview({ result, loading }: { result: DefectStatisticsRepor
     </div> : <div className={styles.overviewMain}>{loading ? <SkeletonBlock className="h-[160px]" /> : <div />}<StatisticsCategoryCards /></div>}
     <div className={styles.detailActions}>
       {hasExcluded && <span role="status" className={styles.exclusionNotice}>집계 제외 기록 있음</span>}
+      {filterSelection}
       <div className={styles.detailButtons}>
         {comparison && <button type="button" aria-expanded={comparisonOpen} aria-controls="statistics-comparison" onClick={() => setComparisonOpen((value) => !value)}>이전 기간 상세<ChevronDown aria-hidden className={comparisonOpen ? styles.expanded : undefined} /></button>}
         {result && <button type="button" aria-expanded={basisOpen} aria-controls="statistics-basis" onClick={() => setBasisOpen((value) => !value)}>집계 기준<ChevronDown aria-hidden className={basisOpen ? styles.expanded : undefined} /></button>}
+        {filterToggle}
       </div>
     </div>
     <div id="statistics-comparison" hidden={!comparisonOpen}>{comparisonOpen && result && <div className={styles.detailContent}><CategoryComparison result={result} /></div>}</div>
@@ -393,6 +395,15 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
   const futureResult = result?.observed_until === null;
   const trend = result ? detailTrend ? result.timeline : result.trend.filter((entry) => entry.start_date <= today).map((entry) => ({ ...entry, label: entry.is_partial ? `${entry.label} · 집계 중` : entry.label })) : [];
 
+  const filterChips = <>
+      {selectedDepartments.map((value) => <button key={value} type="button" onClick={() => setSelectedDepartments((current) => current.filter((entry) => entry !== value))} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.green, 12), color: LEGACY_COLORS.green }}>부서 {value} ×</button>)}
+      {selectedModels.map((value) => <button key={value} type="button" onClick={() => setSelectedModels((current) => current.filter((entry) => entry !== value))} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.cyan, 12), color: LEGACY_COLORS.cyan }}>모델 {value} ×</button>)}
+      {selectedProcessSteps.map((value) => <button key={value} type="button" onClick={() => setSelectedProcessSteps((current) => current.filter((entry) => entry !== value))} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.yellow, 12), color: LEGACY_COLORS.yellow }}>공정 {PROCESS_LABELS[value]} ×</button>)}
+      {reason && <button type="button" onClick={() => { setReason(undefined); setReasonLabel(undefined); }} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.blue, 12), color: LEGACY_COLORS.blue }}>사유 {reasonLabel} ×</button>}
+      {itemId && <button type="button" aria-label={`선택 품목 ${itemLabel ?? itemId} 해제`} onClick={() => { setItemId(undefined); setItemLabel(undefined); }} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.blue, 12), color: LEGACY_COLORS.blue }}>품목 {itemLabel ?? itemId} ×</button>}
+      {(categoryCount > 0 || reason || itemId) && <button type="button" onClick={resetFilters} className="standard-hover min-h-11 rounded-[10px] px-2 text-sm font-bold focus-visible:ring-2" style={{ color: LEGACY_COLORS.blue }}>전체 초기화</button>}
+  </>;
+  const categoryFilters = <div id="statistics-category-filters" className={mobilePresentation ? undefined : styles.filters} hidden={!filtersOpen}>{filtersOpen && <div className={mobilePresentation ? "mt-2" : undefined}><DefectCategoryFilters departments={availableDepartments} models={modelOptions} currentDept={currentDepartment} showMyDepartment={false} selectedDepartments={selectedDepartments} selectedModels={selectedModels} selectedProcessSteps={selectedProcessSteps} onDepartmentsChange={setSelectedDepartments} onModelsChange={setSelectedModels} onProcessStepsChange={setSelectedProcessSteps} onResetCategoryFilters={resetFilters} /></div>}</div>;
   return <div className={`flex min-w-0 flex-col gap-3 ${mobilePresentation ? "" : styles.desktop}`}>
     <header className="flex min-w-0 flex-col gap-2 rounded-[20px] border px-4 py-3 lg:flex-row lg:items-center lg:justify-between" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
       <div className="flex min-w-0 items-center gap-2"><button type="button" onClick={onBack} className="standard-hover flex min-h-11 shrink-0 items-center gap-1 rounded-[12px] border px-3 text-sm font-bold" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}><ArrowLeft className="h-4 w-4" />작업 선택</button><div className="min-w-0"><h2 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>불량 통계</h2><p className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>최초 발생 기준 · 불량·B급·구형 포함</p></div></div>
@@ -405,17 +416,19 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
       </div><button type="button" aria-label="새로고침" onClick={refresh} className="standard-hover flex h-11 w-11 items-center justify-center rounded-[10px] focus-visible:ring-2" style={{ color: LEGACY_COLORS.blue }}><RefreshCw className="h-4 w-4" /></button></div>
     </header>
 
-    <section className="min-w-0 rounded-[20px] border px-3 py-2" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}><div className="flex flex-wrap items-center gap-2">
-      {mobilePresentation ? <><button type="button" aria-label="분류 조건 펼치기" aria-expanded={filtersOpen} aria-controls="statistics-category-filters" onClick={() => setFiltersOpen((value) => !value)} className="standard-hover flex min-h-11 items-center gap-1 rounded-[12px] px-2 text-sm font-bold focus-visible:ring-2" style={{ color: LEGACY_COLORS.blue }}>분류 조건 <ChevronDown className={`h-4 w-4 transition-transform ${filtersOpen ? "rotate-180" : ""}`} /></button>
-      <span className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>{categoryCount ? `${categoryCount}개 조건 선택` : "전체 부서 · 전체 모델 · 전체 공정"}</span></> : <DefectFilterDisclosure expanded={filtersOpen} onToggle={() => setFiltersOpen((value) => !value)} controlsId="statistics-category-filters" summary={categoryCount ? `${categoryCount}개 조건 선택` : "전체 부서 · 전체 모델 · 전체 공정"} />}
-      {selectedDepartments.map((value) => <button key={value} type="button" onClick={() => setSelectedDepartments((current) => current.filter((entry) => entry !== value))} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.green, 12), color: LEGACY_COLORS.green }}>부서 {value} ×</button>)}
-      {selectedModels.map((value) => <button key={value} type="button" onClick={() => setSelectedModels((current) => current.filter((entry) => entry !== value))} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.cyan, 12), color: LEGACY_COLORS.cyan }}>모델 {value} ×</button>)}
-      {selectedProcessSteps.map((value) => <button key={value} type="button" onClick={() => setSelectedProcessSteps((current) => current.filter((entry) => entry !== value))} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.yellow, 12), color: LEGACY_COLORS.yellow }}>공정 {PROCESS_LABELS[value]} ×</button>)}
-      {reason && <button type="button" onClick={() => { setReason(undefined); setReasonLabel(undefined); }} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.blue, 12), color: LEGACY_COLORS.blue }}>사유 {reasonLabel} ×</button>}
-      {itemId && <button type="button" aria-label={`선택 품목 ${itemLabel ?? itemId} 해제`} onClick={() => { setItemId(undefined); setItemLabel(undefined); }} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.blue, 12), color: LEGACY_COLORS.blue }}>품목 {itemLabel ?? itemId} ×</button>}
-      {(categoryCount > 0 || reason || itemId) && <button type="button" onClick={resetFilters} className="standard-hover min-h-11 rounded-[10px] px-2 text-sm font-bold focus-visible:ring-2" style={{ color: LEGACY_COLORS.blue }}>전체 초기화</button>}
-    </div><div id="statistics-category-filters" hidden={!filtersOpen}>{filtersOpen && <div className="mt-2"><DefectCategoryFilters departments={availableDepartments} models={modelOptions} currentDept={currentDepartment} showMyDepartment={false} selectedDepartments={selectedDepartments} selectedModels={selectedModels} selectedProcessSteps={selectedProcessSteps} onDepartmentsChange={setSelectedDepartments} onModelsChange={setSelectedModels} onProcessStepsChange={setSelectedProcessSteps} onResetCategoryFilters={resetFilters} /></div>}</div></section>
-    {!mobilePresentation && <StatisticsOverview result={result && !error && !futureResult ? result : null} loading={!result && !error} />}
+    {mobilePresentation && <section className="min-w-0 rounded-[20px] border px-3 py-2" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}><div className="flex flex-wrap items-center gap-2">
+      <><button type="button" aria-label="분류 조건 펼치기" aria-expanded={filtersOpen} aria-controls="statistics-category-filters" onClick={() => setFiltersOpen((value) => !value)} className="standard-hover flex min-h-11 items-center gap-1 rounded-[12px] px-2 text-sm font-bold focus-visible:ring-2" style={{ color: LEGACY_COLORS.blue }}>분류 조건 <ChevronDown className={`h-4 w-4 transition-transform ${filtersOpen ? "rotate-180" : ""}`} /></button>
+      <span className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>{categoryCount ? `${categoryCount}개 조건 선택` : "전체 부서 · 전체 모델 · 전체 공정"}</span></>
+      {filterChips}
+      {result && !error && !futureResult && <p className="min-w-0 basis-full break-words text-sm font-medium lg:ml-auto lg:basis-auto lg:flex-1 lg:text-right" style={{ color: LEGACY_COLORS.muted2 }}>{result.is_partial ? "현재까지" : "선택 기간"} 발생 합계 {formatQty(result.summary.quantity)}개({result.summary.record_count}건). 최다 등록 사유는 {topReasons.length ? `${topReasons.map((entry) => entry.label).join(" · ")}(${topReasons.length > 1 ? "각 " : ""}${formatQty(topReasonQty)}개, 전체 ${share(topReasonQty, result.summary.quantity)})` : "없습니다"}. {comparison ? comparison.quantity_delta === 0 ? "이전 비교 기간과 수량이 같습니다." : `이전 비교 기간보다 ${formatQty(Math.abs(comparison.quantity_delta))}개 ${comparison.quantity_delta > 0 ? "많습니다" : "적습니다"}.` : "비교할 이전 기간이 없습니다."}</p>}
+    </div>{categoryFilters}</section>}
+    {!mobilePresentation && <>
+      <StatisticsOverview result={result && !error && !futureResult ? result : null} loading={!result && !error}
+        filterToggle={<DefectFilterDisclosure expanded={filtersOpen} onToggle={() => setFiltersOpen((value) => !value)} controlsId="statistics-category-filters" />}
+        filterSelection={<div className={styles.filterSelection}>{categoryCount === 0 && !reason && !itemId && <span className={styles.secondary}>전체 부서 · 전체 모델 · 전체 공정</span>}{filterChips}</div>}
+      />
+      {categoryFilters}
+    </>}
 
     {!result && !error ? <div role="status" aria-label="불량 통계 불러오는 중" aria-busy="true" className="space-y-3"><span className="sr-only">불량 통계 불러오는 중</span>{mobilePresentation ? <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">{[0, 1, 2, 3].map((index) => <SkeletonBlock key={index} className="h-[100px] rounded-[20px]" />)}</div> : null}<div className={`grid gap-3 ${mobilePresentation ? "lg:grid-cols-2" : "xl:grid-cols-2"}`}>{[0, 1, 2, 3].map((index) => <div key={index} data-testid="statistics-panel-skeleton"><SkeletonBlock className={`${mobilePresentation ? "h-[255px]" : "h-[440px]"} rounded-[20px]`} /></div>)}</div></div>
       : error ? <div tabIndex={-1} ref={(node) => { node?.focus(); }}><ReadFailure message={error} onRetry={refresh} /></div>
