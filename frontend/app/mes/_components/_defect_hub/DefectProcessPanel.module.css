@@ -1,0 +1,32 @@
+.stepper {
+  display: flex;
+  gap: 0;
+}
+
+.primaryStep { display: flex; flex: 1 1 0; min-width: 0; }
+.primaryStep + .primaryStep { margin-left: 8px; }
+
+.followup {
+  display: flex;
+  flex: 0 1 0;
+  min-width: 0;
+  margin-left: 0;
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  transition: flex-grow 200ms cubic-bezier(.4, 0, .2, 1), margin-left 200ms cubic-bezier(.4, 0, .2, 1), opacity 200ms ease, visibility 0s linear 200ms;
+}
+
+.followupShown {
+  flex-grow: 1;
+  margin-left: 8px;
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.stepButton { width: 100%; min-width: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .followup { transition: none; }
+}

@@ -2,7 +2,6 @@
 import { useDesktopWorkGuard } from "../DesktopTabHome";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
@@ -22,6 +21,8 @@ import { ApiError } from "@/lib/api-core";
 import type { Supplier } from "@/lib/api";
 import { SupplierPickerStep } from "../_warehouse_v2/SupplierPickerStep";
 import { DefectQuantitySummary } from "./DefectQuantitySummary";
+import stepperStyles from "./DefectFlowStepper.module.css";
+import processStyles from "./DefectProcessPanel.module.css";
 
 type ProcessAction = "unquarantine" | "scrap" | "return" | "disassemble";
 
@@ -61,6 +62,7 @@ export function DefectProcessPanel({
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [action, setAction] = useState<ProcessAction>("unquarantine");
+  const [lastFollowupLabel, setLastFollowupLabel] = useState("BOM 확인");
   const availableQty = Math.max(
     1,
     processingLocations.reduce(
@@ -268,27 +270,25 @@ export function DefectProcessPanel({
   const quantitySummary = <DefectQuantitySummary availableLabel="격리 가용 재고"
     available={processingLocations.reduce((total, current) => total + (Number(current.available_quantity) || 0), 0)}
     total={boundedProcessQty} count={processingLocations.length} countLabel="격리 기록" unit="개" />;
+  const nextStepLabel = restoreOnly ? null : action === "return" ? "공급업체 선택" : action === "disassemble" && location.has_bom ? "BOM 확인" : null;
+  useEffect(() => {
+    if (nextStepLabel) setLastFollowupLabel(nextStepLabel);
+  }, [nextStepLabel]);
+  const processHeader = <>
+    <h2 className="sr-only">{step === 3 ? "반품 공급업체 선택" : isBatch ? "불량 여러 건 처리" : "불량 처리"}</h2>
+    <nav aria-label="불량 처리 단계" className={`iwp mb-3 shrink-0 ${stepperStyles.root} ${processStyles.stepper}`}>
+      <div className={processStyles.primaryStep}><button type="button" className={`iwpb done ${processStyles.stepButton}`} disabled={busy} onClick={onCancel}><span className="iwpl">격리 목록</span></button></div>
+      <div className={processStyles.primaryStep}><button type="button" className={`iwpb ${step === 1 ? "a" : "done"} ${processStyles.stepButton}`} disabled={busy || step === 1} aria-current={step === 1 ? "step" : undefined} onClick={() => setStep(1)}><span className="iwpl">처리 선택</span></button></div>
+      <div className={`${processStyles.followup} ${nextStepLabel ? processStyles.followupShown : ""}`} aria-hidden={!nextStepLabel} inert={!nextStepLabel}>
+        <button type="button" className={`iwpb ${step === 1 ? "locked" : "a"} ${processStyles.stepButton}`} disabled aria-current={step !== 1 && nextStepLabel ? "step" : undefined}><span className="iwpl">{nextStepLabel ?? lastFollowupLabel}</span></button>
+      </div>
+    </nav>
+  </>;
 
   if (step === 3) {
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-4">
-        <div className="flex shrink-0 items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setStep(1)}
-            disabled={busy}
-            className="standard-hover flex items-center gap-2 rounded-[12px] border px-4 py-2 text-sm font-bold disabled:opacity-50"
-            style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
-          >
-            <ArrowLeft className="h-4 w-4" /> 이전
-          </button>
-          <div>
-            <h2 className="text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>반품 공급업체 선택</h2>
-            <p className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              {isBatch ? `${processingLocations.length}건 · ` : ""}{formatQty(boundedProcessQty)}개 · {location.department} 불량 격리
-            </p>
-          </div>
-        </div>
+        {processHeader}
         <div className="mb-3 flex shrink-0 flex-wrap items-center gap-3">
           <div className="min-w-0 flex-1 basis-[240px]">
             <div className="break-words text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>{location.item_name}</div>
@@ -341,27 +341,7 @@ export function DefectProcessPanel({
   if (step === 2) {
     return (
       <div className="flex flex-1 min-h-0 flex-col">
-        {/* 헤더 */}
-        <div className="mb-5 flex shrink-0 items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setStep(1)}
-            disabled={busy}
-            className="standard-hover flex items-center gap-2 rounded-[12px] border px-4 py-2 text-sm font-bold transition-colors disabled:opacity-50"
-            style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            이전
-          </button>
-          <div>
-            <h2 className="text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>{isBatch ? "불량 여러 건 처리" : "불량 처리"}</h2>
-            <div className="flex items-center gap-2 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              <span>① 처리 선택</span>
-              <span>→</span>
-              <span style={{ color: LEGACY_COLORS.yellow }}>② BOM 확인</span>
-            </div>
-          </div>
-        </div>
+        {processHeader}
 
         {/* 스크롤 영역 */}
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
@@ -473,29 +453,7 @@ export function DefectProcessPanel({
 
   return (
     <div className="flex flex-1 min-h-0 flex-col">
-      {/* 헤더 */}
-      <div className="mb-5 flex shrink-0 items-center gap-3">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={busy}
-          className="standard-hover flex items-center gap-2 rounded-[12px] border px-4 py-2 text-sm font-bold transition-colors disabled:opacity-50"
-          style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          목록
-        </button>
-        <div>
-          <h2 className="text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>{isBatch ? "불량 여러 건 처리" : "불량 처리"}</h2>
-          {!restoreOnly && location.has_bom && (
-            <div className="flex items-center gap-2 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              <span style={{ color: LEGACY_COLORS.yellow }}>① 처리 선택</span>
-              <span>→</span>
-              <span>② BOM 확인</span>
-            </div>
-          )}
-        </div>
-      </div>
+      {processHeader}
 
       {/* 스크롤 영역 */}
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">

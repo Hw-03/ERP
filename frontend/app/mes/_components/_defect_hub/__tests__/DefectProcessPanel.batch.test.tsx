@@ -62,6 +62,30 @@ const locations = [location("record-1", 2), location("record-2", 3)];
 const employee = { employee_id: "employee-1", name: "작업자", department: "조립" };
 
 describe("DefectProcessPanel batch processing", () => {
+  it("격리 처리 단계 바는 현재 단계를 표시하고 완료 단계와 격리 목록으로 돌아간다", () => {
+    const onCancel = vi.fn();
+    render(<DefectProcessPanel locations={locations} currentEmployee={employee} onDone={vi.fn()} onCancel={onCancel} />);
+    const stepper = within(screen.getByRole("navigation", { name: "불량 처리 단계" }));
+    expect(stepper.getByRole("button", { name: "처리 선택", exact: true })).toHaveAttribute("aria-current", "step");
+    expect(stepper.queryByRole("button", { name: "BOM 확인", exact: true })).not.toBeInTheDocument();
+    const bomButton = stepper.getByRole("button", { name: "BOM 확인", exact: true, hidden: true });
+    fireEvent.click(screen.getByRole("button", { name: /^재작업/ }));
+    expect(stepper.getByRole("button", { name: "BOM 확인", exact: true })).toBe(bomButton);
+    expect(stepper.getByRole("button", { name: "BOM 확인", exact: true })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /^전체 폐기/ }));
+    expect(stepper.queryByRole("button", { name: "BOM 확인", exact: true })).not.toBeInTheDocument();
+    expect(bomButton).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^재작업/ }));
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "외관 불량" } });
+    fireEvent.click(screen.getByRole("button", { name: "다음 →", exact: true }));
+    const bomStepper = within(screen.getByRole("navigation", { name: "불량 처리 단계" }));
+    expect(bomStepper.getByRole("button", { name: "BOM 확인", exact: true })).toHaveAttribute("aria-current", "step");
+    fireEvent.click(bomStepper.getByRole("button", { name: "처리 선택", exact: true }));
+    expect(screen.getByRole("button", { name: "다음 →", exact: true })).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole("navigation", { name: "불량 처리 단계" })).getByRole("button", { name: "격리 목록", exact: true }));
+    expect(onCancel).toHaveBeenCalledOnce();
+  });
+
   it.each([false, true])("기존 격리 처리와 정상 복귀에 격리 재고 요약을 표시한다 (restoreOnly=%s)", (restoreOnly) => {
     render(<DefectProcessPanel locations={locations} restoreOnly={restoreOnly} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />);
     const summary = screen.getByLabelText("품목 수량 요약");
