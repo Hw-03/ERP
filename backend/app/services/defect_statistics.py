@@ -557,6 +557,7 @@ def _build_breakdowns(
     """정규화 발생을 품목·사유·부서별 건수와 수량으로 집계한다."""
 
     item_totals: dict[uuid.UUID, _Totals] = {}
+    item_occurrences: dict[uuid.UUID, list[_Occurrence]] = {}
     items_by_id: dict[uuid.UUID, _Occurrence] = {}
     reason_totals: dict[str, _Totals] = {}
     reason_labels: dict[str, str] = {}
@@ -565,6 +566,7 @@ def _build_breakdowns(
         item_total = item_totals.setdefault(occurrence.item_id, _Totals())
         item_total.record_count += 1
         item_total.quantity += occurrence.quantity
+        item_occurrences.setdefault(occurrence.item_id, []).append(occurrence)
         items_by_id.setdefault(occurrence.item_id, occurrence)
 
         reason_key = str(occurrence.reason_category_id) if occurrence.reason_category_id else occurrence.reason
@@ -585,6 +587,7 @@ def _build_breakdowns(
             mes_code=items_by_id[item_id].mes_code,
             record_count=totals.record_count,
             quantity=totals.quantity,
+            categories=_build_category_breakdown(item_occurrences[item_id]),
         )
         for item_id, totals in item_totals.items()
     ]
@@ -640,6 +643,7 @@ def _build_timeline(
         buckets = [value.isoformat() for value in dates]
         labels = {value.isoformat(): f"{value.month}/{value.day}" for value in dates}
     totals = {bucket: _Totals() for bucket in buckets}
+    bucket_occurrences: dict[str, list[_Occurrence]] = {bucket: [] for bucket in buckets}
     for occurrence in occurrences:
         occurred_date = _to_kst_date(occurrence.occurred_at)
         bucket = (
@@ -652,12 +656,14 @@ def _build_timeline(
             continue
         total.record_count += 1
         total.quantity += occurrence.quantity
+        bucket_occurrences[bucket].append(occurrence)
     return [
         DefectStatisticsTimelineEntry(
             bucket=bucket,
             label=labels[bucket],
             record_count=totals[bucket].record_count,
             quantity=totals[bucket].quantity,
+            categories=_build_category_breakdown(bucket_occurrences[bucket]),
         )
         for bucket in buckets
     ]
@@ -894,6 +900,7 @@ def get_defect_statistics_report(
                    if period == "month" else str(trend_period.start_date.year)),
             record_count=len(occurrences),
             quantity=sum(occurrence.quantity for occurrence in occurrences),
+            categories=_build_category_breakdown(occurrences),
             start_date=trend_period.start_date, end_date=trend_period.end_date,
             is_partial=trend_end > trend_until,
         ))

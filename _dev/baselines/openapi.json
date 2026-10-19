@@ -3118,6 +3118,13 @@
       "DefectStatisticsItemBreakdownEntry": {
         "description": "품목별 분류값과 화면 표시에 필요한 품목 식별자.",
         "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/DefectStatisticsBreakdownEntry"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
           "item_id": {
             "format": "uuid",
             "title": "Item Id",
@@ -3435,6 +3442,13 @@
             "title": "Bucket",
             "type": "string"
           },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/DefectStatisticsBreakdownEntry"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
           "label": {
             "title": "Label",
             "type": "string"
@@ -3463,6 +3477,13 @@
           "bucket": {
             "title": "Bucket",
             "type": "string"
+          },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/DefectStatisticsBreakdownEntry"
+            },
+            "title": "Categories",
+            "type": "array"
           },
           "end_date": {
             "format": "date",

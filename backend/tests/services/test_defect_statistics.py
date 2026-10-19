@@ -477,6 +477,13 @@ def test_category_selection_filters_every_aggregate_but_keeps_card_totals(
     assert [entry.quantity for entry in report.category_totals] == [4, 7, 507]
     assert report.comparison.summary.quantity == previous
     assert report.comparison.quantity_delta == expected - previous
+    for entries in (report.items, report.timeline, report.trend, report.comparison.items):
+        for entry in entries:
+            assert [part.key for part in entry.categories] == ["DEFECT", "B_GRADE", "OBSOLETE"]
+            assert sum(part.quantity for part in entry.categories) == entry.quantity
+            assert sum(part.record_count for part in entry.categories) == entry.record_count
+            if category:
+                assert all(part.quantity == 0 for part in entry.categories if part.key != category)
     assert sum(entry.quantity for entry in report.departments) == expected
     assert sum(entry.quantity for entry in report.reasons) == expected
     assert report.trend[-1].quantity == expected
@@ -514,6 +521,9 @@ def test_category_query_combines_filters_at_kst_boundary_and_preserves_zero_part
     assert report.trend[-1].quantity == expected
     assert len(report.categories) == 3
     assert sum(entry.quantity for entry in report.categories) == expected
+    for bucket in report.timeline:
+        assert len(bucket.categories) == 3
+        assert sum(entry.quantity for entry in bucket.categories) == bucket.quantity
 
 
 def _add_operation(

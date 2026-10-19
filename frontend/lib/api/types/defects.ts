@@ -165,6 +165,7 @@ export interface DefectStatisticsBreakdown {
 export interface DefectStatisticsItemBreakdown extends DefectStatisticsBreakdown {
   item_id: string;
   mes_code: string | null;
+  categories: DefectStatisticsBreakdown[];
 }
 
 export interface DefectStatisticsTimelineEntry {
@@ -172,6 +173,7 @@ export interface DefectStatisticsTimelineEntry {
   label: string;
   record_count: number;
   quantity: number;
+  categories: DefectStatisticsBreakdown[];
 }
 
 export interface DefectStatisticsResponse {

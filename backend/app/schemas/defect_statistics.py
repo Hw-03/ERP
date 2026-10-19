@@ -48,6 +48,7 @@ class DefectStatisticsItemBreakdownEntry(DefectStatisticsBreakdownEntry):
 
     item_id: uuid.UUID
     mes_code: str | None = None
+    categories: list[DefectStatisticsBreakdownEntry] = Field(default_factory=list)
 
 
 class DefectStatisticsTimelineEntry(BaseModel):
@@ -57,6 +58,7 @@ class DefectStatisticsTimelineEntry(BaseModel):
     label: str
     record_count: int
     quantity: int
+    categories: list[DefectStatisticsBreakdownEntry] = Field(default_factory=list)
 
 
 class DefectStatisticsSummary(BaseModel):
