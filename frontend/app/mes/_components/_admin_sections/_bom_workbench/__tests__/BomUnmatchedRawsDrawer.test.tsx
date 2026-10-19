@@ -45,25 +45,29 @@ function closestWithClass(element: HTMLElement, className: string): HTMLElement 
 }
 
 describe("BomUnmatchedRawsDrawer", () => {
-  it("uses the opaque theme background when closed and for the expanded scrollable list", () => {
+  it("opens an accessible scrollable card list from the summary bar", () => {
     const { container } = render(
       <BomUnmatchedRawsDrawer rawItems={[rawItem()]} childIdSet={new Set()} />,
     );
 
     const drawer = container.firstElementChild as HTMLDivElement;
-    expect(drawer.style.background).toBe(LEGACY_COLORS.bg);
-    expect(drawer).not.toHaveClass("border");
+    expect(drawer.style.background).toBe(LEGACY_COLORS.s1);
+    expect(drawer).toHaveClass("border");
     expect(screen.getByRole("button")).toHaveClass("no-btn-inset");
+    expect(screen.getByRole("button")).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("Raw material")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button"));
 
-    const list = closestWithClass(screen.getByText("Raw material"), "max-h-[30vh]");
-    expect(list.style.background).toBe(LEGACY_COLORS.bg);
-    expect(list).toHaveClass("max-h-[30vh]", "overflow-y-auto");
+    const list = closestWithClass(screen.getByText("Raw material"), "overflow-y-auto");
+    expect(list.style.background).toBe(LEGACY_COLORS.s2);
+    expect(screen.getByRole("button")).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("region", { name: "미배치 원자재 목록" })).toBe(list);
+    expect(list).toHaveClass("min-h-0", "flex-1", "overflow-y-auto");
     expect(list.style.borderTop).toBe(`1px solid ${LEGACY_COLORS.border}`);
-    expect(screen.getByText("Raw material").closest(".grid")?.style.borderBottom).toBe(`1px solid ${LEGACY_COLORS.border}`);
     expect(screen.getByText("RAW-001")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button"));
+    expect(screen.queryByRole("region")).not.toBeInTheDocument();
   });
 
   it("keeps status-marked unmatched raws visible while showing the completed header state", () => {
@@ -88,8 +92,8 @@ describe("BomUnmatchedRawsDrawer", () => {
 
     fireEvent.click(screen.getByRole("button"));
     const disused = screen.getByRole("checkbox", { name: "Raw material (RAW-001) 불용" });
-    const row = screen.getByText("Raw material").closest(".grid");
-    expect(row?.firstElementChild).toContainElement(disused);
+    const row = screen.getByText("Raw material").closest(".rounded-xl");
+    expect(row).toContainElement(disused);
     expect(disused).toHaveAttribute("aria-label", "Raw material (RAW-001) 불용");
     fireEvent.click(disused);
     expect(onStatusChange).toHaveBeenLastCalledWith("raw-1", "DISUSED");

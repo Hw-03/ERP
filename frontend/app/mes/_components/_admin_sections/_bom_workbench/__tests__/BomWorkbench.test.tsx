@@ -502,6 +502,13 @@ describe("BomWorkbench", () => {
     fireEvent.change(quantity, { target: { value: "7" } });
     expect(quantity).toHaveValue(7);
 
+    fireEvent.click(screen.getByRole("button", { name: /미배치 원자재.*펼치기/ }));
+    expect(quantity).not.toBeVisible();
+    expect(screen.getByRole("region", { name: "미배치 원자재 목록" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /미배치 원자재.*접기/ }));
+    expect(quantity).toBeVisible();
+    expect(quantity).toHaveValue(7);
+
     realtime.revision = 1;
     rerender(<BomWorkbench {...props} />);
 

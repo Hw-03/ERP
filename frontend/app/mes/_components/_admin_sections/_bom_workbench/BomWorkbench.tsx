@@ -102,6 +102,7 @@ export function BomWorkbench({
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [unmatchedStatusBusyItemIds, setUnmatchedStatusBusyItemIds] = useState<Set<string>>(new Set());
+  const [unmatchedOpen, setUnmatchedOpen] = useState(false);
   const [historyReady, setHistoryReady] = useState(false);
   const [historyValidationDeferred, setHistoryValidationDeferred] = useState(false);
   const itemsRef = useRef(items);
@@ -478,6 +479,7 @@ export function BomWorkbench({
         className={`grid min-h-0 flex-1 gap-3`}
         data-mode={mode}
         style={{
+          display: mode === "edit" && unmatchedOpen ? "none" : undefined,
           gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
         }}
       >
@@ -571,6 +573,8 @@ export function BomWorkbench({
       {/* 하단: 미배치 원자재 (편집 모드에서만) */}
       {mode === "edit" && !initialRead.loading && !initialRead.error && (
         <BomUnmatchedRawsDrawer
+          open={unmatchedOpen}
+          onOpenChange={setUnmatchedOpen}
           rawItems={rawItems}
           childIdSet={childIdSet}
           busyItemIds={unmatchedStatusBusyItemIds}
