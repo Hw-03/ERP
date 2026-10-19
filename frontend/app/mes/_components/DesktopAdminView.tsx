@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DesktopPinLock } from "./DesktopPinLock";
 import { AdminSectionTabs } from "./_admin_sections/AdminSectionTabs";
@@ -8,6 +8,7 @@ import { AdminSectionContent } from "./_admin_sections/AdminSectionContent";
 import { useAdminBootstrap } from "./_admin_hooks/useAdminBootstrap";
 import { useAdminSettings } from "./_admin_hooks/useAdminSettings";
 import { useAdminViewState, type AdminSection } from "./_admin_hooks/useAdminViewState";
+import { AdminReadProvider } from "./_admin_sections/_admin_primitives/AdminReadState";
 import { useConfirmNavigation } from "@/lib/ui/dirty-guard";
 import { StatusTargetNotice, useStatusTargetNotice } from "./common/StatusTargetNotice";
 
@@ -64,12 +65,14 @@ export function DesktopAdminView({
     refreshAllBom,
     refreshItems,
     refreshEmployees,
-    loadData,
+    loadData, readStates, retryRead,
   } = useAdminBootstrap({
     unlocked,
     globalSearch,
     onError: setMessage,
   });
+
+  const readContext = useMemo(() => ({ states: readStates, retry: retryRead }), [readStates, retryRead]);
 
   const {
     pinForm, setPinForm,
@@ -111,7 +114,7 @@ export function DesktopAdminView({
         <section className="flex min-h-0 flex-1 flex-col overflow-auto pt-1 lg:overflow-hidden">
           {/* 섹션별 콘텐츠 */}
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <AdminSectionContent
+            <AdminReadProvider value={readContext}><AdminSectionContent
               section={section}
               globalSearch={globalSearch}
               onStatusChange={onStatusChange}
@@ -136,7 +139,7 @@ export function DesktopAdminView({
               isSaving={isSaving}
               changePin={changePin}
               adminPin={adminPin}
-            />
+            /></AdminReadProvider>
           </div>
         </section>
       </div>

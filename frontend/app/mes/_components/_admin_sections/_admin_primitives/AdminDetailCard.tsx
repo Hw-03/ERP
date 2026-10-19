@@ -14,6 +14,7 @@ export interface AdminDetailCardProps {
   status?: ReactNode;
   actions?: ReactNode;
   tabs?: AdminDetailTab[];
+  tabsDisabled?: boolean;
   tabActions?: ReactNode;
   activeTab?: string;
   onTabChange?: (id: string) => void;
@@ -27,6 +28,7 @@ export function AdminDetailCard({
   status,
   actions,
   tabs,
+  tabsDisabled = false,
   tabActions,
   activeTab,
   onTabChange,
@@ -41,7 +43,7 @@ export function AdminDetailCard({
   const hasHeaderContent = Boolean(title || subtitle || status);
 
   function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    if (!tabs || tabs.length === 0) return;
+    if (tabsDisabled || !tabs || tabs.length === 0) return;
 
     let nextIndex: number | null = null;
     if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
@@ -111,6 +113,7 @@ export function AdminDetailCard({
                   id={tabId}
                   type="button"
                   role="tab"
+                  disabled={tabsDisabled}
                   aria-selected={active}
                   aria-controls={tabPanelId}
                   tabIndex={active ? 0 : -1}

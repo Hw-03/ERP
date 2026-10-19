@@ -15,9 +15,11 @@ export interface AdminKpiItem {
 export interface AdminKpiBarProps {
   items: AdminKpiItem[];
   placement?: "block" | "header";
+  loading?: boolean;
+  unavailable?: boolean;
 }
 
-export function AdminKpiBar({ items, placement = "block" }: AdminKpiBarProps) {
+export function AdminKpiBar({ items, placement = "block", loading = false, unavailable = false }: AdminKpiBarProps) {
   if (items.length === 0) return null;
   return (
     <div
@@ -28,11 +30,12 @@ export function AdminKpiBar({ items, placement = "block" }: AdminKpiBarProps) {
         <KpiCard
           key={kpi.key}
           label={kpi.label}
-          value={kpi.value}
+          value={unavailable ? "—" : kpi.value}
+          loading={loading}
           hint={placement === "header" ? undefined : kpi.hint}
           tone={kpi.tone}
           active={kpi.active}
-          onClick={kpi.onClick}
+          onClick={unavailable ? undefined : kpi.onClick}
           compact
           headerCompact={placement === "header"}
         />

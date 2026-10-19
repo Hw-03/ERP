@@ -4,6 +4,8 @@ import { useEffect, useRef, type AriaRole, type ReactNode } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState } from "../../common/EmptyState";
 import { SearchInput } from "../../common/SearchInput";
+import { SkeletonBlock } from "../../common/LoadingSkeleton";
+import { AdminReadBoundary, type useAdminReadState } from "./AdminReadState";
 
 export interface AdminListPanelProps<T> {
   title?: string;
@@ -23,6 +25,8 @@ export interface AdminListPanelProps<T> {
   listAriaLabel?: string;
   listClassName?: string;
   externalScrollbar?: boolean;
+  read?: ReturnType<typeof useAdminReadState>;
+  skeleton?: ReactNode;
 }
 
 export function AdminListPanel<T>({
@@ -43,6 +47,8 @@ export function AdminListPanel<T>({
   listAriaLabel,
   listClassName,
   externalScrollbar = false,
+  read,
+  skeleton,
 }: AdminListPanelProps<T>) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -60,9 +66,11 @@ export function AdminListPanel<T>({
 
   const listContent = <>
     {listHeader}
+    <AdminReadBoundary read={read ?? { loading: false, error: undefined, retry: () => {} }} skeleton={skeleton} label={listAriaLabel ?? title ?? "목록"}>
     {items.length === 0
       ? emptyState ?? <EmptyState variant="no-data" compact />
       : items.map((item) => renderItem(item))}
+    </AdminReadBoundary>
   </>;
   const viewport = <div
     ref={scrollRef}
@@ -97,7 +105,7 @@ export function AdminListPanel<T>({
             )}
             {countLabel && (
               <div className="whitespace-nowrap text-sm font-semibold leading-5 tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>
-                {countLabel}
+                {read?.loading ? <SkeletonBlock className="h-4 w-10" /> : read?.error ? "—" : countLabel}
               </div>
             )}
           </div>

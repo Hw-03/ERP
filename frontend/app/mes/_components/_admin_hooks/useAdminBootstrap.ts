@@ -11,6 +11,7 @@ import {
 } from "@/lib/api";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
+import { INITIAL_ADMIN_READ_STATES, type AdminReadDomain, type AdminReadStates } from "../_admin_sections/_admin_primitives/AdminReadState";
 
 /**
  * 관리자 화면의 5개 도메인 부트스트랩 + BOM 새로고침 훅.
@@ -32,6 +33,8 @@ export interface UseAdminBootstrapOptions {
 }
 
 export interface UseAdminBootstrapResult {
+  readStates: AdminReadStates;
+  retryRead: (domain: AdminReadDomain) => void;
   items: Item[];
   setItems: React.Dispatch<React.SetStateAction<Item[]>>;
   employees: Employee[];
@@ -60,56 +63,90 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
   const itemsRequestId = useRef(0);
   const employeesRequestId = useRef(0);
   const allBomRequestId = useRef(0);
+  const departmentsRequestId = useRef(0);
+  const [readStates, setReadStates] = useState(INITIAL_ADMIN_READ_STATES);
+  const loadedDomains = useRef(new Set<AdminReadDomain>());
+
+  const markPending = useCallback((domain: AdminReadDomain): void => {
+    if (!loadedDomains.current.has(domain)) setReadStates((current) => current[domain].status === "pending" ? current : { ...current, [domain]: { status: "pending" } });
+  }, []);
+  const markReady = useCallback((domain: AdminReadDomain): void => {
+    if (loadedDomains.current.has(domain)) return;
+    loadedDomains.current.add(domain);
+    setReadStates((current) => current[domain].status === "ready" ? current : { ...current, [domain]: { status: "ready" } });
+  }, []);
+  const markFailure = useCallback((domain: AdminReadDomain, failure: unknown): void => {
+    if (!loadedDomains.current.has(domain)) setReadStates((current) => ({ ...current,
+      [domain]: { status: "error", error: failure instanceof Error ? failure.message : "관리자 데이터를 불러오지 못했습니다." },
+    }));
+  }, []);
 
   // 개인 저장 결과보다 먼저 시작한 조회가 저장 상태를 되돌리지 않게 한다.
   const setEmployees = useCallback((next: React.SetStateAction<Employee[]>): void => {
     employeesRequestId.current += 1;
     setEmployeesState(next);
-  }, []);
+    markReady("employees");
+  }, [markReady]);
 
   // models 만 React Query 로 분리 — enabled(unlocked) 로 게이트 보존.
-  const { data: modelsData } = useModelsQuery({ enabled: unlocked });
+  const { data: modelsData, error: modelsError, refetch: refetchModels } = useModelsQuery({ enabled: unlocked });
   useEffect(() => {
-    if (modelsData) setProductModels(modelsData);
-  }, [modelsData]);
-
-  const loadData = useCallback(async () => {
-    const requestId = ++itemsRequestId.current;
-    const employeeRequestId = ++employeesRequestId.current;
-    const [nextItems, nextEmployees, nextDepts] = await Promise.all([
-      api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
-      api.getEmployees({ activeOnly: false }),
-      api.getDepartments(),
-    ]);
-    if (requestId === itemsRequestId.current) setItems(nextItems);
-    if (employeeRequestId === employeesRequestId.current) setEmployeesState(nextEmployees);
-    setDepartments(nextDepts);
-  }, [globalSearch]);
+    if (modelsData !== undefined) { setProductModels(modelsData); markReady("models"); }
+    else if (modelsError) markFailure("models", modelsError);
+  }, [modelsData, modelsError, markReady, markFailure]);
 
   const refreshAllBom = useCallback(() => {
     const requestId = ++allBomRequestId.current;
+    markPending("bom");
     void api
       .getAllBOM()
       .then((rows) => {
-        if (requestId === allBomRequestId.current) setAllBomRows(rows);
+        if (requestId === allBomRequestId.current) { setAllBomRows(rows); markReady("bom"); }
       })
-      .catch(() => {
+      .catch((failure: unknown) => {
+        if (requestId === allBomRequestId.current) markFailure("bom", failure);
         // Keep the last successful BOM snapshot when a realtime refresh fails.
       });
-  }, []);
+  }, [markPending, markReady, markFailure]);
 
   // 품목만 재조회 — BOM 완료 토글 후 bom_completed_at 반영용
   const refreshItems = useCallback(async () => {
     const requestId = ++itemsRequestId.current;
-    const next = await api.getItems({ limit: 2000, search: globalSearch.trim() || undefined });
-    if (requestId === itemsRequestId.current) setItems(next);
-  }, [globalSearch]);
+    markPending("items");
+    try {
+      const next = await api.getItems({ limit: 2000, search: globalSearch.trim() || undefined });
+      if (requestId === itemsRequestId.current) { setItems(next); markReady("items"); }
+    } catch (failure) { if (requestId === itemsRequestId.current) markFailure("items", failure); throw failure; }
+  }, [globalSearch, markPending, markReady, markFailure]);
 
   const refreshEmployees = useCallback(async () => {
     const requestId = ++employeesRequestId.current;
-    const next = await api.getEmployees({ activeOnly: false });
-    if (requestId === employeesRequestId.current) setEmployeesState(next);
-  }, []);
+    markPending("employees");
+    try {
+      const next = await api.getEmployees({ activeOnly: false });
+      if (requestId === employeesRequestId.current) { setEmployeesState(next); markReady("employees"); }
+    } catch (failure) { if (requestId === employeesRequestId.current) markFailure("employees", failure); throw failure; }
+  }, [markPending, markReady, markFailure]);
+
+  const refreshDepartments = useCallback(async () => {
+    const requestId = ++departmentsRequestId.current;
+    markPending("departments");
+    try {
+      const next = await api.getDepartments();
+      if (requestId === departmentsRequestId.current) { setDepartments(next); markReady("departments"); }
+    } catch (failure) { if (requestId === departmentsRequestId.current) markFailure("departments", failure); throw failure; }
+  }, [markPending, markReady, markFailure]);
+
+  const loadData = useCallback(async () => {
+    await Promise.all([refreshItems(), refreshEmployees(), refreshDepartments()]);
+  }, [refreshItems, refreshEmployees, refreshDepartments]);
+
+  const retryRead = useCallback((domain: AdminReadDomain): void => {
+    if (domain === "bom") { refreshAllBom(); return; }
+    if (domain === "models") { markPending("models"); void refetchModels(); return; }
+    const refresh = { items: refreshItems, employees: refreshEmployees, departments: refreshDepartments }[domain];
+    void refresh().catch((failure: unknown) => onError(failure instanceof Error ? failure.message : "관리자 데이터를 불러오지 못했습니다."));
+  }, [refreshAllBom, refetchModels, refreshItems, refreshEmployees, refreshDepartments, markPending, onError]);
 
   // items/employees/departments 부트스트랩 — unlocked + globalSearch 변화 시
   useEffect(() => {
@@ -137,6 +174,7 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
   }, [unlocked, realtimeRevision, refreshItems, refreshEmployees, refreshAllBom, onError]);
 
   return {
+    readStates, retryRead,
     items, setItems,
     employees, setEmployees,
     productModels, setProductModels,

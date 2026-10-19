@@ -48,6 +48,55 @@ describe("useAdminBootstrap realtime refresh", () => {
     mocks.getAllBOM.mockReset().mockResolvedValue([]);
   });
 
+  it("distinguishes an initial pending response from a successfully empty list and keeps data during refresh", async () => {
+    const first = deferred<unknown[]>();
+    const refresh = deferred<unknown[]>();
+    mocks.getItems.mockReturnValueOnce(first.promise).mockReturnValueOnce(refresh.promise);
+    const onError = vi.fn();
+    const { result } = renderHook(() => useAdminBootstrap({ unlocked: true, globalSearch: "", onError }));
+    expect(result.current.readStates.items.status).toBe("pending");
+    await act(async () => { first.resolve([]); await first.promise; });
+    await waitFor(() => expect(result.current.readStates.items.status).toBe("ready"));
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.refreshItems(); });
+    expect(result.current.readStates.items.status).toBe("ready");
+    await act(async () => { refresh.resolve([]); await pending; });
+  });
+
+  it("ends the initial skeleton on failure and retries without treating an empty success as loading", async () => {
+    mocks.getAllBOM.mockRejectedValueOnce(new Error("BOM read failed")).mockResolvedValueOnce([]);
+    const onError = vi.fn();
+    const { result } = renderHook(() => useAdminBootstrap({ unlocked: true, globalSearch: "", onError }));
+    await waitFor(() => expect(result.current.readStates.bom).toEqual({ status: "error", error: "BOM read failed" }));
+    act(() => result.current.retryRead("bom"));
+    await waitFor(() => expect(result.current.readStates.bom.status).toBe("ready"));
+    expect(result.current.allBomRows).toEqual([]);
+  });
+
+  it.each(["items", "employees", "departments"] as const)("retries initial %s failures and keeps the ready state on a later refresh failure", async (domain) => {
+    const read = { items: mocks.getItems, employees: mocks.getEmployees, departments: mocks.getDepartments }[domain];
+    read.mockRejectedValueOnce(new Error("initial failure")).mockResolvedValueOnce([]);
+    const onError = vi.fn();
+    const { result } = renderHook(() => useAdminBootstrap({ unlocked: true, globalSearch: "", onError }));
+    await waitFor(() => expect(result.current.readStates[domain].status).toBe("error"));
+    act(() => result.current.retryRead(domain));
+    await waitFor(() => expect(result.current.readStates[domain].status).toBe("ready"));
+    expect(result.current[domain]).toEqual([]);
+    onError.mockClear();
+    read.mockRejectedValueOnce(new Error("refresh failure"));
+    act(() => result.current.retryRead(domain));
+    await waitFor(() => expect(onError).toHaveBeenCalledWith("refresh failure"));
+    expect(result.current.readStates[domain].status).toBe("ready");
+  });
+
+  it("accepts cached empty models as a completed read", async () => {
+    const onError = vi.fn();
+    const { result } = renderHook(() => useAdminBootstrap({ unlocked: true, globalSearch: "", onError }));
+    expect(result.current.productModels).toEqual([]);
+    expect(result.current.readStates.models.status).toBe("ready");
+    await waitFor(() => expect(Object.values(result.current.readStates).every((read) => read.status === "ready")).toBe(true));
+  });
+
   it("refreshes items, employees and BOM rows without reloading departments on revision changes", async () => {
     const onError = vi.fn();
     const { rerender } = renderHook(
