@@ -308,6 +308,22 @@ def test_sqlite_backup_publishes_manifest_last_with_exact_evidence(
     assert result.errors == ()
 
 
+def test_empty_wal_created_by_readonly_connection_keeps_generation(tmp_path: Path) -> None:
+    """An empty WAL contains no writes and may appear during read-only inspection."""
+    source = tmp_path / "readonly-wal.db"
+    with closing(sqlite3.connect(source)) as writer:
+        writer.execute("PRAGMA journal_mode=WAL")
+        writer.execute("CREATE TABLE demo (id INTEGER PRIMARY KEY)")
+        writer.commit()
+    assert not Path(f"{source}-wal").exists()
+    before = backup_manifest.sqlite_file_generation(source)
+
+    with closing(sqlite3.connect(f"file:{source.as_posix()}?mode=ro", uri=True)) as reader:
+        reader.execute("SELECT * FROM demo").fetchall()
+        assert Path(f"{source}-wal").stat().st_size == 0
+        assert backup_manifest.sqlite_file_generation(source) == before
+
+
 def test_sqlite_wal_followup_commit_marks_existing_backup_stale(
     runtime_dir: Path,
     monkeypatch: pytest.MonkeyPatch,

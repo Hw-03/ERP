@@ -127,12 +127,13 @@ def file_sha256(path: Path) -> str:
 
 
 def sqlite_file_generation(path: Path) -> str:
-    """Fingerprint SQLite database/WAL bytes to detect logical round trips."""
+    """Fingerprint writes, treating an absent and empty WAL as the same state."""
 
     digest = hashlib.sha256()
     for label, candidate in (("database", path), ("wal", Path(f"{path}-wal"))):
         digest.update(label.encode("ascii"))
-        if not candidate.is_file():
+        # Read-only SQLite connections may create a zero-byte WAL without writes.
+        if not candidate.is_file() or (label == "wal" and candidate.stat().st_size == 0):
             digest.update(b"\x00")
             continue
         digest.update(b"\x01")
