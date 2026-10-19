@@ -12,6 +12,7 @@ export interface AdminListPanelProps<T> {
   countLabel?: string;
   searchValue?: string;
   searchPlaceholder?: string;
+  searchDisabled?: boolean;
   onSearchChange?: (value: string) => void;
   filters?: ReactNode;
   action?: ReactNode;
@@ -34,6 +35,7 @@ export function AdminListPanel<T>({
   countLabel,
   searchValue,
   searchPlaceholder = "검색...",
+  searchDisabled = false,
   onSearchChange,
   filters,
   action,
@@ -113,7 +115,7 @@ export function AdminListPanel<T>({
         </div>
       )}
       {onSearchChange && (
-        <SearchInput value={searchValue ?? ""} onChange={onSearchChange} placeholder={searchPlaceholder}
+        <SearchInput disabled={searchDisabled} value={searchValue ?? ""} onChange={onSearchChange} placeholder={searchPlaceholder}
           className="shrink-0 rounded-[12px]" inputProps={{ className: "placeholder:font-medium" }} />
       )}
       {filters && <div className="flex shrink-0 flex-wrap gap-1.5">{filters}</div>}

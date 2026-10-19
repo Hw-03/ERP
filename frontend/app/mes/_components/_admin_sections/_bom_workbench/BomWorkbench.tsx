@@ -41,7 +41,7 @@ type BomWorkbenchHistoryState = { dept: BomDeptFilter; mode: Mode; parentId: str
 
 const BOM_WORKBENCH_HISTORY_KEY = "bomWorkbench";
 
-function readBomWorkbenchHistoryState(value: unknown): BomWorkbenchHistoryState | null {
+export function readBomWorkbenchHistoryState(value: unknown): BomWorkbenchHistoryState | null {
   if (!value || typeof value !== "object") return null;
   const candidate = (value as Record<string, unknown>)[BOM_WORKBENCH_HISTORY_KEY];
   if (!candidate || typeof candidate !== "object") return null;

@@ -1,6 +1,6 @@
 "use client";
 
-import type { Dispatch, SetStateAction } from "react";
+import { memo, type Dispatch, type SetStateAction } from "react";
 import type { BOMDetailEntry, DepartmentMaster, Employee, Item, ProductModel } from "@/lib/api";
 import { AdminMasterItemsSection } from "./AdminMasterItemsSection";
 import { AdminEmployeesSection } from "./AdminEmployeesSection";
@@ -51,7 +51,7 @@ export interface AdminSectionContentProps {
   adminPin: string;
 }
 
-export function AdminSectionContent(props: AdminSectionContentProps) {
+export const AdminSectionContent = memo(function AdminSectionContent(props: AdminSectionContentProps) {
   const {
     section, globalSearch, onStatusChange, setMessage, showSave,
     items, setItems,
@@ -159,4 +159,4 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
     );
   }
   return null;
-}
+});
