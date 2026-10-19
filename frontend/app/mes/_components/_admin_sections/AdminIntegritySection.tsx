@@ -1,8 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
+import { CircleCheck, ClipboardCheck, RefreshCw, ShieldCheck, TriangleAlert, Wrench } from "lucide-react";
 import { adminApi, type InventoryIntegrityCategory, type InventoryIntegrityResult } from "@/lib/api/admin";
 import { Button } from "@/lib/ui/Button";
+import { AdminPageHeader } from "./_admin_primitives/AdminPageHeader";
 
 const CATEGORY_LABELS: Record<InventoryIntegrityCategory, string> = {
   DEFECT_STOCK_MISMATCH: "불량 원장·재고",
@@ -35,41 +38,60 @@ export function AdminIntegritySection() {
   const repairableCount = result?.issues.filter((issue) => issue.repairable).length ?? 0;
 
   return (
-    <section className="admin-integrity">
-      <header>
-        <div>
-          <h2>정합성</h2>
-          <p>재고·불량·취소·연결 업무·주간보고를 읽기 전용으로 검사합니다.</p>
+    <>
+    <section className="admin-integrity" aria-label="정합성 검사" aria-busy={loading}>
+      <div className="admin-integrity-header">
+        <div className="admin-integrity-intro">
+          <AdminPageHeader icon={ShieldCheck} title="정합성" />
         </div>
-        <Button variant="secondary" size="sm" loading={loading} onClick={() => void load()}>
+        {result && <dl className="admin-integrity-summary">
+          <div className={result ? "admin-integrity-status" : undefined} data-alert={result ? !result.is_consistent : undefined}>
+            <dt><ShieldCheck size={20} aria-hidden="true" />검사 결과</dt>
+            <dd >{result?.is_consistent ? "정상" : "확인 필요"}</dd>
+          </div>
+          <div data-alert={result ? result.issue_count > 0 : undefined}>
+            <dt><TriangleAlert size={20} aria-hidden="true" />발견 문제</dt>
+            <dd >{<>{result?.issue_count}<span>건</span></>}</dd>
+          </div>
+          <div>
+            <dt><Wrench size={20} aria-hidden="true" />CLI 복구 가능</dt>
+            <dd >{<>{repairableCount}<span>건</span></>}</dd>
+          </div>
+        </dl>}
+        <Button variant="secondary" size="md" className="min-h-11 admin-integrity-recheck" iconLeft={<RefreshCw />} loading={loading} onClick={() => void load()}>
           다시 검사
         </Button>
-      </header>
+      </div>
 
       {error && <p role="alert" className="admin-integrity-error">{error}</p>}
 
       {result && <>
-        <div className="admin-integrity-summary">
-          <span>검사 결과: {result.is_consistent ? "정상" : "확인 필요"}</span>
-          <span>· 발견 문제 {result.issue_count}건</span>
-          <span>· <b>CLI 복구 가능</b> {repairableCount}건</span>
-          <span>· {new Date(result.generated_at).toLocaleString("ko-KR")}</span>
-        </div>
-
-        <div className="admin-integrity-categories">
-          {(Object.keys(CATEGORY_LABELS) as InventoryIntegrityCategory[]).map((category) => <span
+        <div className="admin-integrity-checks">
+          <div className="admin-integrity-checks-heading">
+            <h3><ClipboardCheck size={16} aria-hidden="true" />항목별 검사</h3>
+            <p className="admin-integrity-description">재고·불량·취소·연결 업무·주간보고를 읽기 전용으로 검사합니다.</p>
+            <p className="admin-integrity-timestamp">검사 시각 {<time dateTime={result.generated_at}>{new Date(result.generated_at).toLocaleString("ko-KR")}</time>}</p>
+          </div>
+          <div className="admin-integrity-categories">
+          {(Object.keys(CATEGORY_LABELS) as InventoryIntegrityCategory[]).map((category) => <div
             key={category}
-            data-alert={Boolean(result.category_counts[category])}
+            data-alert={Boolean(result?.category_counts[category])}
           >
-            {CATEGORY_LABELS[category]} {result.category_counts[category]}
-          </span>)}
+            {result?.category_counts[category] ? <TriangleAlert size={16} aria-hidden="true" /> : <CircleCheck size={16} aria-hidden="true" />}
+            <span>{CATEGORY_LABELS[category]}</span>
+            <strong>{<>{result?.category_counts[category]}<small>건</small></>}</strong>
+          </div>)}
+          </div>
         </div>
 
         <div className="admin-integrity-results">
-          {result.issues.length === 0 ? <p className="admin-integrity-empty">
-            발견된 정합성 문제가 없습니다.
-          </p> : <ul>
-            {result.issues.map((issue) => <li key={issue.problem_id}>
+          {result?.issues.length === 0 ? <div className="admin-integrity-empty">
+            <Image src="/images/dexray/weekly-empty.webp" alt="" width={840} height={560} sizes="300px" className="admin-integrity-mascot" />
+            <span className="admin-integrity-empty-badge"><CircleCheck size={16} aria-hidden="true" />검사 완료</span>
+            <h3>발견된 정합성 문제가 없습니다.</h3>
+            <p>검사한 항목이 모두 정상입니다.</p>
+          </div> : <ul>
+            {result?.issues.map((issue) => <li key={issue.problem_id}>
               <div className="admin-integrity-issue-meta">
                 <span>{CATEGORY_LABELS[issue.category]}</span>
                 <span>{issue.problem_id}</span>
@@ -89,5 +111,6 @@ export function AdminIntegritySection() {
         </div>
       </>}
     </section>
+    </>
   );
 }
