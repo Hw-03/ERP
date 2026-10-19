@@ -10,19 +10,20 @@
 .card:focus-visible { outline: 2px solid var(--c-blue); outline-offset: 3px; }
 .card[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--choice-tone); }
 .card:disabled { cursor: default; }
-.workCard { display: flex; min-height: 0; flex-direction: column; gap: 12px; padding: 24px; }
+.workCard { display: flex; min-height: 0; flex-direction: column; gap: 12px; padding: clamp(20px, 10cqh, 36px); }
 .cardHeading { display: flex; align-items: center; gap: 16px; }
-.icon { display: flex; width: 48px; height: 48px; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 15px; color: var(--choice-tone); background: color-mix(in srgb, var(--choice-tone) 10%, transparent); }
+.icon { display: flex; width: clamp(40px, min(4.4vw, 26cqh), 56px); height: clamp(40px, min(4.4vw, 26cqh), 56px); flex-shrink: 0; align-items: center; justify-content: center; border-radius: 15px; color: var(--choice-tone); background: color-mix(in srgb, var(--choice-tone) 10%, transparent); }
+.icon svg { width: 100%; height: 100%; }
 .selectionMark { display: flex; flex-shrink: 0; margin-left: auto; color: var(--c-muted); }
 .card[aria-pressed="true"] .selectionMark { color: var(--choice-tone); }
-.cardTitle { color: var(--c-text); font-size: clamp(24px, 1.5vw, 28px); font-weight: 900; line-height: 1.2; }
-.description { margin-top: auto; color: var(--c-muted2); font-size: 14px; font-weight: 500; line-height: 1.6; }
+.cardTitle { min-width: 0; color: var(--c-text); font-size: 40px; font-weight: 900; line-height: 1.2; word-break: keep-all; }
+.description { margin-top: auto; color: var(--c-muted2); font-size: 20px; font-weight: 900; line-height: 1.25; text-wrap: pretty; word-break: keep-all; }
 .sourceReveal { display: flex; min-height: 0; opacity: 0; transform: translateY(8px); visibility: hidden; pointer-events: none; transition: opacity 200ms ease, transform 200ms ease, visibility 200ms; }
 .expanded { opacity: 1; transform: translateY(0); visibility: visible; pointer-events: auto; }
 .sourceClip { display: flex; min-height: 0; flex: 1; overflow: hidden; }
 .sourceSection { display: flex; min-height: 0; flex: 1; flex-direction: column; }
 .sourceSection .sectionLabel { height: var(--source-label-height); }
-.sourceCard { display: flex; min-height: 0; flex-direction: column; gap: 16px; padding: 24px; }
+.sourceCard { display: flex; min-height: 0; flex-direction: column; gap: 16px; padding: clamp(20px, 10cqh, 36px); }
 .leaving { animation: choiceExit 120ms ease-in forwards; pointer-events: none; }
 @keyframes choiceExit { to { opacity: 0; transform: translateY(-4px); } }
 @media (max-width: 1400px) { .content { min-height: 440px; } .workCard, .sourceCard { padding: 20px; } }
