@@ -114,6 +114,25 @@ describe("BomWorkbench", () => {
     expect(container.querySelector("div[data-bom-row-surface]")).toBeNull();
   });
 
+  it("starts with all departments and filters parents from the parent-list controls", async () => {
+    vi.spyOn(api, "getBOM").mockResolvedValue([]);
+    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    const highParent = { ...selectedParent, item_id: "high-parent", item_name: "High parent", process_type_code: "HA" } as Item;
+    render(<BomWorkbench items={[selectedParent, highParent]} setItems={vi.fn()} allBomRows={[]}
+      refreshAllBom={vi.fn()} refreshItems={async () => undefined} onStatusChange={vi.fn()} onError={vi.fn()} />);
+
+    const parentList = screen.getByText("상위 품목 선택").closest("[data-scrollbar-rail-shell]") as HTMLElement;
+    const departments = within(parentList).getByRole("group", { name: "상위 품목 부서 필터" });
+    expect(within(departments).getByRole("button", { name: "전체" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(parentList).getByText("Selected parent summary")).toBeVisible();
+    expect(within(parentList).getByText("High parent")).toBeVisible();
+
+    fireEvent.click(within(departments).getByRole("button", { name: "고압" }));
+    expect(within(parentList).queryByText("Selected parent summary")).not.toBeInTheDocument();
+    expect(within(parentList).getByText("High parent")).toBeVisible();
+    await waitFor(() => expect(window.history.state.bomWorkbench).toEqual({ dept: "H", mode: "edit", parentId: "high-parent" }));
+  });
+
   it("constrains the workbench and parent column while preserving the parent-list scroll region", () => {
     const { container } = render(
       <BomWorkbench
@@ -130,7 +149,7 @@ describe("BomWorkbench", () => {
     expect(root).toHaveClass("flex", "flex-1", "min-h-0", "flex-col");
 
     const threeColumnLayout = Array.from(container.querySelectorAll<HTMLDivElement>("div")).find(
-      (element) => element.style.gridTemplateColumns === "minmax(280px, 1fr) minmax(340px, 1fr) minmax(340px, 1fr)",
+      (element) => element.style.gridTemplateColumns === "repeat(3, minmax(0, 1fr))",
     );
     expect(threeColumnLayout).toBeDefined();
 
@@ -386,7 +405,11 @@ describe("BomWorkbench", () => {
       />,
     );
 
-    await screen.findByText("현재 구성 (0건)");
+    const currentSummary = await screen.findByText(/현재 구성 \(0건\)/);
+    const currentPanel = currentSummary.closest("[data-scrollbar-rail-shell]") as HTMLElement;
+    expect(within(currentPanel).getByText(selectedParent.item_name)).toBeVisible();
+    expect(within(currentPanel).getByRole("button", { name: /검토 · 완료/ })).toBeDisabled();
+    expect(container.querySelector(".mb-3.flex.min-w-0.flex-wrap")).not.toBeInTheDocument();
     const viewports = Array.from(container.querySelectorAll<HTMLElement>("[data-scrollbar-rail-viewport]"));
     expect(viewports).toHaveLength(3);
 
@@ -423,10 +446,9 @@ describe("BomWorkbench", () => {
     );
 
     const departmentFilters = screen.getByTestId("bom-department-filters");
-    expect(departmentFilters).toHaveClass("min-h-[58px]", "flex-wrap");
-    for (const filter of departmentFilters.querySelectorAll("button")) {
-      expect(filter).toHaveClass("h-11");
-    }
+    const parentList = screen.getByText("상위 품목 선택").closest("[data-scrollbar-rail-shell]") as HTMLElement;
+    expect(parentList).toContainElement(departmentFilters);
+    expect(departmentFilters.previousElementSibling).toHaveAttribute("aria-label", "상위 품목 단계 필터");
 
     expect(screen.queryByRole("button", { name: "BOM 내보내기" })).not.toBeInTheDocument();
     const modeControls = screen.getByRole("group", { name: "BOM 보기 방식" });
@@ -434,16 +456,13 @@ describe("BomWorkbench", () => {
     expect(screen.getByRole("button", { name: "편집" })).toHaveClass("h-11", "min-w-[82px]");
     expect(screen.getByRole("button", { name: "사용처" })).toHaveClass("h-11", "min-w-[82px]");
 
-    const departmentWrapper = departmentFilters.parentElement!;
-    expect(departmentWrapper).toHaveClass("min-w-0", "max-w-full");
-    expect(departmentWrapper).not.toHaveClass("shrink-0");
-
     const summary = (await screen.findAllByText("Selected parent summary")).find((element) =>
       element.classList.contains("text-base"),
     )!;
-    const summaryCard = summary.closest(".rounded-2xl")!;
-    expect(summaryCard).toHaveClass("min-w-0", "flex-1");
-    expect(departmentWrapper.nextElementSibling).toBe(summaryCard);
+    const summaryCard = summary.closest("[data-scrollbar-rail-shell]")!;
+    expect(summaryCard).toHaveClass("min-h-0", "flex-1");
+    expect(summaryCard).toContainElement(screen.getByRole("button", { name: "검토 · 완료" }));
+    expect(within(summaryCard as HTMLElement).queryByText("미착수", { exact: true })).not.toBeInTheDocument();
   });
   it("reloads selected BOM data on revision without clearing an edited row quantity draft", async () => {
     const row = {
@@ -532,7 +551,7 @@ describe("BomWorkbench", () => {
 
     await waitFor(() => expect(window.history.state).toEqual({
       shell: "kept",
-      bomWorkbench: { dept: "A", mode: "edit", parentId: "parent-1" },
+      bomWorkbench: { dept: "ALL", mode: "edit", parentId: "parent-1" },
     }));
     expect(pushState).not.toHaveBeenCalled();
 
@@ -595,7 +614,7 @@ describe("BomWorkbench", () => {
     );
 
     await waitFor(() => expect(window.history.state.bomWorkbench).toEqual({
-      dept: "A",
+      dept: "ALL",
       mode: "edit",
       parentId: "parent-1",
     }));
@@ -607,14 +626,14 @@ describe("BomWorkbench", () => {
     fireEvent.click(deletedTarget);
 
     await waitFor(() => expect(window.history.state.bomWorkbench).toEqual({
-      dept: "A",
+      dept: "ALL",
       mode: "edit",
       parentId: "parent-1",
     }));
     expect(pushState).not.toHaveBeenCalled();
     expect(replaceState).toHaveBeenLastCalledWith({
       shell: "kept",
-      bomWorkbench: { dept: "A", mode: "edit", parentId: "parent-1" },
+      bomWorkbench: { dept: "ALL", mode: "edit", parentId: "parent-1" },
     }, "");
   });
 
@@ -654,7 +673,8 @@ describe("BomWorkbench", () => {
     act(() => {
       window.dispatchEvent(new PopStateEvent("popstate", { state: restoredState }));
     });
-    await screen.findByText("사용처 (0건)");
+    const usageSummary = await screen.findByText(/사용처 \(0건\)/);
+    expect(usageSummary.closest(".col-span-2")).not.toBeNull();
     expect(await screen.findAllByText("Second parent")).not.toHaveLength(0);
     expect(pushState).not.toHaveBeenCalled();
     expect(replaceState).not.toHaveBeenCalled();

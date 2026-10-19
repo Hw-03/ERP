@@ -85,7 +85,7 @@ export function BomWorkbench({
 }: Props) {
   const initialRead = useAdminReadState("items", "bom");
   const realtimeRevision = useRealtimeRevision();
-  const [dept, setDept] = useState<BomDeptFilter>("A");
+  const [dept, setDept] = useState<BomDeptFilter>("ALL");
   const [parentId, setParentId] = useState("");
   const selectedParentIdRef = useRef(parentId);
   selectedParentIdRef.current = parentId;
@@ -472,34 +472,19 @@ export function BomWorkbench({
         }
       />
 
-      {/* 부서 탭 + 선택된 부모 헤더 (한 줄) */}
-      <div className="mb-3 flex min-w-0 flex-wrap items-center gap-3">
-        <div className="min-w-0 max-w-full">
-          <BomDeptTabs value={dept} onChange={handleDeptChange} />
-        </div>
-        <BomParentHeader
-          loading={mode === "edit" ? bomRead.loading : whereUsedRead.loading}
-          unavailable={mode === "edit" ? !!bomRead.error : !!whereUsedRead.error}
-          parent={parent}
-          mode={mode}
-          childCount={mode === "edit" ? bomRows.length : whereUsedRows.length}
-          isCompleted={isCompleted}
-          onOpenReview={() => setReviewOpen(true)}
-        />
-      </div>
-
       {/* 메인: 좌(상위) | 중(자식추가) | 우(현재구성) */}
       <div
-        className="grid min-h-0 flex-1 gap-3"
+
+        className={`grid min-h-0 flex-1 gap-3`}
+        data-mode={mode}
         style={{
-          gridTemplateColumns: mode === "edit"
-            ? "minmax(280px, 1fr) minmax(340px, 1fr) minmax(340px, 1fr)"
-            : "minmax(280px, 0.78fr) minmax(0, 1.22fr)",
+          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
         }}
       >
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
           <BomParentList
             dept={dept}
+            departmentFilters={<BomDeptTabs value={dept} onChange={handleDeptChange} />}
             items={activeItems}
             allBomRows={allBomRows}
             completedSet={completedSet}
@@ -538,6 +523,16 @@ export function BomWorkbench({
             </div>
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               <BomEditPanel
+                parentHeader={<BomParentHeader
+                  embedded
+                  loading={bomRead.loading}
+                  unavailable={!!bomRead.error}
+                  parent={parent}
+                  mode="edit"
+                  childCount={bomRows.length}
+                  isCompleted={isCompleted}
+                  onOpenReview={() => setReviewOpen(true)}
+                />}
                 read={bomRead}
                 parent={parent}
                 bomRows={bomRows}
@@ -551,8 +546,18 @@ export function BomWorkbench({
             </div>
           </>
         ) : (
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="col-span-2 flex min-h-0 min-w-0 flex-1 flex-col">
             <BomWhereUsedPanel
+              parentHeader={<BomParentHeader
+                embedded
+                loading={whereUsedRead.loading}
+                unavailable={!!whereUsedRead.error}
+                parent={parent}
+                mode="whereused"
+                childCount={whereUsedRows.length}
+                isCompleted={isCompleted}
+                onOpenReview={() => setReviewOpen(true)}
+              />}
               read={whereUsedRead}
               selected={parent}
               rows={whereUsedRows}

@@ -6,7 +6,7 @@ import type { BOMEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { BomSearchInput } from "./BomSearchInput";
 import { DEPT_LETTERS, DEPT_LETTER_TO_NAME, deptColor, deptOf, stageOf, type DeptLetter, type StageLetter } from "./bomDept";
-import { BOM_EDIT_LIST_GRID_TEMPLATE, BomTableHeader, BomTableItemRow } from "./BomTablePrimitives";
+import { BOM_EDIT_LIST_GRID_TEMPLATE, BOM_SEARCH_BAR_CLASS_NAME, BOM_FILTER_BAR_CLASS_NAME, BomTableHeader, BomTableItemRow } from "./BomTablePrimitives";
 import { EmptyState } from "../../common";
 import { useItemSearch } from "@/lib/queries/useItemSearch";
 import { QuantityInput } from "../../common/QuantityInput";
@@ -119,12 +119,12 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
       className="relative flex min-h-0 flex-1 flex-col rounded-2xl"
       style={{ background: LEGACY_COLORS.s2 }}
     >
-      <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
+      <div className={BOM_SEARCH_BAR_CLASS_NAME} style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
         <div className="shrink-0 text-xs font-bold uppercase tracking-widest" style={{ color: LEGACY_COLORS.muted2 }}>
           하위 품목 추가
         </div>
         {isLocked && (
-          <span className="shrink-0 text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+          <span className="shrink-0 whitespace-nowrap text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
             완료 해제 후 수정 가능
           </span>
         )}
@@ -133,7 +133,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
         </div>
       </div>
 
-      <div className="px-4 py-3">
+      <div className={BOM_FILTER_BAR_CLASS_NAME}>
         <div className="overflow-x-auto">
           <div className="flex min-w-full w-max items-center gap-1">
             <div role="group" aria-label="단계 필터" className="flex shrink-0 gap-1.5">
@@ -209,7 +209,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
           data-scrollbar-rail-viewport
           className="absolute inset-y-0 left-0 right-0 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]"
         >
-          <div className="flex min-h-full min-w-full flex-col" style={{ background: LEGACY_COLORS.s2, borderTop: `1px solid ${LEGACY_COLORS.border}` }}>
+          <div className="flex min-h-full min-w-full flex-col" style={{ background: LEGACY_COLORS.s2 }}>
             <BomTableHeader
               variant="candidate"
               gridTemplateColumns={BOM_EDIT_LIST_GRID_TEMPLATE}
@@ -232,13 +232,13 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
                   background={expanded ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)` : undefined}
                   trailing={already ? (
                     <span
-                      className="inline-flex justify-self-end items-center gap-1 text-[12px] font-semibold"
+                      className="inline-flex justify-self-center items-center gap-1 whitespace-nowrap text-[12px] font-semibold"
                       style={{ color: LEGACY_COLORS.green }}
                     >
-                      <Check size={12} /> 등록됨
+                      <Check size={12} className="shrink-0" /> 등록됨
                     </span>
                   ) : (
-                    <span className="justify-self-end" style={{ color: LEGACY_COLORS.blue }}>
+                    <span className="justify-self-center" style={{ color: LEGACY_COLORS.blue }}>
                       {expanded ? <X size={14} /> : <Plus size={14} />}
                     </span>
                   )}

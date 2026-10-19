@@ -14,9 +14,12 @@ import { Tooltip } from "@/lib/ui";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { BomBadge } from "./BomBadge";
 
-export const BOM_EDIT_LIST_GRID_TEMPLATE = "52px minmax(0, 1fr) 78px 44px";
-export const BOM_CURRENT_ROW_GRID_TEMPLATE = "52px minmax(0, 1fr) 78px 72px 28px";
-export const BOM_ROW_SURFACE_CLASS_NAME = "grid h-[37px] items-center gap-3 border-b px-3 transition-colors duration-150 hover:bg-[var(--c-s4)]";
+export const BOM_EDIT_LIST_GRID_TEMPLATE = "40px minmax(0, 1fr) clamp(78px, 5.75vw, 110px) 64px";
+export const BOM_CURRENT_ROW_GRID_TEMPLATE = "40px minmax(0, 1fr) clamp(78px, 5.75vw, 110px) 72px 28px";
+export const BOM_WHERE_USED_ROW_GRID_TEMPLATE = "40px minmax(0, 1fr) clamp(78px, 5.75vw, 110px) 72px";
+export const BOM_SEARCH_BAR_CLASS_NAME = "flex h-12 shrink-0 items-center gap-3 px-4";
+export const BOM_FILTER_BAR_CLASS_NAME = "flex h-10 shrink-0 items-center border-b border-[var(--c-border)] px-4";
+export const BOM_ROW_SURFACE_CLASS_NAME = "grid h-[37px] items-center gap-2 border-b px-3 transition-colors duration-150 hover:bg-[var(--c-s4)]";
 
 export function bomRowSurfaceStyle({
   gridTemplateColumns,
@@ -98,12 +101,13 @@ export function BomRowTooltip({ itemName, children }: BomRowTooltipProps) {
   );
 }
 
-type HeaderVariant = "parent" | "whereused" | "candidate" | "current";
+type HeaderVariant = "parent" | "whereused" | "candidate" | "current" | "usage";
 
 const HEADER_COLUMNS: Record<HeaderVariant, readonly [string, string?][]> = {
-  parent: [["공정"], ["품목명"], ["품목 코드"], ["상태", "justify-self-end"]],
-  whereused: [["공정"], ["품목명"], ["품목 코드"]],
-  candidate: [["공정"], ["품목명"], ["품목 코드"], ["추가", "justify-self-end"]],
+  parent: [["공정"], ["품목명"], ["품목 코드"], ["상태", "justify-self-center"]],
+  whereused: [["공정"], ["품목명"], ["품목 코드", "text-center"]],
+  usage: [["공정"], ["품목명"], ["품목 코드", "text-center"], ["수량", "justify-self-center"]],
+  candidate: [["공정"], ["품목명"], ["품목 코드"], ["추가", "justify-self-center"]],
   current: [["공정"], ["품목명"], ["품목 코드"], ["수량", "justify-self-center"], ["삭제", "justify-self-center"]],
 };
 
@@ -115,7 +119,7 @@ interface BomTableHeaderProps {
 export function BomTableHeader({ variant, gridTemplateColumns }: BomTableHeaderProps) {
   return (
     <div
-      className={`sticky top-0 z-10 grid items-center gap-3 px-3 py-2 font-bold uppercase ${variant === "current" ? "h-[50px] text-sm tracking-[0.5px]" : "text-[11px] tracking-[1.5px]"}`}
+      className="sticky top-0 z-10 grid h-9 shrink-0 items-center gap-2 px-3 text-xs font-bold uppercase tracking-[0.5px]"
       style={{
         gridTemplateColumns,
         background: "var(--c-popup-bg)",
@@ -139,6 +143,7 @@ interface BomTableItemRowProps {
   borderBottom?: boolean;
   disabled?: boolean;
   pressed?: boolean;
+  title?: string;
 }
 
 export function BomTableItemRow({
@@ -150,6 +155,7 @@ export function BomTableItemRow({
   borderBottom = true,
   disabled = false,
   pressed,
+  title,
 }: BomTableItemRowProps) {
   return (
     <BomRowTooltip itemName={item.item_name}>
@@ -159,6 +165,7 @@ export function BomTableItemRow({
       disabled={disabled}
       onClick={onClick}
       aria-pressed={pressed}
+      title={title}
       data-bom-row-surface
       className={`${BOM_ROW_SURFACE_CLASS_NAME} no-btn-inset w-full text-left disabled:cursor-not-allowed disabled:opacity-50`}
       style={bomRowSurfaceStyle({ gridTemplateColumns, background, borderBottom })}

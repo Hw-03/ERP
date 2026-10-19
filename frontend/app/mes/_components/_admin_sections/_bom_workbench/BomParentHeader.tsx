@@ -11,10 +11,9 @@ import { SkeletonBlock } from "../../common/LoadingSkeleton";
 /**
  * 선택된 BOM 부모(또는 사용처 모드에서 선택된 품목) 헤더 카드.
  *
- * 원래는 BomEditPanel / BomWhereUsedPanel 내부 상단에 있던 헤더를 BomDeptTabs 옆으로 hoist
- * — 우측 패널은 그리드만 보유, 헤더는 부서 탭과 같은 줄에서 가로로 길게 배치된다.
+ * 편집·사용처 모드에서 선택 품목 정보를 결과 패널 상단에 표시한다.
  *
- * mode="edit"      → 자식 N개 + 상태 칩 + [검토 · 완료] 버튼
+ * mode="edit"      → 구성 건수 + [검토 · 완료] 버튼 (독립 카드에만 상태 칩)
  * mode="whereused" → N개 부모에서 사용
  */
 interface Props {
@@ -25,6 +24,7 @@ interface Props {
   onOpenReview: () => void;
   loading?: boolean;
   unavailable?: boolean;
+  embedded?: boolean;
 }
 
 export function BomParentHeader({
@@ -35,6 +35,7 @@ export function BomParentHeader({
   onOpenReview,
   loading = false,
   unavailable = false,
+  embedded = false,
 }: Props) {
   if (!parent) return loading ? <div aria-hidden="true" className="flex min-h-[58px] min-w-0 flex-1 items-center gap-3 rounded-2xl border px-4 py-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
     <SkeletonBlock className="h-6 w-10" /><div className="flex flex-1 flex-col gap-2"><SkeletonBlock className="h-4 w-1/3" /><SkeletonBlock className="h-3 w-36" /></div><SkeletonBlock className="h-9 w-28" />
@@ -47,7 +48,7 @@ export function BomParentHeader({
       : BOM_STATUS_META.todo;
 
   const subtitleSuffix =
-    mode === "edit" ? `${childCount}개 자식` : `${childCount}개 부모에서 사용`;
+    embedded ? `${mode === "edit" ? "현재 구성" : "사용처"} (${childCount}건)` : mode === "edit" ? `${childCount}개 자식` : `${childCount}개 부모에서 사용`;
 
   // 카드 자체 강조 — process_type 색으로 살짝 틴트 + 보더 강조.
   // BomBadge 와 같은 색 계열로 톤 일치 (조립/출하/고압 등 부서마다 다름).
@@ -56,10 +57,10 @@ export function BomParentHeader({
 
   return (
     <div
-      className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl border px-4 py-2"
+      className={embedded ? "flex h-[88px] min-w-0 items-center gap-3 px-4 py-2" : "flex min-w-0 flex-1 items-center gap-3 rounded-2xl border px-4 py-2"}
       style={{
-        minWidth: "min(100%, 420px)",
-        background: LEGACY_COLORS.s2,
+        minWidth: embedded ? undefined : "min(100%, 420px)",
+        background: embedded ? undefined : LEGACY_COLORS.s2,
         borderColor: `color-mix(in srgb, ${accent} 35%, ${LEGACY_COLORS.border})`,
       }}
     >
@@ -73,8 +74,8 @@ export function BomParentHeader({
         </TruncatedText>
       </div>
       {mode === "edit" && (
-        <>
-          <span
+        <div className={embedded ? "shrink-0" : "contents"}>
+          {!embedded && <span
             className="inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[12px] font-bold"
             style={{
               background: `color-mix(in srgb, ${statusMeta.color} 14%, transparent)`,
@@ -82,7 +83,7 @@ export function BomParentHeader({
             }}
           >
             {loading ? <SkeletonBlock className="h-3 w-8" /> : unavailable ? "—" : statusMeta.label}
-          </span>
+          </span>}
           <button
             type="button"
             onClick={onOpenReview}
@@ -101,7 +102,7 @@ export function BomParentHeader({
           >
             <ClipboardCheck size={14} /> 검토 · 완료
           </button>
-        </>
+        </div>
       )}
     </div>
   );

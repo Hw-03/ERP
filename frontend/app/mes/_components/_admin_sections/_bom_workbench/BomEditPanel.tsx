@@ -1,6 +1,7 @@
 "use client";
 
 import type { BOMEntry, Item } from "@/lib/api";
+import type { ReactNode } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState } from "../../common/EmptyState";
 import { BomRow } from "./BomRow";
@@ -14,7 +15,7 @@ import { SkeletonBlock } from "../../common/LoadingSkeleton";
  *
  * 본문: 현재 BOM 그리드 (BomRow — 인라인 수량 편집 / 삭제)
  *
- * 부모 헤더(배지+이름+코드+상태+검토버튼)는 BomDeptTabs 옆 행으로 hoist 되어 BomParentHeader 가 담당.
+ * 부모 헤더(배지+이름+코드+상태+검토버튼)는 패널 상단에 표시한다.
  * 하위품목 추가는 가운데 BomChildAddBox 가 담당(별도 컬럼).
  */
 interface Props {
@@ -25,6 +26,7 @@ interface Props {
   onRequestDelete: (row: BOMEntry, childName: string) => void;
   isLocked?: boolean;
   read?: ReturnType<typeof useAdminReadState>;
+  parentHeader?: ReactNode;
 }
 
 export function BomEditPanel({
@@ -35,6 +37,7 @@ export function BomEditPanel({
   onRequestDelete,
   isLocked = false,
   read,
+  parentHeader,
 }: Props) {
   if (!parent && !read?.loading && !read?.error) {
     return (
@@ -55,17 +58,17 @@ export function BomEditPanel({
   const itemMap = new Map(items.map((i) => [i.item_id, i]));
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className={`flex min-h-0 flex-1 flex-col`}>
       <div
         data-scrollbar-rail-shell
         className="relative flex min-h-0 flex-1 flex-col rounded-2xl"
         style={{ background: LEGACY_COLORS.s1 }}
       >
         <div
-          className="flex h-[58px] shrink-0 items-center px-4 text-sm font-black"
+          className={parentHeader ? "h-[88px] shrink-0" : "flex h-[88px] shrink-0 items-center px-4 text-sm font-black"}
           style={{ color: LEGACY_COLORS.muted2, borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
         >
-          <>현재 구성 {read?.loading ? <SkeletonBlock className="ml-2 h-4 w-12" /> : read?.error ? "—" : `(${bomRows.length}건)`}</>
+          {parentHeader ?? <>현재 구성 {read?.loading ? <SkeletonBlock className="ml-2 h-4 w-12" /> : read?.error ? "—" : `(${bomRows.length}건)`}</>}
         </div>
         <div className="relative min-h-0 flex-1">
           <div

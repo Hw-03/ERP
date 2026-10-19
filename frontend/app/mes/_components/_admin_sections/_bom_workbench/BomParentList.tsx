@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { BOMDetailEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { BomSearchInput } from "./BomSearchInput";
 import { BOM_STATUS_META, bomStatusOf, stageOf, type BomDeptFilter, type StageLetter } from "./bomDept";
 import type { StatusFilter } from "./BomStatsRow";
-import { BOM_EDIT_LIST_GRID_TEMPLATE, BomTableHeader, BomTableItemRow } from "./BomTablePrimitives";
+import { BOM_EDIT_LIST_GRID_TEMPLATE, BOM_SEARCH_BAR_CLASS_NAME, BOM_FILTER_BAR_CLASS_NAME, BomTableHeader, BomTableItemRow } from "./BomTablePrimitives";
 import { EmptyState } from "../../common";
 import { useItemSearch } from "@/lib/queries/useItemSearch";
 import { AdminReadBoundary, useAdminReadState } from "../_admin_primitives/AdminReadState";
@@ -24,6 +24,7 @@ import { AdminTableSkeleton } from "../_admin_primitives/AdminSkeleton";
  */
 interface Props {
   dept: BomDeptFilter;
+  departmentFilters?: ReactNode;
   items: Item[];
   allBomRows: BOMDetailEntry[];
   completedSet: Set<string>;
@@ -46,10 +47,11 @@ const STAGE_FILTERS_WHEREUSED: { id: "ALL" | StageLetter; label: string }[] = [
   { id: "F", label: "공정완료" },
 ];
 
-const WHERE_USED_LIST_GRID_TEMPLATE = "52px minmax(0, 1fr) minmax(0, 0.82fr)";
+const WHERE_USED_LIST_GRID_TEMPLATE = "40px minmax(0, 1fr) clamp(78px, 5.75vw, 110px)";
 
 export function BomParentList({
   dept,
+  departmentFilters,
   items,
   allBomRows,
   completedSet,
@@ -98,11 +100,11 @@ export function BomParentList({
   return (
     <div
       data-scrollbar-rail-shell
-      className="relative flex min-h-0 flex-1 flex-col rounded-2xl"
+      className={`relative flex min-h-0 flex-1 flex-col rounded-2xl${mode === "whereused" ? " [&_[data-bom-row-code]]:text-center" : ""}`}
       style={{ background: LEGACY_COLORS.s2 }}
     >
       {/* 검색 */}
-      <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
+      <div className={BOM_SEARCH_BAR_CLASS_NAME} style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
         <div className="shrink-0 text-xs font-bold uppercase tracking-widest" style={{ color: LEGACY_COLORS.muted2 }}>
           상위 품목 선택
         </div>
@@ -110,10 +112,10 @@ export function BomParentList({
           <BomSearchInput value={search} onChange={setSearch} bg={LEGACY_COLORS.s1 as string} />
         </div>
       </div>
-      <div className="px-4 py-3">
+      <div className={BOM_FILTER_BAR_CLASS_NAME}>
         <div className="overflow-x-auto">
           <div className="flex min-w-full w-max items-center gap-1">
-            <div className="flex shrink-0 gap-1.5">
+            <div role="group" aria-label="상위 품목 단계 필터" className="flex shrink-0 gap-1.5">
               {filters.map((f) => {
                 const active = stageFilter === f.id;
                 return (
@@ -134,6 +136,7 @@ export function BomParentList({
                 );
               })}
             </div>
+            {departmentFilters}
           </div>
         </div>
       </div>
@@ -144,7 +147,7 @@ export function BomParentList({
           data-scrollbar-rail-viewport
           className="absolute inset-y-0 left-0 right-0 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]"
         >
-          <div className="flex min-h-full min-w-full flex-col" style={{ background: LEGACY_COLORS.s2, borderTop: `1px solid ${LEGACY_COLORS.border}` }}>
+          <div className="flex min-h-full min-w-full flex-col" style={{ background: LEGACY_COLORS.s2 }}>
             <BomTableHeader
               variant={mode === "edit" ? "parent" : "whereused"}
               gridTemplateColumns={mode === "edit" ? BOM_EDIT_LIST_GRID_TEMPLATE : WHERE_USED_LIST_GRID_TEMPLATE}
@@ -167,7 +170,7 @@ export function BomParentList({
                     background={isSelected ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)` : undefined}
                     trailing={mode === "edit" ? (
                       <span
-                        className="inline-flex justify-self-end items-center rounded px-1.5 py-0.5 text-[12px] font-bold"
+                        className="inline-flex justify-self-center items-center whitespace-nowrap rounded px-1.5 py-0.5 text-[12px] font-bold"
                         style={{
                           background: `color-mix(in srgb, ${meta.color} 14%, transparent)`,
                           color: meta.color,
