@@ -32,6 +32,26 @@
     {"name": "unicode-query-spacing", "query": "보드\ufeffbattery", "name_fields": ["Battery Bridge BD"], "literal_fields": [], "aliases": [], "expected": true},
     {"name": "expanded-short-word-inner-spacing", "query": "보드", "name_fields": ["Battery B / D"], "literal_fields": [], "aliases": [], "expected": true},
     {"name": "expanded-short-word-unicode-spacing", "query": "보드", "name_fields": ["Battery B\ufeff/\u3000D"], "literal_fields": [], "aliases": [], "expected": true},
-    {"name": "expanded-short-word-outer-boundary", "query": "보드", "name_fields": ["AB / DRIVE"], "literal_fields": [], "aliases": [], "expected": false}
+    {"name": "expanded-short-word-outer-boundary", "query": "보드", "name_fields": ["AB / DRIVE"], "literal_fields": [], "aliases": [], "expected": false},
+    {"name": "comma-first-name", "query": "전극,게터", "name_fields": ["전극 (70kV)"], "literal_fields": [], "aliases": [], "expected": true},
+    {"name": "comma-second-name", "query": "전극, 게터", "name_fields": ["게터"], "literal_fields": [], "aliases": [], "expected": true},
+    {"name": "comma-no-match", "query": "전극, 게터", "name_fields": ["애노드 (70kV)"], "literal_fields": [], "aliases": [], "expected": false},
+    {"name": "comma-code-list", "query": "8-TR-0001, 8-TR-0003", "name_fields": ["게터"], "literal_fields": ["8-TR-0003"], "aliases": [], "expected": true},
+    {"name": "comma-and-first-branch", "query": "전극 70, 게터", "name_fields": ["전극 (70kV)"], "literal_fields": [], "aliases": [], "expected": true},
+    {"name": "comma-and-second-branch", "query": "전극 70, 게터", "name_fields": ["게터"], "literal_fields": [], "aliases": [], "expected": true},
+    {"name": "comma-and-missing-condition", "query": "전극 70, 게터", "name_fields": ["전극 (100kV)"], "literal_fields": [], "aliases": [], "expected": false},
+    {"name": "comma-cross-fields-and", "query": "배터리 홍길동, 게터", "name_fields": ["Battery"], "literal_fields": ["홍길동"], "aliases": [], "expected": true},
+    {"name": "comma-synonym-phrase", "query": "게터, ADX6000 배터리 보드", "name_fields": ["ADX6000 Power Module"], "literal_fields": [], "aliases": [], "expected": true},
+    {"name": "comma-alias", "query": "게터, 내장재", "name_fields": ["내부폼"], "literal_fields": [], "aliases": ["내장재"], "expected": true},
+    {"name": "comma-does-not-expand-metadata", "query": "게터, 배터리", "name_fields": ["다른 품목"], "literal_fields": ["battery"], "aliases": [], "expected": false},
+    {"name": "comma-keeps-abbreviation-boundary", "query": "게터, 보드", "name_fields": ["ABDRIVE MOTOR"], "literal_fields": [], "aliases": [], "expected": false},
+    {"name": "comma-snapshot-name", "query": "이전 품명, 게터", "name_fields": ["현재 품명", "이전 품명"], "literal_fields": [], "aliases": [], "expected": true},
+    {"name": "comma-empty-branches", "query": ", 전극, , 게터,,", "name_fields": ["게터"], "literal_fields": [], "aliases": [], "expected": true},
+    {"name": "comma-empty-branches-do-not-match-all", "query": ", 전극, , 게터,,", "name_fields": ["애노드"], "literal_fields": [], "aliases": [], "expected": false},
+    {"name": "comma-ignored-branch-does-not-match-all", "query": "전극, - / .", "name_fields": ["애노드"], "literal_fields": [], "aliases": [], "expected": false},
+    {"name": "comma-unicode-spacing", "query": "\ufeff전극\u3000,\u00a0게터\ufeff", "name_fields": ["게터"], "literal_fields": [], "aliases": [], "expected": true},
+    {"name": "comma-only-matches-nothing", "query": ", ,,, - / .", "name_fields": ["애노드"], "literal_fields": [], "aliases": [], "expected": false},
+    {"name": "comma-keeps-sql-wildcards-literal", "query": "100%, A_B", "name_fields": ["100 percent AXB"], "literal_fields": [], "aliases": [], "expected": false},
+    {"name": "comma-ampersand-stays-literal", "query": "전극 & 70, 게터", "name_fields": ["전극 (70kV)"], "literal_fields": [], "aliases": [], "expected": false}
   ]
 }

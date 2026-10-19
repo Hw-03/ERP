@@ -28,11 +28,14 @@ def test_sql_abbreviation_boundary_uses_same_unicode_lowercase_as_memory(db_sess
 
 
 @pytest.mark.parametrize("case", CONTRACT["cases"], ids=lambda case: case["name"])
-def test_memory_sql_contract(db_session, case):
+@pytest.mark.parametrize("engine", ["memory", "sql"])
+def test_memory_sql_contract(db_session, case, engine):
     from app.services.item_search import matches_item_search, build_item_search_filter
     groups = case.get("groups", CONTRACT["groups"])
-    assert matches_item_search(case["query"], name_fields=case["name_fields"],
-        literal_fields=case["literal_fields"], aliases=case["aliases"], groups=groups) is case["expected"]
+    if engine == "memory":
+        assert matches_item_search(case["query"], name_fields=case["name_fields"],
+            literal_fields=case["literal_fields"], aliases=case["aliases"], groups=groups) is case["expected"]
+        return
     predicate = build_item_search_filter(None, case["query"],
         name_columns=[literal(value) for value in case["name_fields"] + case["aliases"]],
         literal_columns=[literal(value) for value in case["literal_fields"]], groups=groups)
