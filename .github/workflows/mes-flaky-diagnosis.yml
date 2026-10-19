@@ -24,9 +24,13 @@ jobs:
       CI: "true"
       NEXT_TELEMETRY_DISABLED: "1"
       PYTHONUTF8: "1"
-      MES_DIAG_ROOT: ${{ runner.temp }}/mes-flaky-diagnostic
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/mes-flaky-diagnostic/browsers
     steps:
+      - name: Set isolated runner paths
+        shell: bash
+        run: |
+          echo "MES_DIAG_ROOT=$RUNNER_TEMP/mes-flaky-diagnostic" >> "$GITHUB_ENV"
+          echo "PLAYWRIGHT_BROWSERS_PATH=$RUNNER_TEMP/mes-flaky-diagnostic/browsers" >> "$GITHUB_ENV"
+
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
