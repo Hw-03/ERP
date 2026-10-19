@@ -489,29 +489,37 @@ function ModelDetailView({ model, headerActions, linkedItems, linkedBomCount, ed
       </div>
 
         {linkedItems.length > 0 && (
-          <div className="flex min-h-0 flex-1 flex-col">
-            <div className="mb-2 text-[12px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              연결 품목 미리보기
-            </div>
-            <div
-              className="flex min-h-0 flex-1 flex-col gap-1.5 rounded-[14px] border p-3"
-              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-            >
-              {linkedItems.slice(0, 6).map((it) => (
-                <div key={it.item_id} className="flex items-center justify-between gap-2 text-[14px]">
-                  <div className="min-w-0 flex-1 truncate" style={{ color: LEGACY_COLORS.text }}>
-                    {it.item_name}
-                  </div>
-                  <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                    {it.mes_code ?? "—"}
-                  </span>
-                </div>
-              ))}
+          <div data-scrollbar-rail-shell className="relative flex min-h-0 flex-1 flex-col rounded-[16px]" style={{ background: LEGACY_COLORS.bg }}>
+            <div className="flex shrink-0 items-center gap-2 px-4 pb-3 pt-4">
+              <h3 className="text-[16px] font-bold" style={{ color: LEGACY_COLORS.text }}>
+                연결 품목 미리보기
+              </h3>
               {linkedItems.length > 6 && (
-                <div className="mt-1 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
                   외 {linkedItems.length - 6}건
-                </div>
+                </span>
               )}
+            </div>
+            <div className="relative min-h-0 flex-1">
+              <div data-scrollbar-rail-viewport role="region" aria-label="연결 품목 미리보기" className="absolute inset-y-0 left-0 right-0 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]">
+                <div className="flex min-h-full flex-col gap-2 px-4 pb-4" style={{ background: LEGACY_COLORS.bg }}>
+                  {linkedItems.slice(0, 6).map((it) => (
+                    <div key={it.item_id} className={`${styles.previewRow} text-[14px]`}>
+                      <div className="min-w-0 flex-1 truncate" style={{ color: LEGACY_COLORS.text }}>
+                        {it.item_name}
+                      </div>
+                      <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                        {it.mes_code ?? "—"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div data-scrollbar-rail-frame aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border }} />
+            <div data-scrollbar-rail-masks aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-between">
+              <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 0, transparent 0 15px, var(--c-s1) 16px)" }} />
+              <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 0, transparent 0 15px, var(--c-s1) 16px)" }} />
             </div>
           </div>
         )}

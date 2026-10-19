@@ -89,6 +89,12 @@ describe("AdminModelsSection", () => {
     expect(findByClasses(container, "min-h-0", "flex-1", "flex-col")).toHaveClass("flex", "min-h-0", "flex-1", "flex-col");
     expect(screen.getAllByText(/linked item [1-6]$/)).toHaveLength(6);
     expect(screen.queryByText("linked item 7")).not.toBeInTheDocument();
+    const preview = screen.getByRole("region", { name: "연결 품목 미리보기" });
+    expect(preview).toHaveAttribute("data-scrollbar-rail-viewport");
+    expect(preview).toHaveClass("lg:-right-2.5", "lg:[scrollbar-gutter:stable]");
+    expect(preview.parentElement).toHaveClass("min-h-0", "flex-1");
+    expect(screen.getByRole("heading", { name: "연결 품목 미리보기" }).parentElement).toContainElement(screen.getByText("외 1건"));
+    expect(preview).not.toContainElement(screen.getByText("외 1건"));
     expect(screen.getByRole("button", { name: "이 모델 삭제" })).toHaveClass("mt-auto");
   });
 
