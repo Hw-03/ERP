@@ -8,6 +8,16 @@ async function chooseReason(page: Page, line: Locator, name: string, quantity: n
   await line.getByRole("textbox").fill(memo);
 }
 
+async function assertCartTotal(group: Locator, quantity: number, count: number, mobile: boolean): Promise<void> {
+  if (mobile) {
+    await expect(group).toContainText(`총 ${quantity} EA · ${count}건`);
+    return;
+  }
+  const summary = group.getByLabel("품목 수량 요약", { exact: true });
+  await expect(summary.getByRole("term")).toHaveText(["창고 가용 재고", "총 처리 수량", "사유"]);
+  await expect(summary.getByRole("definition")).toHaveText([/^20\s*EA$/, new RegExp(`^${quantity}\\s*EA$`), new RegExp(`^${count}\\s*건$`)]);
+}
+
 async function assertReasonLayout(line: Locator, mobile: boolean): Promise<void> {
   const quantity = line.getByRole("spinbutton");
   const category = line.getByRole("button", { name: "사유 카테고리 선택", exact: true });
@@ -24,7 +34,7 @@ async function assertReasonLayout(line: Locator, mobile: boolean): Promise<void>
     }
     throw new Error("사유 입력 영역의 크기 컨테이너가 없습니다.");
   });
-  if (!mobile && line.page().viewportSize()?.width === 1100) expect(stackedDesktop).toBe(true);
+  if (!mobile && line.page().viewportSize()?.width === 1100) expect(stackedDesktop).toBe(false);
   const overlapsVertically = (first: typeof q, second: typeof q): boolean =>
     first.y < second.y + second.height && second.y < first.y + first.height;
   expect(q.height).toBe(44);
@@ -183,7 +193,7 @@ for (const scenario of [
     await page.getByRole("textbox", { name: "검색", exact: true }).filter({ visible: true }).fill(itemName);
     const pickerButton = page.getByTestId(`defect-picker-row-${item.item_id}`).filter({ visible: true }).getByRole("button");
     await pickerButton.click();
-    if (scenario.mobile) await page.getByRole("button", { name: /수량 조정/ }).filter({ visible: true }).click();
+    await page.getByRole("button", { name: scenario.mobile ? /수량 조정/ : "수량·처리 정보 →" }).filter({ visible: true }).click();
 
     const group = page.getByTestId("defect-quarantine-item-group").filter({ visible: true });
     await expect(group).toHaveCount(1);
@@ -214,7 +224,7 @@ for (const scenario of [
     await assertHideConfirmation(page, lines.nth(0), hiddenCategory.category_id, hiddenName, testInfo.outputPath("hide-confirmation.png"));
     await group.getByRole("button", { name: /다른 사유 추가/ }).click();
     await chooseReason(page, lines.nth(2), categories[2], 3, "C 입력 보존");
-    await expect(group).toContainText("총 10 EA · 3건");
+    await assertCartTotal(group, 10, 3, scenario.mobile);
 
     if (scenario.width === 1915) {
       await group.getByRole("button", { name: /다른 사유 추가/ }).click();
@@ -254,9 +264,9 @@ for (const scenario of [
     await expect(lines).toHaveCount(2);
     await expect(lines.nth(0).getByRole("textbox")).toHaveValue("A 입력 보존");
     await expect(lines.nth(1).getByRole("textbox")).toHaveValue("C 입력 보존");
-    await expect(group).toContainText("총 6 EA · 2건");
+    await assertCartTotal(group, 6, 2, scenario.mobile);
     await group.getByRole("button", { name: /다른 사유 추가/ }).click();
-    await expect(lines.nth(2).getByRole("button", { name: "사유 카테고리 선택", exact: true })).toHaveText("카테고리 선택");
+    await expect(lines.nth(2).getByRole("button", { name: "사유 카테고리 선택", exact: true })).toHaveText(scenario.mobile ? "카테고리 선택" : "사유 카테고리를 선택하세요.");
     await chooseReason(page, lines.nth(2), categories[1], 4, "B 재입력");
 
     const submit = page.getByRole("button", { name: /격리하기 \(3건\)/ }).filter({ visible: true });
@@ -273,9 +283,14 @@ for (const scenario of [
       await expect(group).toBeVisible();
       await expect(lines).toHaveCount(3);
     } else {
-      await expect(pickerButton).toHaveText(/담김 · 3건/);
-      await pickerButton.click();
+      await page.getByRole("navigation", { name: "불량 처리 단계" }).getByRole("button", { name: "품목 선택", exact: true }).click();
+      await page.getByRole("textbox", { name: "검색", exact: true }).filter({ visible: true }).fill(itemName);
+      await expect(pickerButton).toHaveText("담김");
+      await page.getByRole("button", { name: "수량·처리 정보 →", exact: true }).filter({ visible: true }).click();
       await expect(lines).toHaveCount(3);
+      await expect(lines.nth(0).getByRole("textbox")).toHaveValue("A 입력 보존");
+      await expect(lines.nth(1).getByRole("textbox")).toHaveValue("C 입력 보존");
+      await expect(lines.nth(2).getByRole("textbox")).toHaveValue("B 재입력");
       await expect.poll(async () => {
         const header = await group.getByText(itemName, { exact: true }).boundingBox();
         const panel = await page.getByTestId("defect-cart-panel").boundingBox();

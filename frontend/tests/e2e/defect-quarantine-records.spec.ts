@@ -19,6 +19,7 @@ async function openList(page: Page) {
   const defectState = await page.evaluate(() => history.state?.defect ?? null);
   if (defectState === "list") {
     await expect(listHeading).toBeVisible();
+    await page.getByRole("button", { name: "필터 펼치기", exact: true }).filter({ visible: true }).click();
     await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "전체", exact: true }).click();
     return;
   }
@@ -28,6 +29,7 @@ async function openList(page: Page) {
     .filter({ hasText: "격리 항목" })
     .click();
   await expect(listHeading).toBeVisible();
+  await page.getByRole("button", { name: "필터 펼치기", exact: true }).filter({ visible: true }).click();
   await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "전체", exact: true }).click();
 }
 
