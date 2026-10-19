@@ -8,6 +8,7 @@ import { PROCESS_TYPE_OPTIONS, UNIT_OPTIONS } from "../adminShared";
 import { useDepartments } from "../../DepartmentsContext";
 import type { ProductModel } from "@/lib/api";
 import { modelSlotsToSymbolPrefix, sortModelsBySymbol } from "@/lib/mes/item-code";
+import { PROCESS_TO_DEPT } from "@/lib/mes/process";
 
 export type ItemFormData = {
   item_name: string;
@@ -73,6 +74,14 @@ const inputStyle = {
 
 const WAREHOUSE_LOCATION = "창고";
 const MATERIAL_TYPE_OPTIONS = ["원자재", "부자재", "불용", "기타"] as const;
+const CATEGORY_DEPARTMENT_OPTIONS = Array.from(new Map(
+  PROCESS_TYPE_OPTIONS.map(({ value }) => [value[0], PROCESS_TO_DEPT[value]]),
+), ([value, label]) => ({ value, label: `${label} (${value})` }));
+const PROCESS_STAGE_OPTIONS = [
+  { value: "R", label: "원자재 (R)" },
+  { value: "A", label: "중간공정 (A)" },
+  { value: "F", label: "공정 완료 (F)" },
+];
 
 /** model_slots + process_type_code 로 권장 prefix 계산 */
 function previewCodePrefix(slots: number[], processType: string, models: ProductModel[]): string {
@@ -125,7 +134,7 @@ function MesCodeSection({
         {previewFullCode(form, models)}
       </div>
       <p className="mt-1.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-        품목 코드는 사용제품·카테고리·옵션에서 자동 계산됩니다. 사용제품만 바꾸면 번호 유지(즉시 미리 보임), 카테고리를 바꾸면 새 카테고리의 다음 번호가 저장 시 부여됩니다.
+        품목 코드는 사용제품·부서·공정 단계에서 자동 계산됩니다. 사용제품만 바꾸면 번호 유지(즉시 미리 보임), 부서나 공정 단계를 바꾸면 새 카테고리의 다음 번호가 저장 시 부여됩니다.
       </p>
     </div>
   );
@@ -145,6 +154,25 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
 
   const locs = form.initial_locations ?? [];
   const totalQty = locs.reduce((s, r) => s + Number(r.quantity || 0), 0);
+  const categoryDepartment = form.process_type_code[0] ?? "";
+  const processStage = form.process_type_code[1] ?? "";
+
+  /** 부서·단계 중 변경한 축만 합성하여 기존 카테고리 저장 계약을 유지한다. */
+  function changeCategory(part: "department" | "stage", value: string): void {
+    setForm((current) => {
+      const department = part === "department" ? value : current.process_type_code[0] ?? "";
+      const currentStage = current.process_type_code[1] ?? "";
+      const stage = part === "stage" ? value : PROCESS_STAGE_OPTIONS.some((option) => option.value === currentStage) ? currentStage : "R";
+      const code = `${department}${stage}`;
+      if (!PROCESS_TYPE_OPTIONS.some((option) => option.value === code)) return current;
+      return {
+        ...current,
+        process_type_code: code,
+        sales_review_required: enableAfSalesReviewDefault && code === "AF" && current.process_type_code !== "AF"
+          ? true : current.sales_review_required,
+      };
+    });
+  }
 
   return (
     <>
@@ -165,25 +193,21 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
         </div>
       ))}
 
-      {/* 카테고리 */}
-      <div>
-        <FieldLabel label="카테고리" badge="필수" />
-        <AppSelect
-          value={form.process_type_code}
-          onChange={(v) =>
-            setForm((f) => ({
-              ...f,
-              process_type_code: v,
-              sales_review_required:
-                enableAfSalesReviewDefault && v === "AF" && f.process_type_code !== "AF"
-                  ? true
-                  : f.sales_review_required,
-            }))
-          }
-          size="lg"
-          triggerStyle={{ background: LEGACY_COLORS.s1 }}
-          options={PROCESS_TYPE_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
-        />
+      {/* 카테고리: 부서와 공정 단계 */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="min-w-0">
+          <FieldLabel label="부서" badge="필수" />
+          <AppSelect value={categoryDepartment} onChange={(value) => changeCategory("department", value)}
+            size="lg" triggerStyle={{ background: LEGACY_COLORS.s1 }} triggerAriaLabel="부서"
+            placeholder="부서 선택" options={CATEGORY_DEPARTMENT_OPTIONS} />
+        </div>
+        <div className="min-w-0">
+          <FieldLabel label="공정 단계" badge="필수" />
+          <AppSelect value={processStage} onChange={(value) => changeCategory("stage", value)}
+            size="lg" triggerStyle={{ background: LEGACY_COLORS.s1 }} triggerAriaLabel="공정 단계"
+            placeholder="공정 단계 선택" options={PROCESS_STAGE_OPTIONS}
+            disabled={!CATEGORY_DEPARTMENT_OPTIONS.some((option) => option.value === categoryDepartment)} />
+        </div>
       </div>
 
       {/* 사용 제품 (모델 슬롯) */}
