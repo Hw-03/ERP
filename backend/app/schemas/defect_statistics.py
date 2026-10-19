@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 
 DefectStatisticsPeriodKind = Literal["week", "month", "year"]
+DefectStatisticsCategory = Literal["DEFECT", "B_GRADE", "OBSOLETE"]
 
 
 class DefectStatisticsPeriod(BaseModel):
@@ -30,6 +31,7 @@ class DefectStatisticsFilters(BaseModel):
     reason: str | None = None
     reason_category_id: uuid.UUID | None = None
     item_id: uuid.UUID | None = None
+    initial_category: DefectStatisticsCategory | None = None
 
 
 class DefectStatisticsBreakdownEntry(BaseModel):
@@ -76,6 +78,7 @@ class DefectStatisticsResponse(BaseModel):
     reasons: list[DefectStatisticsBreakdownEntry]
     departments: list[DefectStatisticsBreakdownEntry]
     categories: list[DefectStatisticsBreakdownEntry]
+    category_totals: list[DefectStatisticsBreakdownEntry] = Field(default_factory=list)
     excluded_legacy_count: int
     excluded_category_count: int
 

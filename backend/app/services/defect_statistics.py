@@ -399,7 +399,6 @@ def _direct_log_department(log: TransactionLog) -> str:
     return UNCLASSIFIED_LABEL
 
 
-
 def _occurrence_from_direct_log(
     log: TransactionLog,
     operation: InventoryOperation,
@@ -541,6 +540,11 @@ def _sort_breakdowns(
             entry.key,
         ),
     )
+
+
+def _select_initial_category(occurrences: list[_Occurrence], category: str | None) -> list[_Occurrence]:
+    """기존 필터가 적용된 모수에서 최초 분류만 선택하며 원본은 유지한다."""
+    return [entry for entry in occurrences if category is None or entry.initial_category == category]
 
 
 def _build_breakdowns(
@@ -689,7 +693,9 @@ def get_defect_statistics(
         end_utc=end_utc,
         filters=resolved_filters,
     )
-    occurrences = quarantine_occurrences + direct_occurrences
+    source_occurrences = quarantine_occurrences + direct_occurrences
+    category_totals = _build_category_breakdown(source_occurrences)
+    occurrences = _select_initial_category(source_occurrences, filters.initial_category if filters else None)
     items, reasons, departments = _build_breakdowns(occurrences)
     return DefectStatisticsResponse(
         period=calculated_period,
@@ -704,6 +710,7 @@ def get_defect_statistics(
         reasons=reasons,
         departments=departments,
         categories=_build_category_breakdown(occurrences),
+        category_totals=category_totals,
         excluded_legacy_count=len(excluded_legacy_times),
         excluded_category_count=len(excluded_category_times),
     )
@@ -808,7 +815,7 @@ def get_defect_statistics_report(
         return DefectStatisticsReportResponse(
             period=selected, summary=empty_summary, timeline=[], items=empty_items,
             reasons=empty_reasons, departments=empty_departments,
-            categories=_build_category_breakdown([]), excluded_category_count=0,
+            categories=_build_category_breakdown([]), category_totals=_build_category_breakdown([]), excluded_category_count=0,
             excluded_legacy_count=0, as_of=as_of, observed_until=None,
             is_partial=False, comparison=None, trend=[],
         )
@@ -840,6 +847,11 @@ def get_defect_statistics_report(
     def in_range(value: datetime, start: datetime, end: datetime) -> bool:
         return start <= _utc_naive(value) < end
 
+    category_totals = _build_category_breakdown([
+        occurrence for occurrence in all_occurrences
+        if in_range(occurrence.occurred_at, selected_start, _utc_naive(observed_until))
+    ])
+    all_occurrences = _select_initial_category(all_occurrences, filters.initial_category if filters else None)
     selected_occurrences = [
         occurrence for occurrence in all_occurrences
         if in_range(occurrence.occurred_at, selected_start, _utc_naive(observed_until))
@@ -889,6 +901,7 @@ def get_defect_statistics_report(
         period=selected, summary=summary, timeline=timeline, items=items,
         reasons=reasons, departments=departments,
         categories=_build_category_breakdown(selected_occurrences),
+        category_totals=category_totals,
         excluded_category_count=sum(
             in_range(value, selected_start, _utc_naive(observed_until))
             for value in excluded_category_times

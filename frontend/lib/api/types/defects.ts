@@ -192,6 +192,7 @@ export interface DefectStatisticsResponse {
   reasons: DefectStatisticsBreakdown[];
   departments: DefectStatisticsBreakdown[];
   categories: DefectStatisticsBreakdown[];
+  category_totals: DefectStatisticsBreakdown[];
   excluded_legacy_count: number;
   excluded_category_count: number;
 }
@@ -202,6 +203,7 @@ export interface DefectStatisticsQuery {
   departments: string[];
   models: string[];
   process_steps: string[];
+  initial_category?: DefectManagementCategory;
 }
 
 export interface DefectStatisticsReportQuery extends DefectStatisticsQuery {
