@@ -31,6 +31,8 @@ import { DeptAddForm } from "./_department_parts/DeptAddForm";
 import { DeptDetailView } from "./_department_parts/DeptDetailView";
 import styles from "./AdminDepartmentsSection.module.css";
 import masterStyles from "./_admin_primitives/AdminMasterData.module.css";
+import { AdminReadBoundary, useAdminReadState } from "./_admin_primitives/AdminReadState";
+import { AdminDetailSkeleton, AdminTableSkeleton } from "./_admin_primitives/AdminSkeleton";
 
 interface Props {
   employees: Employee[];
@@ -49,6 +51,8 @@ export function AdminDepartmentsSection({
   onStatusChange,
   onError,
 }: Props) {
+  const read = useAdminReadState("departments", "employees");
+  const detailRead = useAdminReadState("departments", "employees", "items");
   const {
     departments,
     addName,
@@ -182,6 +186,7 @@ export function AdminDepartmentsSection({
           title="부서 관리"
           summary={
             <AdminKpiBar
+              loading={read.loading} unavailable={!!read.error}
               placement="header"
               items={[
                 { key: "all", label: "전체 부서", value: departments.length, hint: "등록된 부서 수", tone: LEGACY_COLORS.blue },
@@ -191,7 +196,7 @@ export function AdminDepartmentsSection({
             />
           }
           actions={
-            <Button variant="primary" size="md" className="min-h-11" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>
+            <Button disabled={detailRead.loading || !!detailRead.error} variant="primary" size="md" className="min-h-11" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>
               부서 추가
             </Button>
           }
@@ -199,6 +204,7 @@ export function AdminDepartmentsSection({
 
         <div className={`flex min-h-0 flex-1 gap-4 ${styles.workspace}`}>
           <AdminListPanel
+            read={read} skeleton={<AdminTableSkeleton columns="minmax(0,0.9fr) minmax(0,1fr) 88px" count={3} />}
             title="부서 목록"
             countLabel={`${filteredDepartments.length}개`}
             width="clamp(360px, 28vw, 440px)"
@@ -286,7 +292,7 @@ export function AdminDepartmentsSection({
                 ? "새 부서 추가"
                 : selectedDept
                   ? undefined
-                  : "부서를 선택하세요"
+                  : detailRead.loading || detailRead.error || filteredDepartments.length > 0 ? undefined : "부서를 선택하세요"
             }
             actions={
               addMode ? (
@@ -296,6 +302,7 @@ export function AdminDepartmentsSection({
               ) : null
             }
           >
+            <AdminReadBoundary read={{ ...detailRead, loading: detailRead.loading || (!!detailRead.managed && !detailRead.error && !selectedDept && !addMode && filteredDepartments.length > 0) }} skeleton={<AdminDetailSkeleton variant="departments" />} label="부서 상세">
             {addMode ? (
               <DeptAddForm value={addName} onChange={setAddName} onSubmit={handleSubmitAdd} />
             ) : selectedDept ? (
@@ -332,6 +339,7 @@ export function AdminDepartmentsSection({
                 />
               </div>
             )}
+            </AdminReadBoundary>
           </AdminDetailCard>
         </div>
       </div>
