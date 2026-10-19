@@ -66,8 +66,8 @@ kprobe:tcp_send_active_reset {
 }
 // RESET_PROBES: generated from this kernel's tracepoint format, never guessed by version.
 tracepoint:signal:signal_generate /@tracked[(uint32)args->pid]/ {
-  printf("MESK event=signal_generate mono_ns=%llu pid=%d tid=%d target=%d signal=%d code=%d result=%d\n",
-    nsecs(monotonic), pid, tid, args->pid, args->sig, args->code, args->result);
+  printf("MESK event=signal_generate mono_ns=%llu init_pid=%d init_tid=%d target=%d signal=%d code=%d result=%d\n",
+    nsecs(monotonic), curtask->tgid, curtask->pid, args->pid, args->sig, args->code, args->result);
 }
 tracepoint:signal:signal_deliver /@tracked[(uint32)curtask->tgid] || @tracked[(uint32)curtask->pid]/ {
   printf("MESK event=signal_deliver mono_ns=%llu pid=%d tid=%d init_pid=%d init_tid=%d signal=%d code=%d\n",

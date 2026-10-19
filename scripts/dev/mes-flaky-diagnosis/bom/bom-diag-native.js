@@ -4,6 +4,8 @@
   if (window.__MES_BOM_DIAG_ENABLED__ !== true || window.__mesBomDiag) return;
   const SELECTOR = 'input[data-testid="shipping-bom-line-controls"]';
   const NOTE_SELECTOR = 'textarea[aria-label="요청 메모"]';
+  const passive = window.__MES_BOM_PASSIVE__ === true;
+  const quantityOnly = passive || window.__MES_BOM_QUANTITY_ONLY__ === true;
   const CAPACITY = 8192;
   const ring = new Array(CAPACITY);
   const nodes = new WeakMap();
@@ -17,9 +19,10 @@
   let instanceSerial = 0;
   let sequence = 0;
   let currentStep = null;
+  let errors = 0;
   const incidents = [];
   const writerTrap = { requested: window.__MES_BOM_VALUE_TRAP__ === true, installed: false,
-    errors: 0, incidentOverflow: 0, stackTruncated: 0, stackUnparsed: 0 };
+    errors: 0, incidentOverflow: 0, stackTruncated: 0, stackUnparsed: 0, diagnosticPauses: 0, subsequentResets: 0 };
 
   const numeric = (value) => {
     if (value === "") return "";
@@ -49,7 +52,7 @@
   const token = (map, value) => {
     if (typeof value !== "string" || !value) return null;
     if (!map.has(value)) {
-      if (map.size >= CAPACITY) return null;
+      if (map.size >= CAPACITY) { if (passive) errors += 1; return null; }
       map.set(value, map.size + 1);
     }
     return map.get(value);
@@ -67,7 +70,7 @@
   const describe = (node) => {
     if (!(node instanceof Element)) return { uid: nodeId(node), tag: null, quantity: false };
     const quantity = node.matches(SELECTOR);
-    const requestNote = node.matches(NOTE_SELECTOR);
+    const requestNote = !quantityOnly && node.matches(NOTE_SELECTOR);
     const description = { uid: nodeId(node), tag: node.tagName, quantity, requestNote, connected: node.isConnected };
     // Do not read PIN, employee lookup, invoice or any other general input value.
     if (quantity || requestNote) {
@@ -92,27 +95,30 @@
     return description;
   };
   const quantities = () => [...document.querySelectorAll(SELECTOR)].map(describe);
-  const lineSnapshots = (value) => Array.isArray(value) ? value.map((line) => ({
+  const lineSnapshots = (value) => Array.isArray(value) ? (passive ? value.slice(0, 128) : value).map((line) => ({
     key: token(lines, line.key), child: token(children, line.child_item_id),
     stage: line.parent_stage === "PA" ? "PA" : line.parent_stage === "PF" ? "PF" : null,
     quantity: numeric(line.quantity), included: typeof line.included === "boolean" ? line.included : null,
     origin: line.origin === "DEFAULT" ? "DEFAULT" : line.origin === "CUSTOM" ? "CUSTOM" : null,
   })) : null;
   const record = (kind, detail = {}) => {
-    const item = {
-      sequence: ++sequence, time: performance.now(), kind,
-      step: currentStep, documentFocused: document.hasFocus(), visibility: document.visibilityState,
-      active: describe(document.activeElement), ...detail,
-    };
-    ring[(sequence - 1) % CAPACITY] = item;
-    for (const incident of incidents) if (incident.after.length < 64) incident.after.push(item);
-    return sequence;
+    try {
+      const item = {
+        sequence: ++sequence, time: performance.now(), kind,
+        step: currentStep, documentFocused: document.hasFocus(), visibility: document.visibilityState,
+        active: describe(document.activeElement), ...detail,
+      };
+      ring[(sequence - 1) % CAPACITY] = item;
+      for (const incident of incidents) if (incident.after.length < 64) incident.after.push(item);
+      return sequence;
+    } catch (error) { errors += 1; if (!passive) throw error; return null; }
   };
   const exportSnapshot = () => {
     const count = Math.min(sequence, CAPACITY);
     const start = Math.max(0, sequence - CAPACITY);
     return {
-      document: performance.timeOrigin, sequence, capacity: CAPACITY, dropped: start,
+      document: performance.timeOrigin, sequence, capacity: CAPACITY, dropped: start, errors,
+      mode: passive ? "passive" : "diagnostic",
       events: Array.from({ length: count }, (_, index) => ring[(start + index) % CAPACITY]),
       writerTrap: { ...writerTrap }, incidents: incidents.map((incident) => ({
         ...incident, afterComplete: incident.after.length === 64,
@@ -183,7 +189,7 @@
         Object.defineProperty(prototype, "value", { ...descriptor, set: function (value) {
           let before = null;
           try {
-            if (this instanceof Element && (this.matches(SELECTOR) || this.matches(NOTE_SELECTOR))) before = describe(this);
+            if (this instanceof Element && (this.matches(SELECTOR) || !quantityOnly && this.matches(NOTE_SELECTOR))) before = describe(this);
           } catch { writerTrap.errors += 1; }
           const result = Reflect.apply(descriptor.set, this, [value]);
           if (before) {
@@ -192,13 +198,19 @@
               const destructive = before.quantity ? (before.value === 2 || before.value === 3) && after.value === 1
                 : before.value?.empty === false && after.value?.empty === true;
               if (destructive) {
-                if (incidents.length === 8) writerTrap.incidentOverflow += 1;
+                if (passive && incidents.length) writerTrap.subsequentResets += 1;
+                else if (incidents.length === 8) writerTrap.incidentOverflow += 1;
                 else {
                   const start = Math.max(0, sequence - 128);
                   const preceding = Array.from({ length: sequence - start }, (_, offset) => ring[(start + offset) % CAPACITY]);
                   record("writer:destructive", { before, after,
                     event: window.event instanceof Event ? eventId(window.event) : null, stack: writerStack() });
                   incidents.push({ trigger: ring[(sequence - 1) % CAPACITY], before: preceding, after: [] });
+                  if (!passive && quantityOnly && window.__MES_BOM_PAUSE_ON_RESET__ === true && writerTrap.diagnosticPauses === 0) {
+                    writerTrap.diagnosticPauses += 1;
+                    // Post-write diagnostic pause only. Later events are timing-perturbed evidence.
+                    debugger;
+                  }
                 }
               }
             } catch { writerTrap.errors += 1; }
@@ -221,38 +233,46 @@
         data: isQuantity ? numeric(event.data) : isRequestNote ? noteShape(event.data) : null,
       };
     };
+    const observe = (kind, event) => {
+      try { record(kind, details(event)); }
+      catch (error) { errors += 1; if (!passive) throw error; }
+    };
     window.addEventListener(type, (event) => {
-      record("native:" + type + ":capture", details(event));
+      if (quantityOnly && !(event.target instanceof Element && event.target.matches(SELECTOR))) return;
+      observe("native:" + type + ":capture", event);
       // A capture-queued microtask may run at a listener boundary before dispatch ends.
       // It is an extra sample, not proof of final cancellation. Prefer window-bubble
       // when it exists; absent bubble can also mean propagation was stopped.
-      queueMicrotask(() => record("native:" + type + ":after-dispatch", details(event)));
+      queueMicrotask(() => observe("native:" + type + ":after-dispatch", event));
     }, { capture: true, passive: true });
     window.addEventListener(type, (event) => {
-      record("native:" + type + ":window-bubble", details(event));
+      if (quantityOnly && !(event.target instanceof Element && event.target.matches(SELECTOR))) return;
+      observe("native:" + type + ":window-bubble", event);
     }, { passive: true });
   }
 
   const originalFetch = window.fetch;
   window.fetch = function (...args) {
     const [input, init] = args;
-    const candidate = typeof input === "string" ? input : input instanceof URL ? input.href
-      : input instanceof Request ? input.url : null;
-    const url = candidate?.includes("/api/shipping/bom-match") ? new URL(candidate, location.href) : null;
     let request = null;
-    if (url?.pathname === "/api/shipping/bom-match" && (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase() === "POST") {
-      if (typeof init?.body === "string") {
-        try {
-          const body = JSON.parse(init.body);
-          request = record("network:bom-match:request", {
-            base: token(children, body.base_pf_item_id), lines: lineSnapshots(body.bom_lines),
-            bodyReadable: true,
-          });
-        } catch {
-          request = record("network:bom-match:request", { bodyReadable: false });
-        }
-      } else request = record("network:bom-match:request", { bodyReadable: false });
-    }
+    try {
+      const candidate = typeof input === "string" ? input : input instanceof URL ? input.href
+        : input instanceof Request ? input.url : null;
+      const url = candidate?.includes("/api/shipping/bom-match") ? new URL(candidate, location.href) : null;
+      if (url?.pathname === "/api/shipping/bom-match" && (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase() === "POST") {
+        if (typeof init?.body === "string") {
+          try {
+            const body = JSON.parse(init.body);
+            request = record("network:bom-match:request", {
+              base: token(children, body.base_pf_item_id), lines: lineSnapshots(body.bom_lines),
+              bodyReadable: true, linesDropped: passive && Array.isArray(body.bom_lines) ? Math.max(0, body.bom_lines.length - 128) : 0,
+            });
+          } catch {
+            request = record("network:bom-match:request", { bodyReadable: false });
+          }
+        } else request = record("network:bom-match:request", { bodyReadable: false });
+      }
+    } catch (error) { errors += 1; if (!passive) throw error; }
     const pending = Reflect.apply(originalFetch, this, args);
     if (request !== null) {
       // Observe settlement without replacing the original Promise returned to the app.

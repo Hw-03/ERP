@@ -10,6 +10,12 @@ const execute = promisify(execFile);
 let page: Page | undefined;
 let activeId: string | undefined;
 let capture: Promise<void> | undefined;
+let failureCollector: { testId: string; collect: () => Promise<unknown> } | undefined;
+
+/** Optional memory drain; test identity prevents a previous test's collector leaking into this one. */
+export function registerFailureCollector(collect: () => Promise<unknown>): void {
+  failureCollector = { testId: test.info().testId, collect };
+}
 
 export function registerBoundary(candidate: Page | undefined): void {
   const info = test.info();
@@ -50,6 +56,11 @@ async function preserve(info: TestInfo): Promise<void> {
     finally { if (timer) clearTimeout(timer); }
   }
   // Failure-only I/O. The live collectors keep running; their final drain is cut at failure.frozen.
+  if (failureCollector?.testId === info.testId) await collect("passive_input", async () => {
+    const value = await failureCollector!.collect();
+    fs.writeFileSync(path.join(directory, "passive-input-before-cleanup.json"), JSON.stringify(value));
+    return { available: value !== null };
+  });
   await collect("database", async () => {
     const { stdout } = await execute("python", [path.join(process.env.MES_DIAG_SOURCE!, "scripts/dev/mes-flaky-diagnosis/snapshot-db.py"), "--source",
       process.env.MES_DIAG_SOURCE!, "--output", path.join(directory, "before-cleanup.db")], { timeout: 12_000 });
