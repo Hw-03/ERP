@@ -74,7 +74,7 @@ describe("DefectItemPicker mobile scroll", () => {
   it("부서 재고도 예약분을 제외한 가용이 없으면 추가하지 못한다", () => {
     const item = { ...makeItem(1), process_type_code: "AR", locations: [{ department: "조립", status: "PRODUCTION", quantity: 10, pending_quantity: 10, available_quantity: 0 }] } as Item;
     render(<DefectItemPicker items={[item]} productModels={[]} source="production" selectedIds={new Set()} onAdd={vi.fn()} onRemove={vi.fn()} />);
-    expect(screen.getByRole("columnheader", { name: "부서 가용" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "부서 가용 재고" })).toBeInTheDocument();
     expect(within(screen.getByTestId("defect-picker-row-item-1")).getByRole("button")).toBeDisabled();
   });
 
@@ -280,7 +280,7 @@ describe("DefectItemPicker mobile scroll", () => {
       />,
     );
 
-    expect(screen.getByRole("columnheader", { name: "부서 가용" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "부서 가용 재고" })).toBeInTheDocument();
     const row = screen.getByTestId("defect-picker-row-item-1");
     expect(within(row).getAllByRole("cell")[2]).toHaveTextContent(/^4$/);
   });

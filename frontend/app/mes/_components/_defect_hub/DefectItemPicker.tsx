@@ -349,9 +349,9 @@ export function DefectItemPicker({
         ) : (<>
         <table className={`w-full border-collapse text-sm ${mobilePresentation ? "table-fixed" : ""}`}>
           <colgroup>
-            {mobilePresentation ? <><col /><col className="w-[100px]" /></> : <><col className="w-full sm:w-[66%]" />
+            {mobilePresentation ? <><col /><col className="w-[100px]" /></> : <><col className="w-full sm:w-[62%]" />
             <col className="w-0 sm:w-[16%]" />
-            <col className="w-0 sm:w-[8%]" />
+            <col className="w-0 sm:w-[12%]" />
             <col className="w-auto sm:w-[10%]" /></>}
           </colgroup>
           <thead className="sticky top-0 z-10 relative">
@@ -359,7 +359,7 @@ export function DefectItemPicker({
               className="text-left text-[11px] font-bold uppercase tracking-[1.5px]"
               style={{ color: LEGACY_COLORS.muted2 }}
             >
-              {["품목명", "품목 코드", source === "warehouse" ? "창고 가용" : "부서 가용", mobilePresentation ? "선택" : "추가"].map((h, i) => !mobilePresentation || i === 0 || i === 3 ? (
+              {["품목명", "품목 코드", source === "warehouse" ? "창고 가용 재고" : "부서 가용 재고", mobilePresentation ? "선택" : "추가"].map((h, i) => !mobilePresentation || i === 0 || i === 3 ? (
                 <th
                   key={h}
                   className={
