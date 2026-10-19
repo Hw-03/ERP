@@ -31,6 +31,8 @@
 .categories { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center; padding: 24px 0; }
 .category { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: 12px; padding: 12px 28px; border-radius: 12px; text-align: left; }
 .category + .category { border-left: 1px solid var(--c-border); }
+.category:focus-visible { outline: 2px solid var(--c-blue); outline-offset: -2px; }
+.category[aria-pressed="true"] { box-shadow: inset 0 0 0 1px currentColor; }
 .categoryTitle { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 700; }
 .categoryDot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; }
 .categoryValue { font-size: 28px; font-weight: 800; line-height: 1.2; letter-spacing: -.03em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
@@ -54,6 +56,11 @@
 .panelHeading { display: flex; min-height: 44px; flex-shrink: 0; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .panelHeading h3 { font-size: 20px; line-height: 28px; letter-spacing: -.025em; }
 .chart { height: 320px; min-width: 0; margin-top: 16px; }
+.legend { display: flex; flex-shrink: 0; flex-wrap: wrap; gap: 8px 20px; margin-top: 8px; color: var(--c-muted2); font-size: 14px; }
+.legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.chartTooltip { min-width: 180px; padding: 12px; border: 1px solid var(--c-border); border-radius: 12px; background: var(--c-s1); color: var(--c-text); font-size: 14px; line-height: 24px; }
+.chartTooltip > div { display: flex; justify-content: space-between; gap: 24px; }
+.tooltipTotal { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--c-border); }
 .concentration { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 9px; background: color-mix(in srgb, var(--c-blue) 7%, var(--c-s1)); color: var(--c-muted2); font-size: 14px; }
 .concentration strong { color: var(--c-blue); }
 .itemTable { font-size: 16px; line-height: 22px; }
@@ -62,6 +69,10 @@
 .itemTable tbody tr { height: 68px; }
 .numericCell { padding-left: 8px; text-align: right; font-size: 16px; line-height: 22px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .numericCell > span { font-size: 14px; }
+.numericCell > .registeredQuantity { font-size: inherit; font-weight: 700; }
+.numericCell > .categoryAmounts { font-size: 12px; }
+.categoryAmounts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px 6px; margin-top: 4px; font-size: 12px; line-height: 18px; }
+.categoryAmounts > span { white-space: nowrap; }
 .itemTable td { padding-block: 8px; }
 .itemButton { padding: 6px; margin-left: -6px; }
 .itemButton[aria-pressed="true"] { background: color-mix(in srgb, var(--c-blue) 10%, transparent); }

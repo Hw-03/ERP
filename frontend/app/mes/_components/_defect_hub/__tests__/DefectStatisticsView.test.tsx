@@ -5,25 +5,32 @@ const api = vi.hoisted(() => ({ getStatisticsReport: vi.fn() }));
 vi.mock("@/lib/api/defects", () => ({ defectsApi: api }));
 vi.mock("recharts", () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  BarChart: ({ children, data }: { children: React.ReactNode; data: Array<{ label: string }> }) => <div data-testid="trend-chart" data-count={data.length} data-labels={data.map((entry) => entry.label).join(",")}>{children}</div>,
-  Bar: () => null, CartesianGrid: () => null, Tooltip: () => null, XAxis: () => null, YAxis: () => null,
+  BarChart: ({ children, data }: { children: React.ReactNode; data: Array<{ label: string }> }) => <div data-testid="trend-chart" data-count={data.length} data-labels={data.map((entry) => entry.label).join(",")} data-values={JSON.stringify(data)}>{children}</div>,
+  Bar: ({ dataKey, stackId }: { dataKey: string; stackId: string }) => <span data-testid="category-bar" data-series={dataKey} data-stack={stackId} />,
+  CartesianGrid: () => null, Tooltip: () => null, XAxis: () => null, YAxis: () => null,
 }));
 import { DefectStatisticsView, shiftStatisticsAnchor } from "../DefectStatisticsView";
 
+const categoryParts = (defect: number, bGrade = 0, obsolete = 0, counts?: [number, number, number]) => [
+  { key: "DEFECT", label: "불량", quantity: defect, record_count: defect ? 1 : 0 },
+  { key: "B_GRADE", label: "B급", quantity: bGrade, record_count: bGrade ? 1 : 0 },
+  { key: "OBSOLETE", label: "구형", quantity: obsolete, record_count: obsolete ? 1 : 0 },
+].map((part, index) => ({ ...part, record_count: counts?.[index] ?? part.record_count }));
 const item = (item_id: string, label: string, quantity: number, record_count = 1) =>
-  ({ key: item_id, item_id, mes_code: `MES-${item_id}`, label, quantity, record_count });
+  ({ key: item_id, item_id, mes_code: `MES-${item_id}`, label, quantity, record_count, categories: categoryParts(quantity, 0, 0, [record_count, 0, 0]) });
 const group = (key: string, quantity: number, record_count = 1) => ({ key, label: key, quantity, record_count });
 const report = {
   period: { kind: "month" as const, anchor: "2026-10-06", start_date: "2026-10-01", end_date: "2026-10-31" },
   as_of: "2026-10-06T10:00:00+09:00", observed_until: "2026-10-06T10:00:00+09:00", is_partial: true,
   summary: { quantity: 10, record_count: 4, top_item: item("a", "A품목", 6), top_reason: group("외관", 5, 2) },
-  timeline: [{ bucket: "2026-10-01", label: "1일", quantity: 3, record_count: 1 }],
-  trend: [{ bucket: "2026-10", label: "10월", start_date: "2026-10-01", end_date: "2026-10-31", is_partial: true, quantity: 10, record_count: 4 }],
+  timeline: [{ bucket: "2026-10-01", label: "1일", quantity: 3, record_count: 1, categories: categoryParts(3) }],
+  trend: [{ bucket: "2026-10", label: "10월", start_date: "2026-10-01", end_date: "2026-10-31", is_partial: true, quantity: 10, record_count: 4, categories: categoryParts(6, 3, 1, [2, 1, 1]) }],
   items: [item("a", "A품목", 6, 2), item("b", "B품목", 3), item("c", "C품목", 1)],
   reasons: [group("외관", 5, 2), group("파손", 5, 2)],
   departments: [group("조립", 6, 2), group("품질", 4, 2)],
   excluded_legacy_count: 1,
   excluded_category_count: 2,
+  category_totals: categoryParts(6, 3, 1, [2, 1, 1]),
   categories: [
     { key: "DEFECT", label: "불량", quantity: 6, record_count: 2 },
     { key: "B_GRADE", label: "B급", quantity: 3, record_count: 1 },
@@ -65,11 +72,70 @@ function nextPages(): void {
 }
 
 describe("DefectStatisticsView report", () => {
+  it.each([false, true])("분류 조회는 상단 모수를 보존하고 그래프·품목·비교를 함께 바꾼다 (mobile %s)", async (mobilePresentation) => {
+    const parts = categoryParts(0, 7, 507, [0, 1, 2]);
+    const windowItem = { ...item("window", "WINDOW", 514, 3), categories: parts };
+    const all = { ...report, category_totals: parts, categories: parts,
+      summary: { ...report.summary, quantity: 514, record_count: 3 }, items: [windowItem],
+      timeline: [{ ...report.timeline[0], quantity: 514, record_count: 3, categories: parts }],
+      trend: [{ ...report.trend[0], quantity: 514, record_count: 3, categories: parts }],
+    };
+    const selectedParts = categoryParts(0, 0, 507, [0, 0, 2]);
+    const selected = { ...all, categories: selectedParts,
+      summary: { ...all.summary, quantity: 507, record_count: 2 },
+      items: [{ ...windowItem, quantity: 507, record_count: 2, categories: selectedParts }],
+      timeline: [{ ...all.timeline[0], quantity: 507, record_count: 2, categories: selectedParts }],
+      trend: [{ ...all.trend[0], quantity: 507, record_count: 2, categories: selectedParts }],
+      comparison: { ...report.comparison, quantity_delta: 503, summary: { ...report.comparison.summary, quantity: 4 }, categories: categoryParts(0, 0, 4), items: [{ ...item("window", "WINDOW", 4), categories: categoryParts(0, 0, 4) }] },
+    };
+    api.getStatisticsReport.mockResolvedValueOnce(all).mockResolvedValueOnce(selected).mockResolvedValue(all);
+    render(<DefectStatisticsView {...props} mobilePresentation={mobilePresentation} />);
+    expect(await screen.findByRole("columnheader", { name: "등록 수량" })).toBeInTheDocument();
+    const obsolete = screen.getByRole("button", { name: "구형 분류 조회" });
+    expect(screen.getByRole("table", { name: "품목 비교 목록" })).toHaveTextContent("B급 7");
+    expect(screen.getAllByTestId("category-bar").map((bar) => bar.dataset.series)).toEqual(["DEFECT", "B_GRADE", "OBSOLETE"]);
+    expect(new Set(screen.getAllByTestId("category-bar").map((bar) => bar.dataset.stack))).toEqual(new Set(["categories"]));
+    fireEvent.click(obsolete);
+    await waitFor(() => expect(within(screen.getAllByRole("article")[0]).getByText(quantityText("507개"))).toBeInTheDocument());
+    expect(api.getStatisticsReport).toHaveBeenLastCalledWith(expect.objectContaining({ initial_category: "OBSOLETE" }));
+    expect(screen.getByRole("button", { name: "B급 분류 조회" })).toHaveTextContent("7");
+    expect(screen.getByRole("button", { name: "구형 분류 조회" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("table", { name: "품목 비교 목록" })).toHaveTextContent("+503개");
+    fireEvent.click(screen.getByRole("button", { name: "구형 분류 조회" }));
+    await waitFor(() => expect(within(screen.getAllByRole("article")[0]).getByText(quantityText("514개"))).toBeInTheDocument());
+    expect(api.getStatisticsReport).toHaveBeenLastCalledWith(expect.objectContaining({ initial_category: undefined }));
+  });
 
+  it("분류는 기간 변경에 유지되고 전체 초기화로 해제된다", async () => {
+    render(<DefectStatisticsView {...props} />);
+    fireEvent.click(await screen.findByRole("button", { name: "B급 분류 조회" }));
+    await waitFor(() => expect(api.getStatisticsReport).toHaveBeenLastCalledWith(expect.objectContaining({ initial_category: "B_GRADE" })));
+    fireEvent.click(screen.getByRole("button", { name: "주간", exact: true }));
+    await waitFor(() => expect(api.getStatisticsReport).toHaveBeenLastCalledWith(expect.objectContaining({ period: "week", initial_category: "B_GRADE" })));
+    fireEvent.click(await screen.findByRole("button", { name: "전체 초기화" }));
+    await waitFor(() => expect(api.getStatisticsReport).toHaveBeenLastCalledWith(expect.objectContaining({ initial_category: undefined })));
+  });
 
-
-
-
+  it.each([false, true])("분류 변경은 이전 숫자를 숨기고 늦게 온 응답을 무시하며 실패 후 같은 분류로 재시도한다 (mobile %s)", async (mobilePresentation) => {
+    let resolveOld!: (value: typeof report) => void;
+    api.getStatisticsReport.mockResolvedValueOnce(report)
+      .mockReturnValueOnce(new Promise((resolve) => { resolveOld = resolve; }))
+      .mockRejectedValueOnce(new Error("분류 조회 실패"))
+      .mockResolvedValueOnce({ ...report, summary: { ...report.summary, quantity: 7 } });
+    render(<DefectStatisticsView {...props} mobilePresentation={mobilePresentation} />);
+    await screen.findByText(quantityText("10개"));
+    fireEvent.click(screen.getByRole("button", { name: "구형 분류 조회" }));
+    expect(screen.queryByText(quantityText("10개"))).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "B급 분류 조회" })).not.toHaveTextContent("3개");
+    fireEvent.click(screen.getByRole("button", { name: "B급 분류 조회" }));
+    await screen.findByRole("button", { name: "다시 시도" });
+    await act(async () => { resolveOld(report); });
+    expect(screen.queryByText(quantityText("10개"))).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "B급 분류 조회" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    await screen.findByText(quantityText("7개"));
+    expect(api.getStatisticsReport).toHaveBeenLastCalledWith(expect.objectContaining({ initial_category: "B_GRADE" }));
+  });
 
   it("filters a managed reason by ID while showing its current name", async () => {
     const id = "94b714e1-82d2-41a0-81bc-471d5030d052";
@@ -366,7 +432,7 @@ describe("DefectStatisticsView report", () => {
     fireEvent.click(screen.getByRole("button", { name: "품목 비교 다음 페이지" }));
     const lastRows = within(screen.getByRole("table", { name: "품목 비교 목록" })).getAllByRole("row");
     expect(lastRows.slice(1).map((row) => within(row).getByRole("button").getAttribute("aria-label"))).toEqual(["품목 품목 13 선택", "품목 전기 전용 품목 선택"]);
-    expect(lastRows[2]).toHaveTextContent("0개0건0%4개");
+    expect(lastRows[2]).toHaveTextContent("0개불량 0B급 0구형 00건0%4개");
     expect(screen.getByRole("button", { name: "품목 비교 다음 페이지" })).toBeDisabled();
     expect(screen.getByLabelText("상위 3개 품목: 30개 / 전체 130개")).toBeVisible();
     expect(api.getStatisticsReport).toHaveBeenCalledTimes(1);
@@ -375,13 +441,13 @@ describe("DefectStatisticsView report", () => {
     expect(screen.getByRole("status", { name: "품목 비교 현재 페이지" })).toHaveTextContent("2 / 3");
   });
 
-  it.each(["기간", "기준일", "부서", "모델", "공정", "사유", "품목"])("resets every page when the %s identity changes", async (condition) => {
+  it.each(["기간", "기준일", "부서", "모델", "공정", "사유", "품목", "분류"])("resets every page when the %s identity changes", async (condition) => {
     api.getStatisticsReport.mockResolvedValue(manyEntriesReport);
     render(<DefectStatisticsView {...props} />);
     await screen.findByText(quantityText("130개"));
     nextPages();
     if (["부서", "모델", "공정"].includes(condition)) fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
-    const names: Record<string, string> = { 기간: "연간", 기준일: "이전 기간", 부서: "조립", 모델: "DX", 공정: "중간공정", 사유: "사유 사유 7 선택", 품목: "품목 품목 7 선택" };
+    const names: Record<string, string> = { 기간: "연간", 기준일: "이전 기간", 부서: "조립", 모델: "DX", 공정: "중간공정", 사유: "사유 사유 7 선택", 품목: "품목 품목 7 선택", 분류: "구형 분류 조회" };
     fireEvent.click(screen.getByRole("button", { name: names[condition], exact: true }));
     await waitFor(() => expect(api.getStatisticsReport).toHaveBeenCalledTimes(2));
     for (const title of panelTitles) expect(await screen.findByRole("status", { name: `${title} 현재 페이지` })).toHaveTextContent("1 / 3");

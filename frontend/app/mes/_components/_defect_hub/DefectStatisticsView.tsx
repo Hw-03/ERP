@@ -5,7 +5,7 @@ import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react"
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useDesktopQueryState } from "../DesktopTabHome";
 import { defectsApi } from "@/lib/api/defects";
-import type { DefectStatisticsBreakdown, DefectStatisticsComparison, DefectStatisticsItemBreakdown, DefectStatisticsPeriodKind, DefectStatisticsReportResponse } from "@/lib/api/types/defects";
+import type { DefectManagementCategory, DefectStatisticsBreakdown, DefectStatisticsComparison, DefectStatisticsItemBreakdown, DefectStatisticsPeriodKind, DefectStatisticsReportResponse } from "@/lib/api/types/defects";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
@@ -36,15 +36,29 @@ const STATISTICS_CATEGORIES = [
   { key: "OBSOLETE", label: "구형", color: LEGACY_COLORS.muted2 },
 ] as const;
 
-/** 상단에서 현재 조회 결과의 원래 발생 분류를 함께 확인한다. */
-function StatisticsCategoryCards({ totals }: { totals?: DefectStatisticsBreakdown[] }): ReactElement {
+/** 그래프·표·카드에서 분류의 색과 순서를 동일하게 유지한다. */
+function CategoryAmounts({ categories }: { categories: DefectStatisticsBreakdown[] }): ReactElement {
+  return <span className={styles.categoryAmounts} aria-label="분류별 수량">{STATISTICS_CATEGORIES.map(({ key, label, color }) =>
+    <span key={key} style={{ color }}>{label} {formatQty(categories.find((entry) => entry.key === key)?.quantity ?? 0)}</span>)}</span>;
+}
+
+function StatisticsChartTooltip({ active, point, label }: { active?: boolean; point?: { categories: DefectStatisticsBreakdown[]; quantity: number; bucket: string; start_date?: string; end_date?: string }; label: string }): ReactElement | null {
+  if (!active || !point) return null;
+  const periodLabel = point.start_date ? `${point.start_date} ~ ${point.end_date}` : point.bucket || label;
+  return <div className={styles.chartTooltip}><strong>{periodLabel}</strong>{STATISTICS_CATEGORIES.map(({ key, label: name, color }) =>
+    <div key={key} style={{ color }}><span>{name}</span><span>{formatQty(point.categories.find((entry) => entry.key === key)?.quantity ?? 0)}개</span></div>)}
+    <div className={styles.tooltipTotal}><span>조회 합계</span><strong>{formatQty(point.quantity)}개</strong></div></div>;
+}
+
+/** 선택 조건과 무관한 모수를 보여 주되 새 조건을 조회하는 동안 이전 숫자를 숨긴다. */
+function StatisticsCategoryCards({ totals, selected, onChange }: { totals?: DefectStatisticsBreakdown[]; selected?: DefectManagementCategory; onChange: (category: DefectManagementCategory | undefined) => void }): ReactElement {
   return <div role="group" aria-label="발생 분류" className={styles.categories}>{STATISTICS_CATEGORIES.map(({ key, label, color }) => {
     const category = totals?.find((entry) => entry.key === key);
-    return <article key={key} className={styles.category}>
+    return <button key={key} type="button" aria-label={`${label} 분류 조회`} aria-pressed={selected === key} onClick={() => onChange(selected === key ? undefined : key)} className={`standard-hover no-btn-inset ${styles.category}`} style={{ background: selected === key ? tint(color, 10) : "transparent", color: LEGACY_COLORS.text }}>
       <span className={styles.categoryTitle}><span className={styles.categoryDot} style={{ background: color }} />{label}</span>
       <span className={styles.categoryValue}>{category ? formatQty(category.quantity) : "—"}<span>개</span></span>
       <span className={styles.secondary}>{category ? `${formatQty(category.record_count)}건 등록` : "조회 대기"}</span>
-    </article>;
+    </button>;
   })}</div>;
 }
 
@@ -194,7 +208,7 @@ function StatisticsNotes({ result }: { result: DefectStatisticsReportResponse })
 }
 
 /** PC에서는 발생량을 먼저 보여 주고 비교·집계 설명은 각각 펼쳐 확인한다. */
-function StatisticsOverview({ result, loading, filterToggle, filterSelection }: { result: DefectStatisticsReportResponse | null; loading: boolean; filterToggle: ReactNode; filterSelection: ReactNode }): ReactElement {
+function StatisticsOverview({ result, loading, filterToggle, filterSelection, initialCategory, onCategoryChange }: { result: DefectStatisticsReportResponse | null; loading: boolean; filterToggle: ReactNode; filterSelection: ReactNode; initialCategory?: DefectManagementCategory; onCategoryChange: (category: DefectManagementCategory | undefined) => void }): ReactElement {
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [basisOpen, setBasisOpen] = useState(false);
   const comparison = result?.comparison;
@@ -204,15 +218,15 @@ function StatisticsOverview({ result, loading, filterToggle, filterSelection }: 
   return <section className={styles.overview} aria-label="발생 현황">
     {result ? <div className={styles.overviewMain}>
       <article className={styles.total}>
-        <p className={styles.eyebrow}>전체 등록 수량</p>
+        <div className="flex w-full flex-wrap items-center justify-between gap-2"><p className={styles.eyebrow}>{initialCategory ? STATISTICS_CATEGORIES.find((entry) => entry.key === initialCategory)?.label : "전체"} 등록 수량</p><button type="button" aria-label="전체 분류 조회" aria-pressed={!initialCategory} onClick={() => onCategoryChange(undefined)} className="standard-hover min-h-11 rounded-[10px] px-3 text-sm font-bold focus-visible:ring-2" style={{ background: !initialCategory ? tint(LEGACY_COLORS.blue, 10) : LEGACY_COLORS.s1, color: LEGACY_COLORS.blue }}>전체</button></div>
         <div className={styles.totalLine}><p className={styles.totalValue}>{formatQty(result.summary.quantity)}<span>개</span></p><span className={styles.secondary}>{result.summary.record_count}건 등록</span></div>
         {comparison ? <div className={styles.change}>
           <span style={{ color: deltaTone }} className={styles.delta}>{signedQty(comparison.quantity_delta)}{comparison.quantity_change_pct !== null && ` (${comparison.quantity_change_pct > 0 ? "+" : ""}${Number(comparison.quantity_change_pct.toFixed(1))}%)`}</span>
           <span className={styles.secondary}>이전 {periodUnit} {result.is_partial ? "같은 시점 " : ""}대비</span>
         </div> : <p className={styles.secondary}>비교 없음</p>}
       </article>
-      <StatisticsCategoryCards totals={result.categories} />
-    </div> : <div className={styles.overviewMain}>{loading ? <SkeletonBlock className="h-[160px]" /> : <div />}<StatisticsCategoryCards /></div>}
+      <StatisticsCategoryCards totals={result.category_totals} selected={initialCategory} onChange={onCategoryChange} />
+    </div> : <div className={styles.overviewMain}>{loading ? <SkeletonBlock className="h-[160px]" /> : <div />}<StatisticsCategoryCards selected={initialCategory} onChange={onCategoryChange} /></div>}
     <div className={styles.detailActions}>
       {hasExcluded && <span role="status" className={styles.exclusionNotice}>집계 제외 기록 있음</span>}
       {filterSelection}
@@ -304,7 +318,7 @@ function ItemComparison({ result, selected, onSelect, mobilePresentation, page, 
           const delta = (now?.quantity ?? 0) - (before?.quantity ?? 0);
           return <tr key={entry.item_id} className={`border-t ${mobilePresentation ? "" : "h-[62px]"}`} style={{ borderColor: LEGACY_COLORS.border }}>
             <td className="py-1 pr-1"><StatisticsItemName entry={entry} selected={selected === entry.item_id} onSelect={onSelect} mobilePresentation={mobilePresentation} /></td>
-            <td className={numericCell}>{formatQty(now?.quantity ?? 0)}개</td><td className={numericCell}>{now?.record_count ?? 0}건</td><td className={`${numericCell} whitespace-nowrap`}>{share(now?.quantity ?? 0, result.summary.quantity)}</td>
+            <td className={numericCell}><span className={styles.registeredQuantity}>{formatQty(now?.quantity ?? 0)}개</span><CategoryAmounts categories={now?.categories ?? []} /></td><td className={numericCell}>{now?.record_count ?? 0}건</td><td className={`${numericCell} whitespace-nowrap`}>{share(now?.quantity ?? 0, result.summary.quantity)}</td>
             <td className={numericCell}>{formatQty(before?.quantity ?? 0)}개 <span className="block" style={{ color: delta > 0 ? LEGACY_COLORS.red : LEGACY_COLORS.green }}>({signedQty(delta)})</span></td>
           </tr>;
         })}</tbody></table>
@@ -323,6 +337,7 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
   const [savedReasonLabel, setReasonLabel] = useStatisticsQueryState<string | undefined>("defect-statistics-reason-label", undefined, mobilePresentation);
   const [itemId, setItemId] = useStatisticsQueryState<string | undefined>("defect-statistics-item", undefined, mobilePresentation);
   const [itemLabel, setItemLabel] = useStatisticsQueryState<string | undefined>("defect-statistics-item-label", undefined, mobilePresentation);
+  const [initialCategory, setInitialCategory] = useStatisticsQueryState<DefectManagementCategory | undefined>("defect-statistics-initial-category", undefined, mobilePresentation);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [detailTrend, setDetailTrend] = useState(false);
   const [historicalDepartments, setHistoricalDepartments] = useState<string[]>([]);
@@ -332,7 +347,7 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
   const [pages, setPages] = useState({ items: 1, departments: 1, reasons: 1 });
   const today = todayInKst();
   const queryAnchor = periodIdentity(anchor, period) > periodIdentity(today, period) ? today : anchor;
-  const conditionKey = JSON.stringify([period, queryAnchor, selectedDepartments, selectedModels, selectedProcessSteps, reason, itemId]);
+  const conditionKey = JSON.stringify([period, queryAnchor, selectedDepartments, selectedModels, selectedProcessSteps, reason, itemId, initialCategory]);
   const key = JSON.stringify([conditionKey, retryNonce]);
   const result = stored?.key === key ? stored.value : null;
   const reasonLabel = result?.reasons.find((entry) => entry.key === reason)?.label ?? savedReasonLabel ?? reason;
@@ -358,7 +373,7 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
     let active = true;
     void defectsApi.getStatisticsReport({ period, anchor: queryAnchor, departments: selectedDepartments, models: selectedModels, process_steps: selectedProcessSteps,
       reason: reason && REASON_ID_PATTERN.test(reason) ? undefined : reason,
-      reason_category_id: reason && REASON_ID_PATTERN.test(reason) ? reason : undefined, item_id: itemId }).then((value) => {
+      reason_category_id: reason && REASON_ID_PATTERN.test(reason) ? reason : undefined, item_id: itemId, initial_category: initialCategory }).then((value) => {
       if (!active) return;
       setErrorState(null);
       setStored({ key, value });
@@ -372,9 +387,9 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
       if (active) setErrorState({ key, message: failure instanceof Error ? failure.message : "불량 통계를 불러오지 못했습니다." });
     });
     return () => { active = false; };
-  }, [key, period, queryAnchor, selectedDepartments, selectedModels, selectedProcessSteps, reason, itemId]);
+  }, [key, period, queryAnchor, selectedDepartments, selectedModels, selectedProcessSteps, reason, itemId, initialCategory]);
 
-  function resetFilters(): void { setSelectedDepartments([]); setSelectedModels([]); setSelectedProcessSteps([]); setReason(undefined); setReasonLabel(undefined); setItemId(undefined); setItemLabel(undefined); }
+  function resetFilters(): void { setSelectedDepartments([]); setSelectedModels([]); setSelectedProcessSteps([]); setReason(undefined); setReasonLabel(undefined); setItemId(undefined); setItemLabel(undefined); setInitialCategory(undefined); }
   function refresh(): void { setRetryNonce((value) => value + 1); }
   function selectReason(value: string): void {
     const selected = reason === value ? undefined : value;
@@ -394,15 +409,16 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
   const topItemsQuantity = topItems.reduce((total, entry) => total + entry.quantity, 0);
   const comparison = result?.comparison;
   const futureResult = result?.observed_until === null;
-  const trend = result ? detailTrend ? result.timeline : result.trend.filter((entry) => entry.start_date <= today).map((entry) => ({ ...entry, label: entry.is_partial ? `${entry.label} · 집계 중` : entry.label })) : [];
+  const trend = (result ? detailTrend ? result.timeline : result.trend.filter((entry) => entry.start_date <= today).map((entry) => ({ ...entry, label: entry.is_partial ? `${entry.label} · 집계 중` : entry.label })) : []).map((entry) => ({ ...entry, ...Object.fromEntries(STATISTICS_CATEGORIES.map(({ key }) => [key, entry.categories.find((part) => part.key === key)?.quantity ?? 0])) }));
 
   const filterChips = <>
+      {initialCategory && <button type="button" onClick={() => setInitialCategory(undefined)} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.blue, 12), color: LEGACY_COLORS.blue }}>분류 {STATISTICS_CATEGORIES.find((entry) => entry.key === initialCategory)?.label} ×</button>}
       {selectedDepartments.map((value) => <button key={value} type="button" onClick={() => setSelectedDepartments((current) => current.filter((entry) => entry !== value))} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.green, 12), color: LEGACY_COLORS.green }}>부서 {value} ×</button>)}
       {selectedModels.map((value) => <button key={value} type="button" onClick={() => setSelectedModels((current) => current.filter((entry) => entry !== value))} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.cyan, 12), color: LEGACY_COLORS.cyan }}>모델 {value} ×</button>)}
       {selectedProcessSteps.map((value) => <button key={value} type="button" onClick={() => setSelectedProcessSteps((current) => current.filter((entry) => entry !== value))} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.yellow, 12), color: LEGACY_COLORS.yellow }}>공정 {PROCESS_LABELS[value]} ×</button>)}
       {reason && <button type="button" onClick={() => { setReason(undefined); setReasonLabel(undefined); }} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.blue, 12), color: LEGACY_COLORS.blue }}>사유 {reasonLabel} ×</button>}
       {itemId && <button type="button" aria-label={`선택 품목 ${itemLabel ?? itemId} 해제`} onClick={() => { setItemId(undefined); setItemLabel(undefined); }} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.blue, 12), color: LEGACY_COLORS.blue }}>품목 {itemLabel ?? itemId} ×</button>}
-      {(categoryCount > 0 || reason || itemId) && <button type="button" onClick={resetFilters} className="standard-hover min-h-11 rounded-[10px] px-2 text-sm font-bold focus-visible:ring-2" style={{ color: LEGACY_COLORS.blue }}>전체 초기화</button>}
+      {(categoryCount > 0 || reason || itemId || initialCategory) && <button type="button" onClick={resetFilters} className="standard-hover min-h-11 rounded-[10px] px-2 text-sm font-bold focus-visible:ring-2" style={{ color: LEGACY_COLORS.blue }}>전체 초기화</button>}
   </>;
   const categoryFilters = <div id="statistics-category-filters" className={mobilePresentation ? undefined : styles.filters} hidden={!filtersOpen}>{filtersOpen && <div className={mobilePresentation ? "mt-2" : undefined}><DefectCategoryFilters departments={availableDepartments} models={modelOptions} currentDept={currentDepartment} showMyDepartment={false} selectedDepartments={selectedDepartments} selectedModels={selectedModels} selectedProcessSteps={selectedProcessSteps} onDepartmentsChange={setSelectedDepartments} onModelsChange={setSelectedModels} onProcessStepsChange={setSelectedProcessSteps} onResetCategoryFilters={resetFilters} /></div>}</div>;
   const periodSelector = <div role="group" aria-label="집계 단위" className={mobilePresentation ? "flex gap-1" : styles.periodButtons}>
@@ -433,8 +449,10 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
       {filterChips}
       {result && !error && !futureResult && <p className="min-w-0 basis-full break-words text-sm font-medium lg:ml-auto lg:basis-auto lg:flex-1 lg:text-right" style={{ color: LEGACY_COLORS.muted2 }}>{result.is_partial ? "현재까지" : "선택 기간"} 발생 합계 {formatQty(result.summary.quantity)}개({result.summary.record_count}건). 최다 등록 사유는 {topReasons.length ? `${topReasons.map((entry) => entry.label).join(" · ")}(${topReasons.length > 1 ? "각 " : ""}${formatQty(topReasonQty)}개, 전체 ${share(topReasonQty, result.summary.quantity)})` : "없습니다"}. {comparison ? comparison.quantity_delta === 0 ? "이전 비교 기간과 수량이 같습니다." : `이전 비교 기간보다 ${formatQty(Math.abs(comparison.quantity_delta))}개 ${comparison.quantity_delta > 0 ? "많습니다" : "적습니다"}.` : "비교할 이전 기간이 없습니다."}</p>}
     </div>{categoryFilters}</section>}
+    {mobilePresentation && <section className={styles.overview} aria-label="발생 분류 선택"><div className="flex justify-end px-3 pt-2"><button type="button" aria-label="전체 분류 조회" aria-pressed={!initialCategory} onClick={() => setInitialCategory(undefined)} className="standard-hover min-h-11 rounded-[10px] px-3 text-sm font-bold focus-visible:ring-2" style={{ color: LEGACY_COLORS.blue }}>전체</button></div><StatisticsCategoryCards totals={result?.category_totals} selected={initialCategory} onChange={setInitialCategory} /></section>}
     {!mobilePresentation && <>
       <StatisticsOverview result={result && !error && !futureResult ? result : null} loading={!result && !error}
+        initialCategory={initialCategory} onCategoryChange={setInitialCategory}
         filterToggle={<DefectFilterDisclosure expanded={filtersOpen} onToggle={() => setFiltersOpen((value) => !value)} controlsId="statistics-category-filters" />}
         filterSelection={<div className={styles.filterSelection}>{categoryCount === 0 && !reason && !itemId && <span className={styles.secondary}>전체 부서 · 전체 모델 · 전체 공정</span>}{filterChips}</div>}
       />
@@ -446,7 +464,7 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
       : futureResult ? <div role="status" className="rounded-[20px] border p-5 text-sm font-bold" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>미래 기간은 아직 집계하지 않았습니다.</div>
       : result && <>
         {mobilePresentation && <><div className="grid min-w-0 gap-3 lg:grid-cols-2 xl:grid-cols-4">
-          <Card label="전체 등록 수량" value={`${formatQty(result.summary.quantity)}개`} detail={`${result.summary.record_count}건 등록`} tone={LEGACY_COLORS.red} />
+          <Card label={`${initialCategory ? STATISTICS_CATEGORIES.find((entry) => entry.key === initialCategory)?.label : "전체"} 등록 수량`} value={`${formatQty(result.summary.quantity)}개`} detail={`${result.summary.record_count}건 등록`} tone={LEGACY_COLORS.red} />
           <Card label="이전 대비 수량" value={comparison ? signedQty(comparison.quantity_delta) : "비교 없음"} detail={comparison ? `${comparison.quantity_change_pct === null ? "비율 산출 불가" : `${comparison.quantity_change_pct > 0 ? "+" : ""}${Number(comparison.quantity_change_pct.toFixed(1))}%`} · 이전 ${formatQty(comparison.summary.quantity)}개` : "이전 기간 없음"} note={comparison ? `${comparisonBasis(comparison, result.is_partial)}${comparison.summary.quantity === 0 ? " · 이전 수량 0개로 비율을 표시하지 않습니다" : ""}` : undefined} tone={LEGACY_COLORS.yellow} />
           <Card label="최다 등록 사유" value={topReasons.length ? topReasons.map((entry) => entry.label).join(" · ") : "없음"} detail={topReasons.length ? `${formatQty(topReasonQty)}개 · 전체 ${share(topReasonQty, result.summary.quantity)}${topReasons.length > 1 ? " · 공동 1위" : ""}` : "등록된 사유 없음"} tone={LEGACY_COLORS.blue} />
           <Card label={`상위 ${topItems.length}개 품목 집중도`} value={share(topItemsQuantity, result.summary.quantity)} detail={`${formatQty(topItemsQuantity)}개 / 전체 ${formatQty(result.summary.quantity)}개`} tone={LEGACY_COLORS.green} />
@@ -456,7 +474,8 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
         </section></>}
         <div className={mobilePresentation ? "grid min-w-0 gap-3 lg:grid-cols-2" : styles.panelGrid}>
           <section className={`flex ${mobilePresentation ? "h-[255px]" : `${styles.panel} ${styles.trendPanel}`} min-h-0 min-w-0 flex-col rounded-[20px] border p-4`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}><div className={mobilePresentation ? "flex shrink-0 items-center justify-between gap-2" : styles.panelHeading}><h3 className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>{detailTrend ? "선택 기간 상세" : "최근 추이"}</h3><button type="button" onClick={() => setDetailTrend((value) => !value)} className="standard-hover min-h-11 rounded-[10px] px-2 text-sm font-bold focus-visible:ring-2" style={{ color: LEGACY_COLORS.blue }}>{detailTrend ? "최근 추이 보기" : "선택 기간 상세"}</button></div><p className={`shrink-0 ${mobilePresentation ? "text-xs" : styles.secondary}`} style={{ color: LEGACY_COLORS.muted2 }}>{detailTrend ? "선택 기간의 일별·월별 발생 수량" : period === "week" ? "최근 8주" : period === "month" ? "최근 6개월" : "최근 3년"}{!detailTrend && result.trend.some((entry) => entry.is_partial) ? " · 집계 중" : ""}</p>
-            {trend.length === 0 ? <EmptyState compact className="min-h-0 flex-1" title="표시할 추이가 없습니다." description="" /> : <div className={mobilePresentation ? "mt-2 min-h-0 flex-1" : styles.chart}><ResponsiveContainer width="100%" height="100%"><BarChart data={trend} margin={{ top: 12, right: 8, left: mobilePresentation ? -18 : 0, bottom: 0 }}><CartesianGrid stroke={LEGACY_COLORS.border} vertical={false} /><XAxis dataKey="label" tick={{ fill: LEGACY_COLORS.muted2, fontSize: mobilePresentation ? 12 : 14 }} axisLine={false} tickLine={false} /><YAxis tick={{ fill: LEGACY_COLORS.muted2, fontSize: mobilePresentation ? 12 : 14 }} axisLine={false} tickLine={false} allowDecimals={false} /><Tooltip contentStyle={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, borderRadius: 12 }} /><Bar dataKey="quantity" name="발생 수량" fill={LEGACY_COLORS.red} radius={[8, 8, 2, 2]} /></BarChart></ResponsiveContainer></div>}
+            <div className={styles.legend} aria-label="그래프 분류 범례">{STATISTICS_CATEGORIES.map(({ key, label, color }) => <span key={key}><span className={styles.categoryDot} style={{ background: color }} />{label}</span>)}</div>
+            {trend.length === 0 ? <EmptyState compact className="min-h-0 flex-1" title="표시할 추이가 없습니다." description="" /> : <div className={mobilePresentation ? "mt-2 min-h-0 flex-1" : styles.chart}><ResponsiveContainer width="100%" height="100%"><BarChart data={trend} margin={{ top: 12, right: 8, left: mobilePresentation ? -18 : 0, bottom: 0 }}><CartesianGrid stroke={LEGACY_COLORS.border} vertical={false} /><XAxis dataKey="label" tick={{ fill: LEGACY_COLORS.muted2, fontSize: mobilePresentation ? 12 : 14 }} axisLine={false} tickLine={false} /><YAxis tick={{ fill: LEGACY_COLORS.muted2, fontSize: mobilePresentation ? 12 : 14 }} axisLine={false} tickLine={false} allowDecimals={false} /><Tooltip content={({ active, payload, label }) => <StatisticsChartTooltip active={active} point={payload?.[0]?.payload} label={String(label ?? "")} />} />{STATISTICS_CATEGORIES.map(({ key, label, color }) => <Bar key={key} dataKey={key} name={label} stackId="categories" fill={color} maxBarSize={mobilePresentation ? undefined : 56} />)}</BarChart></ResponsiveContainer></div>}
           </section>
           <ItemComparison result={result} selected={itemId} onSelect={selectItem} mobilePresentation={mobilePresentation} page={pages.items} onPageChange={(page) => setPages((current) => ({ ...current, items: page }))} />
           <BreakdownPanel title="부서별 집계" entries={result.departments} total={result.summary.quantity} onSelect={selectDepartment} selected={selectedDepartments.length === 1 ? selectedDepartments[0] : undefined} mobilePresentation={mobilePresentation} page={pages.departments} onPageChange={(page) => setPages((current) => ({ ...current, departments: page }))} />
