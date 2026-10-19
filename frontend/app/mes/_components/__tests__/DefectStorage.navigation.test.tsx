@@ -95,7 +95,7 @@ describe.each([false, true])("보관 정상 복귀 history mobile=%s", (mobile) 
     await traverse("back");
     expect(window.history.state).toEqual(storageState);
     await openRestore();
-    fireEvent.click(screen.getByRole("button", { name: "목록", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "격리 목록", exact: true }));
     await waitFor(() => expect(window.history.state).toEqual(storageState));
     await openRestore();
     await complete(2);

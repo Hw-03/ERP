@@ -2,6 +2,8 @@
 
 ## 2026-10-20 승인 후 재개
 
+병합 c2f8d3f5 후보 push 완료, 첫 CI39335133787의 프론트3파일11실패를 조사했다. 정렬 combobox→버튼, 목록→격리 목록, useAccessRevocationLeave mock 누락. 테스트3파일만 수정 후39건·관련 ESLint 확인, 제품 변경 없음. 다음은 수정 commit/push 및 새 HEAD CI. 원장 registry에 세 파일 참조 없음. 기존 전체 검증을 재실행하지 않는다.
+
 사용자가3.30MiB 조정을 승인했다. bundle-approved.log의 도구3검사·실제3.271MiB 게이트 통과. fetch 후 origin/main9824903e 동일, 병합 충돌 없음. 제품 소스/빌드 입력 불변으로 기존 검사·production 빌드를 재사용한다. 아래 번들 차단은 해제됐다. 다음은 병합 커밋·후보 push·최종 CI이며 main·직원 변경은 계속 금지한다.
 
 ## 최신 진행 — 2026-10-19 main을 후보에 통합, 번들 결정 대기

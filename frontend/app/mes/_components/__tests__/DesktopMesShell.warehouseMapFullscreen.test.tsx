@@ -43,6 +43,7 @@ vi.mock("@/lib/ui/dirty-guard", () => ({
   useConfirmNavigation: () => (next: () => void) => next(),
   useBeforeViewportSwitch: () => async () => {},
   useFlushDirtyEntries: () => async () => {},
+  useAccessRevocationLeave: () => () => true,
 }));
 
 vi.mock("@/lib/queries/useProductionQuery", () => ({

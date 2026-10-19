@@ -10,6 +10,8 @@
 - [x] CP3 (2026-10-19) 격리 production에서 OR 검색·창고 격리/복귀/취소·관리자 BOM 저장/취소 확인. 사용자 원 DB 해시 불변·3038 production 복원.
 - [ ] CP4 후보 브랜치 푸시·최종 CI·결과 기록.
 
+CP4 진행: c2f8d3f5 후보 push 완료. CI39335133787 프론트 실패3파일을 국소 수정해39건 통과. 최종 수정 HEAD CI 성공은 아직 미확인이다.
+
 2026-10-20 사용자 승인으로3.30MiB 한도 적용, 실제3.271MiB 게이트 통과. CP4 병합 커밋·후보 push·CI 진행. 원문 `_attic/runtime/integration-main-20261019/`. 백엔드375·관련 프론트·타입/ESLint/production 빌드/DB 사본 보존 통과. 원 사용자3038/8038은 기존 DB로 production 복원했고 임시 QA3039는 종료했다. main·직원·예약은 변경하지 않는다. 상세: [통합 결과](../../../docs/superpowers/plans/2026-10-19-mes-candidate-main-integration-results.md).
 
 ## 2026-10-19 관측 신뢰성 보완: 완료 5 / 전체 5, 과거 제품 원인 미확정
