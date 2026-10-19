@@ -115,7 +115,6 @@ test("MES-DIAG-ITEM-SHAPE", async ({ request }, testInfo) => {
         expect(response.status(), "synthetic item creation response").toBe(201);
         const item: ItemRow = await response.json();
         expect(item.process_type_code).toBe(code);
-        expect(item.model_slots).toEqual([1]);
         expect(item.unit).toBe("EA");
         expect(typeof item.item_id).toBe("string");
         expect(created.has(item.item_id), "each creation must return a new item").toBe(false);
@@ -132,6 +131,8 @@ test("MES-DIAG-ITEM-SHAPE", async ({ request }, testInfo) => {
     expect(preparedProcesses).toEqual(addCounts(BASELINE, BACKGROUND));
     const synthetic = after.filter(item => created.has(item.item_id));
     expect(synthetic.length).toBe(281);
+    // POST returns the plain ItemResponse; GET computes the registered model slots.
+    for (const item of synthetic) expect(item.model_slots).toEqual([1]);
     expect(synthetic.every(item => Number(item.quantity) === 0 && Number(item.warehouse_qty) === 0 && item.locations?.length === 0), "synthetic items must have zero stock").toBe(true);
     expect(preparedItemCount + Object.values(IO_SCENARIO).reduce((sum, count) => sum + count, 0)).toBe(286);
     expect(addCounts(preparedProcesses, IO_SCENARIO)).toEqual(ORIGINAL);

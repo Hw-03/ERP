@@ -19,8 +19,6 @@ from typing import Any
 
 HERE = Path(__file__).resolve().parent
 BATCHES = (
-    ("bom-original-precursors", ("shipping-additional-expectations.spec.ts",),
-     "SHIP-(DISCARD|VARIANT|CANDIDATE-DRIFT|GENERATED-ROLES) ", 4),
     ("io-original-item-scale", ("000-mes-flaky-items.spec.ts", "io-as-research-audit.spec.ts"),
      "MES-DIAG-ITEM-SHAPE|IO-RESEARCH-RETURNS", 2),
 )
