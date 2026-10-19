@@ -1,6 +1,58 @@
 # BOM·AS 실패 순간 보존 — 실행 기록
 
-**현재 판단: 두 원인은 미확정이며 병합 보류다.** 아래 완료는 관측 도구 준비를 뜻하며 제품 결함 해결을 뜻하지 않는다.
+**현재 판단: 두 원인은 미확정이며 병합 보류다.** 승인된 일반 E2E 관측 1회는 첫 실패에서 종료했다. 32건 통과 뒤 선행 `STATE01 defect`가 실패해, 원 BOM·AS를 포함한 나머지 268건은 미실행이다. 관측 도구와 정리 전 보존은 통과했지만 제품 원인 해결·수정·회귀 검증의 완료 조건은 충족하지 않았다.
+
+## 2026-10-19 12:52 KST — 이번 실행의 최종 결과
+
+후보 실행 HEAD는 `edd81fa0cbf4b115b74dce53edf25bed6ff1acd5`, [진단 CI39195321428](https://github.com/Hw-03/ERP/actions/runs/39195321428)는 실패로 종료했다. 같은 HEAD의 자동 일반 CI39195321547만 승인 범위에 따라 취소했다. 아래 결과는 이 HEAD·이 입력의 관측이며 새 전체 CI 성공이 아니다. 이후 절의 준비 결과와 “시작 전” 문장은 당시 경과를 보존한 것이다.
+
+| 범위 | 실제 결과 | 판정·직원 업무에 대한 의미 |
+|---|---|---|
+| 관측 도구 준비 | Linux Python 24건, Node 12건, 실제 React 입력 off/on, assertion/timeout 정리 전 보존, CI 커널 수집 자체 검사 통과 | 도구 확인. 원 BOM·AS 결함의 재현이나 해결이 아님 |
+| 원 일반 E2E 순서 1회 | 32건 통과 → 33번째 `STATE01 defect` timeout → 268건 미실행, retry 0·worker 1·repeat 1 | 첫 실패 중단 규칙 준수. BOM/AS 원 선택자에는 도달하지 못함 |
+| 첫 실패 후·cleanup 전 보존 | 화면·browser trace·합성 DB online backup 보존 완료, quick_check `ok`, 원본/실행 사본 해시 불변 | 실패 전부터 쌓인 관측 기록과 실패 후 snapshot을 구분함. BOM recorder는 대상 화면이 아니어서 `available:false` |
+| 새로 관측한 선행 실패 | 재시도 클릭 전달 전에 추가 GET에 주입된 빈 성공 응답으로 버튼이 사라짐 | 시험의 응답 전환과 재조회가 겹친 경계 확인. 추가 GET의 직접 예약자는 미확정이며 원 두 문제와 같은 원인이라고 볼 수 없음 |
+| 연결 종료 관측 | 커널 6,642 events, decode/loss 0. Next의 request error 160건은 모두 destroy 선행·errno/syscall 없는 socketCloseListener 오류 | 실제 close/reset 경로 일부를 구분함. 원 AS의 `read ECONNRESET / -104`는 원 선택자에 도달하기 전까지 관측되지 않음 |
+| 원 BOM·AS 해결 | 원인 확정 없음, 제품 패치 없음, 새 회귀 검사 10회·원 선택자 3회 단계 미실행 | 병합 보류 유지. 직원 업무 영향 없음으로 판정할 수 없음 |
+
+### 선행 불량 조회 실패 — 무엇을 확인했고 어디서 멈췄나
+
+1. **목적:** 실제 불량 화면이 최초 로딩, 오류, 사용자의 재시도, 빈 성공, 검색 결과 0을 구별하는지 확인하는 기존 일반 검사다. 이번 계획에서는 원 BOM·AS에 이르는 동일 일반 실행 순서의 선행 조건이었다.
+2. **환경·순서:** GitHub Ubuntu 24.04.5, kernel `6.17.0-1022-azure`, Node `20.20.2`, Python `3.11.17`, Playwright `1.60.0`, Chromium revision `1223`. 같은 호스트의 `localhost:3100` → `127.0.0.1:8021`과 합성 DB만 사용했다. `actors.requester` 합성 계정 로그인 → 불량 → 격리 목록 → 조회 보류 → 주입한 503 오류 표시 → 빈 응답 단계 전환 → “다시 시도” 클릭 순서다. 특정 실제 품목·직원은 사용하지 않았다.
+3. **수량 대조:** 조회 응답을 주입하는 화면 검사여서 입출고·예약·후속 사용·취소 수량은 적용 대상이 아니다. 이 검사에 대해 재고 전후 불변을 별도로 대조하지 않았으며 수량 PASS로 세지 않는다. 합성 DB는 실패 당시 상태를 보존했다.
+4. **실제 결과:** 최초 로딩·오류 표시·버튼 활성화 단언은 통과했다. 원 시험의 `capacity-readstates.spec.ts:85–86`은 응답 상태를 `empty`로 먼저 바꾼 뒤 클릭을 기다린다. 12:41:49.204 KST에 추가 `/api/defects/locations` GET이 발생하고 시험 handler가 200·`[]`를 반환했다. Playwright는 버튼의 안정성을 기다리는 중 DOM 분리를 관측했다. 실제 클릭 전달 없이 이후 버튼을 계속 기다려 기존 60초 제한에 도달했다. 보존 화면은 정상적인 빈 목록 표시다.
+5. **차이·판정:** 이번에는 main을 재실행하지 않았다. 따라서 main과 후보의 새 회귀 여부를 비교 완료하지 않았다. `scriptedRead`의 요청 시점 phase 분기(`capacity-readstates.spec.ts:27–29`)와 클릭 전 phase 전환이 겹친 자동화 경계는 확인됐다. `DesktopDefectView.tsx:172–216`의 realtime revision 재조회와 직전 config/models/items/SSE 시간은 일치하지만 실제 revision·effect 원인 기록이 없어 추가 GET의 직접 예약자로 확정하지 않는다. 원 BOM·AS와 같은 원인이라는 증거도 없다.
+6. **직원 영향:** 화면이 빈 성공 응답을 받아 오류 버튼을 제거한 사실 자체는 직원 업무 결함의 증거가 아니다. 이 건으로 직원 재고·결재 결함을 선언하거나, 반대로 원 BOM·AS의 직원 영향이 없다고 판단하지 않는다.
+7. **정확한 근거:** 아래 로컬 기준 `R/original-general-once/first-failures/1931981560c0ad6c017f-813adbd0069bf3c26cc8/before-cleanup-trace.zip`의 `trace.trace:285,305,320`(통과), `:322–345`(클릭 대기·응답 주입·DOM 분리), `trace.network:185`(추가 GET), 같은 폴더 `before-cleanup.png`, `receipt.json`, `before-cleanup.db`. 소스는 실행 HEAD의 `frontend/tests/e2e/capacity-readstates.spec.ts`다. 계측 사본은 줄이 달라지므로 이 문서의 소스 줄은 후보 원본 기준이다.
+8. **미확인 조건:** 추가 GET의 직접 예약자, 관측이 전체 타이밍에 준 영향, 이 선행 검사에 대한 최소 수정·재현 대조, 뒤의 BOM·AS 원 실패 모두 미확인이다. 선행 결함을 원 두 문제로 바꾸어 보고하지 않는다.
+
+실패 보존은 12:42:44.039 KST에 시작해 44.408에 끝났고 그 뒤 cleanup이 시작됐다. `page.unroute`의 닫힌 context 오류는 teardown 뒤 발생한 부수 오류다. 버튼 소실은 약 55초 앞서므로 실패 보존 I/O가 버튼을 없앤 원인이라는 근거는 없다. 지속적인 관측의 timing 영향까지 배제한 것은 아니다.
+
+### 연결 오류 — 같은 ECONNRESET 문자열을 원인으로 합치지 않음
+
+`next-http.jsonl`의 request.error 160건은 모두 같은 요청의 `request.destroy.called` 이후 발생했으며 errno·syscall이 없었다. 첫 frame도 모두 `Socket.socketCloseListener (node:_http_client:477:27)`이다. 원 AS의 `syscall=read`, `errno=-104` 서명은 전체 기록에서 0건이다. 이는 **AS 원 검사가 미실행된 앞 구간의 관측**이며 AS 원인이 사라졌다는 뜻이 아니다.
+
+한 소켓을 끝까지 연결한 사례는 다음과 같다. 각 파일은 `R/original-general-once` 아래에 있다.
+
+| 순서 | 직접 관측 | 원문 |
+|---|---|---|
+| 요청 | Next PID 3740, request 1973, connection 1961, `GET /api/app-session`, `56126→8021` | `next-http.jsonl:20276` |
+| 종료 시작 | downstream ServerResponse close 경로에서 request.destroy → socket.destroy | `next-http.jsonl:20284–20285` |
+| 커널 | 같은 socket의 owner 3740, tcp_close → `TCP_ABORT_ON_CLOSE` raw reason 11 | `kernel-events.jsonl:2858,2863` |
+| 실제 통신 | Next 측 `56126→8021` RST+ACK | `packets.jsonl:9659` |
+| 수신 | backend PID 3786, connection 1969의 `ConnectionResetError errno=104` | `backend-protocol.jsonl:22750` |
+| Next 오류 | errno/syscall 없는 socketCloseListener ECONNRESET | `next-http.jsonl:20288` |
+
+이 사례의 종료 주체는 Next이며 원 AS의 Next 측 OS read reset과 다르다. 시험 시작 이후 관측된 TCP RST 8건은 모두 Next 측→backend이고 반대 방향은 0건이었다. 준비 구간의 별도 RST 4건과 구분했다. 최초 실패 전 두 서버 leader의 종료나 OOM victim은 없었다. 일부 다른 TID의 종료는 서버 프로세스 종료로 세지 않았다. backend SIGTERM 및 Next SIGKILL은 실패 보존·cleanup 뒤 소유 프로세스 정리 구간에 있다. 모든 요청 종료가 업무상 정상 취소인지까지 판정한 것은 아니다.
+
+### 재사용·보존·다음 안전한 지점
+
+- 로컬 원문 기준 `R`은 `C:/Users/user/.codex/worktrees/mes-main-candidate-comparison/ERP/_attic/runtime/flaky-capture-20261019/ci-39195321428`이다. 원 보고서·화면·DB·로그는 ignored 안에 두며 수정하지 않았다. 별도 읽기 대조는 같은 상위 폴더의 `final_capture_audit.py`와 `final-capture-audit.json`이다.
+- 실패 DB SHA256은 `ab6d9d60ff181dab8bb510bfc448154567c3e2e2de09c72d74129955cd524924`, receipt와 실제 파일이 일치한다. `checkout-final.json`·`export-final.json`의 소스 불변, `kernel-result.json`의 누락 검사, `failure-boundaries.jsonl`의 보존→정리 순서를 확인했다. ring이 없는 불량 화면에 대해 BOM 값을 관측한 것처럼 표시하지 않았다.
+- 이번 CI의 Python 24건·Node 12건·관측 자체 검사와 앞선 유효 국소 검사는 해당 입력의 근거로 유지한다. 새 일반 실행의 통과 32건도 실제 실행 조건에만 연결한다. 실패·268건 미실행·이전 실패 원문을 덮어쓰지 않는다. 전체 backend·coverage·성능·복구·기대값·제품 production 빌드는 실행하지 않았다.
+- 12:51 KST 읽기 확인에서 사용자 검토 DB와 session 파일 해시는 시작과 동일하고 3038/8038 PID는 각각 46916/10744로 유지됐다. 사용자의 초안·연구 요청은 진단에 사용하지 않았다. Windows 진단 3100/8021 listener는 없고 CI 소유 프로세스는 종료했다. main의 별도 세션 변경을 후보에 가져오지 않았다.
+- 승인된 일반 묶음 1회는 소진했다. **다음은 원 두 문제의 해결 완료가 아니라 선행 검사 응답 전환/추가 조회 경계가 남은 상태다.** 같은 전체 묶음을 반복하거나, 앞 32건을 이미 실행한 것으로 간주해 새 DB·새 worker에서 뒤를 이어 원 실행 재현이라 표시하지 않는다. 추가 조사가 이어지면 먼저 이 별도 선행 경계의 국소 대조와 원 두 실패로 연결되는 근거의 유무를 확인해야 한다. 원 두 건에 대한 추측 패치는 하지 않는다.
+- 이전 artifact에 포함된 중복 node_modules 정리는 자동 승인 검토가 `blocked by policy`로 거부해 수행하지 않았다. 해당 사본은 보존했으며 다른 삭제 경로로 우회하지 않았다.
 
 ## 2026-10-19 도구 준비
 

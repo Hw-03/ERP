@@ -4,8 +4,11 @@
 
 - 브랜치 `codex/mes-main-candidate-comparison-20261016`, 시작 HEAD121706c3. 사용자 검토3038/8038·BOM 초안·연구 요청 보존. 새 synthetic 진단3100/8021만 허용. main·직원 DB/서비스·예약 변경 금지.
 - 새 [계획](../../../docs/superpowers/plans/2026-10-19-mes-failure-capture.md)과 [진행 결과](../../../docs/superpowers/plans/2026-10-19-mes-failure-capture-results.md)를 따른다. 아래11:10 차단 기록은 새 실행 승인 이전 기록이다.
-- 현재 단계: CP1 도구 안전성·정적 검사 완료, 후보 진단 푸시 준비. Python22·Node12·actionlint·diff check 및 최종 kernel-selftest07 통과. 실제 React 입력 off/on 보존, namespace가 다른 kernel PID 연결, 원 assertion/timeout 전 DB0→cleanup 후1과 trace 보존을 확인. 이 검사는 원 제품 실패 재현이 아니다.
-- 원 일반 보고서의 첫 시도301개/64파일과 현재 수집 순서 일치. 일반 E2E는 아직 실행하지 않았다. 다음 행동은 도구 최종 검사 → 후보 진단 커밋/푸시 → 해당 SHA 일반 CI만 취소 → 일반 cohort1회 관찰이다.
+- 현재 단계: 실행 후보/원격edd81fa0, 진단CI39195321428 종료·자료 읽기 분석 완료. 관측 도구/Python24/Node12·실제React/실제kernel6.17 bpftrace0.20 가드는 통과했다. 최초 일반 묶음은32통과→선행STATE01 defect 1실패→268미실행. 원AS/BOM에 도달하지 못했으므로 제품 원인은 두 건 모두 미확정이며 패치 없음.
+- 원 일반 보고서의 첫 시도301개/64파일과 수집 순서 일치. 정확한 SHA 일반CI39195321547는 취소 완료. 이전 진단은 모두 업무 전 가드에서 중단했고 승인된 일반1회는 이번에 소진했다. 같은 전체 묶음 재실행 금지. 새 DB/worker에서 뒤만 실행한 것을 원 실행의 연속으로 표시하지 않는다.
+- 최초 실패: `capacity-readstates.spec.ts:85–86`의 empty 전환 후 추가 GET이 200·`[]`를 받아 retry 버튼이 실제 click 전에 사라짐. 추가 GET의 직접 예약자는 미확정. 12:42:44.039 봉인 → 44.408 보존 완료 → cleanup. page.unroute/context closed는 후속 정리 오류다. Next request.error 160건은 모두 destroy 선행/errno·syscall 없음, 원 AS read/-104 서명 0. 한 연결의 Next close → TCP_ABORT_ON_CLOSE → backend reset까지 확인했으나 원 AS와 같은 사건 아님.
+- 다음 행동: 새 원문/상세 결과를 읽고 이 별도 선행 검사의 응답 전환·추가 조회 경계와 원 두 실패의 연결 가능성을 국소 대조할 것. 아직 원 두 실패의 경계 기록 없음. 추가 전체 관측·추측 제품 패치·완료 판정으로 넘어가지 않는다.
+- 환경/근거: R=`_attic/runtime/flaky-capture-20261019/ci-39195321428`, 합성 DB `/home/runner/work/_temp/mes-flaky-diagnostic/source/backend/mes_e2e.db`, before-cleanup DB SHA256 `ab6d9d60ff181dab8bb510bfc448154567c3e2e2de09c72d74129955cd524924`. `R/original-general-once/first-failures/1931981560c0ad6c017f-813adbd0069bf3c26cc8`의 receipt complete·DB/trace/screenshot과 kernel usable/유실 0. 실제 원문은 로컬에 내려받음. Node 20.20.2/Python 3.11.17/Chromium 1223, Ubuntu 24.04.5/kernel 6.17.0-1022-azure. CI 프로세스 종료. 보호 DB/session hash와 3038 PID46916/8038 PID10744 유지(12:51 KST). Windows/WSL의 진단 3100/8021 listener도 없다.
 - 새 원문: 후보 `_attic/runtime/flaky-capture-20261019`, WSL `/home/hw/mes-flaky-capture-20261019`. 기존 원문·실패·사용자 DB는 그대로다. preflight.json과 starting-working-changes.patch가 현재 실행 시작 기준이다.
 - 기존에 미커밋이던 AS 완료 문구·기록은 섞어 커밋하지 않는다. 이번 문서 상단 추가분만 분리한다. 도구 검사는 관련 소스가 동일한 근거를 재사용한다. 제품 코드·전체 기대값·복구·성능 검사를 반복하지 않는다.
 - 한계: fixture 준비 단계에서 자체 정리가 먼저 수행되는 실패는 before-cleanup 전체 보존으로 인정하지 않는다. capture partial·kernel 기록 누락·순서 불일치면 진단 한계를 기록하고 제품 원인 확정에 쓰지 않는다.
