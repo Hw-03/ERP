@@ -28,9 +28,13 @@
 .detailContent table { font-size: 16px; line-height: 24px; }
 .detailContent thead { font-size: 14px; }
 .notes { display: flex; flex-direction: column; gap: 8px; color: var(--c-muted2); font-size: 14px; line-height: 1.7; }
+.panelGrid { display: grid; min-width: 0; grid-template-columns: minmax(0, 1.8fr) repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 18px; }
+.trendPanel { grid-column: 1 / -1; }
+.itemPanel { grid-column: auto; }
 .panel { padding: 20px; }
 .panelHeading { display: flex; min-height: 44px; flex-shrink: 0; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .panelHeading h3 { font-size: 20px; line-height: 28px; letter-spacing: -.025em; }
+.chart { height: 320px; min-width: 0; margin-top: 16px; }
 .concentration { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 9px; background: color-mix(in srgb, var(--c-blue) 7%, var(--c-s1)); color: var(--c-muted2); font-size: 14px; }
 .concentration strong { color: var(--c-blue); }
 .itemTable { font-size: 16px; line-height: 22px; }
@@ -48,6 +52,7 @@
 .breakdownLine { align-items: center; font-size: 16px; }
 .breakdownValue { display: flex; flex-shrink: 0; flex-direction: column; align-items: flex-end; gap: 2px; max-width: 44%; font-size: 16px; line-height: 22px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .leader { display: inline-block; margin-top: 3px; color: var(--c-blue); font-size: 14px; font-weight: 600; line-height: 18px; }
+@media (max-width: 1439px) { .panelGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .itemPanel { grid-column: 1 / -1; } }
 @media (max-width: 1399px) { .total { padding: 22px; } .category { padding-inline: 20px; } .panel { padding: 18px; } }
-@media (max-width: 1099px) { .overviewMain { grid-template-columns: minmax(0, 1fr); } .category { padding-inline: 24px; } }
+@media (max-width: 1099px) { .panelGrid { grid-template-columns: minmax(0, 1fr); } .overviewMain { grid-template-columns: minmax(0, 1fr); } .category { padding-inline: 24px; } }
 @media (max-width: 639px) { .categories { padding: 8px 0; } .category { gap: 8px; padding: 10px 12px; } .categoryTitle { font-size: 14px; } .categoryValue { font-size: 24px; } .category .secondary { font-size: 12px; } }
