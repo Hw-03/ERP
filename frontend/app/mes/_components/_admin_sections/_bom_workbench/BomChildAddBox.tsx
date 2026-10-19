@@ -10,6 +10,8 @@ import { BOM_EDIT_LIST_GRID_TEMPLATE, BomTableHeader, BomTableItemRow } from "./
 import { EmptyState } from "../../common";
 import { useItemSearch } from "@/lib/queries/useItemSearch";
 import { QuantityInput } from "../../common/QuantityInput";
+import { AdminReadBoundary, type useAdminReadState } from "../_admin_primitives/AdminReadState";
+import { AdminTableSkeleton } from "../_admin_primitives/AdminSkeleton";
 
 /**
  * 가운데 하위품목 추가 패널.
@@ -21,7 +23,8 @@ import { QuantityInput } from "../../common/QuantityInput";
  * 자기참조(parent===child)·이미 자식인 항목은 후보에서 비활성.
  */
 interface Props {
-  parent: Item;
+  parent: Item | null;
+  read?: ReturnType<typeof useAdminReadState>;
   bomRows: BOMEntry[];
   items: Item[];
   onAdd: (childId: string, childName: string, qty: number) => Promise<boolean>;
@@ -35,7 +38,7 @@ const STAGE_FILTERS: { id: "ALL" | StageLetter; label: string }[] = [
   { id: "F", label: "공정완료" },
 ];
 
-export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false }: Props) {
+export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false, read }: Props) {
   const { matchesItem } = useItemSearch();
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState<DeptLetter | "">("");
@@ -50,7 +53,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
   // 부모/필터 바뀌면 펼친 입력 닫기
   useEffect(() => {
     setExpandedId(null);
-  }, [parent.item_id]);
+  }, [parent?.item_id]);
 
   useEffect(() => {
     if (expandedId) {
@@ -68,7 +71,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
 
   const candidates = useMemo(() => {
     return items
-      .filter((i) => i.item_id !== parent.item_id)
+      .filter((i) => i.item_id !== parent?.item_id)
       .filter((i) => {
         if (!deptFilter) return true;
         return deptOf(i.process_type_code) === deptFilter;
@@ -80,10 +83,10 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
       .filter((i) => {
         return matchesItem(i, search);
       });
-  }, [items, parent.item_id, search, deptFilter, stageFilter, matchesItem]);
+  }, [items, parent?.item_id, search, deptFilter, stageFilter, matchesItem]);
 
   function openRow(id: string) {
-    if (isLocked) return;
+    if (isLocked || read?.loading || read?.error || !parent) return;
     setExpandedId(id);
     setQtyDraft("1");
   }
@@ -94,7 +97,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
   }
 
   async function commit(child: Item) {
-    if (isLocked) return;
+    if (isLocked || read?.loading || read?.error || !parent) return;
     const qty = parseFloat(qtyDraft);
     if (!Number.isFinite(qty) || qty <= 0) {
       qtyRef.current?.focus();
@@ -211,6 +214,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
               variant="candidate"
               gridTemplateColumns={BOM_EDIT_LIST_GRID_TEMPLATE}
             />
+            <AdminReadBoundary read={read ?? { loading: false, error: undefined, retry: () => {} }} label="하위 품목 목록" skeleton={<AdminTableSkeleton columns={BOM_EDIT_LIST_GRID_TEMPLATE} count={4} rowClassName="h-[37px]" />}>
             {candidates.length === 0 ? (
               <EmptyState variant="no-search-result" compact illustrated />
             ) : (
@@ -303,6 +307,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
             );
               })
             )}
+            </AdminReadBoundary>
           </div>
         </div>
       </div>

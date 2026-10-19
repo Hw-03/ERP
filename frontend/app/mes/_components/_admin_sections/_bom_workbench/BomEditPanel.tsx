@@ -5,6 +5,9 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState } from "../../common/EmptyState";
 import { BomRow } from "./BomRow";
 import { BOM_CURRENT_ROW_GRID_TEMPLATE, BomTableHeader } from "./BomTablePrimitives";
+import { AdminReadBoundary, type useAdminReadState } from "../_admin_primitives/AdminReadState";
+import { AdminTableSkeleton } from "../_admin_primitives/AdminSkeleton";
+import { SkeletonBlock } from "../../common/LoadingSkeleton";
 
 /**
  * 우측 "현재 BOM 구성" 패널.
@@ -21,6 +24,7 @@ interface Props {
   onSaveQty: (bomId: string, qty: number) => void | Promise<void>;
   onRequestDelete: (row: BOMEntry, childName: string) => void;
   isLocked?: boolean;
+  read?: ReturnType<typeof useAdminReadState>;
 }
 
 export function BomEditPanel({
@@ -30,8 +34,9 @@ export function BomEditPanel({
   onSaveQty,
   onRequestDelete,
   isLocked = false,
+  read,
 }: Props) {
-  if (!parent) {
+  if (!parent && !read?.loading && !read?.error) {
     return (
       <div
         className="flex min-h-0 flex-1 flex-col rounded-2xl border"
@@ -60,7 +65,7 @@ export function BomEditPanel({
           className="flex h-[58px] shrink-0 items-center px-4 text-sm font-black"
           style={{ color: LEGACY_COLORS.muted2, borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
         >
-          현재 구성 ({bomRows.length}건)
+          <>현재 구성 {read?.loading ? <SkeletonBlock className="ml-2 h-4 w-12" /> : read?.error ? "—" : `(${bomRows.length}건)`}</>
         </div>
         <div className="relative min-h-0 flex-1">
           <div
@@ -72,6 +77,7 @@ export function BomEditPanel({
                 variant="current"
                 gridTemplateColumns={BOM_CURRENT_ROW_GRID_TEMPLATE}
               />
+              <AdminReadBoundary read={read ?? { loading: false, error: undefined, retry: () => {} }} label="현재 구성" skeleton={<AdminTableSkeleton columns={BOM_CURRENT_ROW_GRID_TEMPLATE} count={5} rowClassName="h-[37px]" />}>
               {bomRows.length === 0 ? (
                 <EmptyState
                   variant="no-data"
@@ -91,6 +97,7 @@ export function BomEditPanel({
                   />
                 ))
               )}
+              </AdminReadBoundary>
             </div>
           </div>
         </div>

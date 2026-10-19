@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, type BOMEntry, type Item } from "@/lib/api";
 import { itemsApi } from "@/lib/api/items";
 import { BomWorkbench } from "../BomWorkbench";
+import { AdminReadProvider, INITIAL_ADMIN_READ_STATES } from "../../_admin_primitives/AdminReadState";
 
 const realtime = vi.hoisted(() => ({ revision: null as number | null }));
 
@@ -39,6 +40,78 @@ describe("BomWorkbench", () => {
   beforeEach(() => {
     realtime.revision = null;
     window.history.replaceState({}, "", "/mes?tab=admin");
+  });
+
+  it("reserves all three panels and hides zero counts and selection hints during initial bootstrap", () => {
+    render(<AdminReadProvider value={{ states: INITIAL_ADMIN_READ_STATES, retry: vi.fn() }}>
+      <BomWorkbench items={[]} setItems={vi.fn()} allBomRows={[]} refreshAllBom={vi.fn()}
+        refreshItems={async () => undefined} onStatusChange={vi.fn()} onError={vi.fn()} />
+    </AdminReadProvider>);
+    expect(screen.getAllByTestId("admin-table-skeleton")).toHaveLength(3);
+    expect(screen.getByRole("status", { name: "현재 구성 불러오는 중" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.queryByText("0")).not.toBeInTheDocument();
+    expect(screen.queryByText(/좌측에서 상위 품목을 선택|등록된 BOM 이 없습니다/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /미배치 원자재/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps BOM rows as skeletons until a selected parent's first response and supports retry", async () => {
+    const pending = deferred<BOMEntry[]>();
+    vi.spyOn(api, "getBOM").mockReturnValueOnce(pending.promise).mockResolvedValueOnce([]);
+    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    render(<BomWorkbench items={[selectedParent]} setItems={vi.fn()} allBomRows={[]}
+      refreshAllBom={vi.fn()} refreshItems={async () => undefined} onStatusChange={vi.fn()} onError={vi.fn()} />);
+    expect(screen.getByRole("status", { name: "현재 구성 불러오는 중" })).toBeInTheDocument();
+    expect(screen.queryByText("등록된 BOM 이 없습니다")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "검토 · 완료" })).toBeDisabled();
+    await act(async () => { pending.reject(new Error("BOM 조회 실패")); });
+    expect(await screen.findAllByText(/BOM 조회 실패/)).toHaveLength(2);
+    fireEvent.click(screen.getAllByRole("button", { name: /다시|재시도/ })[0]);
+    expect(await screen.findByText("등록된 BOM 이 없습니다")).toBeInTheDocument();
+  });
+
+  it("ignores an earlier parent's late response while the newly selected parent is loading", async () => {
+    const first = deferred<BOMEntry[]>();
+    const second = deferred<BOMEntry[]>();
+    vi.spyOn(api, "getBOM").mockImplementation((id) => id === "parent-1" ? first.promise : second.promise);
+    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    const other = { ...selectedParent, item_id: "parent-2", item_name: "Second parent" };
+    render(<BomWorkbench items={[selectedParent, other]} setItems={vi.fn()} allBomRows={[]}
+      refreshAllBom={vi.fn()} refreshItems={async () => undefined} onStatusChange={vi.fn()} onError={vi.fn()} />);
+    const list = screen.getByText("상위 품목 선택").closest("[data-scrollbar-rail-shell]") as HTMLElement;
+    fireEvent.click(within(list).getByText("Second parent"));
+    await act(async () => { first.resolve([]); await first.promise; });
+    expect(screen.getByRole("status", { name: "현재 구성 불러오는 중" })).toBeInTheDocument();
+    expect(screen.queryByText("등록된 BOM 이 없습니다")).not.toBeInTheDocument();
+    await act(async () => { second.resolve([]); await second.promise; });
+    expect(await screen.findByText("등록된 BOM 이 없습니다")).toBeInTheDocument();
+  });
+
+  it("does not replace the new selection with a late refresh after saving the previous BOM", async () => {
+    const savedRefresh = deferred<BOMEntry[]>();
+    const row = { bom_id: "bom-1", parent_item_id: "parent-1", child_item_id: "child-1", quantity: 2, unit: "EA" } as BOMEntry;
+    const getBom = vi.spyOn(api, "getBOM").mockResolvedValueOnce([row]).mockReturnValueOnce(savedRefresh.promise).mockResolvedValue([]);
+    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    vi.spyOn(api, "updateBOM").mockResolvedValue(row);
+    const other = { ...selectedParent, item_id: "parent-2", item_name: "Second parent" };
+    const child = { item_id: "child-1", item_name: "Previous child", process_type_code: "AR", unit: "EA" } as Item;
+    const { container } = render(<BomWorkbench items={[selectedParent, other, child]} setItems={vi.fn()} allBomRows={[]}
+      refreshAllBom={vi.fn()} refreshItems={async () => undefined} onStatusChange={vi.fn()} onError={vi.fn()} />);
+    await waitFor(() => expect(container.querySelector("div[data-bom-row-surface]")).not.toBeNull());
+    const currentRow = container.querySelector("div[data-bom-row-surface]")!;
+    fireEvent.click(currentRow.querySelector("button")!);
+    const quantity = currentRow.querySelector("input[type=number]")!;
+    fireEvent.change(quantity, { target: { value: "3" } });
+    fireEvent.keyDown(quantity, { key: "Enter" });
+    await waitFor(() => expect(getBom).toHaveBeenCalledTimes(2));
+    const list = screen.getByText("상위 품목 선택").closest("[data-scrollbar-rail-shell]") as HTMLElement;
+    fireEvent.click(within(list).getByText("Second parent"));
+    await screen.findByText("등록된 BOM 이 없습니다");
+    fireEvent.click(within(list).getByText("Selected parent summary"));
+    await waitFor(() => expect(getBom).toHaveBeenCalledTimes(4));
+    await screen.findByText("등록된 BOM 이 없습니다");
+    await act(async () => { savedRefresh.resolve([row]); await savedRefresh.promise; });
+    expect(screen.getByText("등록된 BOM 이 없습니다")).toBeInTheDocument();
+    expect(container.querySelector("div[data-bom-row-surface]")).toBeNull();
   });
 
   it("constrains the workbench and parent column while preserving the parent-list scroll region", () => {

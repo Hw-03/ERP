@@ -9,6 +9,8 @@ import type { StatusFilter } from "./BomStatsRow";
 import { BOM_EDIT_LIST_GRID_TEMPLATE, BomTableHeader, BomTableItemRow } from "./BomTablePrimitives";
 import { EmptyState } from "../../common";
 import { useItemSearch } from "@/lib/queries/useItemSearch";
+import { AdminReadBoundary, useAdminReadState } from "../_admin_primitives/AdminReadState";
+import { AdminTableSkeleton } from "../_admin_primitives/AdminSkeleton";
 
 /**
  * 좌측 부모 품목 리스트 — 선택된 부서의 품목을 검색/단계/상태 필터링.
@@ -56,6 +58,7 @@ export function BomParentList({
   onSelect,
   mode,
 }: Props) {
+  const read = useAdminReadState("items", "bom");
   const { matchesItem } = useItemSearch();
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState<"ALL" | StageLetter>("ALL");
@@ -146,6 +149,7 @@ export function BomParentList({
               variant={mode === "edit" ? "parent" : "whereused"}
               gridTemplateColumns={mode === "edit" ? BOM_EDIT_LIST_GRID_TEMPLATE : WHERE_USED_LIST_GRID_TEMPLATE}
             />
+            <AdminReadBoundary read={read} label="상위 품목 목록" skeleton={<AdminTableSkeleton columns={mode === "edit" ? BOM_EDIT_LIST_GRID_TEMPLATE : WHERE_USED_LIST_GRID_TEMPLATE} count={mode === "edit" ? 4 : 3} rowClassName="h-[37px]" />}>
             {list.length === 0 ? (
               <EmptyState variant="no-search-result" compact illustrated />
             ) : (
@@ -176,6 +180,7 @@ export function BomParentList({
                 );
               })
             )}
+            </AdminReadBoundary>
           </div>
         </div>
       </div>

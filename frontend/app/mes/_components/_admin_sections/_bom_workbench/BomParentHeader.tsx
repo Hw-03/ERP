@@ -6,6 +6,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TruncatedText } from "@/lib/ui";
 import { BomBadge } from "./BomBadge";
 import { BOM_STATUS_META, deptColor, deptOf } from "./bomDept";
+import { SkeletonBlock } from "../../common/LoadingSkeleton";
 
 /**
  * 선택된 BOM 부모(또는 사용처 모드에서 선택된 품목) 헤더 카드.
@@ -22,6 +23,8 @@ interface Props {
   childCount: number;
   isCompleted: boolean;
   onOpenReview: () => void;
+  loading?: boolean;
+  unavailable?: boolean;
 }
 
 export function BomParentHeader({
@@ -30,8 +33,12 @@ export function BomParentHeader({
   childCount,
   isCompleted,
   onOpenReview,
+  loading = false,
+  unavailable = false,
 }: Props) {
-  if (!parent) return null;
+  if (!parent) return loading ? <div aria-hidden="true" className="flex min-h-[58px] min-w-0 flex-1 items-center gap-3 rounded-2xl border px-4 py-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+    <SkeletonBlock className="h-6 w-10" /><div className="flex flex-1 flex-col gap-2"><SkeletonBlock className="h-4 w-1/3" /><SkeletonBlock className="h-3 w-36" /></div><SkeletonBlock className="h-9 w-28" />
+  </div> : null;
 
   const statusMeta = isCompleted
     ? BOM_STATUS_META.done
@@ -62,7 +69,7 @@ export function BomParentHeader({
           {parent.item_name}
         </TruncatedText>
         <TruncatedText className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-          {parent.mes_code ?? "(코드 없음)"} · {subtitleSuffix}
+          {parent.mes_code ?? "(코드 없음)"} · {loading ? <SkeletonBlock className="inline-block h-3 w-20" /> : unavailable ? "—" : subtitleSuffix}
         </TruncatedText>
       </div>
       {mode === "edit" && (
@@ -74,12 +81,12 @@ export function BomParentHeader({
               color: statusMeta.color,
             }}
           >
-            {statusMeta.label}
+            {loading ? <SkeletonBlock className="h-3 w-8" /> : unavailable ? "—" : statusMeta.label}
           </span>
           <button
             type="button"
             onClick={onOpenReview}
-            disabled={childCount === 0 && !isCompleted}
+            disabled={loading || unavailable || (childCount === 0 && !isCompleted)}
             className="standard-hover inline-flex shrink-0 items-center gap-1.5 rounded-md border px-3 py-1.5 text-[12px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             style={{
               background: `color-mix(in srgb, ${LEGACY_COLORS.green} 12%, transparent)`,

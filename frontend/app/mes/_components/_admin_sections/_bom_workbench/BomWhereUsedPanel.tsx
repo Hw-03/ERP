@@ -6,6 +6,9 @@ import { formatBomQuantity } from "@/lib/mes/bomFormat";
 import { TruncatedText } from "@/lib/ui";
 import { EmptyState } from "../../common/EmptyState";
 import { BomBadge } from "./BomBadge";
+import { AdminReadBoundary, type useAdminReadState } from "../_admin_primitives/AdminReadState";
+import { AdminTableSkeleton } from "../_admin_primitives/AdminSkeleton";
+import { SkeletonBlock } from "../../common/LoadingSkeleton";
 
 /**
  * 역참조 모드 — 선택된 품목이 어느 부모의 자식으로 등장하는지 1단계 조회.
@@ -17,10 +20,11 @@ interface Props {
   rows: BOMDetailEntry[];
   items: Item[];
   onSelectParent: (parentId: string) => void;
+  read?: ReturnType<typeof useAdminReadState>;
 }
 
-export function BomWhereUsedPanel({ selected, rows, items, onSelectParent }: Props) {
-  if (!selected) {
+export function BomWhereUsedPanel({ selected, rows, items, onSelectParent, read }: Props) {
+  if (!selected && !read?.loading && !read?.error) {
     return (
       <div
         className="flex min-h-0 flex-1 flex-col rounded-2xl border"
@@ -50,9 +54,10 @@ export function BomWhereUsedPanel({ selected, rows, items, onSelectParent }: Pro
           className="px-4 py-2.5 text-xs font-bold uppercase tracking-widest"
           style={{ color: LEGACY_COLORS.muted2, borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
         >
-          사용처 ({rows.length}건)
+          <>사용처 {read?.loading ? <SkeletonBlock className="inline-block h-3 w-12" /> : read?.error ? "—" : `(${rows.length}건)`}</>
         </div>
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <AdminReadBoundary read={read ?? { loading: false, error: undefined, retry: () => {} }} label="BOM 사용처" skeleton={<AdminTableSkeleton columns="auto 1fr 120px" count={5} rowClassName="h-[37px]" />}>
           {rows.length === 0 ? (
             <EmptyState
               variant="no-data"
@@ -91,6 +96,7 @@ export function BomWhereUsedPanel({ selected, rows, items, onSelectParent }: Pro
               );
             })
           )}
+          </AdminReadBoundary>
         </div>
       </div>
     </div>
