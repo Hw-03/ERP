@@ -1,0 +1,11 @@
+.officialControls {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--c-border);
+}
+
+.officialControls > label {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}

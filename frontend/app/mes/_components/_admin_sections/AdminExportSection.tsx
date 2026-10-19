@@ -12,6 +12,7 @@ import { FilterChip } from "../common/FilterChip";
 import { AdminActivityAuditControls } from "./AdminActivityAuditControls";
 import { AdminAuditCsvControls } from "./AdminAuditCsvControls";
 import { toDateKey } from "../_history_sections/historyFormat";
+import styles from "./AdminExportSection.module.css";
 
 type RangePreset = "today" | "7d" | "30d" | "90d";
 type DataScope = "all" | "items" | "transactions" | "employees" | "bom";
@@ -307,7 +308,7 @@ export function AdminExportSection() {
             title="F704-02 연간 자재 입출고관리대장"
             className="h-full"
           >
-            <div className="mt-auto flex flex-col gap-3 pt-4 sm:flex-row sm:items-end sm:justify-between">
+            <div className={`mt-auto flex flex-col gap-3 pt-4 sm:flex-row sm:items-end sm:justify-between ${styles.officialControls}`}>
               <label htmlFor="f704-year" className="flex flex-col gap-1.5 text-[12px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
                 F704-02 연도
                 <input
@@ -321,7 +322,7 @@ export function AdminExportSection() {
                     if (Number.isInteger(year)) setF704Year(year);
                   }}
                   className="h-11 w-28 rounded-[12px] border px-3 text-[14px] font-bold tabular-nums outline-none transition-colors focus-visible:border-[var(--c-green)] focus-visible:ring-2 focus-visible:ring-[color:var(--c-green)]/20"
-                  style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                  style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
                 />
               </label>
               <Button
@@ -345,7 +346,7 @@ export function AdminExportSection() {
             title="F705-02 연간 생산일지"
             className="h-full"
           >
-            <div className="mt-auto flex flex-col gap-3 pt-4 sm:flex-row sm:items-end sm:justify-between">
+            <div className={`mt-auto flex flex-col gap-3 pt-4 sm:flex-row sm:items-end sm:justify-between ${styles.officialControls}`}>
               <label htmlFor="f705-year" className="flex flex-col gap-1.5 text-[12px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
                 F705-02 연도
                 <input
@@ -356,7 +357,7 @@ export function AdminExportSection() {
                   value={f705Year}
                   onChange={(event) => setF705Year(Number(event.currentTarget.value))}
                   className="h-11 w-28 rounded-[12px] border px-3 text-[14px] font-bold tabular-nums outline-none transition-colors focus-visible:border-[var(--c-green)] focus-visible:ring-2 focus-visible:ring-[color:var(--c-green)]/20"
-                  style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                  style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
                 />
               </label>
               <Button
