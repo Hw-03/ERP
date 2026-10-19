@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from contextlib import ExitStack
+from contextlib import redirect_stdout
 import hashlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -201,8 +203,9 @@ class GuardTests(unittest.TestCase):
             else:
                 (root / ".git").write_text("gitdir: fake-worktree", encoding="utf-8")
             before = sorted(str(path.relative_to(root)) for path in root.rglob("*"))
-            with self.subTest(kind=kind), self.assertRaises(ValueError):
-                BOM.prepare(root)
+            for native_only in (False, True):
+                with self.subTest(kind=kind, native_only=native_only), self.assertRaises(ValueError):
+                    BOM.prepare(root, native_only=native_only)
             self.assertEqual(sorted(str(path.relative_to(root)) for path in root.rglob("*")), before)
 
     def test_bom_hash_drift_is_rejected_before_apply(self) -> None:
@@ -212,9 +215,13 @@ class GuardTests(unittest.TestCase):
         source.parent.mkdir(parents=True)
         source.write_text("unexpected source", encoding="utf-8")
         before = source.read_bytes()
-        with patch.object(sys, "argv", ["apply-bom-diagnostics.py", "--sourcecopy", str(root), "--apply"]):
-            with self.assertRaises(ValueError):
-                BOM.main()
+        for native_only in (False, True):
+            argv = ["apply-bom-diagnostics.py", "--sourcecopy", str(root), "--apply"]
+            if native_only:
+                argv.append("--native-only")
+            with self.subTest(native_only=native_only), patch.object(sys, "argv", argv):
+                with self.assertRaises(ValueError):
+                    BOM.main()
         self.assertEqual(source.read_bytes(), before)
         self.assertFalse((root / "frontend/tests/e2e/_bom-diag-fixture.ts").exists())
 
@@ -242,16 +249,79 @@ class GuardTests(unittest.TestCase):
             "source": str(root), "checkout": str(self.checkout), "commit": BOM.EXPECTED_HEAD,
         }), encoding="utf-8")
         hashes = {relative: BOM.text_sha256(value) for relative, value in fixtures.items()}
-        with ExitStack() as stack:
-            stack.enter_context(patch.object(BOM, "HERE", helpers))
-            stack.enter_context(patch.object(BOM, "EXPECTED_TEXT_SHA256", hashes))
-            stack.enter_context(patch.object(BOM, "instrument_source", return_value="instrumented source\n"))
-            stack.enter_context(patch.object(sys, "argv", ["apply-bom-diagnostics.py", "--sourcecopy", str(root), "--apply"]))
-            with self.assertRaises(ValueError):
-                BOM.main()
+        for native_only in (False, True):
+            argv = ["apply-bom-diagnostics.py", "--sourcecopy", str(root), "--apply"]
+            if native_only:
+                argv.append("--native-only")
+            with self.subTest(native_only=native_only), ExitStack() as stack:
+                stack.enter_context(patch.object(BOM, "HERE", helpers))
+                stack.enter_context(patch.object(BOM, "EXPECTED_TEXT_SHA256", hashes))
+                stack.enter_context(patch.object(BOM, "instrument_source", return_value="instrumented source\n"))
+                stack.enter_context(patch.object(sys, "argv", argv))
+                with self.assertRaises(ValueError):
+                    BOM.main()
         for relative, value in fixtures.items():
             self.assertEqual((self.checkout / relative).read_text(encoding="utf-8"), value)
         self.assertFalse((frontend / "tests/e2e/_bom-diag-fixture.ts").exists())
+
+    def bom_copy_fixture(self) -> tuple[Path, Path, dict[str, str]]:
+        """Use tiny matching inputs with CRLF to detect any product-source rewrite."""
+        root = self.runner / "source"
+        root.mkdir()
+        fixtures = {
+            BOM.SOURCE: "source fixture\n",
+            BOM.SPEC: 'import { test } from "./_common-expectations";\n',
+            BOM.QUANTITY: "quantity fixture\n",
+        }
+        for relative, value in fixtures.items():
+            target = root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(value.replace("\n", "\r\n").encode("utf-8"))
+        helpers = self.base / "helpers"
+        helpers.mkdir()
+        for name in ("bom-diag-fixture.ts", "bom-diag-native.js"):
+            (helpers / name).write_text("diagnostic helper", encoding="utf-8")
+        return root, helpers, {relative: BOM.text_sha256(value) for relative, value in fixtures.items()}
+
+    def test_bom_native_only_apply_preserves_product_bytes(self) -> None:
+        """Remove only React-source instrumentation while retaining the native fixture."""
+        root, helpers, hashes = self.bom_copy_fixture()
+        original = {relative: (root / relative).read_bytes() for relative in (BOM.SOURCE, BOM.QUANTITY)}
+        stream = io.StringIO()
+        with ExitStack() as stack:
+            stack.enter_context(patch.object(BOM, "HERE", helpers))
+            stack.enter_context(patch.object(BOM, "EXPECTED_TEXT_SHA256", hashes))
+            react_patch = stack.enter_context(patch.object(BOM, "instrument_source", side_effect=AssertionError("React patch called")))
+            outputs, planned = BOM.prepare(root, native_only=True)
+            self.assertNotIn(BOM.SOURCE, outputs)
+            self.assertFalse(planned["react_source_instrumented"])
+            self.assertEqual(planned["source_diff"], "")
+            self.assertEqual(planned["setter_sites"], [])
+            stack.enter_context(patch.object(sys, "argv", ["apply-bom-diagnostics.py", "--sourcecopy", str(root), "--apply", "--native-only"]))
+            with redirect_stdout(stream):
+                BOM.main()
+        react_patch.assert_not_called()
+        applied = json.loads(stream.getvalue())
+        self.assertTrue(applied["react_source_unchanged"])
+        self.assertEqual(applied["react_source_before_sha256"], applied["react_source_after_sha256"])
+        for relative, expected in original.items():
+            self.assertEqual((root / relative).read_bytes(), expected)
+        self.assertIn('from "./_bom-diag-fixture";', (root / BOM.SPEC).read_text(encoding="utf-8"))
+        for name in ("_bom-diag-fixture.ts", "_bom-diag-native.js"):
+            self.assertTrue((root / "frontend/tests/e2e" / name).is_file())
+
+    def test_bom_default_still_instruments_react_source(self) -> None:
+        """An omitted flag must preserve the existing default patch contract."""
+        root, helpers, hashes = self.bom_copy_fixture()
+        with patch.object(BOM, "HERE", helpers), patch.object(BOM, "EXPECTED_TEXT_SHA256", hashes), patch.object(
+            BOM, "instrument_source", return_value="instrumented source\n"
+        ) as react_patch:
+            outputs, report = BOM.prepare(root)
+        react_patch.assert_called_once_with("source fixture\n")
+        self.assertEqual(outputs[BOM.SOURCE], "instrumented source\n")
+        self.assertTrue(report["react_source_instrumented"])
+        self.assertEqual(report["setter_sites"], list(BOM.SETTER_SITES))
+        self.assertTrue(report["source_diff"])
 
 
 if __name__ == "__main__":

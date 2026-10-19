@@ -19,8 +19,8 @@ from typing import Any
 
 HERE = Path(__file__).resolve().parent
 BATCHES = (
-    ("io-original-item-scale", ("000-mes-flaky-items.spec.ts", "io-as-research-audit.spec.ts"),
-     "MES-DIAG-ITEM-SHAPE|IO-RESEARCH-RETURNS", 2),
+    ("bom-native-only-precursors", ("shipping-additional-expectations.spec.ts",),
+     "SHIP-(DISCARD|VARIANT|CANDIDATE-DRIFT|GENERATED-ROLES) ", 4),
 )
 
 
@@ -208,7 +208,7 @@ def run_batch(source: Path, artifacts: Path, name: str, specs: tuple[str, ...], 
             contents = json.loads(report.read_text())
             result["stats"] = contents["stats"]
             if result["exit_code"] == 0:
-                result["worker_indices"] = verify_report(contents, expected, name == "bom-original-precursors")
+                result["worker_indices"] = verify_report(contents, expected, name.startswith("bom-"))
         elif result["exit_code"] == 0:
             raise RuntimeError("successful runner did not produce its JSON report")
     except Exception as exc:

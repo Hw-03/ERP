@@ -127,8 +127,8 @@ def owned_path(sourcecopy: Path, relative: str) -> Path:
     return candidate
 
 
-def prepare(sourcecopy: Path) -> tuple[dict[str, str], dict[str, object]]:
-    """Validate immutable inputs and return all outputs before any filesystem write."""
+def prepare(sourcecopy: Path, native_only: bool = False) -> tuple[dict[str, str], dict[str, object]]:
+    """Validate immutable inputs; native-only leaves the product source out of writes."""
     if (sourcecopy / ".git").exists():
         raise ValueError("refusing a Git checkout; use a dedicated git-archive source copy")
     originals = {}
@@ -137,26 +137,30 @@ def prepare(sourcecopy: Path) -> tuple[dict[str, str], dict[str, object]]:
         if text_sha256(value) != expected:
             raise ValueError(f"unexpected source text hash: {relative}")
         originals[relative] = value
+    source_before_sha256 = hashlib.sha256(owned_path(sourcecopy, SOURCE).read_bytes()).hexdigest()
     outputs = {
-        SOURCE: instrument_source(originals[SOURCE]),
         SPEC: replace_once(originals[SPEC], 'from "./_common-expectations";', 'from "./_bom-diag-fixture";'),
         "frontend/tests/e2e/_bom-diag-fixture.ts": (HERE / "bom-diag-fixture.ts").read_text(encoding="utf-8"),
         "frontend/tests/e2e/_bom-diag-native.js": (HERE / "bom-diag-native.js").read_text(encoding="utf-8"),
     }
+    if not native_only:
+        outputs[SOURCE] = instrument_source(originals[SOURCE])
     for relative in outputs:
         owned_path(sourcecopy, relative)
     for relative in outputs.keys() - originals.keys():
         if owned_path(sourcecopy, relative).exists():
             raise ValueError(f"refusing to replace existing helper: {relative}")
     diff = "".join(difflib.unified_diff(
-        originals[SOURCE].splitlines(keepends=True), outputs[SOURCE].splitlines(keepends=True),
+        originals[SOURCE].splitlines(keepends=True), outputs.get(SOURCE, originals[SOURCE]).splitlines(keepends=True),
         fromfile="a/" + SOURCE, tofile="b/" + SOURCE,
     ))
     report = {
         "basis_head": EXPECTED_HEAD,
         "sourcecopy": str(sourcecopy),
         "default_enabled": False,
-        "setter_sites": list(SETTER_SITES),
+        "react_source_instrumented": not native_only,
+        "react_source_before_sha256": source_before_sha256,
+        "setter_sites": [] if native_only else list(SETTER_SITES),
         "original_test_body_changed": False,
         "output_text_sha256": {name: text_sha256(value) for name, value in outputs.items()},
         "source_diff": diff,
@@ -169,13 +173,19 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sourcecopy", required=True, type=Path)
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--native-only", action="store_true", help="retain native observer without modifying React product source")
     args = parser.parse_args()
     sourcecopy = args.sourcecopy.resolve(strict=True)
-    outputs, report = prepare(sourcecopy)
+    outputs, report = prepare(sourcecopy, native_only=args.native_only)
     if args.apply:
         for relative, value in outputs.items():
             with owned_path(sourcecopy, relative).open("w", encoding="utf-8", newline="\n") as handle:
                 handle.write(value)
+    source_after_sha256 = hashlib.sha256(owned_path(sourcecopy, SOURCE).read_bytes()).hexdigest()
+    report["react_source_after_sha256"] = source_after_sha256
+    report["react_source_unchanged"] = source_after_sha256 == report["react_source_before_sha256"]
+    if args.native_only and not report["react_source_unchanged"]:
+        raise ValueError("native-only mode changed React product source bytes")
     report["applied"] = args.apply
     print(json.dumps(report, ensure_ascii=True, indent=2))
 

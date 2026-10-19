@@ -130,7 +130,7 @@ def prepare(checkout: Path, root: Path) -> None:
     save(artifacts / "export-original.json", {"root": str(source), "commit": commit, "files": exported})
     save(source / ".mes-flaky-export.json", {"source": str(source), "checkout": str(checkout), "commit": commit})
     with (artifacts / "bom-patch.json").open("w", encoding="utf-8") as log:
-        subprocess.run([sys.executable, str(HERE / "bom/apply-bom-diagnostics.py"), "--sourcecopy", str(source), "--apply"],
+        subprocess.run([sys.executable, str(HERE / "bom/apply-bom-diagnostics.py"), "--sourcecopy", str(source), "--native-only", "--apply"],
                        stdout=log, stderr=subprocess.STDOUT, check=True)
     setup = source / "frontend/tests/e2e/global-setup.ts"
     content = setup.read_text(encoding="utf-8")
