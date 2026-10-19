@@ -13,6 +13,8 @@ import { AdminActivityAuditControls } from "./AdminActivityAuditControls";
 import { AdminAuditCsvControls } from "./AdminAuditCsvControls";
 import { toDateKey } from "../_history_sections/historyFormat";
 import styles from "./AdminExportSection.module.css";
+import transitions from "./AdminTransitions.module.css";
+import { useAdminSelectionFade } from "./useAdminSelectionFade";
 
 type RangePreset = "today" | "7d" | "30d" | "90d";
 type DataScope = "all" | "items" | "transactions" | "employees" | "bom";
@@ -183,6 +185,8 @@ export function AdminExportSection() {
   const [includeInactive, setIncludeInactive] = useState(false);
   const [mode, setMode] = useState<ExportMode>("general");
   const [auditKind, setAuditKind] = useState<AuditKind>("inventory");
+  const modeFadeRef = useAdminSelectionFade(mode);
+  const auditFadeRef = useAdminSelectionFade(auditKind);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<ExportFeedback | null>(null);
   const [f704Year, setF704Year] = useState(() => new Date().getFullYear());
@@ -407,7 +411,7 @@ export function AdminExportSection() {
         >
 
           {mode === "operations" ? (
-            <div className={`mt-4 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto`}>
+            <div ref={modeFadeRef} className={`mt-4 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto ${transitions.selection}`}>
               <p className="text-sm" style={{ color: LEGACY_COLORS.muted }}>수량 기록, 차이 0 실사 관측, 업무 정정과 원업무 연결을 함께 내보냅니다.</p>
               <div className={styles.settingsGrid}>
                 <div role="group" aria-label="통합 작업 기간" className={styles.setting}><Label>기간 선택</Label><p className={styles.dateRange}><CalendarDays size={16} aria-hidden="true" />{operationRange.start} ~ {operationRange.end}</p><div className="mt-2 flex flex-wrap gap-2">{(["today", "7d", "30d", "90d"] as RangePreset[]).map((option) => <FilterChip key={option} active={preset === option} label={option === "today" ? "오늘" : option === "7d" ? "7일" : option === "30d" ? "30일" : "90일"} onClick={() => setPreset(option)} size="sm" className="min-h-11" />)}</div></div>
@@ -417,7 +421,7 @@ export function AdminExportSection() {
               <Button className="mt-auto min-h-11" loading={busy} iconLeft={<Download />} onClick={() => void handleOperationExport()}>통합 작업 {format === "csv" ? "CSV" : "Excel"} 다운로드</Button>
             </div>
           ) : mode === "general" ? (
-            <div data-testid="general-export-controls" className={`flex min-h-0 flex-1 flex-col`}>
+            <div ref={modeFadeRef} data-testid="general-export-controls" className={`flex min-h-0 flex-1 flex-col ${transitions.selection}`}>
             <div data-testid="export-control-panel" className="mt-4 min-h-0 flex-1 xl:overflow-y-auto xl:pr-1">
               <div className={styles.settingsGrid}>
                 <div role="group" aria-label="데이터 범위" className={`${styles.setting} ${!supportsExcel ? styles.wideSetting : ""}`}>
@@ -521,7 +525,7 @@ export function AdminExportSection() {
             </div>
             </div>
           ) : (
-            <div className={`mt-4 flex min-h-0 flex-1 flex-col`}>
+            <div ref={modeFadeRef} className={`mt-4 flex min-h-0 flex-1 flex-col ${transitions.selection}`}>
               <div role="group" aria-label="원본 로그 종류" className="flex shrink-0 flex-wrap gap-1.5">
                 <FilterChip
                   active={auditKind === "inventory"}
@@ -538,7 +542,7 @@ export function AdminExportSection() {
                   className="min-h-11"
                 />
               </div>
-              <div className={`mt-3 flex min-h-0 flex-1 flex-col ${styles.auditControls}`}>
+              <div ref={auditFadeRef} className={`mt-3 flex min-h-0 flex-1 flex-col ${styles.auditControls} ${transitions.selection}`}>
                 {auditKind === "inventory" ? <AdminAuditCsvControls /> : <AdminActivityAuditControls />}
               </div>
             </div>
