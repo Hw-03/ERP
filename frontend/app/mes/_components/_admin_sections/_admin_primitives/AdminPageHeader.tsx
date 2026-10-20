@@ -21,7 +21,10 @@ export function AdminPageHeader({
 }: AdminPageHeaderProps) {
   const tone = danger ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-3">
+    <div
+      className="mb-4 flex shrink-0 flex-wrap items-center gap-3 rounded-[20px] border px-3 py-2"
+      style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+    >
       <div className="flex min-w-0 items-center gap-3">
         <div
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]"

@@ -10,6 +10,7 @@ import { AppSelect } from "../common/AppSelect";
 import { EmptyState } from "../common";
 import { AdminDownloadSkeleton } from "./_admin_primitives/AdminSkeleton";
 import { FilterChip } from "../common/FilterChip";
+import { useAdminReadReveal } from "./useAdminReadReveal";
 
 type AuditFormat = "csv" | "xlsx";
 type AuditFeedback = { kind: "success" | "error"; message: string };
@@ -38,6 +39,7 @@ function downloadBlob(blob: Blob, fileName: string): void {
 /** 단일 데이터 내보내기 카드에서 월별 원본 로그 선택과 다운로드만 담당한다. */
 export function AdminAuditCsvControls(): ReactNode {
   const { data: loadedFiles, isLoading, error: queryError, refetch } = useAuditCsvListQuery();
+  const revealRef = useAdminReadReveal(isLoading && loadedFiles === undefined, !!queryError && loadedFiles === undefined);
   const files = useMemo(() => loadedFiles ?? [], [loadedFiles]);
   const [selectedMonth, setSelectedMonth] = useState("");
   const [format, setFormat] = useState<AuditFormat>("csv");
@@ -95,18 +97,18 @@ export function AdminAuditCsvControls(): ReactNode {
 
   if (monthOptions.length === 0) {
     return (
-      <EmptyState
+      <div ref={revealRef} style={{ display: "contents" }}><EmptyState
         variant="no-data"
         compact
         illustrated
         title="아직 누적된 파일이 없습니다"
         description="재고 이동 거래가 발생하면 원본 로그를 내려받을 수 있습니다."
-      />
+      /></div>
     );
   }
 
   return (
-    <div data-testid="audit-csv-controls" className="flex min-h-0 flex-1 flex-col">
+    <div ref={revealRef} data-testid="audit-csv-controls" className="flex min-h-0 flex-1 flex-col">
       <div className="grid gap-4 md:grid-cols-2">
         <div>
           <div className="mb-1.5 text-[12px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>

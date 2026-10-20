@@ -2,6 +2,7 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 import { ReadFailure } from "../../common/ReadState";
+import { useAdminReadReveal } from "../useAdminReadReveal";
 
 export type AdminReadDomain = "items" | "employees" | "departments" | "models" | "bom";
 export type AdminReadState = { status: "pending" | "ready" | "error"; error?: string };
@@ -30,12 +31,15 @@ export function useAdminReadState(...domains: AdminReadDomain[]): AdminReadView 
 }
 
 /** 오류를 빈 데이터 안내와 구분하고, 로딩 안내는 화면 읽기에만 제공한다. */
-export function AdminReadBoundary({ read, skeleton, children, label }: {
-  read: ReturnType<typeof useAdminReadState>; skeleton: ReactNode; children: ReactNode; label: string;
+export function AdminReadBoundary({ read, skeleton, children, label, reveal = true }: {
+  read: ReturnType<typeof useAdminReadState>; skeleton: ReactNode; children: ReactNode; label: string; reveal?: boolean;
 }) {
-  if (read.error) return <ReadFailure message={read.error} onRetry={read.retry} />;
-  if (!read.loading) return <>{children}</>;
-  return <div className="flex h-full min-h-0 flex-1 flex-col" role="status" aria-label={`${label} 불러오는 중`} aria-busy="true">
-    <div aria-hidden="true" className="flex h-full min-h-0 flex-1 flex-col">{skeleton}</div>
+  const ref = useAdminReadReveal(read.loading, !!read.error || !reveal);
+  const loading = read.loading && !read.error;
+  return <div ref={ref} style={{ display: "contents" }}
+    role={loading ? "status" : undefined} aria-label={loading ? `${label} 불러오는 중` : undefined} aria-busy={loading || undefined}>
+    {read.error ? <ReadFailure message={read.error} onRetry={read.retry} /> : loading
+      ? <div aria-hidden="true" className="flex h-full min-h-0 flex-1 flex-col">{skeleton}</div>
+      : children}
   </div>;
 }

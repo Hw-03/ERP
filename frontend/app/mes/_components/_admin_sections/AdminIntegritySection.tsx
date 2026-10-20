@@ -7,6 +7,7 @@ import { adminApi, type InventoryIntegrityCategory, type InventoryIntegrityResul
 import { Button } from "@/lib/ui/Button";
 import { AdminPageHeader } from "./_admin_primitives/AdminPageHeader";
 import { SkeletonBlock } from "../common/LoadingSkeleton";
+import { useAdminReadReveal } from "./useAdminReadReveal";
 
 const CATEGORY_LABELS: Record<InventoryIntegrityCategory, string> = {
   DEFECT_STOCK_MISMATCH: "불량 원장·재고",
@@ -38,11 +39,12 @@ export function AdminIntegritySection() {
 
   const repairableCount = result?.issues.filter((issue) => issue.repairable).length ?? 0;
   const initialLoading = loading && !result;
+  const revealRef = useAdminReadReveal<HTMLElement>(initialLoading, !!error);
 
   return (
     <>
     {initialLoading && <p role="status" className="sr-only">정합성 검사 결과를 불러오는 중입니다.</p>}
-    <section className="admin-integrity" aria-label="정합성 검사" aria-busy={loading}>
+    <section ref={revealRef} className="admin-integrity" aria-label="정합성 검사" aria-busy={loading}>
       <div className="admin-integrity-header">
         <div className="admin-integrity-intro">
           <AdminPageHeader icon={ShieldCheck} title="정합성" />

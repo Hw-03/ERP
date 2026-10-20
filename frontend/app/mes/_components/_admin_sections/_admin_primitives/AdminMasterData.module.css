@@ -7,11 +7,13 @@
 .detailHeader { display: flex; flex-shrink: 0; align-items: center; gap: 16px; }
 .employeeFields, .modelFields { display: grid; flex: 1; min-width: 0; gap: 12px; }
 .employeeWorkspace [data-admin-detail-content] { padding: 12px; }
-.employeeFields { grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 1px 8px; border: 1px solid var(--c-border); border-radius: 16px; background: var(--c-bg); }
+.employeeFields { grid-template-columns: repeat(5, minmax(0, 1fr)); min-height: 106px; align-items: center; padding: 12px; border: 1px solid var(--c-border); border-radius: 16px; background: var(--c-bg); }
 .modelFields { grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr)); }
-.employeeFields > div { min-width: 0; flex-direction: row; align-items: center; gap: 8px; }
+.employeeFields > div { min-width: 0; flex-direction: column; align-items: stretch; gap: 6px; }
 .employeeFields > div > label { flex-shrink: 0; white-space: nowrap; }
 .employeeFields > div > :last-child { min-width: 0; flex: 1; }
+.employeeFields input, .employeeFields > div > :last-child { font-size: 16px; }
+.employeeFields [role="combobox"] { font-size: 16px; }
 .fieldCard { min-width: 0; padding: 12px; border: 1px solid var(--c-border); border-radius: 16px; background: var(--c-bg); }
 .panel { min-width: 0; border: 1px solid var(--c-border); border-radius: 16px; padding: 16px; background: var(--c-bg); }
 .preview { display: flex; min-height: 160px; flex: 1; flex-direction: column; gap: 8px; overflow-y: auto; }
@@ -22,5 +24,20 @@
 .itemForm button { min-width: 44px; }
 .workspace button { min-height: 44px; min-width: 44px; }
 .employeeCards button { min-height: 48px; }
+.employeeCards { display: grid; flex: 1; gap: 16px; align-items: stretch; }
+.employeeLeft { display: flex; min-width: 0; flex-direction: column; gap: 16px; }
+.employeeAccountRows { display: grid; flex: 1; grid-template-rows: repeat(2, minmax(min-content, 1fr)); gap: 12px; }
+.employeeAccountRow { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid var(--c-border); border-radius: 12px; background: var(--c-s1); }
+.employeePermissions { display: grid; gap: 16px; }
+.employeePermissions > div > label { font-size: 16px; line-height: 24px; letter-spacing: normal; }
+.employeePermissions button { height: 48px; }
+.permissionControl { position: relative; display: flex; min-width: 0; border: 1px solid var(--c-border); border-radius: 14px; padding: 0 4px; background: var(--c-s1); }
+.permissionHighlight { position: absolute; top: 4px; bottom: 4px; left: 4px; border-radius: 10px; background: color-mix(in srgb, var(--permission-color) 16%, transparent); pointer-events: none; transition: transform 0.32s cubic-bezier(0.34,1.56,0.64,1), background-color 150ms; }
+.employeePermissions .permissionOption { position: relative; z-index: 1; flex: 1; min-width: 0; min-height: 46px; height: 46px; border-radius: 10px; color: color-mix(in srgb, var(--permission-color) 75%, var(--c-muted2)); font-size: 14px; font-weight: 700; transition: color 150ms; }
+.permissionOption[aria-checked="true"] { color: var(--permission-color); }
+.permissionOption:focus-visible { outline: 2px solid var(--c-blue); outline-offset: -2px; }
+@media (prefers-reduced-motion: reduce) { .permissionHighlight, .permissionOption { transition: none; } }
+@media (min-width: 1280px) { .employeeCards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1600px) { .employeePermissions { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 1599px) { .employeeFields { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 1399px) { .employeeFields, .modelFields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

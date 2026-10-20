@@ -2,7 +2,7 @@
 
 import { useId, type KeyboardEvent, type ReactNode } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { useAdminSelectionFade } from "../useAdminSelectionFade";
+import { AdminDetailViewport } from "./AdminDetailViewport";
 import transitions from "../AdminTransitions.module.css";
 
 export interface AdminDetailTab {
@@ -12,6 +12,7 @@ export interface AdminDetailTab {
 
 export interface AdminDetailCardProps {
   selectionKey?: string | number;
+  externalScrollbar?: boolean;
   title?: ReactNode;
   subtitle?: ReactNode;
   status?: ReactNode;
@@ -27,6 +28,7 @@ export interface AdminDetailCardProps {
 
 export function AdminDetailCard({
   selectionKey,
+  externalScrollbar = false,
   title,
   subtitle,
   status,
@@ -39,7 +41,6 @@ export function AdminDetailCard({
   children,
   footer,
 }: AdminDetailCardProps) {
-  const fadeRef = useAdminSelectionFade(selectionKey === undefined ? undefined : JSON.stringify([selectionKey, activeTab]));
   const tabInstanceId = useId();
   const hasTabs = Boolean(tabs?.length);
   const activeTabIndex = tabs?.findIndex((tab) => tab.id === activeTab) ?? -1;
@@ -62,9 +63,19 @@ export function AdminDetailCard({
     document.getElementById(`${tabInstanceId}-tab-${nextIndex}`)?.focus();
   }
 
+  const content = <AdminDetailViewport
+    selectionKey={selectionKey === undefined ? undefined : JSON.stringify([selectionKey, activeTab])}
+    data-admin-detail-content
+    data-scrollbar-rail-viewport={externalScrollbar ? "" : undefined}
+    role={hasTabs ? "tabpanel" : undefined}
+    id={hasTabs ? tabPanelId : undefined}
+    aria-labelledby={hasTabs ? `${tabInstanceId}-tab-${selectedTabIndex}` : undefined}
+    className={`${externalScrollbar ? "absolute inset-y-0 left-0 right-0 lg:-right-2.5" : "min-h-0 flex-1"} overflow-y-auto p-5 [scrollbar-gutter:stable] ${transitions.selection}`}
+  >{children}</AdminDetailViewport>;
+
   return (
     <div
-      className="flex min-h-0 flex-1 flex-col rounded-[20px] border"
+      className={`relative flex min-h-0 flex-1 flex-col rounded-[20px] border ${externalScrollbar ? "lg:mr-2.5" : ""}`}
       style={{
         background: LEGACY_COLORS.s1,
         borderColor: LEGACY_COLORS.border,
@@ -143,16 +154,19 @@ export function AdminDetailCard({
           {tabActions && <div className="flex shrink-0 items-center gap-2">{tabActions}</div>}
         </div>
       )}
-      <div
-        ref={fadeRef}
-        data-admin-detail-content
-        role={hasTabs ? "tabpanel" : undefined}
-        id={hasTabs ? tabPanelId : undefined}
-        aria-labelledby={hasTabs ? `${tabInstanceId}-tab-${selectedTabIndex}` : undefined}
-        className={`min-h-0 flex-1 overflow-y-auto p-5 [scrollbar-gutter:stable] ${transitions.selection}`}
-      >
-        {children}
-      </div>
+      {externalScrollbar ? <div data-scrollbar-rail-shell className="relative min-h-0 flex-1">
+        {content}
+        <div data-scrollbar-rail-masks aria-hidden className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between">
+          <div className="flex justify-between">
+            <span className="h-[19px] w-[19px]" style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 18px, var(--c-bg) 19px)" }} />
+            <span className="h-[19px] w-[19px]" style={{ background: "radial-gradient(circle at 0 100%, transparent 0 18px, var(--c-bg) 19px)" }} />
+          </div>
+          <div className="flex justify-between">
+            <span className="h-[19px] w-[19px]" style={{ background: "radial-gradient(circle at 100% 0, transparent 0 18px, var(--c-bg) 19px)" }} />
+            <span className="h-[19px] w-[19px]" style={{ background: "radial-gradient(circle at 0 0, transparent 0 18px, var(--c-bg) 19px)" }} />
+          </div>
+        </div>
+      </div> : content}
       {footer && (
         <div
           className="shrink-0 border-t px-5 py-3"
@@ -161,6 +175,7 @@ export function AdminDetailCard({
           {footer}
         </div>
       )}
+      {externalScrollbar && <div aria-hidden className="pointer-events-none absolute -inset-px z-30 rounded-[20px] border" style={{ borderColor: LEGACY_COLORS.border }} />}
     </div>
   );
 }

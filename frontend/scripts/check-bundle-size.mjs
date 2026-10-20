@@ -2,7 +2,7 @@
 /**
  * Round-16 #4 — Bundle size gate.
  *
- * .next-prod/static/chunks 의 *.js 합산 크기가 임계 (default 3.25 MB) 이내인지 검사.
+ * .next-prod/static/chunks 의 *.js 합산 크기가 임계 (default 3.30 MB) 이내인지 검사.
  * Next.js production build 후 실행. 임계 초과 시 exit 1.
  *
  * 사용:
@@ -23,8 +23,9 @@ const FRONTEND_ROOT = path.resolve(__dirname, "..");
 
 const args = process.argv.slice(2);
 const maxIdx = args.indexOf("--max");
-// 2026-10-19: 관리자·불량 개선의 clean build 실측 3.228 MB와 소폭의 여유를 반영. 테스트 코드·중복 청크 유입 없음.
-const MAX_MB = maxIdx >= 0 ? parseFloat(args[maxIdx + 1]) : 3.25;
+// 2026-10-20: 관리자 가상 목록(@tanstack/react-virtual)·입력 보호 추가 후 3.283 MB.
+// 모든 행을 마운트하던 비용을 제한하는 의존성의 증가분만 반영하며 여유는 약 18 KB다.
+const MAX_MB = maxIdx >= 0 ? parseFloat(args[maxIdx + 1]) : 3.30;
 const MAX_BYTES = MAX_MB * 1024 * 1024;
 
 async function walk(dir) {

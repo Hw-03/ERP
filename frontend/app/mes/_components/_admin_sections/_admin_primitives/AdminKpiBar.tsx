@@ -1,6 +1,7 @@
 "use client";
 
 import { KpiCard } from "../../common/KpiCard";
+import { useAdminReadReveal } from "../useAdminReadReveal";
 
 export interface AdminKpiItem {
   key: string;
@@ -20,9 +21,11 @@ export interface AdminKpiBarProps {
 }
 
 export function AdminKpiBar({ items, placement = "block", loading = false, unavailable = false }: AdminKpiBarProps) {
+  const ref = useAdminReadReveal(loading, unavailable);
   if (items.length === 0) return null;
   return (
     <div
+      ref={ref}
       className={`${placement === "block" ? "mb-3" : ""} grid shrink-0 gap-2`}
       style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
     >

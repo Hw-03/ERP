@@ -11,6 +11,7 @@ import { AppSelect } from "../common/AppSelect";
 import { EmptyState } from "../common";
 import { AdminDownloadSkeleton } from "./_admin_primitives/AdminSkeleton";
 import { FilterChip } from "../common/FilterChip";
+import { useAdminReadReveal } from "./useAdminReadReveal";
 
 type ActivityAuditFormat = "csv" | "xlsx";
 type ActivityAuditFeedback = { kind: "success" | "error"; message: string };
@@ -39,6 +40,7 @@ function downloadBlob(blob: Blob, fileName: string): void {
 /** 현재 브라우저 단말명과 월별 작업 감사 파일 다운로드를 관리한다. */
 export function AdminActivityAuditControls(): ReactNode {
   const { data: loadedFiles, isLoading, error: queryError, refetch } = useActivityAuditListQuery();
+  const revealRef = useAdminReadReveal(isLoading && loadedFiles === undefined, !!queryError && loadedFiles === undefined);
   const files = useMemo(() => loadedFiles ?? [], [loadedFiles]);
   const [terminalName, setTerminalName] = useState("");
   const [registering, setRegistering] = useState(false);
@@ -107,7 +109,7 @@ export function AdminActivityAuditControls(): ReactNode {
   }
 
   return (
-    <div data-testid="activity-audit-controls" className="flex min-h-0 flex-1 flex-col gap-4">
+    <div ref={revealRef} data-testid="activity-audit-controls" className="flex min-h-0 flex-1 flex-col gap-4">
       <div className="rounded-[12px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
         <label htmlFor="activity-audit-terminal-name" className="text-[12px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
           현재 단말명

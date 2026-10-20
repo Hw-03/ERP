@@ -42,7 +42,7 @@ export function AdminDetailSkeleton({ variant }: { variant: "models" | "employee
   const fields = variant === "models" ? ["모델명", "기호 (1-5자)", "연결 품목 수", "연결 BOM 수"]
     : variant === "employees" ? ["사번", "이름", "직급", "부서", "연락처"] : ["부서명", "코드", "소속 직원", "관련 품목"];
   const fieldGrid = variant === "models" ? styles.modelFields : variant === "employees" ? styles.employeeFields : deptStyles.metaGrid;
-  return <div aria-hidden="true" data-testid="admin-detail-skeleton" className={`flex min-h-full flex-1 flex-col ${variant === "employees" ? "gap-4" : "gap-3"}`}>
+  return <div aria-hidden="true" data-testid="admin-detail-skeleton" className={`flex min-h-full flex-1 flex-col gap-3 ${variant === "departments" ? deptStyles.detailLayout : ""}`}>
     <div className={styles.detailHeader}>
       <div className={fieldGrid}>{fields.map((label) => variant === "employees"
         ? <FieldRow key={label} label={label}><SkeletonBlock className="h-11 w-full rounded-[12px]" /></FieldRow>
@@ -54,33 +54,39 @@ export function AdminDetailSkeleton({ variant }: { variant: "models" | "employee
       <div className={styles.preview}>{Array.from({ length: 6 }, (_, index) => <div key={index} className={styles.previewRow}>
         <SkeletonBlock className="h-5 w-2/3" /><SkeletonBlock className="ml-auto h-3 w-20" />
       </div>)}<SkeletonBlock className="mt-1 h-4 w-16" /></div>
-    </div> : variant === "employees" ? <div className="grid min-h-0 gap-3 lg:grid-cols-2 xl:items-stretch">
-      <DetailCardSlot title="결재 권한" className="h-full">
-        <div className="flex flex-col gap-3">{["창고 결재 역할", "부서 결재 역할", "AS·연구 승인 권한"].map((label) =>
-          <FieldRow key={label} label={label}><SkeletonBlock className="h-11 w-full rounded-[10px]" /></FieldRow>)}
+    </div> : variant === "employees" ? <div className={styles.employeeCards}>
+      <div className={styles.employeeLeft}>
+      <DetailCardSlot title="결재 권한">
+        <div className={styles.employeePermissions}>{["창고 결재 권한", "부서 결재 권한", "AS·연구 승인 권한"].map((label) =>
+          <FieldRow key={label} label={label}><SkeletonBlock className="h-12 w-full rounded-[10px]" /></FieldRow>)}
         </div>
       </DetailCardSlot>
-      <DetailCardSlot title="직원에게 보이는 메뉴">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{SIDEBAR_TAB_IDS.map((tab) =>
-          <SkeletonBlock key={tab} className="h-11 w-full rounded-[10px]" />)}</div>
+      <DetailCardSlot title="PIN·계정 관리" className="flex-1">
+        <div className={styles.employeeAccountRows}>
+          {[1, 2].map((row) => <div key={row} className={styles.employeeAccountRow}>
+            <div className="flex flex-col gap-2"><SkeletonBlock className="h-5 w-24" /><SkeletonBlock className="h-3 w-32" /></div>
+            <div className="flex gap-2">{Array.from({ length: row }, (_, index) => <SkeletonBlock key={index} className="h-12 w-28 rounded-[10px]" />)}</div>
+          </div>)}
+        </div>
       </DetailCardSlot>
-      <div className="grid gap-3 lg:col-span-2 lg:grid-cols-2">
-        <DetailCardSlot title="PIN"><SkeletonBlock className="h-11 w-32 rounded-[10px]" /></DetailCardSlot>
-        <DetailCardSlot title="계정 상태 및 위험 작업"><div className="flex flex-col gap-2 sm:flex-row">
-          <SkeletonBlock className="h-11 flex-1 rounded-[10px]" /><SkeletonBlock className="h-11 flex-1 rounded-[10px]" />
-        </div></DetailCardSlot>
       </div>
+      <DetailCardSlot title="메뉴 표시" className="h-full">
+        <div className="grid flex-1 auto-rows-fr grid-cols-1 gap-2 sm:grid-cols-2">{SIDEBAR_TAB_IDS.map((tab) =>
+          <SkeletonBlock key={tab} className="min-h-14 w-full rounded-[10px]" />)}</div>
+      </DetailCardSlot>
     </div> : <>
       <p className="-mt-2 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>품목 코드 공정 기준</p>
+      <div className={deptStyles.detailCards}>
+      <DepartmentDetailCardSlot title="소속 직원" className="min-h-0 flex-1">
+        <div className="flex flex-wrap gap-2">{[0, 1, 2].map((index) => <SkeletonBlock key={index} className="h-10 w-28 rounded-[12px]" />)}</div>
+      </DepartmentDetailCardSlot>
       <DepartmentDetailCardSlot title="색상" className="min-h-0 flex-1">
         <div className="flex flex-col gap-3">
         <div className="flex items-center gap-3"><SkeletonBlock className="h-9 w-9 rounded-full" /><SkeletonBlock className="h-11 w-36 rounded-[12px]" /></div>
         <SkeletonBlock className="h-11 w-full rounded-[12px]" />
         </div>
       </DepartmentDetailCardSlot>
-      <DepartmentDetailCardSlot title="소속 직원" className="min-h-0 flex-1">
-        <div className="flex flex-wrap gap-2">{[0, 1, 2].map((index) => <SkeletonBlock key={index} className="h-10 w-28 rounded-[12px]" />)}</div>
-      </DepartmentDetailCardSlot>
+      </div>
     </>}
     {variant === "departments" ? <div className={`${deptStyles.dangerActions} mt-auto flex shrink-0 gap-2`}>
       <SkeletonBlock className="h-11 flex-1 rounded-[12px]" /><SkeletonBlock className="h-11 w-24 rounded-[12px]" />

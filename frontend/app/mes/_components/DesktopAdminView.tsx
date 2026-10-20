@@ -11,6 +11,7 @@ import { useAdminViewState, type AdminSection } from "./_admin_hooks/useAdminVie
 import { useConfirmNavigation } from "@/lib/ui/dirty-guard";
 import { StatusTargetNotice, useStatusTargetNotice } from "./common/StatusTargetNotice";
 import { AdminReadProvider } from "./_admin_sections/_admin_primitives/AdminReadState";
+import { AdminSessionProvider } from "./_admin_hooks/useAdminSessionState";
 
 /**
  * 섹션 헤더와 KPI는 각 섹션이 직접 그린다 (AdminPageHeader / AdminKpiBar 사용).
@@ -113,7 +114,7 @@ export function DesktopAdminView({
         {/* 워크스페이스 */}
         <section className="flex min-h-0 flex-1 flex-col overflow-auto pt-1 lg:overflow-hidden">
           {/* 섹션별 콘텐츠 */}
-          <AdminReadProvider value={readContext}><AdminSectionTransition
+          <AdminSessionProvider><AdminReadProvider value={readContext}><AdminSectionTransition
               section={section}
               contentProps={{
                 globalSearch, onStatusChange, setMessage, showSave,
@@ -122,7 +123,7 @@ export function DesktopAdminView({
                 allBomRows, refreshAllBom, refreshItems, refreshEmployees,
                 pinForm, setPinForm, isSaving, changePin, adminPin,
               }}
-            /></AdminReadProvider>
+            /></AdminReadProvider></AdminSessionProvider>
         </section>
       </div>
 
