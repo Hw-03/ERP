@@ -42,6 +42,7 @@ from app.services import io_dispatch as svc
 from app.services.bom_stock_policy import io_bom_auto_claims, issue_bom_auto_token
 from app.services.pin_auth import DEFAULT_PIN_HASH
 from app.services.sr_execution import release_reservation
+from app.services.work_reservation_errors import WorkReservationError
 from app.routers.inventory._tx_filters import _batch_name_map
 
 D = Decimal
@@ -2791,8 +2792,8 @@ def test_execute_batch_after_dept_approval_missing_batch_raises(db_session):
 # ──────────────────────────── submit_existing_draft (공개 진입점) ────────────────────────────
 
 
-def test_submit_existing_draft_completes_immediate(make_item, db_session):
-    """draft 재제출: 새 batch 없이 기존 라인 즉시 실행 → completed."""
+def test_submit_existing_unreserved_draft_requires_resave(make_item, db_session):
+    """과거 초안은 재저장하여 유효 계획을 확정하기 전 실행할 수 없다."""
     item = make_item(name="임시저장", warehouse_qty=D("0"))
     requester = _make_employee(db_session, warehouse_role="primary")
     batch = _build_batch(
@@ -2806,14 +2807,18 @@ def test_submit_existing_draft_completes_immediate(make_item, db_session):
     )
     db_session.flush()
 
-    result = svc.submit_existing_draft(
-        db_session,
-        batch_id=batch.batch_id,
-        requester_employee_id=requester.employee_id,
-    )
+    with pytest.raises(WorkReservationError) as error:
+        svc.submit_existing_draft(
+            db_session,
+            batch_id=batch.batch_id,
+            requester_employee_id=requester.employee_id,
+            expected_revision=batch.revision,
+        )
 
-    assert result["status"] == "completed"
-    assert _warehouse_qty(db_session, item.item_id) == D("7")
+    assert error.value.code == "WORK_RESERVATION_REQUIRED"
+    assert batch.status == "draft"
+    assert _warehouse_qty(db_session, item.item_id) == D("0")
+    assert db_session.query(TransactionLog).count() == 0
     assert db_session.query(IoBatch).count() == 1
 
 
@@ -2844,6 +2849,7 @@ def test_submit_existing_receive_draft_rejects_non_warehouse_requester_before_mu
             db_session,
             batch_id=batch.batch_id,
             requester_employee_id=requester.employee_id,
+            expected_revision=batch.revision,
         )
 
     assert batch.status == "draft"
@@ -2851,7 +2857,7 @@ def test_submit_existing_receive_draft_rejects_non_warehouse_requester_before_mu
     assert db_session.query(TransactionLog).count() == 0
 
 
-def test_submit_existing_draft_applies_current_bom_stock_exempt_setting(
+def test_submit_existing_unreserved_draft_policy_change_still_requires_resave(
     make_bom, make_item, db_session
 ):
     component = make_item(name="초안의 BOM 자재", process_type_code="AR")
@@ -2882,18 +2888,19 @@ def test_submit_existing_draft_applies_current_bom_stock_exempt_setting(
     component.bom_stock_exempt = True
     db_session.flush()
 
-    result = svc.submit_existing_draft(
-        db_session,
-        batch_id=batch.batch_id,
-        requester_employee_id=requester.employee_id,
-    )
+    with pytest.raises(WorkReservationError) as error:
+        svc.submit_existing_draft(
+            db_session,
+            batch_id=batch.batch_id,
+            requester_employee_id=requester.employee_id,
+            expected_revision=batch.revision,
+        )
 
     line = _single_line(batch)
-    assert result["status"] == "completed"
-    assert result["message"] == "BOM 재고 미반영 품목만 포함되어 재고 변동 없이 처리되었습니다."
-    assert batch.requires_approval is False
-    assert line.bom_stock_exempt is True
-    assert line.included is False
+    assert error.value.code == "WORK_RESERVATION_REQUIRED"
+    assert batch.status == "draft"
+    assert line.bom_stock_exempt is False
+    assert line.included is True
     assert db_session.query(StockRequest).count() == 0
     assert db_session.query(TransactionLog).count() == 0
 
@@ -2922,7 +2929,7 @@ def test_submit_existing_draft_wrong_owner_raises(make_item, db_session):
 
 
 def test_submit_existing_draft_non_draft_status_raises(make_item, db_session):
-    """draft 가 아닌 batch 재제출 시 ValueError."""
+    """draft가 아닌 batch의 재제출은 상태 충돌로 거부한다."""
     item = make_item(name="이미제출", warehouse_qty=D("0"))
     requester = _make_employee(db_session, warehouse_role="primary")
     batch = _build_batch(
@@ -2935,9 +2942,11 @@ def test_submit_existing_draft_non_draft_status_raises(make_item, db_session):
                 "to_bucket": "warehouse", "quantity": D("3")}],
     )
     db_session.flush()
-    with pytest.raises(ValueError, match="임시저장 상태가 아닙니다"):
+    with pytest.raises(WorkReservationError) as error:
         svc.submit_existing_draft(
             db_session,
             batch_id=batch.batch_id,
             requester_employee_id=requester.employee_id,
+            expected_revision=batch.revision,
         )
+    assert error.value.code == "WORK_STATE_CONFLICT"

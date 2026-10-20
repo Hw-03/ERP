@@ -8,6 +8,7 @@ import { deleteJson, fetcher, postJson, putJson, toApiUrl } from "../api-core";
 import type {
   StockRequest,
   StockRequestActionPayload,
+  StockRequestRevertPayload,
   StockRequestCreatePayload,
   StockRequestDraftUpsertPayload,
   StockRequestReservationLine,
@@ -114,7 +115,7 @@ export const stockRequestsApi = {
   cancelStockRequest: (requestId: string, payload: StockRequestActionPayload) =>
     postJson<StockRequest>(toApiUrl(`/api/stock-requests/${requestId}/cancel`), payload),
 
-  revertToDraft: (requestId: string, payload: StockRequestActionPayload) =>
+  revertToDraft: (requestId: string, payload: StockRequestRevertPayload) =>
     postJson<IoBatch>(toApiUrl(`/api/stock-requests/${requestId}/revert-to-draft`), payload),
 
   getItemReservations: (itemId: string) =>

@@ -13,6 +13,7 @@ import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { useDeptColorLookup } from "../DepartmentsContext";
 import { DesktopRightPanelFooter } from "../DesktopRightPanel";
 import { InventoryDetailLocations } from "./InventoryDetailLocations";
+import { InventoryWorkStatusPanel } from "./InventoryWorkStatusPanel";
 import { getManagedStockBreakdown, STOCK_CATEGORY_ORDER, STOCK_CATEGORY_STYLES } from "./inventoryManagedStock";
 import { BomDetailModal } from "./BomDetailModal";
 import { inboundChoices, outboundChoices, quickChoiceToIntent } from "../_warehouse_v2/ioWorkType";
@@ -41,6 +42,7 @@ type Props = {
   imageFilename?: string;
   // 항목 3 — 모바일 빠른작업: 출고 빨강 + 서브옵션 전폭. 기본 desktop(현행 유지)이라 데스크톱 호출처 무변경.
   quickActionVariant?: "mobile" | "desktop";
+  showWorkStatus?: boolean;
 };
 
 export function InventoryDetailPanel({
@@ -50,6 +52,7 @@ export function InventoryDetailPanel({
   actionsDisabled = false,
   imageFilename,
   quickActionVariant = "desktop",
+  showWorkStatus = false,
 }: Props) {
   const mobile = quickActionVariant === "mobile";
   const writeBlocked = actionsDisabled || !!item.deleted_at;
@@ -101,8 +104,11 @@ export function InventoryDetailPanel({
       </div>
     </div>
   ));
+  const locationSection = (Number(item.warehouse_qty) > 0 || (item.locations ?? []).some((location) => Number(location.quantity) > 0))
+    ? <InventoryDetailLocations item={item} getDeptColor={getDeptColor} mobile={mobile} showWorkReservations={showWorkStatus} /> : null;
 
   useEffect(() => {
+    if (showWorkStatus) return;
     let cancelled = false;
     setReservationFailure(null);
     if (reservationsItemRef.current !== item.item_id) {
@@ -131,7 +137,7 @@ export function InventoryDetailPanel({
     return () => {
       cancelled = true;
     };
-  }, [item.item_id, pendingQty, revision, reservationRetry]);
+  }, [item.item_id, pendingQty, revision, reservationRetry, showWorkStatus]);
 
   return (
     <div className={mobile ? "flex flex-col gap-2" : "space-y-4"}>
@@ -184,7 +190,7 @@ export function InventoryDetailPanel({
         />
       )}
       {/* 수량 현황 */}
-      <section
+      {!showWorkStatus && <section
         className={mobile ? "rounded-[20px] border px-3 py-2" : "rounded-[28px] border p-5"}
         style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
       >
@@ -238,10 +244,21 @@ export function InventoryDetailPanel({
             </div>
           )}
         </div>
-      </section>
+      </section>}
+
+      {showWorkStatus && <InventoryWorkStatusPanel key={item.item_id} item={item} mobile={mobile}>
+        {(managedTotals.length > 0 || item.supplier) && <section className={mobile ? "rounded-[20px] border px-3 py-2" : "rounded-[28px] border p-4"}
+          style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
+          {managedTotals.length > 0 && <div className={`grid ${managedTotals.length === 3 ? "grid-cols-3" : managedTotals.length === 2 ? "grid-cols-2" : "grid-cols-1"} gap-2`}>{managedCards}</div>}
+          {item.supplier && <div className={managedTotals.length > 0 ? "mt-2 border-t pt-2" : ""} style={{ borderColor: LEGACY_COLORS.border }}>
+            <p className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>공급처</p><p className="mt-1 break-words text-sm">{item.supplier}</p>
+          </div>}
+        </section>}
+        {locationSection}
+      </InventoryWorkStatusPanel>}
 
       {/* 승인 대기 요청 목록 */}
-      {(reservations.length > 0 || (mobile && pendingQty > 0 && (reservationsLoading || currentReservationFailure))) && (
+      {!showWorkStatus && (reservations.length > 0 || (mobile && pendingQty > 0 && (reservationsLoading || currentReservationFailure))) && (
         <section
           className={mobile ? "border-t" : "rounded-[28px] border p-5"}
           style={{ borderColor: LEGACY_COLORS.border, background: mobile ? "transparent" : LEGACY_COLORS.s2 }}
@@ -278,9 +295,7 @@ export function InventoryDetailPanel({
         </section>
       )}
 
-      {(Number(item.warehouse_qty) > 0 || (item.locations ?? []).some((l) => Number(l.quantity) > 0)) && (
-        <InventoryDetailLocations item={item} getDeptColor={getDeptColor} mobile={mobile} />
-      )}
+      {!showWorkStatus && locationSection}
 
       {/* BOM 하위 구성 */}
       {item.bom_completed_at != null && (

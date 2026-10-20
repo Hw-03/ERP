@@ -111,13 +111,35 @@ describe("draft 삭제 mutation", () => {
     const { result } = renderHook(() => useDeleteIoDraftMutation(), {
       wrapper: makeWrapper(client),
     });
-    await result.current.mutateAsync({ batchId: "io1", employeeId: "e1" });
+    await result.current.mutateAsync({ batchId: "io1", employeeId: "e1", expectedRevision: 7 });
 
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/io/draft/io1");
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("expected_revision=7");
     const init = fetchSpy.mock.calls[0][1] as RequestInit;
     expect(init.method).toBe("DELETE");
     await waitFor(() =>
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.stockRequests.all }),
     );
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.items.all });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.inventory.all });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.admin.workReservationsAll });
+  });
+
+  it("오래된 삭제는 한 번만 요청하고 최신 예약 조회를 갱신한다", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve({
+      ...makeResponse({ detail: { code: "WORK_REVISION_CONFLICT", message: "변경된 작업입니다." } }, false),
+      status: 409,
+    }));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = makeClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const { result } = renderHook(() => useDeleteIoDraftMutation(), { wrapper: makeWrapper(client) });
+
+    await expect(result.current.mutateAsync({ batchId: "io1", employeeId: "e1", expectedRevision: 7 }))
+      .rejects.toMatchObject({ status: 409, code: "WORK_REVISION_CONFLICT" });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.inventory.all });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.admin.workReservationsAll });
   });
 });

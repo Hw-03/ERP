@@ -12,15 +12,20 @@
 
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
-import type { StockRequestActionPayload, StockRequestCreatePayload } from "@/lib/api/types";
+import type { StockRequestActionPayload, StockRequestCreatePayload, StockRequestRevertPayload } from "@/lib/api/types";
 import { STALE_TIME } from "./client";
 import { queryKeys } from "./keys";
+import { invalidateWorkReservationQueries, shouldRefreshWorkReservations } from "./workReservationInvalidation";
 
 function invalidateDecisionQueries(qc: QueryClient) {
   return Promise.all([
-    qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all }),
+    invalidateWorkReservationQueries(qc),
     qc.invalidateQueries({ queryKey: queryKeys.notifications.all }),
   ]);
+}
+
+function refreshAfterDecisionError(qc: QueryClient, error: unknown): void {
+  if (shouldRefreshWorkReservations(error)) void invalidateDecisionQueries(qc);
 }
 
 /** 창고 승인 대기열 */
@@ -79,6 +84,7 @@ export function useApproveStockRequestMutation() {
       payload: StockRequestActionPayload;
     }) => stockRequestsApi.approveStockRequest(requestId, payload),
     onSuccess: () => invalidateDecisionQueries(qc),
+    onError: (error) => refreshAfterDecisionError(qc, error),
   });
 }
 
@@ -94,6 +100,7 @@ export function useRejectStockRequestMutation() {
       payload: StockRequestActionPayload;
     }) => stockRequestsApi.rejectStockRequest(requestId, payload),
     onSuccess: () => invalidateDecisionQueries(qc),
+    onError: (error) => refreshAfterDecisionError(qc, error),
   });
 }
 
@@ -109,6 +116,7 @@ export function useApproveStockRequestDepartmentMutation() {
       payload: StockRequestActionPayload;
     }) => stockRequestsApi.approveStockRequestDepartment(requestId, payload),
     onSuccess: () => invalidateDecisionQueries(qc),
+    onError: (error) => refreshAfterDecisionError(qc, error),
   });
 }
 
@@ -124,6 +132,7 @@ export function useRejectStockRequestDepartmentMutation() {
       payload: StockRequestActionPayload;
     }) => stockRequestsApi.rejectStockRequestDepartment(requestId, payload),
     onSuccess: () => invalidateDecisionQueries(qc),
+    onError: (error) => refreshAfterDecisionError(qc, error),
   });
 }
 
@@ -134,6 +143,7 @@ export function useApproveStockRequestAsResearchMutation() {
     mutationFn: ({ requestId, payload }: { requestId: string; payload: StockRequestActionPayload }) =>
       stockRequestsApi.approveStockRequestAsResearch(requestId, payload),
     onSuccess: () => invalidateDecisionQueries(qc),
+    onError: (error) => refreshAfterDecisionError(qc, error),
   });
 }
 
@@ -144,6 +154,7 @@ export function useRejectStockRequestAsResearchMutation() {
     mutationFn: ({ requestId, payload }: { requestId: string; payload: StockRequestActionPayload }) =>
       stockRequestsApi.rejectStockRequestAsResearch(requestId, payload),
     onSuccess: () => invalidateDecisionQueries(qc),
+    onError: (error) => refreshAfterDecisionError(qc, error),
   });
 }
 
@@ -158,8 +169,8 @@ export function useCancelStockRequestMutation() {
       requestId: string;
       payload: StockRequestActionPayload;
     }) => stockRequestsApi.cancelStockRequest(requestId, payload),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all }),
+    onSuccess: () => invalidateDecisionQueries(qc),
+    onError: (error) => refreshAfterDecisionError(qc, error),
   });
 }
 
@@ -172,11 +183,12 @@ export function useRevertToDraftMutation() {
       payload,
     }: {
       requestId: string;
-      payload: StockRequestActionPayload;
+      payload: StockRequestRevertPayload;
     }) => stockRequestsApi.revertToDraft(requestId, payload),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all });
+      void invalidateDecisionQueries(qc);
     },
+    onError: (error) => refreshAfterDecisionError(qc, error),
   });
 }
 
@@ -186,7 +198,7 @@ export function useCreateStockRequestMutation() {
   return useMutation({
     mutationFn: (payload: StockRequestCreatePayload) =>
       stockRequestsApi.createStockRequest(payload),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all }),
+    onSuccess: () => invalidateDecisionQueries(qc),
+    onError: (error) => refreshAfterDecisionError(qc, error),
   });
 }

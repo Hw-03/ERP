@@ -139,7 +139,12 @@ export interface StockRequestActionPayload {
   actor_employee_id: string;
   pin: string;
   reason?: string;
+  /** CP4 요청 수정에서 연결 IoBatch의 버전을 검증한다. 일반 독립 요청은 별도다. */
+  expected_revision?: number;
 }
+
+/** 수정 전환은 조회에서 확인한 연결 작업 버전이 반드시 필요하다. */
+export type StockRequestRevertPayload = StockRequestActionPayload & { expected_revision: number };
 
 export interface StockRequestReservationLine {
   line_id: string;

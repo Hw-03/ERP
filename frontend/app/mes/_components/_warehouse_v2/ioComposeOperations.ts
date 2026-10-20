@@ -116,7 +116,7 @@ export async function runWarehousePull(
   pullingRef: MutableRefObject<boolean>,
   setPulling: (pulling: boolean) => void,
   itemIds: string[],
-  saveOriginalDraft: () => Promise<string | null>,
+  retainOriginalSession: () => Promise<string | null>,
   previewItem: (itemId: string) => Promise<IoBundle[]>,
   complete: (savedDraftId: string, bundles: IoBundle[]) => void,
 ): Promise<void> {
@@ -125,14 +125,14 @@ export async function runWarehousePull(
   pullingRef.current = true;
   setPulling(true);
   try {
-    const savedDraftId = await saveOriginalDraft();
-    if (!savedDraftId || !isCurrentIoOperation(refs, version)) return;
+    const originalSessionId = await retainOriginalSession();
+    if (!originalSessionId || !isCurrentIoOperation(refs, version)) return;
     const bundles: IoBundle[] = [];
     for (const itemId of itemIds) {
       bundles.push(...await previewItem(itemId));
       if (!isCurrentIoOperation(refs, version)) return;
     }
-    complete(savedDraftId, bundles);
+    complete(originalSessionId, bundles);
   } catch (error) {
     if (!isCurrentIoOperation(refs, version)) return;
     throw error;
@@ -258,7 +258,7 @@ export async function runCompositionSubmit(
   reset: () => void,
   resetFilters: () => void,
   onStatusChange: (message: string) => void,
-  refreshItems: () => Promise<Item[]>,
+  refreshItems: () => Promise<Item[] | void>,
   setItems: (items: Item[]) => void,
   onSubmitSuccess?: () => void,
   submitExistingDraft: (draftId: string) => Promise<IoSubmitResponse> = () =>
@@ -299,18 +299,22 @@ export async function runCompositionSubmit(
       submit,
       submitExistingDraft,
     );
+    // 같은 세션의 제출은 이미 확정됐다. 대기 중 편집을 성공 미확인 상태로 남기지 않는다.
+    if (operationRefs && operationVersion && operationRefs.generation.current !== operationVersion[0]) return;
     if (submittedDraftId) onDraftSubmitted?.(submittedDraftId);
     setResult({ kind: "success", title, message: response.message });
     reset();
     resetFilters();
     onStatusChange(response.message);
     try {
-      setItems(await refreshItems());
+      const refreshedItems = await refreshItems();
+      if (refreshedItems) setItems(refreshedItems);
     } catch {
       // 제출은 성공했으므로 후속 목록 갱신 실패는 무시한다.
     }
     onSubmitSuccess?.();
   } catch (error) {
+    if (operationRefs && operationVersion && operationRefs.generation.current !== operationVersion[0]) return;
     const message = error instanceof Error ? error.message : "제출 중 오류가 발생했습니다.";
     setResult({ kind: "error", title: "제출 실패", message });
   }

@@ -86,6 +86,7 @@ def _submit_final_pf_production(
     io_actions_svc.submit(
         db_session,
         IoSubmitRequest(
+            client_request_id=str(uuid.uuid4()),
             requester_employee_id=actor.employee_id,
             work_type="process",
             sub_type="produce",

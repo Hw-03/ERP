@@ -385,6 +385,206 @@
         "title": "AdminPinVerifyRequest",
         "type": "object"
       },
+      "AdminWorkReservationDetail": {
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "effective_plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkEffectivePlan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expected_effects": {
+            "items": {
+              "$ref": "#/components/schemas/WorkInventoryEffect"
+            },
+            "title": "Expected Effects",
+            "type": "array"
+          },
+          "forecast_issue": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkForecastIssue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/WorkReservationEvent"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "reference_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference No"
+          },
+          "requester_active": {
+            "title": "Requester Active",
+            "type": "boolean"
+          },
+          "requester_department": {
+            "title": "Requester Department",
+            "type": "string"
+          },
+          "requester_employee_id": {
+            "title": "Requester Employee Id",
+            "type": "string"
+          },
+          "requester_name": {
+            "title": "Requester Name",
+            "type": "string"
+          },
+          "reservation_issue": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkReservationIssue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reservation_status": {
+            "enum": [
+              "reserved",
+              "needs_reservation",
+              "not_required",
+              "inactive"
+            ],
+            "title": "Reservation Status",
+            "type": "string"
+          },
+          "reserved_inputs": {
+            "items": {
+              "$ref": "#/components/schemas/WorkReservedInput"
+            },
+            "title": "Reserved Inputs",
+            "type": "array"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "sub_type": {
+            "title": "Sub Type",
+            "type": "string"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/WorkTarget"
+            },
+            "title": "Targets",
+            "type": "array"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "work_type": {
+            "title": "Work Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "batch_id",
+          "revision",
+          "status",
+          "reservation_status",
+          "reservation_issue",
+          "work_type",
+          "sub_type",
+          "reference_no",
+          "requester_employee_id",
+          "requester_name",
+          "requester_department",
+          "requester_active",
+          "targets",
+          "created_at",
+          "updated_at",
+          "reserved_inputs",
+          "expected_effects",
+          "forecast_issue",
+          "notes",
+          "effective_plan",
+          "history"
+        ],
+        "title": "AdminWorkReservationDetail",
+        "type": "object"
+      },
+      "AdminWorkReservationList": {
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/WorkReservationCounts"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WorkReservationSummary"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "skip": {
+            "title": "Skip",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit",
+          "counts"
+        ],
+        "title": "AdminWorkReservationList",
+        "type": "object"
+      },
       "AliasCreate": {
         "additionalProperties": false,
         "properties": {
@@ -3524,6 +3724,25 @@
         "title": "DefectStatisticsTrendEntry",
         "type": "object"
       },
+      "DefectiveLocation": {
+        "properties": {
+          "bucket": {
+            "const": "defective",
+            "title": "Bucket",
+            "type": "string"
+          },
+          "department": {
+            "title": "Department",
+            "type": "string"
+          }
+        },
+        "required": [
+          "bucket",
+          "department"
+        ],
+        "title": "DefectiveLocation",
+        "type": "object"
+      },
       "DefectiveStockBreakdown": {
         "description": "격리 버킷의 실재고를 부서와 현재 관리 분류로 나눈다.",
         "properties": {
@@ -5369,6 +5588,103 @@
         "title": "InventoryIntegrityResponse",
         "type": "object"
       },
+      "InventoryLocationForecast": {
+        "properties": {
+          "expected_in_quantity": {
+            "title": "Expected In Quantity",
+            "type": "integer"
+          },
+          "expected_out_quantity": {
+            "title": "Expected Out Quantity",
+            "type": "integer"
+          },
+          "location": {
+            "discriminator": {
+              "mapping": {
+                "defective": "#/components/schemas/DefectiveLocation",
+                "production": "#/components/schemas/ProductionLocation",
+                "warehouse": "#/components/schemas/WarehouseLocation"
+              },
+              "propertyName": "bucket"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WarehouseLocation"
+              },
+              {
+                "$ref": "#/components/schemas/ProductionLocation"
+              },
+              {
+                "$ref": "#/components/schemas/DefectiveLocation"
+              }
+            ],
+            "title": "Location"
+          },
+          "transfer_in_quantity": {
+            "title": "Transfer In Quantity",
+            "type": "integer"
+          },
+          "transfer_out_quantity": {
+            "title": "Transfer Out Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_in_quantity",
+          "expected_out_quantity",
+          "transfer_in_quantity",
+          "transfer_out_quantity",
+          "location"
+        ],
+        "title": "InventoryLocationForecast",
+        "type": "object"
+      },
+      "InventoryLocationReservation": {
+        "properties": {
+          "approval_reserved_quantity": {
+            "title": "Approval Reserved Quantity",
+            "type": "integer"
+          },
+          "location": {
+            "discriminator": {
+              "mapping": {
+                "defective": "#/components/schemas/DefectiveLocation",
+                "production": "#/components/schemas/ProductionLocation",
+                "warehouse": "#/components/schemas/WarehouseLocation"
+              },
+              "propertyName": "bucket"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WarehouseLocation"
+              },
+              {
+                "$ref": "#/components/schemas/ProductionLocation"
+              },
+              {
+                "$ref": "#/components/schemas/DefectiveLocation"
+              }
+            ],
+            "title": "Location"
+          },
+          "shipping_reserved_quantity": {
+            "title": "Shipping Reserved Quantity",
+            "type": "integer"
+          },
+          "work_reserved_quantity": {
+            "title": "Work Reserved Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "work_reserved_quantity",
+          "approval_reserved_quantity",
+          "shipping_reserved_quantity",
+          "location"
+        ],
+        "title": "InventoryLocationReservation",
+        "type": "object"
+      },
       "InventoryLocationResponse": {
         "description": "부서×상태(생산/불량) 단위 재고 분포.",
         "properties": {
@@ -5409,6 +5725,204 @@
         ],
         "title": "InventoryOperationKindEnum",
         "type": "string"
+      },
+      "InventoryRelatedWork": {
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expected_effects": {
+            "items": {
+              "$ref": "#/components/schemas/WorkInventoryEffect"
+            },
+            "title": "Expected Effects",
+            "type": "array"
+          },
+          "forecast_issue": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkForecastIssue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reference_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference No"
+          },
+          "requester_active": {
+            "title": "Requester Active",
+            "type": "boolean"
+          },
+          "requester_department": {
+            "title": "Requester Department",
+            "type": "string"
+          },
+          "requester_employee_id": {
+            "title": "Requester Employee Id",
+            "type": "string"
+          },
+          "requester_name": {
+            "title": "Requester Name",
+            "type": "string"
+          },
+          "reservation_issue": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkReservationIssue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reservation_status": {
+            "enum": [
+              "reserved",
+              "needs_reservation",
+              "not_required",
+              "inactive"
+            ],
+            "title": "Reservation Status",
+            "type": "string"
+          },
+          "reserved_inputs": {
+            "items": {
+              "$ref": "#/components/schemas/WorkReservedInput"
+            },
+            "title": "Reserved Inputs",
+            "type": "array"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "sub_type": {
+            "title": "Sub Type",
+            "type": "string"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/WorkTarget"
+            },
+            "title": "Targets",
+            "type": "array"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "work_type": {
+            "title": "Work Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "batch_id",
+          "revision",
+          "status",
+          "reservation_status",
+          "reservation_issue",
+          "work_type",
+          "sub_type",
+          "reference_no",
+          "requester_employee_id",
+          "requester_name",
+          "requester_department",
+          "requester_active",
+          "targets",
+          "created_at",
+          "updated_at",
+          "reserved_inputs",
+          "expected_effects",
+          "forecast_issue"
+        ],
+        "title": "InventoryRelatedWork",
+        "type": "object"
+      },
+      "InventoryReservationSummary": {
+        "properties": {
+          "approval_reserved_quantity": {
+            "title": "Approval Reserved Quantity",
+            "type": "integer"
+          },
+          "expected_in_quantity": {
+            "title": "Expected In Quantity",
+            "type": "integer"
+          },
+          "expected_out_quantity": {
+            "title": "Expected Out Quantity",
+            "type": "integer"
+          },
+          "forecast_by_location": {
+            "items": {
+              "$ref": "#/components/schemas/InventoryLocationForecast"
+            },
+            "title": "Forecast By Location",
+            "type": "array"
+          },
+          "forecast_complete": {
+            "title": "Forecast Complete",
+            "type": "boolean"
+          },
+          "reservation_by_location": {
+            "items": {
+              "$ref": "#/components/schemas/InventoryLocationReservation"
+            },
+            "title": "Reservation By Location",
+            "type": "array"
+          },
+          "shipping_reserved_quantity": {
+            "title": "Shipping Reserved Quantity",
+            "type": "integer"
+          },
+          "transfer_in_quantity": {
+            "title": "Transfer In Quantity",
+            "type": "integer"
+          },
+          "transfer_out_quantity": {
+            "title": "Transfer Out Quantity",
+            "type": "integer"
+          },
+          "work_reserved_quantity": {
+            "title": "Work Reserved Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_in_quantity",
+          "expected_out_quantity",
+          "transfer_in_quantity",
+          "transfer_out_quantity",
+          "work_reserved_quantity",
+          "approval_reserved_quantity",
+          "shipping_reserved_quantity",
+          "forecast_complete",
+          "reservation_by_location",
+          "forecast_by_location"
+        ],
+        "title": "InventoryReservationSummary",
+        "type": "object"
       },
       "InventoryResponse": {
         "properties": {
@@ -5528,6 +6042,31 @@
         "title": "InventorySummaryResponse",
         "type": "object"
       },
+      "InventoryWorkStatus": {
+        "properties": {
+          "item_id": {
+            "title": "Item Id",
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/InventoryReservationSummary"
+          },
+          "works": {
+            "items": {
+              "$ref": "#/components/schemas/InventoryRelatedWork"
+            },
+            "title": "Works",
+            "type": "array"
+          }
+        },
+        "required": [
+          "item_id",
+          "summary",
+          "works"
+        ],
+        "title": "InventoryWorkStatus",
+        "type": "object"
+      },
       "IoBatchResponse": {
         "properties": {
           "approver_employee_id": {
@@ -5586,6 +6125,18 @@
             "default": false,
             "title": "Department Routes Normalized",
             "type": "boolean"
+          },
+          "effective_plan": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Plan"
           },
           "from_department": {
             "anyOf": [
@@ -5659,6 +6210,32 @@
           "requires_approval": {
             "title": "Requires Approval",
             "type": "boolean"
+          },
+          "reservation_issue": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reservation Issue"
+          },
+          "reservation_status": {
+            "enum": [
+              "reserved",
+              "needs_reservation",
+              "not_required",
+              "inactive"
+            ],
+            "title": "Reservation Status",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
           },
           "shipping_request_id": {
             "anyOf": [
@@ -5757,6 +6334,8 @@
         },
         "required": [
           "batch_id",
+          "revision",
+          "reservation_status",
           "work_type",
           "sub_type",
           "status",
@@ -5884,6 +6463,20 @@
         "title": "IoComponentSelection",
         "type": "object"
       },
+      "IoDraftSubmitRequest": {
+        "properties": {
+          "expected_revision": {
+            "minimum": 0.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_revision"
+        ],
+        "title": "IoDraftSubmitRequest",
+        "type": "object"
+      },
       "IoDraftUpsert": {
         "properties": {
           "batch_id": {
@@ -5916,6 +6509,18 @@
               }
             ],
             "title": "Client Request Id"
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision"
           },
           "from_department": {
             "anyOf": [
@@ -6156,6 +6761,7 @@
             "type": "string"
           },
           "quantity": {
+            "minimum": 0.0,
             "title": "Quantity",
             "type": "integer"
           },
@@ -6215,6 +6821,18 @@
               }
             ],
             "title": "From Department"
+          },
+          "owner_batch_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Batch Id"
           },
           "requester_employee_id": {
             "anyOf": [
@@ -6547,6 +7165,18 @@
               }
             ],
             "title": "Client Request Id"
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision"
           },
           "from_department": {
             "anyOf": [
@@ -7854,6 +8484,9 @@
             "default": 0,
             "title": "Warehouse Qty",
             "type": "integer"
+          },
+          "work_reservations": {
+            "$ref": "#/components/schemas/InventoryReservationSummary"
           }
         },
         "required": [
@@ -7861,7 +8494,8 @@
           "item_name",
           "unit",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "work_reservations"
         ],
         "title": "ItemWithInventory",
         "type": "object"
@@ -8863,6 +9497,25 @@
           }
         },
         "title": "ProductSymbolUpdate",
+        "type": "object"
+      },
+      "ProductionLocation": {
+        "properties": {
+          "bucket": {
+            "const": "production",
+            "title": "Bucket",
+            "type": "string"
+          },
+          "department": {
+            "title": "Department",
+            "type": "string"
+          }
+        },
+        "required": [
+          "bucket",
+          "department"
+        ],
+        "title": "ProductionLocation",
         "type": "object"
       },
       "ProductionReceiptRequest": {
@@ -12643,6 +13296,45 @@
         "title": "StockRequestResponse",
         "type": "object"
       },
+      "StockRequestRevertRequest": {
+        "description": "승인 요청 수정은 연결 작업의 확인한 버전을 반드시 전송한다.",
+        "properties": {
+          "actor_employee_id": {
+            "format": "uuid",
+            "title": "Actor Employee Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "minimum": 0.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "pin": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Pin",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "actor_employee_id",
+          "pin",
+          "expected_revision"
+        ],
+        "title": "StockRequestRevertRequest",
+        "type": "object"
+      },
       "StockRequestStatusEnum": {
         "enum": [
           "draft",
@@ -14528,6 +15220,25 @@
         "title": "WarehouseBoxUpdate",
         "type": "object"
       },
+      "WarehouseLocation": {
+        "properties": {
+          "bucket": {
+            "const": "warehouse",
+            "title": "Bucket",
+            "type": "string"
+          },
+          "department": {
+            "title": "Department",
+            "type": "null"
+          }
+        },
+        "required": [
+          "bucket",
+          "department"
+        ],
+        "title": "WarehouseLocation",
+        "type": "object"
+      },
       "WarehouseMapResponse": {
         "properties": {
           "angles": {
@@ -15302,6 +16013,632 @@
           "message"
         ],
         "title": "WeeklyWarning",
+        "type": "object"
+      },
+      "WorkEffectivePlan": {
+        "properties": {
+          "effects": {
+            "items": {
+              "$ref": "#/components/schemas/WorkInventoryEffect"
+            },
+            "title": "Effects",
+            "type": "array"
+          },
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "fingerprint",
+          "effects"
+        ],
+        "title": "WorkEffectivePlan",
+        "type": "object"
+      },
+      "WorkForecastIssue": {
+        "properties": {
+          "code": {
+            "enum": [
+              "missing_effect_mapping",
+              "unsupported_legacy_plan"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "WorkForecastIssue",
+        "type": "object"
+      },
+      "WorkInventoryEffect": {
+        "properties": {
+          "bundle_id": {
+            "title": "Bundle Id",
+            "type": "string"
+          },
+          "effect_id": {
+            "title": "Effect Id",
+            "type": "string"
+          },
+          "from": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "production": "#/components/schemas/ProductionLocation",
+                    "warehouse": "#/components/schemas/WarehouseLocation"
+                  },
+                  "propertyName": "bucket"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/WarehouseLocation"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ProductionLocation"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From"
+          },
+          "item_id": {
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "in",
+              "out",
+              "move"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
+          },
+          "operation_line_id": {
+            "title": "Operation Line Id",
+            "type": "string"
+          },
+          "quantity": {
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "defective": "#/components/schemas/DefectiveLocation",
+                    "production": "#/components/schemas/ProductionLocation",
+                    "warehouse": "#/components/schemas/WarehouseLocation"
+                  },
+                  "propertyName": "bucket"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/WarehouseLocation"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ProductionLocation"
+                  },
+                  {
+                    "$ref": "#/components/schemas/DefectiveLocation"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "item_name",
+          "mes_code",
+          "unit",
+          "effect_id",
+          "operation_line_id",
+          "bundle_id",
+          "quantity",
+          "kind",
+          "from",
+          "to"
+        ],
+        "title": "WorkInventoryEffect",
+        "type": "object"
+      },
+      "WorkReservationCancelRequest": {
+        "properties": {
+          "expected_revision": {
+            "minimum": 0.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "reason"
+        ],
+        "title": "WorkReservationCancelRequest",
+        "type": "object"
+      },
+      "WorkReservationCounts": {
+        "properties": {
+          "draft": {
+            "title": "Draft",
+            "type": "integer"
+          },
+          "needs_reservation": {
+            "title": "Needs Reservation",
+            "type": "integer"
+          },
+          "not_required": {
+            "title": "Not Required",
+            "type": "integer"
+          },
+          "reserved": {
+            "title": "Reserved",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "draft",
+          "reserved",
+          "needs_reservation",
+          "not_required"
+        ],
+        "title": "WorkReservationCounts",
+        "type": "object"
+      },
+      "WorkReservationEvent": {
+        "properties": {
+          "action": {
+            "enum": [
+              "saved",
+              "submitted",
+              "returned",
+              "backfilled",
+              "admin_cancelled",
+              "owner_deleted",
+              "approval_changed",
+              "settlement_failed"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "actor_employee_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Employee Id"
+          },
+          "actor_name": {
+            "title": "Actor Name",
+            "type": "string"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "event_id",
+          "action",
+          "revision",
+          "occurred_at",
+          "actor_employee_id",
+          "actor_name",
+          "reason"
+        ],
+        "title": "WorkReservationEvent",
+        "type": "object"
+      },
+      "WorkReservationIssue": {
+        "properties": {
+          "code": {
+            "enum": [
+              "legacy_unprocessed",
+              "stock_shortage",
+              "inactive_owner",
+              "unsupported_source",
+              "plan_invalid",
+              "returned_after_rejection"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "shortages": {
+            "items": {
+              "$ref": "#/components/schemas/WorkReservationShortage"
+            },
+            "title": "Shortages",
+            "type": "array"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "shortages"
+        ],
+        "title": "WorkReservationIssue",
+        "type": "object"
+      },
+      "WorkReservationShortage": {
+        "properties": {
+          "available_quantity": {
+            "title": "Available Quantity",
+            "type": "integer"
+          },
+          "item_id": {
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "location": {
+            "discriminator": {
+              "mapping": {
+                "production": "#/components/schemas/ProductionLocation",
+                "warehouse": "#/components/schemas/WarehouseLocation"
+              },
+              "propertyName": "bucket"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WarehouseLocation"
+              },
+              {
+                "$ref": "#/components/schemas/ProductionLocation"
+              }
+            ],
+            "title": "Location"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
+          },
+          "required_quantity": {
+            "title": "Required Quantity",
+            "type": "integer"
+          },
+          "shortage_quantity": {
+            "title": "Shortage Quantity",
+            "type": "integer"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "item_name",
+          "mes_code",
+          "unit",
+          "location",
+          "required_quantity",
+          "available_quantity",
+          "shortage_quantity"
+        ],
+        "title": "WorkReservationShortage",
+        "type": "object"
+      },
+      "WorkReservationSummary": {
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "reference_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference No"
+          },
+          "requester_active": {
+            "title": "Requester Active",
+            "type": "boolean"
+          },
+          "requester_department": {
+            "title": "Requester Department",
+            "type": "string"
+          },
+          "requester_employee_id": {
+            "title": "Requester Employee Id",
+            "type": "string"
+          },
+          "requester_name": {
+            "title": "Requester Name",
+            "type": "string"
+          },
+          "reservation_issue": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkReservationIssue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reservation_status": {
+            "enum": [
+              "reserved",
+              "needs_reservation",
+              "not_required",
+              "inactive"
+            ],
+            "title": "Reservation Status",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "sub_type": {
+            "title": "Sub Type",
+            "type": "string"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/WorkTarget"
+            },
+            "title": "Targets",
+            "type": "array"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "work_type": {
+            "title": "Work Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "batch_id",
+          "revision",
+          "status",
+          "reservation_status",
+          "reservation_issue",
+          "work_type",
+          "sub_type",
+          "reference_no",
+          "requester_employee_id",
+          "requester_name",
+          "requester_department",
+          "requester_active",
+          "targets",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "WorkReservationSummary",
+        "type": "object"
+      },
+      "WorkReservedInput": {
+        "properties": {
+          "item_id": {
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "location": {
+            "discriminator": {
+              "mapping": {
+                "production": "#/components/schemas/ProductionLocation",
+                "warehouse": "#/components/schemas/WarehouseLocation"
+              },
+              "propertyName": "bucket"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WarehouseLocation"
+              },
+              {
+                "$ref": "#/components/schemas/ProductionLocation"
+              }
+            ],
+            "title": "Location"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
+          },
+          "operation_line_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Operation Line Ids",
+            "type": "array"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "draft",
+              "approval"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "stock_request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Request Id"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "item_name",
+          "mes_code",
+          "unit",
+          "location",
+          "quantity",
+          "source",
+          "stock_request_id",
+          "operation_line_ids"
+        ],
+        "title": "WorkReservedInput",
+        "type": "object"
+      },
+      "WorkTarget": {
+        "properties": {
+          "item_id": {
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "item_name",
+          "mes_code",
+          "unit",
+          "quantity"
+        ],
+        "title": "WorkTarget",
         "type": "object"
       }
     }
@@ -16266,6 +17603,384 @@
         "summary": "Download F705 02",
         "tags": [
           "Admin Export"
+        ]
+      }
+    },
+    "/api/admin/work-reservations": {
+      "get": {
+        "description": "Expose only authenticated, filtered administrator detail rows.",
+        "operationId": "list_reservations_api_admin_work_reservations_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "in": "query",
+            "name": "requester_department",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Requester Department"
+            }
+          },
+          {
+            "in": "query",
+            "name": "requester_employee_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Requester Employee Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "reservation_status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "reserved",
+                    "needs_reservation",
+                    "not_required",
+                    "inactive"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reservation Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "owner_active",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Owner Active"
+            }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "required": false,
+            "schema": {
+              "default": "active",
+              "enum": [
+                "active",
+                "cancelled"
+              ],
+              "title": "View",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "updated_asc",
+              "enum": [
+                "updated_asc",
+                "updated_desc"
+              ],
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "skip",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Skip",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminWorkReservationList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Reservations",
+        "tags": [
+          "Admin Work Reservations"
+        ]
+      }
+    },
+    "/api/admin/work-reservations/{batch_id}": {
+      "get": {
+        "description": "Read history and the frozen snapshot without creating any reservation.",
+        "operationId": "get_reservation_api_admin_work_reservations__batch_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Batch Id",
+              "type": "string"
+            }
+          },
+          {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminWorkReservationDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Reservation",
+        "tags": [
+          "Admin Work Reservations"
+        ]
+      }
+    },
+    "/api/admin/work-reservations/{batch_id}/cancel": {
+      "post": {
+        "description": "Commit snapshot, release, revision and audit together, or roll all of them back.",
+        "operationId": "cancel_reservation_api_admin_work_reservations__batch_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Batch Id",
+              "type": "string"
+            }
+          },
+          {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkReservationCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminWorkReservationDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Reservation",
+        "tags": [
+          "Admin Work Reservations"
         ]
       }
     },
@@ -23555,6 +25270,50 @@
         ]
       }
     },
+    "/api/inventory/work-status": {
+      "get": {
+        "description": "Return stored reservations and identifiable open effects without materializing stock rows.",
+        "operationId": "inventory_work_status_api_inventory_work_status_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryWorkStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Inventory Work Status",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
     "/api/io/draft": {
       "get": {
         "operationId": "get_io_draft_api_io_draft_get",
@@ -23693,6 +25452,16 @@
               "title": "Requester Employee Id",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "expected_revision",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "Expected Revision",
+              "type": "integer"
+            }
           }
         ],
         "responses": {
@@ -23741,6 +25510,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IoDraftSubmitRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "201": {
             "content": {
@@ -28858,7 +30637,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/StockRequestActionRequest"
+                "$ref": "#/components/schemas/StockRequestRevertRequest"
               }
             }
           },
@@ -33285,6 +35064,10 @@
     {
       "description": "관리자용 생산 이력 내보내기.",
       "name": "Admin Export"
+    },
+    {
+      "description": "관리자용 작업 예약 조회와 취소.",
+      "name": "Admin Work Reservations"
     },
     {
       "description": "조립 체크리스트 관리.",

@@ -56,6 +56,9 @@ describe("useApproveStockRequestMutation", () => {
     expect(result.current.data?.status).toBe("approved");
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["stockRequests"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["notifications"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["items"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["inventory"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["admin", "workReservations"] });
   });
 
   it("잘못된 PIN으로 승인 실패(403)", async () => {
@@ -70,6 +73,29 @@ describe("useApproveStockRequestMutation", () => {
     });
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [409, { code: "WORK_PLAN_CHANGED", message: "계획 변경" }],
+    [422, { code: "STOCK_SHORTAGE", message: "재고 부족" }],
+    [500, { code: "WORK_APPROVAL_FAILED_PERSISTED", message: "실패 확정", extra: { state_committed: true } }],
+  ])("오류 %s 뒤 예약 조회를 갱신하고 승인 쓰기를 재시도하지 않는다", async (status, detail) => {
+    const qc = makeQueryClient();
+    const invalidateSpy = vi.spyOn(qc, "invalidateQueries").mockResolvedValue();
+    const requests = vi.fn();
+    server.use(http.post("*/api/stock-requests/:id/approve", () => {
+      requests();
+      return HttpResponse.json({ detail }, { status });
+    }));
+    const { result } = renderHook(() => useApproveStockRequestMutation(), { wrapper: makeWrapper(qc) });
+
+    await expect(result.current.mutateAsync({ requestId: "req-1", payload: { actor_employee_id: "e1", pin: "0000" } }))
+      .rejects.toMatchObject({ status });
+
+    expect(requests).toHaveBeenCalledTimes(1);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["inventory"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["items"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["admin", "workReservations"] });
   });
 });
 
@@ -124,7 +150,7 @@ describe("useRevertToDraftMutation", () => {
     });
 
     result.current.mutate(
-      { requestId: "req-1", payload: { actor_employee_id: "e1", pin: "0000" } },
+      { requestId: "req-1", payload: { actor_employee_id: "e1", pin: "0000", expected_revision: 7 } },
       { onSuccess },
     );
 

@@ -10,12 +10,7 @@ import { formatQty } from "@/lib/mes/format";
 import { ImageLightbox } from "@/lib/ui/ImageLightbox";
 import { InventoryTableRow } from "./InventoryTable";
 import { InventoryStockSummary } from "./InventoryStockSummary";
-import { isDisusedInventoryItem } from "./inventoryFilter";
-
-function safeAvailableQty(item: Item) {
-  const n = Number(item.available_quantity);
-  return isNaN(n) ? 0 : n;
-}
+import { isDisusedInventoryItem, safeAvailableQty } from "./inventoryFilter";
 
 function getMinStock(item: Item) {
   return item.min_stock == null ? 0 : Number(item.min_stock);
@@ -39,6 +34,8 @@ function InventoryItemRowImpl({ item, selected, detailOpen = true, onSelect, ima
     ? { label: "불용", color: LEGACY_COLORS.muted2 }
     : stock;
   const isCritical = qty <= 0 || (minStock > 0 && qty < minStock);
+  const reservations = item.work_reservations;
+  const reservedQuantity = reservations ? reservations.work_reserved_quantity + reservations.approval_reserved_quantity + reservations.shipping_reserved_quantity : undefined;
 
 
   const StockIcon = statusBadge.label === "불용" ? Archive : stock.label === "품절" ? XCircle : stock.label === "부족" ? AlertTriangle : CheckCircle2;
@@ -82,7 +79,14 @@ function InventoryItemRowImpl({ item, selected, detailOpen = true, onSelect, ima
           ) : (
             <div className="font-semibold">{item.item_name}</div>
           )}
-          <InventoryStockSummary item={item} compact={compact} mode="bar" />
+          <InventoryStockSummary item={item} compact={compact} mode="bar" showWorkReservations />
+          {reservations && ((reservedQuantity ?? 0) > 0 || reservations.expected_in_quantity > 0 || reservations.transfer_in_quantity > 0) && (
+            <div className="mt-1 flex flex-wrap gap-x-2 text-xs font-medium" style={{ color: LEGACY_COLORS.blue }}>
+              {(reservedQuantity ?? 0) > 0 && <span>예약 {formatQty(reservedQuantity)} {item.unit}</span>}
+              {reservations.expected_in_quantity > 0 && <span>입고·생산 예정 +{formatQty(reservations.expected_in_quantity)}</span>}
+              {reservations.transfer_in_quantity > 0 && <span>이동 도착 예정 {formatQty(reservations.transfer_in_quantity)}</span>}
+            </div>
+          )}
         </td>
       {!compact && (
         <>
@@ -90,7 +94,7 @@ function InventoryItemRowImpl({ item, selected, detailOpen = true, onSelect, ima
         {item.mes_code ?? "-"}
       </td>
       <td className="hidden sm:table-cell border-b px-4 py-5 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
-        <InventoryStockSummary item={item} />
+        <InventoryStockSummary item={item} showWorkReservations />
       </td>
         </>
       )}

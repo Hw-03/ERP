@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Sequence
 
-from sqlalchemy import text
+from sqlalchemy import or_, text, update
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -133,7 +133,7 @@ def lock_batch_requests(
     batch_id: uuid.UUID,
 ) -> tuple[IoBatch, list[StockRequest]]:
     """항상 batch → 정렬된 requests 순서로 잠가 형제 요청 교착을 막는다."""
-    batch_query = db.query(IoBatch).filter(IoBatch.batch_id == batch_id)
+    batch_query = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).populate_existing()
     if db.bind is not None and db.bind.dialect.name != "sqlite":
         batch_query = batch_query.with_for_update()
     batch = batch_query.one()
@@ -178,39 +178,52 @@ def _prelock_locations(db: Session, lines: Sequence[IoLine]) -> None:
 def prelock_reservation_sources(
     db: Session,
     requests: Sequence[StockRequest],
+    *,
+    extra_plan: dict | None = None,
 ) -> None:
-    """batch 요청 전체의 Inventory와 예약 원본 위치를 전역 순서로 잠근다."""
-    lines = [line for request in requests for line in request.lines]
-    item_ids = sorted({line.item_id for line in lines})
-    if not item_ids:
-        return
-
+    """기존·신규 효과의 모든 부모/셀 이후 allocation을 잠가 교차 위치 교착을 막는다."""
     from app.services import inventory as inventory_svc
+    from app.services.sr_execution import (
+        _request_department_routing_item_ids,
+        _request_inventory_item_ids,
+    )
+    from app.services.stock_availability import AvailabilityCell, figures_for_cells
 
-    inventory_svc.ensure_and_lock_inventories(db, item_ids)
-    location_keys = set()
+    lines = [line for request in requests for line in request.lines]
+    item_ids = {line.item_id for line in lines}
+    for request in requests:
+        # 재작업은 원본 외에 결정 트리의 자식도 첫 셀 잠금 전에 선언해야 한다.
+        item_ids.update(_request_inventory_item_ids(db, request, request.lines))
+        item_ids.update(_request_department_routing_item_ids(db, request, request.lines))
+    cells: set[AvailabilityCell] = set()
     for line in lines:
-        bucket = RequestBucketEnum(line.from_bucket)
-        if bucket not in (RequestBucketEnum.PRODUCTION, RequestBucketEnum.DEFECTIVE):
-            continue
-        if line.from_department is None:
-            raise ValueError(f"{bucket.value} 출고 예약에는 from_department가 필요합니다.")
-        status = (
-            LocationStatusEnum.PRODUCTION
-            if bucket == RequestBucketEnum.PRODUCTION
-            else LocationStatusEnum.DEFECTIVE
-        )
-        location_keys.add((line.item_id, str(line.from_department), status))
-    for item_id, department, status in sorted(
-        location_keys,
-        key=lambda key: (key[0], key[1], key[2].value),
-    ):
-        inventory_svc._lock_location(
-            db,
-            item_id,
-            DepartmentEnum(department),
-            status,
-        )
+        for bucket, department in ((line.from_bucket, line.from_department), (line.to_bucket, line.to_department)):
+            bucket = RequestBucketEnum(bucket)
+            if bucket == RequestBucketEnum.WAREHOUSE:
+                cells.add(AvailabilityCell.warehouse(line.item_id))
+            elif bucket in (RequestBucketEnum.PRODUCTION, RequestBucketEnum.DEFECTIVE):
+                if department is None:
+                    raise ValueError(f"{bucket.value} 위치에는 부서가 필요합니다.")
+                cells.add(AvailabilityCell.location(line.item_id, department,
+                    LocationStatusEnum.PRODUCTION if bucket == RequestBucketEnum.PRODUCTION else LocationStatusEnum.DEFECTIVE))
+    batch_ids = {row.operation_batch_id for row in requests if row.operation_batch_id is not None}
+    plans = [row.effective_plan for row in db.query(IoBatch).filter(IoBatch.batch_id.in_(batch_ids)).all()]
+    plans.append(extra_plan)
+    for plan in plans:
+        for effect in (plan or {}).get("effects", []):
+            item_id = uuid.UUID(effect["item_id"])
+            item_ids.add(item_id)
+            for endpoint in (effect["from"], effect["to"]):
+                if endpoint is None:
+                    continue
+                cells.add(AvailabilityCell.warehouse(item_id) if endpoint["bucket"] == "warehouse" else
+                    AvailabilityCell.location(item_id, endpoint["department"],
+                        LocationStatusEnum.DEFECTIVE if endpoint["bucket"] == "defective" else LocationStatusEnum.PRODUCTION))
+    inventory_svc.ensure_and_lock_inventories(db, sorted(item_ids))
+    for cell in sorted(cells, key=lambda cell: cell.sort_key):
+        if cell.department is not None:
+            inventory_svc._lock_location(db, cell.item_id, DepartmentEnum(cell.department), cell.status)
+    figures_for_cells(db, cells, lock_allocations=True)
 
 
 def locked_request(
@@ -240,6 +253,8 @@ def settle_if_decided(
     """반환 모드는 첫 반려에 전체 취소하고 전부 승인 시 한 번 실행하며, 기존 모드는 부분 승인한다."""
     if batch.status in {"completed", "partially_completed", "rejected", "failed", "cancelled"}:
         return False
+    batch.reservation_status = "inactive"
+    batch.reservation_issue = None
     if any(bundle.internal_use_bom_mode == "parent_with_returns" for bundle in batch.bundles) and any(
         request.status == StockRequestStatusEnum.REJECTED for request in requests
     ):
@@ -284,6 +299,11 @@ def settle_if_decided(
         batch.completed_at = None
         batch.updated_at = datetime.utcnow()
         return True
+
+    # 물리 실행 없는 반려·미결 결정은 보존하고, 승인 효과를 실행할 때 재검증한다.
+    if batch.effective_plan is not None:
+        from app.services.io_reservations import validate_saved_plan
+        validate_saved_plan(db, batch)
 
     approved_line_ids = {
         request_line.operation_line_id
@@ -386,6 +406,17 @@ def settle_if_decided(
 
 
 def reclassify_undecided_if_no_active_approver(db: Session) -> int:
+    """재분류 계약 충돌은 호출자가 먼저 변경한 직원 권한까지 원복한다."""
+    from app.services.work_reservation_errors import WorkReservationError
+
+    try:
+        return _reclassify_undecided_if_no_active_approver(db)
+    except WorkReservationError:
+        db.rollback()
+        raise
+
+
+def _reclassify_undecided_if_no_active_approver(db: Session) -> int:
     """마지막 활성 전용 승인자가 사라지면 미결 요청을 부서 결재로 일방향 전환한다."""
     lock_approver_roster(db)
     db.flush()
@@ -400,50 +431,70 @@ def reclassify_undecided_if_no_active_approver(db: Session) -> int:
     if active_count:
         return 0
 
-    query = (
-        db.query(StockRequest)
+    hints = (
+        db.query(StockRequest.request_id, StockRequest.operation_batch_id)
         .filter(
             StockRequest.requires_as_research_approval.is_(True),
             StockRequest.as_research_approved_at.is_(None),
             StockRequest.status.in_(tuple(_OPEN_STATUSES)),
         )
-        .order_by(StockRequest.request_id.asc())
+        .all()
     )
-    if db.bind is not None and db.bind.dialect.name != "sqlite":
-        query = query.with_for_update()
-    requests = query.all()
-    if not requests:
+    if not hints:
         return 0
 
     from app.services import notifications
+    from app.services.io_effective_plan import build_effective_plan
+    from app.services.io_reservations import check_revision, record_event, validate_saved_plan
+    from app.services.work_reservation_errors import WorkReservationError
 
-    batch_targets = {
-        batch_id: to_department
-        for batch_id, to_department in db.query(
-            IoBatch.batch_id,
-            IoBatch.to_department,
-        )
-        .filter(
-            IoBatch.batch_id.in_(
-                {
-                    request.operation_batch_id
-                    for request in requests
-                    if request.operation_batch_id is not None
-                }
-            )
-        )
-        .all()
-    }
-    for request in requests:
+    batch_ids = {row.operation_batch_id for row in hints if row.operation_batch_id is not None}
+    batches = db.query(IoBatch).filter(IoBatch.batch_id.in_(batch_ids)).order_by(
+        IoBatch.batch_id.asc()).populate_existing().with_for_update().all()
+    standalone_ids = {row.request_id for row in hints if row.operation_batch_id is None}
+    requests = db.query(StockRequest).filter(or_(
+        StockRequest.operation_batch_id.in_(batch_ids), StockRequest.request_id.in_(standalone_ids),
+    )).order_by(StockRequest.request_id.asc()).populate_existing().with_for_update().all()
+    by_batch = {batch.batch_id: batch for batch in batches}
+    targets = [request for request in requests
+        if request.requires_as_research_approval and request.as_research_approved_at is None
+        and request.status in _OPEN_STATUSES
+        and (request.operation_batch_id is None or (
+            request.operation_batch_id in by_batch
+            and by_batch[request.operation_batch_id].status not in _TERMINAL_BATCH_STATUSES))]
+    changed_batch_ids = {request.operation_batch_id for request in targets if request.operation_batch_id is not None}
+    for batch in batches:
+        if batch.batch_id in changed_batch_ids and batch.effective_plan is not None:
+            validate_saved_plan(db, batch)
+    for request in targets:
+        batch = by_batch.get(request.operation_batch_id)
         request.requires_as_research_approval = False
         request.requires_department_approval = True
-        request.approval_department = (
-            batch_targets.get(request.operation_batch_id)
-            or request.requester_department
-        )
+        request.approval_department = (batch.to_department if batch is not None else None) or request.requester_department
         notifications.notify_request_arrived(db, request)
     db.flush()
-    return len(requests)
+    for batch in batches:
+        if batch.batch_id not in changed_batch_ids:
+            continue
+        if batch.effective_plan is not None:
+            plan = build_effective_plan(db, batch)
+            # A roster edit cannot authorize different material, quantity, direction or routing.
+            if plan["effects"] != batch.effective_plan["effects"]:
+                raise WorkReservationError("WORK_PLAN_CHANGED", "승인 분류 외의 작업 구성이 변경되었습니다.")
+            batch.effective_plan = {**batch.effective_plan, "fingerprint": plan["fingerprint"]}
+        previous_revision = batch.revision
+        db.flush()
+        result = db.execute(update(IoBatch).where(IoBatch.batch_id == batch.batch_id,
+            IoBatch.revision == previous_revision).values(revision=previous_revision + 1,
+            updated_at=datetime.utcnow()).execution_options(synchronize_session=False))
+        if result.rowcount != 1:
+            db.refresh(batch)
+            check_revision(batch, previous_revision)
+            raise WorkReservationError("WORK_STATE_CONFLICT", "작업이 변경되었습니다.")
+        db.refresh(batch)
+        record_event(db, batch, "approval_changed", previous_revision, None, "system", "last_as_research_approver_removed")
+    db.flush()
+    return len(targets)
 
 
 def mark_batch_failed(
@@ -498,6 +549,8 @@ def mark_batch_failed(
         for line in request.lines:
             line.status = StockRequestStatusEnum.FAILED_APPROVAL
     batch.status = "failed"
+    batch.reservation_status = "inactive"
+    batch.reservation_issue = None
     batch.completed_at = None
     batch.updated_at = now
     db.flush()

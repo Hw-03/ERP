@@ -25,6 +25,7 @@ vi.mock("@/lib/queries/useDraftCartQuery", () => ({
 function makeIoDraft(): IoBatch {
   return {
     batch_id: "batch-1",
+    revision: 6,
     work_type: "process",
     sub_type: "disassemble",
     status: "draft",
@@ -104,7 +105,7 @@ describe("DraftCartPanel empty state", () => {
 
     rerender(<DraftCartPanel {...commonProps} layout="mobile" />);
     expect(screen.queryByRole("columnheader", { name: "예정 변동" })).not.toBeInTheDocument();
-    expect(screen.getByLabelText("작업 카드: 부서 입출고, 출고 · BOM")).toBeInTheDocument();
+    expect(screen.getByLabelText("작업 카드: 부서 입출고, 분해")).toBeInTheDocument();
   });
 
   it("locks the confirmation after the first delete request", () => {
@@ -126,6 +127,7 @@ describe("DraftCartPanel empty state", () => {
     fireEvent.keyDown(window, { key: "Enter" });
 
     expect(mockDeleteIoDraft).toHaveBeenCalledOnce();
+    expect(mockDeleteIoDraft).toHaveBeenCalledWith({ batchId: "batch-1", employeeId: "emp-1", expectedRevision: 6 }, expect.any(Object));
     expect(screen.getByRole("button", { name: "삭제 중..." })).toBeDisabled();
   });
 });

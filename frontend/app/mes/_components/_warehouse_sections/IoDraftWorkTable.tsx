@@ -1,9 +1,12 @@
 "use client";
+import { reservationStatusLabel } from "../_warehouse_v2/WorkReservationNotice";
 
 import { useState } from "react";
 import { AlertTriangle, ChevronDown, ChevronRight, GitBranch, Package } from "lucide-react";
 import type { IoBatch, IoBundle, IoLine, IoSubType } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { reservationIssueMessage } from "@/lib/io/reservation-message";
+import { SUB_TYPE_LABEL } from "@/lib/io/glossary";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import {
@@ -146,19 +149,22 @@ export function IoDraftWorkTable({
 
   return (
     <div
-      className="min-w-0 overflow-x-auto rounded-[24px] border"
+      role="region"
+      aria-label="작업 중 목록"
+      tabIndex={0}
+      className="min-w-0 overflow-x-auto rounded-[24px] border focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
       style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
     >
-      <table className="w-full min-w-[1180px] table-fixed border-collapse text-sm">
+      <table className="w-full min-w-[1040px] table-fixed border-collapse text-sm">
         <colgroup>
           <col className="w-[52px]" />
-          <col className="w-[120px]" />
-          <col className="w-[148px]" />
+          <col className="w-[104px]" />
+          <col className="w-[112px]" />
           <col />
-          <col className="w-[128px]" />
-          <col className="w-[92px]" />
-          <col className="w-[220px]" />
-          <col className="w-[188px]" />
+          <col className="w-[112px]" />
+          <col className="w-[80px]" />
+          <col className="w-[156px]" />
+          <col className="w-[176px]" />
         </colgroup>
         <thead>
           <tr style={{ color: LEGACY_COLORS.muted2 }}>
@@ -252,7 +258,7 @@ function DraftRows({
         tabIndex={0}
         aria-expanded={expanded}
         aria-controls={controlsId}
-        className="cursor-pointer transition-colors hover:bg-[color-mix(in_srgb,var(--c-blue)_6%,transparent)]"
+        className="cursor-pointer transition-colors hover:bg-[color-mix(in_srgb,var(--c-blue)_6%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
         style={{ background: expanded ? tint(LEGACY_COLORS.blue, 8) : undefined }}
         onClick={onToggle}
         onKeyDown={(event) => {
@@ -280,17 +286,20 @@ function DraftRows({
         </td>
         <td className="border-b px-3 py-2 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
           <div className="flex items-center justify-center">
-            <span className="inline-flex h-6 max-w-full items-center gap-1.5 rounded-full px-3 text-xs font-bold" style={{ background: tint(LEGACY_COLORS.blue, 14), color: LEGACY_COLORS.blue }}>
+            <span className="inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-1 text-xs font-bold leading-5" style={{ background: tint(LEGACY_COLORS.blue, 14), color: LEGACY_COLORS.blue }}>
               {WorkIcon && <WorkIcon className="h-4 w-4 shrink-0" />}
-              <span className="truncate">{workMeta?.label ?? draft.work_type}</span>
+              <span className="min-w-0 break-keep [overflow-wrap:anywhere]">{SUB_TYPE_LABEL[draft.sub_type] ?? "작업"}</span>
             </span>
           </div>
         </td>
         <td className="border-b px-4 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
           <div className="min-w-0">
-            <p className="truncate font-bold" style={{ color: LEGACY_COLORS.text }}>
+            <p className="break-keep font-bold leading-6 [overflow-wrap:anywhere]" style={{ color: LEGACY_COLORS.text }}>
               {firstBundle?.title ?? "대상 없음"}{draft.bundles.length > 1 ? ` 외 ${draft.bundles.length - 1}건` : ""}
             </p>
+            <p className="mt-1 inline-flex min-h-6 items-center rounded-full px-2.5 py-1 text-xs font-semibold" style={{ color: draft.reservation_status === "needs_reservation" ? LEGACY_COLORS.yellow : draft.reservation_status === "reserved" ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2,
+              background: draft.reservation_status === "needs_reservation" ? LEGACY_COLORS.warningBg : draft.reservation_status === "reserved" ? tint(LEGACY_COLORS.purple, 12) : LEGACY_COLORS.s2 }}>{reservationStatusLabel(draft)}</p>
+            {draft.reservation_issue && <p className="mt-1 break-keep text-xs leading-5 [overflow-wrap:anywhere]" style={{ color: LEGACY_COLORS.yellow }}>{reservationIssueMessage(draft.reservation_issue)}</p>}
             {rejection?.rejected_reason && (
               <p className="mt-1 truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.red }}>
                 반려: {rejection.rejected_reason}
@@ -313,8 +322,8 @@ function DraftRows({
               type="button"
               disabled={busy}
               onClick={(event) => { event.stopPropagation(); onContinue(); }}
-              className="h-11 rounded-[12px] border px-3 text-xs font-bold transition hover:brightness-110 disabled:opacity-50"
-              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.borderStrong, color: LEGACY_COLORS.text }}
+              className="min-h-11 whitespace-nowrap rounded-[12px] border px-3 text-xs font-bold transition hover:brightness-110 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--c-blue)] disabled:opacity-50"
+              style={{ background: tint(LEGACY_COLORS.blue, 10), borderColor: LEGACY_COLORS.borderStrong, color: LEGACY_COLORS.blue }}
             >
               이어서 작업
             </button>
@@ -323,7 +332,7 @@ function DraftRows({
               aria-label="작업 삭제"
               disabled={busy}
               onClick={(event) => { event.stopPropagation(); onRequestDelete(); }}
-              className="h-11 rounded-[12px] px-3 text-xs font-bold transition hover:brightness-110 disabled:opacity-50"
+              className="min-h-11 min-w-11 rounded-[12px] px-3 text-xs font-bold transition hover:brightness-110 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--c-blue)] disabled:opacity-50"
               style={{ background: tint(LEGACY_COLORS.red, 10), color: LEGACY_COLORS.red }}
             >
               삭제
@@ -366,9 +375,9 @@ function BundleRows({ bundle, subType, controlsId }: { bundle: IoBundle; subType
           </span>
         </td>
         <td className="border-b px-4 py-2 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Package className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-            <span className="truncate">{bundle.title}</span>
+            <span className="min-w-0 break-keep leading-6 [overflow-wrap:anywhere]">{bundle.title}</span>
             {tag && <span className="shrink-0 rounded-full px-2 py-1 text-xs font-bold" style={{ background: tint(tagColor, 12), color: tagColor }}>{tag.text}</span>}
           </div>
         </td>
@@ -399,9 +408,9 @@ function DraftLineRow({ bundle, line, subType }: { bundle: IoBundle; line: IoLin
         <span className="inline-flex h-6 items-center rounded-full px-3 text-xs font-bold" style={{ background: tint(tagColor, 12), color: tagColor }}>{tag.text}</span>
       </td>
       <td className="border-b px-4 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
-        <div className="flex min-w-0 items-center gap-2 pl-7">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 pl-3">
           <Package className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
-          <span className="truncate font-semibold" style={{ color: LEGACY_COLORS.text, textDecoration: excluded ? "line-through" : undefined }}>{line.item_name}</span>
+          <span className="min-w-0 break-keep font-semibold leading-6 [overflow-wrap:anywhere]" style={{ color: LEGACY_COLORS.text, textDecoration: excluded ? "line-through" : undefined }}>{line.item_name}</span>
           {shortage && <span className="shrink-0 text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>부족 {formatQty(line.shortage)}</span>}
         </div>
       </td>

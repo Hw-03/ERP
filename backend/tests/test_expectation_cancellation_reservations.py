@@ -1,6 +1,7 @@
 """완료된 창고 이동 취소는 다른 요청의 예약과 총재고를 보존한다."""
 
 from decimal import Decimal
+import uuid
 
 import pytest
 
@@ -28,7 +29,7 @@ def test_warehouse_transfer_cancel_restores_both_cells_and_preserves_other_reser
         payload = {"requester_employee_id": str(actor.employee_id), "work_type": "warehouse_io", "sub_type": "warehouse_to_dept"}
         preview = client.post("/api/io/preview", json={**payload, "targets": [{"source_kind": "direct_item", "item_id": str(item.item_id), "quantity": quantity}]})
         assert preview.status_code == 200, preview.text
-        result = client.post("/api/io/submit", json={**payload, "bundles": preview.json()["bundles"]})
+        result = client.post("/api/io/submit", json={**payload, "client_request_id": str(uuid.uuid4()), "bundles": preview.json()["bundles"]})
         assert result.status_code == 201, result.text
         return result.json()
 

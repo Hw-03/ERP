@@ -7,7 +7,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { useWarehouseData } from "../useWarehouseData";
@@ -62,6 +62,34 @@ afterEach(() => {
 });
 
 describe("useWarehouseData", () => {
+  it("재고 조회 중·오류와 구조 공유된 정상 복구의 성공 횟수를 작성기에 제공한다", async () => {
+    globalThis.fetch = fetchRouter() as unknown as typeof fetch;
+    const client = makeClient();
+    const { result } = renderHook(() => useWarehouseData({ globalSearch: "", onStatusChange: vi.fn() }), { wrapper: makeWrapper(client) });
+    expect(result.current.inventoryQueryState.isSuccess).toBe(false);
+    await waitFor(() => expect(result.current.inventoryQueryState.isSuccess).toBe(true));
+    const initialItems = result.current.items;
+    const initialCount = result.current.inventoryQueryState.dataUpdateCount;
+    const key = queryKeys.items.list({ limit: 2000, search: undefined });
+    let finish!: (response: Response) => void;
+    const originalRouter = fetchRouter();
+    globalThis.fetch = vi.fn((input: RequestInfo | URL) => String(input).includes("/api/items")
+      ? new Promise<Response>((resolve) => { finish = resolve; }) : originalRouter(input)) as unknown as typeof fetch;
+    let refreshing!: Promise<void>;
+    act(() => { refreshing = client.invalidateQueries({ queryKey: key }); });
+    await waitFor(() => expect(result.current.inventoryQueryState.isFetching).toBe(true));
+    await act(async () => { finish(makeResponse({ detail: "재고 조회 실패" }, false)); await refreshing; });
+    await waitFor(() => expect(result.current.inventoryQueryState.isSuccess).toBe(false));
+    expect(result.current.items).toBe(initialItems);
+    expect(result.current.inventoryQueryState.dataUpdateCount).toBe(initialCount);
+    globalThis.fetch = fetchRouter() as unknown as typeof fetch;
+    await act(async () => { await client.invalidateQueries({ queryKey: key }); });
+    await waitFor(() => expect(result.current.inventoryQueryState.isSuccess).toBe(true));
+    expect(result.current.items).toBe(initialItems);
+    expect(result.current.inventoryQueryState.dataUpdateCount).toBeGreaterThan(initialCount);
+    expect(result.current.inventoryQueryState.dataUpdatedAt).toBeGreaterThan(0);
+  });
+
   it("마운트 시 items/employees fetch + loading 반영", async () => {
     const fetchSpy = fetchRouter();
     globalThis.fetch = fetchSpy as unknown as typeof fetch;

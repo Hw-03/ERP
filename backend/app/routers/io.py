@@ -25,6 +25,7 @@ from app.schemas.shipping import (
     ShippingComponentChangeResultResponse,
     ShippingTransactionLogResponse,
 )
+from app.schemas.io import IoDraftSubmitRequest
 from app._evt import emit as _evt_emit
 from app.services import io as io_svc
 from app.services import io_actions as io_actions_svc
@@ -32,6 +33,7 @@ from app.services import shipping as shipping_svc
 from app.services import shipping_actions as shipping_actions_svc
 from app.services.shipping import ShippingError
 from app.services._tx import commit_only
+from app.services.work_reservation_errors import WorkReservationError
 from app.models import Employee, TransactionLog
 
 
@@ -157,7 +159,7 @@ def preview_io(payload: IoPreviewRequest, db: Session = Depends(get_db)):
                 work_type=payload.work_type,
                 sub_type=payload.sub_type,
             )
-        return io_svc.preview(
+        result = io_svc.preview(
             db,
             work_type=payload.work_type,
             sub_type=payload.sub_type,
@@ -165,6 +167,12 @@ def preview_io(payload: IoPreviewRequest, db: Session = Depends(get_db)):
             to_department=payload.to_department,
             targets=payload.targets,
         )
+        if payload.owner_batch_id is not None:
+            from app.services.io_draft import apply_owned_preview_credit
+            apply_owned_preview_credit(db, result, payload.owner_batch_id, payload.requester_employee_id)
+        return result
+    except WorkReservationError as exc:
+        raise http_error(exc.status_code, exc.code, exc.message, **(exc.extra or {}))
     except PermissionError as exc:
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
     except ValueError as exc:
@@ -175,6 +183,22 @@ def preview_io(payload: IoPreviewRequest, db: Session = Depends(get_db)):
 def save_io_draft(payload: IoDraftUpsert, http_request: Request, db: Session = Depends(get_db)):
     try:
         draft = io_svc.save_draft(db, payload)
+    except WorkReservationError as exc:
+        db.rollback()
+        raise http_error(exc.status_code, exc.code, exc.message, **(exc.extra or {}))
+    except IntegrityError:
+        db.rollback()
+        # A concurrent same-key creator may have committed while this transaction waited.
+        from app.services.io_draft import validate_creation_replay
+        existing = io_svc.find_by_client_request_id(db, payload.client_request_id) if payload.client_request_id else None
+        if existing is None or payload.batch_id is not None:
+            raise
+        try:
+            return validate_creation_replay(existing, payload)
+        except PermissionError as exc:
+            raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
+        except WorkReservationError as exc:
+            raise http_error(exc.status_code, exc.code, exc.message, **(exc.extra or {}))
     except PermissionError as exc:
         db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
@@ -221,6 +245,7 @@ def list_io_drafts(
 def delete_io_draft(
     batch_id: uuid.UUID,
     requester_employee_id: uuid.UUID = Query(...),
+    expected_revision: int = Query(..., ge=0),
     db: Session = Depends(get_db),
 ):
     try:
@@ -228,7 +253,11 @@ def delete_io_draft(
             db,
             batch_id=batch_id,
             requester_employee_id=requester_employee_id,
+            expected_revision=expected_revision,
         )
+    except WorkReservationError as exc:
+        db.rollback()
+        raise http_error(exc.status_code, exc.code, exc.message, **(exc.extra or {}))
     except PermissionError as exc:
         db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
@@ -260,6 +289,8 @@ def submit_io(payload: IoSubmitRequest, http_request: Request, db: Session = Dep
             requester=_batch.get("requester_name"),
         )
         return result
+    except WorkReservationError as exc:
+        raise http_error(exc.status_code, exc.code, exc.message, **(exc.extra or {}))
     except PermissionError as exc:
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
     except ValueError as exc:
@@ -269,7 +300,8 @@ def submit_io(payload: IoSubmitRequest, http_request: Request, db: Session = Dep
         if payload.client_request_id and "client_request_id" in str(exc).lower():
             existing = io_svc.find_by_client_request_id(db, payload.client_request_id)
             if existing is not None:
-                return io_svc.build_idempotent_response(existing)
+                from app.services.io_dispatch import direct_submit_replay
+                return direct_submit_replay(existing, payload)
             raise http_error(
                 409,
                 ErrorCode.CONFLICT,
@@ -291,6 +323,7 @@ def submit_io(payload: IoSubmitRequest, http_request: Request, db: Session = Dep
 def submit_io_draft(
     batch_id: uuid.UUID,
     http_request: Request,
+    payload: IoDraftSubmitRequest,
     requester_employee_id: uuid.UUID = Query(...),
     db: Session = Depends(get_db),
 ):
@@ -299,7 +332,10 @@ def submit_io_draft(
             db,
             batch_id=batch_id,
             requester_employee_id=requester_employee_id,
+            expected_revision=payload.expected_revision,
         )
+    except WorkReservationError as exc:
+        raise http_error(exc.status_code, exc.code, exc.message, **(exc.extra or {}))
     except PermissionError as exc:
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
     except ValueError as exc:

@@ -104,7 +104,14 @@ export function DraftCartPanel({
         handlers,
       );
     } else {
-      deleteIoMutation.mutate({ batchId: deleteTarget.draft.batch_id, employeeId }, handlers);
+      const expectedRevision = deleteTarget.draft.revision;
+      if (!Number.isInteger(expectedRevision)) {
+        setBusyId(null);
+        setOpError("작업 버전을 확인할 수 없습니다. 목록을 새로 불러온 뒤 다시 시도하세요.");
+        void refetch();
+        return;
+      }
+      deleteIoMutation.mutate({ batchId: deleteTarget.draft.batch_id, employeeId, expectedRevision: expectedRevision! }, handlers);
     }
   };
 

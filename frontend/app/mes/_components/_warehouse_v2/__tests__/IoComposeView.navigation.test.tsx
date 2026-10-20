@@ -1,9 +1,11 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { IoBundle, IoInternalUseBomMode, Item, ItemConversionResult } from "@/lib/api";
+import type { IoBatch, IoBundle, IoInternalUseBomMode, Item, ItemConversionResult } from "@/lib/api";
 import { api } from "@/lib/api";
 import { IoComposeView } from "../IoComposeView";
+import { DirtyGuardProvider, useBeforeViewportSwitch } from "@/lib/ui/dirty-guard";
+import * as internalUsePreviewLock from "../useInternalUseBomPreviewLock";
 
 const routerPush = vi.fn();
 let navigationQuery = "tab=warehouse";
@@ -13,7 +15,13 @@ const registerDirty = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/activity-audit-context", () => ({ setAuditScreen }));
 vi.mock("@/lib/client-events", () => ({ sendClientEvent }));
-vi.mock("@/lib/ui/dirty-guard", () => ({ useRegisterDirty: registerDirty }));
+vi.mock("@/lib/ui/dirty-guard", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/ui/dirty-guard")>();
+  return { ...actual, useRegisterDirty: (...args: Parameters<typeof actual.useRegisterDirty>) => {
+    registerDirty(...args);
+    actual.useRegisterDirty(...args);
+  } };
+});
 vi.mock("@/lib/queries/useBomQuery", () => ({
   useBomListQuery: () => ({ data: [], isSuccess: true, isPending: false, isError: false, refetch: vi.fn() }),
 }));
@@ -67,14 +75,19 @@ vi.mock("../IoConfirmStep", () => ({
     onSubmit,
     onValidationError,
     autoApprove,
+    notes,
+    onNotesChange,
   }: {
     onSaveDraft: () => void;
     onSubmit: () => void;
     onValidationError?: (message: string) => void;
     autoApprove?: boolean;
+    notes: string;
+    onNotesChange: (value: string) => void;
   }) => (
     <>
       <span data-testid="approval-mode">{autoApprove ? "자동 승인" : "결재 요청"}</span>
+      <input aria-label="작업 메모" value={notes} onChange={(event) => onNotesChange(event.target.value)} />
       <button type="button" data-testid="draft-save" onClick={onSaveDraft}>save</button>
       <button type="button" data-testid="confirm-submit" onClick={onSubmit}>submit</button>
       <button type="button" data-testid="confirm-memo-error" onClick={() => onValidationError?.("메모가 없어 부서 결재 요청을 진행할 수 없습니다.")}>memo error</button>
@@ -240,6 +253,26 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+function ViewportSwitchProbe({ changeShell, failure }: { changeShell: () => void; failure: (error: unknown) => void }) {
+  const beforeSwitch = useBeforeViewportSwitch();
+  return <button onClick={() => void beforeSwitch().then(changeShell).catch(failure)}>화면 모드 전환</button>;
+}
+
+function renderViewportDraft() {
+  const changeShell = vi.fn();
+  const failure = vi.fn();
+  const onReservationChanged = vi.fn().mockRejectedValue(new Error("재고 갱신 실패"));
+  const draft = autoRouteDraft("produce", ["조립"]) as IoBatch;
+  draft.revision = 1;
+  draft.bundles[0].source_kind = "bom_parent";
+  render(<DirtyGuardProvider>
+    <IoComposeView globalSearch="" operator={operator} employees={[]} items={[]} setItems={vi.fn()}
+      onStatusChange={vi.fn()} onReservationChanged={onReservationChanged} restoreDraft={draft} restoreStep={4} />
+    <ViewportSwitchProbe changeShell={changeShell} failure={failure} />
+  </DirtyGuardProvider>);
+  return { changeShell, failure, onReservationChanged };
+}
+
 beforeEach(() => {
   navigationQuery = "tab=warehouse";
   vi.clearAllMocks();
@@ -247,6 +280,7 @@ beforeEach(() => {
   vi.mocked(api.getItems).mockResolvedValue([]);
   vi.mocked(api.saveDraft).mockImplementation(async (payload) => ({
     batch_id: payload.batch_id,
+    revision: 2,
   } as never));
   vi.mocked(api.getItemConversionPreview).mockResolvedValue(conversionResult);
   vi.mocked(api.executeItemConversion).mockResolvedValue(conversionResult);
@@ -273,6 +307,56 @@ beforeEach(() => {
 });
 
 describe("IoComposeView navigation chrome", () => {
+  it("화면 전환용 저장이 성공하면 조회 갱신 실패에도 dirty를 해제하고 전환한다", async () => {
+    const { changeShell, failure, onReservationChanged } = renderViewportDraft();
+    fireEvent.click(await screen.findByRole("button", { name: "반환 기준수량 변경" }));
+    fireEvent.click(screen.getByRole("button", { name: "화면 모드 전환" }));
+    await waitFor(() => expect(changeShell).toHaveBeenCalledTimes(1));
+    expect(api.saveDraft).toHaveBeenCalledTimes(1);
+    expect(onReservationChanged).toHaveBeenCalledTimes(1);
+    expect(failure).not.toHaveBeenCalled();
+  });
+
+  it("화면 전환용 저장 중 새 입력은 dirty로 남겨 화면 전환을 막는다", async () => {
+    const save = deferred<{ batch_id: string; revision: number }>();
+    vi.mocked(api.saveDraft).mockImplementation(() => save.promise as never);
+    const { changeShell, failure } = renderViewportDraft();
+    fireEvent.click(await screen.findByRole("button", { name: "반환 기준수량 변경" }));
+    fireEvent.click(screen.getByRole("button", { name: "화면 모드 전환" }));
+    await waitFor(() => expect(api.saveDraft).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "반환 하위 체크" }));
+    await act(async () => save.resolve({ batch_id: "auto-route-produce-조립", revision: 2 }));
+    await waitFor(() => expect(failure).toHaveBeenCalledWith(new Error("저장되지 않은 변경이 남아 있습니다.")));
+    expect(changeShell).not.toHaveBeenCalled();
+    expect(registerDirty.mock.lastCall?.[1]).toBe(true);
+  });
+
+  it("화면 전환용 미리보기 대기 중 메모가 바뀌면 이전 메모 저장과 전환을 중단한다", async () => {
+    const idle = deferred<void>();
+    const waitStarted = vi.fn();
+    const useActualLock = internalUsePreviewLock.useInternalUseBomPreviewLock;
+    const lock = vi.spyOn(internalUsePreviewLock, "useInternalUseBomPreviewLock").mockImplementation(function useDelayedPreviewLock() {
+      const actual = useActualLock();
+      return { ...actual, waitForIdle: async () => { waitStarted(); await idle.promise; await actual.waitForIdle(); } };
+    });
+    try {
+      const { changeShell, failure } = renderViewportDraft();
+      fireEvent.click(await screen.findByTestId("draft-step-advance"));
+      fireEvent.change(await screen.findByRole("textbox", { name: "작업 메모" }), { target: { value: "저장 시작 전 메모" } });
+      fireEvent.click(screen.getByRole("button", { name: "화면 모드 전환" }));
+      await waitFor(() => expect(waitStarted).toHaveBeenCalledTimes(1));
+      fireEvent.change(screen.getByRole("textbox", { name: "작업 메모" }), { target: { value: "미리보기 대기 중 새 메모" } });
+      await act(async () => idle.resolve());
+      await waitFor(() => expect(failure).toHaveBeenCalledWith(new Error("저장되지 않은 변경이 남아 있습니다.")));
+      expect(api.saveDraft).not.toHaveBeenCalled();
+      expect(changeShell).not.toHaveBeenCalled();
+      expect(screen.getByRole("textbox", { name: "작업 메모" })).toHaveValue("미리보기 대기 중 새 메모");
+      expect(registerDirty.mock.lastCall?.[1]).toBe(true);
+    } finally {
+      lock.mockRestore();
+    }
+  });
+
   it.each([
     ["primary", "none", "결재 요청"],
     ["deputy", "none", "결재 요청"],
@@ -660,7 +744,7 @@ describe("IoComposeView navigation chrome", () => {
 
   it("waits to publish draft status until the success notice reaches the status target", async () => {
     const onStatusChange = vi.fn();
-    vi.mocked(api.saveDraft).mockResolvedValue({ batch_id: "draft-save" } as never);
+    vi.mocked(api.saveDraft).mockResolvedValue({ batch_id: "draft-save", revision: 2 } as never);
 
     render(
       <IoComposeView
@@ -673,6 +757,7 @@ describe("IoComposeView navigation chrome", () => {
         onStatusChange={onStatusChange}
         restoreDraft={{
           batch_id: "draft-save",
+          revision: 1,
           work_type: "warehouse_io",
           sub_type: "warehouse_to_dept",
           from_department: "조립",
@@ -746,6 +831,7 @@ describe("IoComposeView navigation chrome", () => {
         restoreStep={5}
         restoreDraft={{
           batch_id: "draft-mixed-location",
+          revision: 1,
           work_type: "internal_use",
           sub_type: "internal_use_out",
           from_department: null,
@@ -826,6 +912,7 @@ describe("IoComposeView navigation chrome", () => {
     const currentOperator = { ...operator, employee_id: "assembly-staff" };
     const restoreDraft = {
       batch_id: "operator-switch-draft",
+      revision: 1,
       work_type: "process",
       sub_type: "produce",
       from_department: "조립",
@@ -875,12 +962,13 @@ describe("IoComposeView navigation chrome", () => {
       expect(api.submitDraft).toHaveBeenCalledWith(
         "operator-switch-draft",
         currentOperator.employee_id,
+        2,
       );
     });
   });
 
   it("복원 draft의 최종 편집 snapshot을 같은 batch에 저장한 뒤 한 번만 제출한다", async () => {
-    const save = deferred<{ batch_id: string }>();
+    const save = deferred<{ batch_id: string; revision: number }>();
     vi.mocked(api.saveDraft).mockImplementation(() => save.promise as never);
     vi.mocked(api.submitDraft).mockResolvedValue({
       batch: {}, status: "submitted", requires_approval: false, stock_request_id: null,
@@ -921,7 +1009,7 @@ describe("IoComposeView navigation chrome", () => {
         onStatusChange={() => {}}
         restoreStep={5}
         restoreDraft={{
-          batch_id: "edited-desktop-draft", work_type: "warehouse_io", sub_type: "warehouse_to_dept",
+          batch_id: "edited-desktop-draft", revision: 1, work_type: "warehouse_io", sub_type: "warehouse_to_dept",
           from_department: "원자재", to_department: "조립", reference_no: "EDIT-REF-7", notes: "최종 메모",
           bundles: finalBundles,
         } as never}
@@ -944,6 +1032,7 @@ describe("IoComposeView navigation chrome", () => {
       reference_no: "EDIT-REF-7",
       notes: "최종 메모",
       batch_id: "edited-desktop-draft",
+      expected_revision: 1,
       supplier_id: null,
       bundles: finalBundles,
     });
@@ -953,13 +1042,13 @@ describe("IoComposeView navigation chrome", () => {
     expect(api.submitDraft).not.toHaveBeenCalled();
 
     await act(async () => {
-      save.resolve({ batch_id: "edited-desktop-draft" });
+      save.resolve({ batch_id: "edited-desktop-draft", revision: 2 });
       await save.promise;
     });
 
     await waitFor(() => {
       expect(api.submitDraft).toHaveBeenCalledTimes(1);
-      expect(api.submitDraft).toHaveBeenCalledWith("edited-desktop-draft", operator.employee_id);
+      expect(api.submitDraft).toHaveBeenCalledWith("edited-desktop-draft", operator.employee_id, 2);
     });
   });
 

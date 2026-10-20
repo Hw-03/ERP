@@ -75,6 +75,23 @@ class StockRequestLineState:
 
 
 @dataclass(frozen=True)
+class IoBatchState:
+    batch_id: str
+    status: str
+    reservation_status: str
+
+
+@dataclass(frozen=True)
+class DraftReservationState:
+    reservation_id: str
+    batch_id: str
+    item_id: str
+    source_bucket: str
+    source_department: str
+    quantity: Decimal
+
+
+@dataclass(frozen=True)
 class ShippingRequestState:
     request_id: str
     status: str
@@ -148,6 +165,8 @@ class InventoryIntegritySnapshot:
     locations: tuple[LocationState, ...] = ()
     stock_requests: tuple[StockRequestState, ...] = ()
     stock_request_lines: tuple[StockRequestLineState, ...] = ()
+    io_batches: tuple[IoBatchState, ...] = ()
+    draft_reservations: tuple[DraftReservationState, ...] = ()
     shipping_requests: tuple[ShippingRequestState, ...] = ()
     shipping_allocations: tuple[ShippingAllocationState, ...] = ()
     warehouse_boxes: tuple[WarehouseBoxState, ...] = ()
@@ -245,6 +264,7 @@ def _inventory_findings(snapshot: InventoryIntegritySnapshot) -> list[IntegrityF
 
 
 def _reservation_findings(snapshot: InventoryIntegritySnapshot) -> list[IntegrityFinding]:
+    """Reconcile each physical cell against approval and active draft ledgers."""
     requests = {row.request_id: row for row in snapshot.stock_requests}
     expected: dict[tuple[str, str, str, str], Decimal] = defaultdict(Decimal)
     for line in snapshot.stock_request_lines:
@@ -260,6 +280,26 @@ def _reservation_findings(snapshot: InventoryIntegritySnapshot) -> list[Integrit
             continue
         expected[key] += line.quantity
 
+    batches = {row.batch_id: row for row in snapshot.io_batches}
+    findings: list[IntegrityFinding] = []
+    for reservation in snapshot.draft_reservations:
+        key = (
+            ("warehouse", reservation.item_id, "", "")
+            if reservation.source_bucket == "warehouse"
+            else ("location", reservation.item_id, reservation.source_department, "PRODUCTION")
+        )
+        expected[key] += reservation.quantity
+        batch = batches.get(reservation.batch_id)
+        if batch is not None and (batch.status != "draft" or batch.reservation_status != "reserved"):
+            findings.append(_finding(
+                "WORKFLOW_STATE_RESIDUE",
+                reservation_id=reservation.reservation_id,
+                batch_id=reservation.batch_id,
+                status=batch.status,
+                reservation_status=batch.reservation_status,
+                reason="draft_reservation_on_inactive_batch",
+            ))
+
     actual: dict[tuple[str, str, str, str], tuple[Decimal, Decimal, str | None]] = {}
     for inventory in snapshot.inventories:
         actual[("warehouse", inventory.item_id, "", "")] = (
@@ -274,7 +314,6 @@ def _reservation_findings(snapshot: InventoryIntegritySnapshot) -> list[Integrit
             location.row_id,
         )
 
-    findings: list[IntegrityFinding] = []
     for key in sorted(set(actual) | set(expected)):
         scope, item_id, department, status = key
         stored, physical, row_id = actual.get(
@@ -559,8 +598,10 @@ def _warehouse_findings(
 
 
 def _orphan_findings(snapshot: InventoryIntegritySnapshot) -> list[IntegrityFinding]:
+    """Report ledger references whose owning records or inventory no longer exist."""
     inventories = {row.item_id for row in snapshot.inventories}
     requests = {row.request_id for row in snapshot.stock_requests}
+    batches = {row.batch_id for row in snapshot.io_batches}
     shipping_requests = {row.request_id for row in snapshot.shipping_requests}
     operations = {row.operation_id for row in snapshot.operations}
     findings: list[IntegrityFinding] = []
@@ -611,6 +652,14 @@ def _orphan_findings(snapshot: InventoryIntegritySnapshot) -> list[IntegrityFind
                     reason=("missing_request" if line.request_id not in requests else "missing_item"),
                 )
             )
+    for reservation in snapshot.draft_reservations:
+        if reservation.batch_id not in batches or reservation.item_id not in snapshot.item_ids:
+            findings.append(_finding(
+                "ORPHAN_REFERENCE",
+                row_type="io_draft_reservation",
+                row_id=reservation.reservation_id,
+                reason="missing_batch" if reservation.batch_id not in batches else "missing_item",
+            ))
     for allocation in snapshot.shipping_allocations:
         if allocation.request_id not in shipping_requests or allocation.item_id not in snapshot.item_ids:
             findings.append(

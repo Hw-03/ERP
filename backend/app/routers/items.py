@@ -44,6 +44,7 @@ from app.models import ProductSymbol
 from app.services import audit
 from app.services import inventory as inventory_svc
 from app.services import stock_availability, stock_math
+from app.services.work_reservation_queries import bulk_inventory_work_status
 from app.services.audit_actor_session import get_verified_audit_actor_code
 from app.services.inventory_read import bulk_defective_breakdown as _bulk_defective_breakdown
 from app.services.item_display_order import insert_item_at_process_end
@@ -101,6 +102,7 @@ def _to_item_with_inventory(
     model_slots: Optional[list[int]] = None,
     has_bom: Optional[bool] = None,
     defective_breakdown: Optional[list[DefectiveStockBreakdown]] = None,
+    work_reservations: Optional[dict] = None,
 ) -> ItemWithInventory:
     """ItemWithInventory DTO 조립.
 
@@ -112,6 +114,8 @@ def _to_item_with_inventory(
     from decimal import Decimal as _D
 
     fig = figures if figures is not None else stock_math.compute_for(db, item.item_id)
+    if work_reservations is None:
+        work_reservations = bulk_inventory_work_status(db, [item.item_id])[item.item_id]["summary"]
 
     if locations is None:
         loc_rows = (
@@ -152,6 +156,7 @@ def _to_item_with_inventory(
         model_slots = _item_model_slots(item.mes_code)
 
     return ItemWithInventory(
+        work_reservations=work_reservations,
         item_id=item.item_id,
         item_name=item.item_name,
         unit=item.unit,
@@ -412,6 +417,7 @@ def list_items(
     # bulk prefetch — N+1 제거. 기존에는 item 1건당 4 쿼리씩 나갔음.
     item_ids = [it.item_id for it, _ in rows]
     figures_map = stock_math.bulk_compute(db, item_ids)
+    work_status_by_item = bulk_inventory_work_status(db, item_ids)
     reserved_by_cell = stock_availability.bulk_reserved_by_cell(db, item_ids)
 
     from decimal import Decimal as _D
@@ -450,6 +456,7 @@ def list_items(
             model_slots=_item_model_slots(item.mes_code),
             has_bom=item.item_id in bom_parent_ids,
             defective_breakdown=defective_by_item.get(item.item_id, []),
+            work_reservations=work_status_by_item[item.item_id]["summary"],
         )
         for item, inv in rows
     ]

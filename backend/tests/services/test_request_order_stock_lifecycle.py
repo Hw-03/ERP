@@ -95,6 +95,7 @@ def _internal_use_payload(requester: Employee, warehouse_item, department_item) 
             }],
         })
     return IoSubmitRequest(
+        client_request_id=str(uuid.uuid4()),
         requester_employee_id=requester.employee_id,
         work_type="internal_use",
         sub_type="internal_use_out",

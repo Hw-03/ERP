@@ -1,5 +1,5 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, QueryObserver } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryProvider } from "./client";
@@ -105,6 +105,36 @@ afterEach(() => {
 });
 
 describe("invalidateOperationalQueries", () => {
+  it("realtime 변경 전 최초 재고 요청에 캐시가 없어도 오래된 첫 응답을 재사용하지 않는다", async () => {
+    const client = makeClient();
+    const key = queryKeys.items.list({ limit: 2000 });
+    const oldResponse = deferred<number>();
+    const fetchItems = vi.fn<() => Promise<number>>().mockReturnValueOnce(oldResponse.promise).mockResolvedValue(5);
+    const observer = new QueryObserver(client, { queryKey: key, queryFn: fetchItems });
+    const unsubscribe = observer.subscribe(() => {});
+    expect(fetchItems).toHaveBeenCalledTimes(1);
+    const publish = vi.fn();
+    const refreshing = invalidateOperationalQueries(client, publish);
+    oldResponse.resolve(3);
+    await refreshing;
+    expect(publish).toHaveBeenCalledTimes(1);
+    expect(client.getQueryData(key)).toBe(5);
+    expect(fetchItems).toHaveBeenCalledTimes(2);
+    unsubscribe();
+    client.clear();
+  });
+
+  it("품목 작업 현황과 관리자 목록·상세 캐시를 함께 만료시킨다", async () => {
+    const client = makeClient();
+    const keys = [
+      queryKeys.inventory.workStatus("item-1"),
+      queryKeys.admin.workReservations({ owner_active: false, skip: 0 }),
+      queryKeys.admin.workReservationDetail("batch-1"),
+    ];
+    keys.forEach((key) => client.setQueryData(key, { revision: 1 }));
+    await invalidateOperationalQueries(client);
+    keys.forEach((key) => expect(client.getQueryState(key)?.isInvalidated).toBe(true));
+  });
   it("검색 설정 실패와 관계없이 로그인 직원 정보부터 갱신한다", async () => {
     const client = makeClient();
     client.setQueryData(queryKeys.itemSearch.config(), { version: "v1", synonym_groups: [], item_aliases: {} });
@@ -124,7 +154,7 @@ describe("invalidateOperationalQueries", () => {
     pending.resolve({ version: "v2", synonym_groups: [], item_aliases: {} });
     await result;
     expect(client.getQueryData(queryKeys.itemSearch.config())).toMatchObject({ version: "v2" });
-    expect(invalidateSpy).toHaveBeenCalledTimes(12);
+    expect(invalidateSpy).toHaveBeenCalledTimes(13);
   });
   it("무효화하는 operational query root 목록이 정확하다", async () => {
     const client = makeClient();
@@ -145,6 +175,7 @@ describe("invalidateOperationalQueries", () => {
       ["weekly"],
       ["dailyWorkReports"],
       ["stocktake"],
+      ["admin", "workReservations"],
     ]);
   });
 });
@@ -165,7 +196,7 @@ describe("RealtimeSyncProvider", () => {
     await act(async () => vi.advanceTimersByTimeAsync(1_000));
     expect(client.getQueryData(queryKeys.itemSearch.config())).toMatchObject({ version: "v2" });
     expect(screen.getByTestId("revision")).toHaveTextContent("7");
-    expect(invalidateSpy).toHaveBeenCalledTimes(12);
+    expect(invalidateSpy).toHaveBeenCalledTimes(13);
   });
   it("named revision SSE의 첫 valid snapshot을 context에 반영하고 operational cache를 무효화한다", async () => {
     const client = makeClient();
@@ -181,7 +212,7 @@ describe("RealtimeSyncProvider", () => {
     act(() => source.emitRevision(JSON.stringify(VALID_SNAPSHOT)));
 
     await waitFor(() => expect(screen.getByTestId("revision")).toHaveTextContent("7"));
-    expect(invalidateSpy).toHaveBeenCalledTimes(12);
+    expect(invalidateSpy).toHaveBeenCalledTimes(13);
   });
 
   it("250ms 창의 revision burst를 최신 context와 한 번의 무효화로 합친다", async () => {
@@ -204,7 +235,7 @@ describe("RealtimeSyncProvider", () => {
     await act(async () => vi.advanceTimersByTimeAsync(1));
 
     expect(screen.getByTestId("revision")).toHaveTextContent("9");
-    expect(invalidateSpy).toHaveBeenCalledTimes(12);
+    expect(invalidateSpy).toHaveBeenCalledTimes(13);
   });
 
   it("hidden 탭은 갱신을 보류하고 visible 복귀 때 최신 revision만 한 번 적용한다", async () => {
@@ -232,7 +263,7 @@ describe("RealtimeSyncProvider", () => {
     });
 
     expect(screen.getByTestId("revision")).toHaveTextContent("9");
-    expect(invalidateSpy).toHaveBeenCalledTimes(12);
+    expect(invalidateSpy).toHaveBeenCalledTimes(13);
   });
 
   it("무효화 진행 중에는 겹쳐 실행하지 않고 최신 revision을 다음 창에 적용한다", async () => {
@@ -248,7 +279,7 @@ describe("RealtimeSyncProvider", () => {
     act(() => source.emitRevision(JSON.stringify({ ...VALID_SNAPSHOT, revision: 7 })));
     await act(async () => vi.advanceTimersByTimeAsync(250));
     expect(screen.getByTestId("revision")).toHaveTextContent("7");
-    expect(invalidateSpy).toHaveBeenCalledTimes(12);
+    expect(invalidateSpy).toHaveBeenCalledTimes(13);
 
     act(() => {
       source.emitRevision(JSON.stringify({ ...VALID_SNAPSHOT, revision: 8 }));
@@ -256,7 +287,7 @@ describe("RealtimeSyncProvider", () => {
     });
     await act(async () => vi.advanceTimersByTimeAsync(1_000));
     expect(screen.getByTestId("revision")).toHaveTextContent("7");
-    expect(invalidateSpy).toHaveBeenCalledTimes(12);
+    expect(invalidateSpy).toHaveBeenCalledTimes(13);
 
     await act(async () => {
       firstInvalidation.resolve();
@@ -266,7 +297,7 @@ describe("RealtimeSyncProvider", () => {
     await act(async () => vi.advanceTimersByTimeAsync(250));
 
     expect(screen.getByTestId("revision")).toHaveTextContent("9");
-    expect(invalidateSpy).toHaveBeenCalledTimes(24);
+    expect(invalidateSpy).toHaveBeenCalledTimes(26);
   });
 
   it("unmount 시 대기 중인 revision flush timer도 정리한다", async () => {
@@ -290,7 +321,7 @@ describe("RealtimeSyncProvider", () => {
     const source = FakeEventSource.instances[0];
 
     act(() => source.emitRevision(JSON.stringify(VALID_SNAPSHOT)));
-    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(12));
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(13));
 
     act(() => {
       source.emitRevision(JSON.stringify(VALID_SNAPSHOT));
@@ -301,7 +332,7 @@ describe("RealtimeSyncProvider", () => {
       source.emitRevision(JSON.stringify({ revision: 8, updated_at: "not-a-date" }));
     });
 
-    expect(invalidateSpy).toHaveBeenCalledTimes(12);
+    expect(invalidateSpy).toHaveBeenCalledTimes(13);
     expect(screen.getByTestId("revision")).toHaveTextContent("7");
   });
 
@@ -318,7 +349,7 @@ describe("RealtimeSyncProvider", () => {
     act(() => source.emitRevision(JSON.stringify({ ...VALID_SNAPSHOT, revision: 3 })));
     await waitFor(() => expect(screen.getByTestId("revision")).toHaveTextContent("3"));
 
-    expect(invalidateSpy).toHaveBeenCalledTimes(36);
+    expect(invalidateSpy).toHaveBeenCalledTimes(39);
   });
 
   it("GET 시작 후 적용된 SSE보다 늦게 도착한 GET 응답을 폐기한다", async () => {
@@ -341,7 +372,7 @@ describe("RealtimeSyncProvider", () => {
     });
 
     expect(screen.getByTestId("revision")).toHaveTextContent("10");
-    expect(invalidateSpy).toHaveBeenCalledTimes(12);
+    expect(invalidateSpy).toHaveBeenCalledTimes(13);
   });
 
   it("GET 시작 후 같은 revision의 valid SSE가 도착해도 늦은 GET 응답을 폐기한다", async () => {
@@ -363,7 +394,7 @@ describe("RealtimeSyncProvider", () => {
     });
 
     expect(screen.getByTestId("revision")).toHaveTextContent("7");
-    expect(invalidateSpy).toHaveBeenCalledTimes(12);
+    expect(invalidateSpy).toHaveBeenCalledTimes(13);
   });
 
   it("GET 요청 중 SSE 변화가 없으면 낮은 revision도 DB restore snapshot으로 적용한다", async () => {

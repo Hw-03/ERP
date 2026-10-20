@@ -18,6 +18,7 @@ import { IoRemoveButton } from "./IoRemoveButton";
 import { INTERNAL_USE_BOM_MODE_LABEL } from "./internalUseBom";
 import { isBomForced, isCustomProcessBomBundle, processBomEffectLine } from "./ioWorkType";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
+import { isShortageLine } from "./pullFromWarehouse";
 
 const INTERNAL_USE_BOM_GUIDE = {
   parent_and_children: [
@@ -79,7 +80,7 @@ export function IoBundleCard({
 }: Props) {
   const tone = ioDirectionTone(subType);
   const linePullSelectable = (line: IoLine) =>
-    !!pullEnabled && line.included && line.shortage > 0;
+    !!pullEnabled && isShortageLine(processBomEffectLine(subType, bundle, line), getAvailable);
   // React Hook 규칙: 조건부 early return 전에 호출해야 하므로 항상 선언.
   // 단품 분기에서는 사용되지 않지만 hook 호출 순서를 안정시키려는 용도.
   const [collapsed, setCollapsed] = useState(true);

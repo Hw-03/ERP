@@ -10,8 +10,8 @@ from decimal import Decimal
 from typing import Iterable, Optional, Sequence
 import uuid
 
-from sqlalchemy import update
 from sqlalchemy.orm import Session
+from app.schemas.io import IoSubmitRequest
 
 from app.models import (
     BOM,
@@ -66,11 +66,11 @@ from app.services.io_persist import (
     _batch_to_payload,
     ensure_batch_is_mutable,
     _load_requester,
-    _persist_batch,
     normalize_batch_bom_stock_exempt,
     normalize_automatic_routes_with_bom_token_refresh,
 )
 from app.services.supplier import validate_supplier_for_operation
+from app.services.work_reservation_errors import WorkReservationError
 
 
 CUSTOM_BOM_REFERENCE_EXCLUSION_NOTE = "커스텀 BOM 상위 미반영"
@@ -446,29 +446,50 @@ def _normalize_custom_process_bom_effects(
             line.shortage = Decimal("0")
 
 
+def prepare_effective_lines(db: Session, batch: IoBatch) -> None:
+    """원본 토큰으로 live 경로를 갱신한 뒤 실행에 적용할 BOM 포함 정책을 확정한다."""
+    from app.services.item_write_validation import validate_io_items
+
+    normalize_automatic_routes_with_bom_token_refresh(
+        db,
+        work_type=batch.work_type,
+        sub_type=batch.sub_type,
+        bundles=batch.bundles,
+    )
+    normalize_batch_bom_stock_exempt(db, batch)
+    validate_io_items(db, batch.bundles, sub_type=batch.sub_type)
+    _validate_process_bom_parent_lines(batch)
+    _normalize_process_bom_auto_inclusion(batch)
+
+
+def requires_department_approval(batch: IoBatch, custom_bundle_ids: set[uuid.UUID]) -> bool:
+    """커스텀 BOM의 효과가 없어도 참고 행에 대한 부서 결재는 유지한다."""
+    return batch.work_type == "process" and (
+        _has_manual_line(_included_lines(batch)) or bool(custom_bundle_ids)
+    )
+
+
+def finalize_effective_lines(
+    db: Session, batch: IoBatch, custom_bundle_ids: set[uuid.UUID],
+) -> None:
+    """검증한 커스텀 BOM 하위의 실제 방향과 최종 부서 경로를 함께 확정한다."""
+    if custom_bundle_ids:
+        _mark_custom_process_bom_parents_reference_only(batch, custom_bundle_ids)
+        _validate_custom_process_bom_auto_lines(db, batch, custom_bundle_ids)
+        _normalize_custom_process_bom_effects(batch, custom_bundle_ids)
+    _normalize_automatic_batch_routes(db, batch, custom_bundle_ids=custom_bundle_ids)
+
+
 def _prelock_line_inventories(db: Session, lines: Sequence[IoLine]) -> None:
     """다품목 실행 전에 부모 Inventory를 전역 순서로 잠근다."""
     item_ids = sorted({line.item_id for line in lines})
     inventory_svc.ensure_and_lock_inventories(db, item_ids)
 
 
-def _submit_internal_use_approvals(
-    db: Session,
-    *,
-    requester: Employee,
-    batch: IoBatch,
-) -> None:
-    """사용출고 라인을 창고/AS·연구/부서 승인 종류별 최대 3건으로 분리한다."""
-    lines = _included_lines(batch)
-    _validate_included_lines(db, lines)
-    from app.services import internal_use_approval
-
-    requester = internal_use_approval.lock_and_refresh_employee(
-        db,
-        requester.employee_id,
-    )
-    if not bool(requester.is_active):
-        raise PermissionError("비활성 직원은 입출고 작업을 제출할 수 없습니다.")
+def group_internal_use_approval_lines(
+    db: Session, lines: Sequence[IoLine],
+) -> dict[str, list[IoLine]]:
+    """현재 roster로 승인 분할만 계산한다. 저장 호출자는 roster 잠금을 먼저 확보한다."""
     item_process_types = {
         item.item_id: item.process_type_code
         for item in db.query(Item).filter(Item.item_id.in_({line.item_id for line in lines})).all()
@@ -496,6 +517,27 @@ def _submit_internal_use_approvals(
         else:
             kind = "department"
         grouped.setdefault(kind, []).append(line)
+    return grouped
+
+
+def _submit_internal_use_approvals(
+    db: Session,
+    *,
+    requester: Employee,
+    batch: IoBatch,
+) -> None:
+    """사용출고 라인을 창고/AS·연구/부서 승인 종류별 최대 3건으로 분리한다."""
+    lines = _included_lines(batch)
+    _validate_included_lines(db, lines)
+    from app.services import internal_use_approval
+
+    requester = internal_use_approval.lock_and_refresh_employee(
+        db,
+        requester.employee_id,
+    )
+    if not bool(requester.is_active):
+        raise PermissionError("비활성 직원은 입출고 작업을 제출할 수 없습니다.")
+    grouped = group_internal_use_approval_lines(db, lines)
 
     _prelock_line_inventories(db, lines)
     requests: list[StockRequest] = []
@@ -553,7 +595,7 @@ def _submit_internal_use_approvals(
                 requests=requests,
                 actor=requester,
             )
-    except InventoryConflict:
+    except (InventoryConflict, WorkReservationError, PermissionError):
         raise
     except Exception as exc:
         raise internal_use_approval.InternalUseSubmissionSettlementError(
@@ -602,6 +644,14 @@ def _submit_approval(
     _link_stock_request(db, batch=batch, request=request, lines=lines)
     # 창고 결재 대기 요청 도착 → 창고 정/부에게 알림 (io 라우터가 커밋).
     notif_svc.notify_request_arrived(db, request)
+
+
+def department_approval_department(batch: IoBatch, requester: Employee) -> str:
+    """출고·혼합 공정의 승인 부서는 현재 제출 경로와 같은 fallback을 사용한다."""
+    return (
+        batch.to_department or batch.from_department
+        or ("생산부" if requester.department == "창고" else requester.department)
+    )
 
 
 def _submit_dept_only_approval(
@@ -654,10 +704,7 @@ def _submit_dept_only_approval(
         reason_category=batch.reason_category,
         reason_memo=batch.notes if batch.reason_category_id else None,
         # 출고·혼합 공정 요청도 요청자의 창고 소속이 아닌 생산부 결재로 보낸다.
-        approval_department=(
-            batch.to_department or batch.from_department
-            or ("생산부" if requester.department == "창고" else requester.department)
-        ),
+        approval_department=department_approval_department(batch, requester),
     )
     _link_stock_request(db, batch=batch, request=request, lines=request_lines)
 
@@ -1282,16 +1329,7 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
     _prelock_line_inventories(db, [line for bundle in batch.bundles for line in bundle.lines])
     # An old draft token proves the original BOM/inclusion intent.  Validate it
     # and rotate it for the live route before stock-exempt handling reads it.
-    normalize_automatic_routes_with_bom_token_refresh(
-        db,
-        work_type=batch.work_type,
-        sub_type=batch.sub_type,
-        bundles=batch.bundles,
-    )
-    normalize_batch_bom_stock_exempt(db, batch)
-    validate_io_items(db, batch.bundles, sub_type=batch.sub_type)
-    _validate_process_bom_parent_lines(batch)
-    _normalize_process_bom_auto_inclusion(batch)
+    prepare_effective_lines(db, batch)
     validate_internal_use_requester(
         requester,
         work_type=batch.work_type,
@@ -1331,38 +1369,16 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
     )
     custom_process_bom_bundle_ids = _custom_process_bom_bundle_ids(db, batch)
     custom_process_bom = bool(custom_process_bom_bundle_ids)
-    included_lines = _included_lines(batch)
-    department_approval_required = (
-        batch.work_type == "process"
-        and (_has_manual_line(included_lines) or custom_process_bom)
-    )
+    department_approval_required = requires_department_approval(batch, custom_process_bom_bundle_ids)
     if department_approval_required and not (batch.notes or "").strip():
         raise ValueError("부서 결재 요청에는 메모를 입력해야 합니다.")
 
     from app.services.internal_use_approval import InternalUseSubmissionSettlementError
 
     try:
-        if custom_process_bom:
-            _mark_custom_process_bom_parents_reference_only(
-                batch,
-                custom_process_bom_bundle_ids,
-            )
-            _validate_custom_process_bom_auto_lines(
-                db,
-                batch,
-                custom_process_bom_bundle_ids,
-            )
-            _normalize_custom_process_bom_effects(
-                batch,
-                custom_process_bom_bundle_ids,
-            )
         # BOM 자동행 토큰은 미리보기 당시 경로로 먼저 검증한다. 이후 실제 제출 경로는
         # live 품목 코드 기준으로 다시 확정해 선택 부서나 오래된 초안을 실행하지 않는다.
-        _normalize_automatic_batch_routes(
-            db,
-            batch,
-            custom_bundle_ids=custom_process_bom_bundle_ids,
-        )
+        finalize_effective_lines(db, batch, custom_process_bom_bundle_ids)
         included_lines = _included_lines(batch)
         if department_approval_required:
             # process 부서 승인만 필요 — 낱개 또는 기준과 다른 BOM 자동 하위.
@@ -1437,26 +1453,56 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
     }
 
 
-def submit(db: Session, payload) -> dict:
-    payload.sub_type = normalize_process_sub_type(
-        work_type=payload.work_type,
-        sub_type=payload.sub_type,
-        bundles=payload.bundles,
-    )
+def direct_submit_replay(batch: IoBatch, payload: IoSubmitRequest) -> dict:
+    """A creation retry returns current state without ever executing it again."""
+    from app.services.io_draft import build_idempotent_response, validate_creation_replay
+    from app.services.io_reservations import creation_hash
+    if batch.requester_employee_id != payload.requester_employee_id:
+        raise PermissionError("다른 직원이 사용한 요청 키입니다.")
+    if batch.creation_payload_hash == creation_hash(payload, "draft"):
+        raise WorkReservationError("WORK_STATE_CONFLICT", "저장한 작업은 버전을 포함한 전용 제출 경로를 사용해 주세요.")
+    validate_creation_replay(batch, payload, creation_hash(payload, "direct_submit"))
+    return build_idempotent_response(batch)
+
+
+def submit(db: Session, payload: IoSubmitRequest) -> dict:
+    """Reserve all inputs, then transfer them to execution within the caller transaction."""
+    from app.services.io_draft import save_draft, find_by_client_request_id
+    if payload.batch_id is not None:
+        raise WorkReservationError("WORK_STATE_CONFLICT", "저장한 작업은 버전을 포함한 전용 제출 경로를 사용해 주세요.")
     requester = _load_requester(db, payload.requester_employee_id)
-    validate_receive_requester(
-        requester,
-        db=db,
-        work_type=payload.work_type,
-        sub_type=payload.sub_type,
-    )
-    batch = _persist_batch(
-        db,
-        requester=requester,
-        payload=payload,
-        status="submitted",
-        submitted_at=datetime.utcnow(),
-    )
+    if not (payload.client_request_id or "").strip():
+        raise WorkReservationError("VALIDATION_ERROR", "새 작업의 요청 키가 필요합니다.", 422)
+    existing = find_by_client_request_id(db, payload.client_request_id)
+    if existing is not None:
+        return direct_submit_replay(existing, payload)
+    saved = save_draft(db, payload, creation_command="direct_submit")
+    batch = db.get(IoBatch, saved["batch_id"])
+    return _handoff_saved_reservation(db, batch, requester, new_submission=True)
+
+
+def _handoff_saved_reservation(db: Session, batch: IoBatch, requester: Employee,
+                               *, new_submission: bool = False) -> dict:
+    """Hold every source/output parent lock while replacing draft ownership with approval ownership."""
+    from app.services import io_reservations as reservations
+    from app.services.item_write_validation import validate_io_items
+    validate_io_items(db, batch.bundles, sub_type=batch.sub_type)
+    reservations.validate_saved_plan(db, batch)
+    supplier = validate_supplier_for_operation(db, work_type=batch.work_type,
+        sub_type=batch.sub_type, supplier_id=batch.supplier_id)
+    if supplier is not None:
+        batch.supplier_name_snapshot = supplier.name
+    previous_revision = 0 if new_submission else batch.revision
+    if not new_submission:
+        reservations.advance_revision(db, batch, previous_revision)
+    plan = batch.effective_plan
+    reservations.replace_reservations(db, batch, None)
+    batch.effective_plan = plan
+    batch.status = "submitted"
+    batch.submitted_at = datetime.utcnow()
+    batch.updated_at = batch.submitted_at
+    db.flush()
+    reservations.record_event(db, batch, "submitted", previous_revision, requester.employee_id, requester.name)
     return _execute_submission(db, requester=requester, batch=batch)
 
 
@@ -1465,14 +1511,17 @@ def submit_existing_draft(
     *,
     batch_id: uuid.UUID,
     requester_employee_id: uuid.UUID,
+    expected_revision: int | None = None,
 ) -> dict:
-    """저장된 draft를 재제출. 새 batch 생성 없이 기존 라인을 그대로 실행."""
-    batch = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
+    """Check owner and version before atomically handing the draft reservation off."""
+    from app.services import io_reservations as reservations
+    hint = db.get(IoBatch, batch_id)
+    if hint is not None and hint.sub_type == INTERNAL_USE_SUB_TYPE:
+        from app.services.internal_use_approval import lock_approver_roster
+        lock_approver_roster(db)
+    batch = reservations.lock_owned_batch(db, batch_id, requester_employee_id)
     if batch is None:
-        raise ValueError("작업 묶음을 찾을 수 없습니다.")
-    if batch.requester_employee_id != requester_employee_id:
-        raise PermissionError("본인 임시저장 작업만 제출할 수 있습니다.")
-    ensure_batch_is_mutable(batch)
+        raise WorkReservationError("NOT_FOUND", "작업 묶음을 찾을 수 없습니다.", 404)
     requester = _load_requester(db, requester_employee_id)
     validate_receive_requester(
         requester,
@@ -1480,30 +1529,9 @@ def submit_existing_draft(
         work_type=batch.work_type,
         sub_type=batch.sub_type,
     )
-    supplier = validate_supplier_for_operation(
-        db,
-        work_type=batch.work_type,
-        sub_type=batch.sub_type,
-        supplier_id=batch.supplier_id,
-    )
-    if supplier is not None:
-        batch.supplier_name_snapshot = supplier.name
-    submitted_at = datetime.utcnow()
-    transition = db.execute(
-        update(IoBatch)
-        .where(
-            IoBatch.batch_id == batch_id,
-            IoBatch.requester_employee_id == requester_employee_id,
-            IoBatch.status == "draft",
-        )
-        .values(
-            status="submitted",
-            submitted_at=submitted_at,
-            updated_at=submitted_at,
-        )
-    )
-    if transition.rowcount != 1:
-        raise ValueError("임시저장 상태가 아닙니다.")
-    db.flush()
-    db.refresh(batch)
-    return _execute_submission(db, requester=requester, batch=batch)
+    reservations.check_revision(batch, expected_revision)
+    reservations.check_draft(batch)
+    if batch.reservation_status not in {"reserved", "not_required"}:
+        raise WorkReservationError("WORK_RESERVATION_REQUIRED", "예약되지 않은 작업입니다. 다시 저장해 재고를 확보해 주세요.")
+    ensure_batch_is_mutable(batch)
+    return _handoff_saved_reservation(db, batch, requester)

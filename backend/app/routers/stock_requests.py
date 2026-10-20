@@ -14,7 +14,7 @@ from sqlalchemy.orm import Query as SAQuery, Session
 
 from sqlalchemy.exc import IntegrityError
 
-from app.database import get_db, _is_sqlite
+from app.database import get_db
 from app.models import (
     Employee,
     IoBatch,
@@ -36,6 +36,7 @@ from app.schemas import (
     StockRequestSubmitPayload,
 )
 from app.schemas.io import IoBatchResponse
+from app.schemas.stock_request import StockRequestRevertRequest
 from app.services import stock_requests as svc
 from app.services.inv_transfer import department_for_item
 from app.services import stock_request_actions as action_svc
@@ -589,24 +590,11 @@ def get_stock_request(request_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 def _load_request_for_action(db: Session, request_id: uuid.UUID) -> StockRequest:
-    """승인/반려/취소 전용 조회 — PostgreSQL: FOR UPDATE 행 잠금으로 중복 처리 방지."""
+    """연결 조회만 수행하며, 명령 서비스가 batch → requests 순서로 재조회·잠금한다."""
     q = db.query(StockRequest).filter(StockRequest.request_id == request_id)
     request = q.first()
     if request is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "요청을 찾을 수 없습니다.")
-    is_internal_use = False
-    if request.operation_batch_id is not None:
-        is_internal_use = (
-            db.query(IoBatch.batch_id)
-            .filter(
-                IoBatch.batch_id == request.operation_batch_id,
-                IoBatch.sub_type == "internal_use_out",
-            )
-            .first()
-            is not None
-        )
-    if not _is_sqlite and not is_internal_use:
-        request = q.with_for_update().populate_existing().one()
     return request
 
 
@@ -891,7 +879,7 @@ def submit_stock_request_draft(
 @router.post("/{request_id}/revert-to-draft", response_model=IoBatchResponse)
 def revert_stock_request_to_draft(
     request_id: uuid.UUID,
-    payload: StockRequestActionRequest,
+    payload: StockRequestRevertRequest,
     http_request: Request,
     db: Session = Depends(get_db),
 ):
@@ -907,6 +895,7 @@ def revert_stock_request_to_draft(
             request=request,
             requester=requester,
             pin=payload.pin,
+            expected_revision=payload.expected_revision,
             http_request=http_request,
         )
     except PermissionError as exc:

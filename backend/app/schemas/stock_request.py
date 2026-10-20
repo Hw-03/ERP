@@ -78,6 +78,11 @@ class StockRequestActionRequest(BaseModel):
     reason: Optional[str] = None  # reject 시에만 사용
 
 
+class StockRequestRevertRequest(StockRequestActionRequest):
+    """승인 요청 수정은 연결 작업의 확인한 버전을 반드시 전송한다."""
+    expected_revision: int = Field(..., ge=0)
+
+
 class StockRequestLineResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

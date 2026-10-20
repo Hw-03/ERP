@@ -145,8 +145,11 @@ def _activate_legacy_adoption(db_session) -> None:
     )
 
 
-def test_operation_list_preview_cancel_and_summary(client, db_session, make_item) -> None:
+@pytest.mark.parametrize("warehouse_role", ["primary", "none"])
+def test_operation_list_preview_cancel_and_summary(client, db_session, make_item, warehouse_role: str) -> None:
     item, actor, operation, original_log = _seed_operation(db_session, make_item)
+    actor.warehouse_role = warehouse_role
+    db_session.commit()
 
     listing = client.get(f"/api/inventory/operations?item_id={item.item_id}")
     assert listing.status_code == 200, listing.text

@@ -1,4 +1,6 @@
 "use client";
+import { useQueryClient } from "@tanstack/react-query";
+import { invalidateWorkReservationQueries } from "@/lib/queries/workReservationInvalidation";
 import { ReadFailure } from "../../common/ReadState";
 import { MobileIoRestoreSkeleton } from "../warehouse/MobileIoRestoreSkeleton";
 
@@ -69,7 +71,8 @@ export function MobileWarehouseScreen({
   targetRequestId?: string | null;
 }) {
   const revision = useRealtimeRevision();
-  const { employees, items, productModels, loadFailure, setItems, itemsLoading, itemsLoadError, itemsHasData, retryItems } = useWarehouseData({
+  const reservationQueryClient = useQueryClient();
+  const { employees, items, inventoryQueryState, productModels, loadFailure, setItems, refreshItems, itemsLoading, itemsLoadError, itemsHasData, retryItems } = useWarehouseData({
     globalSearch,
     onStatusChange,
   });
@@ -428,6 +431,8 @@ export function MobileWarehouseScreen({
             employees={employees}
             items={items}
             productModels={productModels}
+            inventoryQueryState={inventoryQueryState}
+            onRefreshItems={refreshItems}
             setItems={setItems}
             preselectedItem={editingGeneration === 0 ? preselectedItem : null}
             restoreDraft={restoreIoDraft}
@@ -447,12 +452,15 @@ export function MobileWarehouseScreen({
               setPanelRefreshNonce((n) => n + 1);
               onSubmitSuccess?.();
             }}
-            onDraftSaved={(batchId, step, persistInUrl) => {
+              onReservationChanged={() => invalidateWorkReservationQueries(reservationQueryClient, { throwOnError: true })}
+              onDraftSaved={(batchId, step, persistInUrl) => {
               if (!isCurrentEditing()) return;
               if (persistInUrl === false) {
                 clearWarehouseDraftRestore(batchId, setRestoreIoDraft, restoredUrlDraftRef);
                 return;
               }
+              // 창고 작업을 저장해도 작성기에 보관한 원작업 세션을 유지한다.
+              restoredUrlDraftRef.current = batchId;
               persistWarehouseDraftUrl(batchId, step);
             }}
           />

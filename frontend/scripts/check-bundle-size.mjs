@@ -2,7 +2,7 @@
 /**
  * Round-16 #4 — Bundle size gate.
  *
- * .next-prod/static/chunks 의 *.js 합산 크기가 임계 (default 3.30 MB) 이내인지 검사.
+ * .next-prod/static/chunks 의 *.js 합산 크기가 임계 (default 3.35 MB) 이내인지 검사.
  * Next.js production build 후 실행. 임계 초과 시 exit 1.
  *
  * 사용:
@@ -25,7 +25,8 @@ const args = process.argv.slice(2);
 const maxIdx = args.indexOf("--max");
 // 2026-10-20: 관리자 가상 목록(@tanstack/react-virtual)·입력 보호 추가 후 3.283 MB.
 // 모든 행을 마운트하던 비용을 제한하는 의존성의 증가분만 반영하며 여유는 약 18 KB다.
-const MAX_MB = maxIdx >= 0 ? parseFloat(args[maxIdx + 1]) : 3.30;
+// 2026-10-21: CP9 작업 예약 기능의 동일 환경 Turbopack 실측: 최신 main 3.283 → 3.330 MB (+49,851 bytes).
+const MAX_MB = maxIdx >= 0 ? parseFloat(args[maxIdx + 1]) : 3.35;
 const MAX_BYTES = MAX_MB * 1024 * 1024;
 
 async function walk(dir) {

@@ -36,6 +36,8 @@ from app.models.io_batch import (
     IoBatch,
     IoBundle,
     IoLine,
+    IoDraftReservation,
+    IoWorkReservationEvent,
 )
 from app.models.supplier import Supplier
 from app.models.notification import (
@@ -189,6 +191,8 @@ __all__ = [
     "IoBatch",
     "IoBundle",
     "IoLine",
+    "IoDraftReservation",
+    "IoWorkReservationEvent",
     "Supplier",
     # notifications
     "Notification",

@@ -63,7 +63,7 @@ export function MobileInventoryDetailContent({ item, headerBadge, onGoToWarehous
         삭제된 품목입니다. 입출고 작업을 할 수 없습니다.
       </p>}
       <div id={`${id}-detail-panel`} role="tabpanel" aria-labelledby={`${id}-detail`} hidden={active !== "detail"}>
-        <InventoryDetailPanel item={item} onGoToWarehouse={onGoToWarehouse} canReceive={canReceive} actionsDisabled={actionsDisabled} quickActionVariant="mobile" imageFilename={imageFilename} />
+        <InventoryDetailPanel item={item} onGoToWarehouse={onGoToWarehouse} canReceive={canReceive} actionsDisabled={actionsDisabled} quickActionVariant="mobile" imageFilename={imageFilename} showWorkStatus />
       </div>
       {historyVisited && <div id={`${id}-history-panel`} role="tabpanel" aria-labelledby={`${id}-history`} hidden={active !== "history"} className={styles.history}>
         <InventoryRecentHistoryPanel item={item} mobilePresentation />

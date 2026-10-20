@@ -7,11 +7,13 @@ from decimal import Decimal
 from typing import Iterable, Sequence
 import uuid
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import (
     Inventory,
     InventoryLocation,
+    IoDraftReservation,
     LocationStatusEnum,
     RequestBucketEnum,
     StockRequest,
@@ -108,7 +110,7 @@ def _other_reserved_quantities(
     tuple[RequestBucketEnum, uuid.UUID, str | None, LocationStatusEnum | None],
     Decimal,
 ]:
-    """Return reservations that must remain for other active requests."""
+    """Keep other approval reservations and every active draft ledger protected."""
     lines = (
         db.query(StockRequestLine)
         .join(StockRequest, StockRequestLine.request_id == StockRequest.request_id)
@@ -119,10 +121,30 @@ def _other_reserved_quantities(
         )
         .all()
     )
-    return {
+    protected = {
         _group_key(group): group.quantity
         for group in aggregate_reservations(lines)
     }
+    draft_totals = db.query(
+        IoDraftReservation.item_id,
+        IoDraftReservation.source_bucket,
+        IoDraftReservation.source_department,
+        func.sum(IoDraftReservation.quantity),
+    ).group_by(
+        IoDraftReservation.item_id,
+        IoDraftReservation.source_bucket,
+        IoDraftReservation.source_department,
+    ).all()
+    for item_id, source_bucket, department, quantity in draft_totals:
+        bucket = RequestBucketEnum(source_bucket)
+        key = (
+            bucket,
+            item_id,
+            department if bucket == RequestBucketEnum.PRODUCTION else None,
+            LocationStatusEnum.PRODUCTION if bucket == RequestBucketEnum.PRODUCTION else None,
+        )
+        protected[key] = protected.get(key, Decimal("0")) + Decimal(str(quantity))
+    return protected
 
 
 def _current_pending(db: Session, group: ReservationGroup) -> Decimal:
@@ -170,7 +192,7 @@ def _reconciled_release_quantity(
         Decimal,
     ],
 ) -> Decimal:
-    """Release only pending not required by another active request."""
+    """Release only pending not protected by other approval or draft reservations."""
     current = _current_pending(db, group)
     protected = other_reserved.get(_group_key(group), Decimal("0"))
     return min(group.quantity, max(Decimal("0"), current - protected))
