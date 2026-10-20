@@ -1,16 +1,18 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, type ReactNode } from "react";
+import { useAdminScrollRestoration, useAdminSessionState } from "../../_admin_hooks/useAdminSessionState";
 import type { BOMDetailEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { BomSearchInput } from "./BomSearchInput";
 import { BOM_STATUS_META, bomStatusOf, stageOf, type BomDeptFilter, type StageLetter } from "./bomDept";
 import type { StatusFilter } from "./BomStatsRow";
-import { BOM_EDIT_LIST_GRID_TEMPLATE, BOM_SEARCH_BAR_CLASS_NAME, BOM_FILTER_BAR_CLASS_NAME, BomTableHeader, BomTableItemRow } from "./BomTablePrimitives";
+import { BOM_EDIT_LIST_GRID_TEMPLATE, BOM_SEARCH_BAR_CLASS_NAME, BOM_FILTER_BAR_CLASS_NAME, BomPanelFrame, BomStageFilters, BomTableHeader, BomTableItemRow } from "./BomTablePrimitives";
 import { EmptyState } from "../../common";
 import { useItemSearch } from "@/lib/queries/useItemSearch";
 import { AdminReadBoundary, useAdminReadState } from "../_admin_primitives/AdminReadState";
 import { AdminTableSkeleton } from "../_admin_primitives/AdminSkeleton";
+import { AdminVirtualRows } from "../_admin_primitives/AdminVirtualRows";
 
 /**
  * 좌측 부모 품목 리스트 — 선택된 부서의 품목을 검색/단계/상태 필터링.
@@ -34,18 +36,7 @@ interface Props {
   mode: "edit" | "whereused";
 }
 
-const STAGE_FILTERS: { id: "ALL" | StageLetter; label: string }[] = [
-  { id: "ALL", label: "전체" },
-  { id: "A", label: "중간공정" },
-  { id: "F", label: "공정완료" },
-];
 
-const STAGE_FILTERS_WHEREUSED: { id: "ALL" | StageLetter; label: string }[] = [
-  { id: "ALL", label: "전체" },
-  { id: "R", label: "원자재" },
-  { id: "A", label: "중간공정" },
-  { id: "F", label: "공정완료" },
-];
 
 const WHERE_USED_LIST_GRID_TEMPLATE = "40px minmax(0, 1fr) clamp(78px, 5.75vw, 110px)";
 
@@ -62,8 +53,10 @@ export function BomParentList({
 }: Props) {
   const read = useAdminReadState("items", "bom");
   const { matchesItem } = useItemSearch();
-  const [search, setSearch] = useState("");
-  const [stageFilter, setStageFilter] = useState<"ALL" | StageLetter>("ALL");
+  const [search, setSearch] = useAdminSessionState<string>("bom.parents.search", "");
+  const [stageFilter, setStageFilter] = useAdminSessionState<"ALL" | StageLetter>("bom.parents.stage", "ALL");
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useAdminScrollRestoration(`bom.parents.scroll:${mode}`, scrollRef, !read.loading);
 
   // 부모별 자식 count 맵 (전체 BOM 기준)
   const childCountMap = useMemo(() => {
@@ -95,7 +88,6 @@ export function BomParentList({
       });
   }, [items, dept, search, stageFilter, mode, statusFilter, completedSet, childCountMap, matchesItem]);
 
-  const filters = mode === "whereused" ? STAGE_FILTERS_WHEREUSED : STAGE_FILTERS;
 
   return (
     <div
@@ -115,35 +107,21 @@ export function BomParentList({
       <div className={BOM_FILTER_BAR_CLASS_NAME}>
         <div className="overflow-x-auto">
           <div className="flex min-w-full w-max items-center gap-1">
-            <div role="group" aria-label="상위 품목 단계 필터" className="flex shrink-0 gap-1.5">
-              {filters.map((f) => {
-                const active = stageFilter === f.id;
-                return (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => setStageFilter(f.id)}
-                    aria-pressed={active}
-                    className="whitespace-nowrap rounded-md border px-2 py-1 text-xs font-semibold transition-colors"
-                    style={{
-                      background: active ? LEGACY_COLORS.blue : LEGACY_COLORS.s1,
-                      color: active ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
-                      borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-                    }}
-                  >
-                    {f.label}
-                  </button>
-                );
-              })}
-            </div>
+            <BomStageFilters label="상위 품목 단계 필터" value={stageFilter} onChange={setStageFilter} includeRaw={mode === "whereused"} />
             {departmentFilters}
           </div>
         </div>
       </div>
 
+      {!read.loading && !read.error && selectedId && !list.some(item => item.item_id === selectedId) && (
+        <p role="status" className="shrink-0 px-4 py-2 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+          선택한 품목이 현재 필터에 없습니다. 상세 정보는 유지됩니다.
+        </p>
+      )}
       {/* 리스트 */}
       <div className="relative min-h-0 flex-1">
         <div
+          ref={scrollRef}
           data-scrollbar-rail-viewport
           className="absolute inset-y-0 left-0 right-0 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]"
         >
@@ -156,7 +134,7 @@ export function BomParentList({
             {list.length === 0 ? (
               <EmptyState variant="no-search-result" compact illustrated />
             ) : (
-              list.map((i) => {
+              <AdminVirtualRows items={list} getKey={(item) => item.item_id} estimateSize={37} scrollRef={scrollRef} renderItem={(i) => {
                 const isSelected = i.item_id === selectedId;
                 const status = bomStatusOf(i.item_id, completedSet, childCountMap);
                 const meta = BOM_STATUS_META[status];
@@ -181,23 +159,13 @@ export function BomParentList({
                     ) : null}
                   />
                 );
-              })
+              }} />
             )}
             </AdminReadBoundary>
           </div>
         </div>
       </div>
-      <div data-scrollbar-rail-frame aria-hidden className="pointer-events-none absolute inset-0 z-20 rounded-2xl border" style={{ borderColor: LEGACY_COLORS.border }} />
-      <div data-scrollbar-rail-masks aria-hidden className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between">
-        <div className="flex justify-between">
-          <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 15px, var(--c-bg) 16px)" }} />
-          <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 100%, transparent 0 15px, var(--c-bg) 16px)" }} />
-        </div>
-        <div className="flex justify-between">
-          <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 0, transparent 0 15px, var(--c-bg) 16px)" }} />
-          <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 0, transparent 0 15px, var(--c-bg) 16px)" }} />
-        </div>
-      </div>
+      <BomPanelFrame />
     </div>
   );
 }

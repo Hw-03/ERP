@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { ArrowRightLeft, Network, Pencil } from "lucide-react";
+import { Network } from "lucide-react";
 import { api } from "@/lib/api";
+import { catalogApi } from "@/lib/api/catalog";
+import { useQueryClient } from "@tanstack/react-query";
+import { useBomQuery, useBomWhereUsedQuery } from "@/lib/queries/useBomQuery";
+import { queryKeys } from "@/lib/queries/keys";
 import type { BOMDetailEntry, BOMEntry, Item } from "@/lib/api";
 import { itemsApi } from "@/lib/api/items";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { Button } from "@/lib/ui/Button";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { EmptyState } from "../../common";
 import { AdminPageHeader } from "../_admin_primitives";
@@ -20,10 +23,12 @@ import { BomParentHeader } from "./BomParentHeader";
 import { BomWhereUsedPanel } from "./BomWhereUsedPanel";
 import { BomUnmatchedRawsDrawer } from "./BomUnmatchedRawsDrawer";
 import { bomStatusOf, DEPT_LETTERS, deptOf, stageOf, type BomDeptFilter } from "./bomDept";
-import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { useAdminReadState } from "../_admin_primitives/AdminReadState";
 import transitions from "../AdminTransitions.module.css";
 import { useAdminSelectionFade } from "../useAdminSelectionFade";
+import { BomViewModeControl } from "./BomViewModeControl";
+import { BomUnmatchedRawsSkeleton } from "./BomUnmatchedRawsDrawer";
+import { useAdminSessionState } from "../../_admin_hooks/useAdminSessionState";
 
 interface Props {
   items: Item[];
@@ -86,28 +91,26 @@ export function BomWorkbench({
   onError,
 }: Props) {
   const initialRead = useAdminReadState("items", "bom");
-  const realtimeRevision = useRealtimeRevision();
-  const [dept, setDept] = useState<BomDeptFilter>("ALL");
-  const [parentId, setParentId] = useState("");
+  const queryClient = useQueryClient();
+  const [initialNavigation] = useState(() => typeof window === "undefined" ? null : readBomWorkbenchHistoryState(window.history.state));
+  const [dept, setDept] = useState<BomDeptFilter>(initialNavigation?.dept ?? "ALL");
+  const [parentId, setParentId] = useState(initialNavigation?.parentId ?? "");
   const selectedParentIdRef = useRef(parentId);
   selectedParentIdRef.current = parentId;
-  const [mode, setMode] = useState<Mode>("edit");
-  const [bomRows, setBomRows] = useState<BOMEntry[]>([]);
-  const [whereUsedRows, setWhereUsedRows] = useState<BOMDetailEntry[]>([]);
-  const bomRowsParentRef = useRef<string | null>(null);
-  const bomReadRequestId = useRef(0);
-  const whereUsedParentRef = useRef<string | null>(null);
-  const [detailErrors, setDetailErrors] = useState<{ bom?: { id: string; message: string }; whereused?: { id: string; message: string } }>({});
-  const [detailRetry, setDetailRetry] = useState(0);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [mode, setMode] = useState<Mode>(initialNavigation?.mode ?? "edit");
+  const bomQuery = useBomQuery(parentId, { enabled: mode === "edit" && !initialRead.loading && !initialRead.error });
+  const whereUsedQuery = useBomWhereUsedQuery(parentId, { enabled: mode === "whereused" && !initialRead.loading && !initialRead.error });
+  const bomRows = bomQuery.data ?? EMPTY_BOM_ROWS;
+  const whereUsedRows = whereUsedQuery.data ?? EMPTY_WHERE_USED_ROWS;
+  const [statusFilter, setStatusFilter] = useAdminSessionState<StatusFilter>("bom.status", "ALL");
   const [reviewOpen, setReviewOpen] = useState(false);
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [unmatchedStatusBusyItemIds, setUnmatchedStatusBusyItemIds] = useState<Set<string>>(new Set());
   const [unmatchedOpen, setUnmatchedOpen] = useState(false);
-  const viewFadeRef = useAdminSelectionFade(`${mode}:${unmatchedOpen}`);
+  const viewFadeRef = useAdminSelectionFade(mode);
   const [historyReady, setHistoryReady] = useState(false);
-  const [historyValidationDeferred, setHistoryValidationDeferred] = useState(false);
+  const [historyValidationDeferred, setHistoryValidationDeferred] = useState(items.length === 0 && !!initialNavigation?.parentId);
   const itemsRef = useRef(items);
   itemsRef.current = items;
   const onErrorRef = useRef(onError);
@@ -178,61 +181,6 @@ export function BomWorkbench({
     }
   }, [dept, historyReady, historyValidationDeferred, items.length, mode, modeCandidates, parentId]);
 
-  // 선택된 부모의 직계 자식
-  useEffect(() => {
-    const requestId = ++bomReadRequestId.current;
-    if (!parentId) {
-      bomRowsParentRef.current = null;
-      setBomRows([]);
-      return;
-    }
-    if (bomRowsParentRef.current !== parentId) { bomRowsParentRef.current = null; setBomRows([]); }
-    let alive = true;
-    api
-      .getBOM(parentId)
-      .then((rows) => {
-        if (!alive || requestId !== bomReadRequestId.current) return;
-        bomRowsParentRef.current = parentId;
-        setBomRows(rows);
-      })
-      .catch((failure: unknown) => {
-        if (!alive || requestId !== bomReadRequestId.current) return;
-        const message = failure instanceof Error ? failure.message : "BOM 구성을 불러오지 못했습니다.";
-        if (bomRowsParentRef.current !== parentId) setDetailErrors((current) => ({ ...current, bom: { id: parentId, message } }));
-        else onErrorRef.current(message);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [parentId, realtimeRevision, detailRetry]);
-
-  // 선택된 품목의 역참조 (사용처 모드)
-  useEffect(() => {
-    if (!parentId) {
-      whereUsedParentRef.current = null;
-      setWhereUsedRows([]);
-      return;
-    }
-    if (whereUsedParentRef.current !== parentId) { whereUsedParentRef.current = null; setWhereUsedRows([]); }
-    let alive = true;
-    api
-      .getBOMWhereUsed(parentId)
-      .then((rows) => {
-        if (!alive) return;
-        whereUsedParentRef.current = parentId;
-        setWhereUsedRows(rows);
-      })
-      .catch((failure: unknown) => {
-        if (!alive) return;
-        const message = failure instanceof Error ? failure.message : "사용처를 불러오지 못했습니다.";
-        if (whereUsedParentRef.current !== parentId) setDetailErrors((current) => ({ ...current, whereused: { id: parentId, message } }));
-        else onErrorRef.current(message);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [parentId, realtimeRevision, detailRetry]);
-
   function handleDeptChange(next: BomDeptFilter): void {
     if (next === dept) return;
     const nextParentId = candidatesFor(activeItems, next, mode)[0]?.item_id ?? "";
@@ -283,18 +231,17 @@ export function BomWorkbench({
   );
   const isCompleted = parent ? completedSet.has(parent.item_id) : false;
   const selectingParent = !parent && modeCandidates.length > 0;
-  const bomError = detailErrors.bom?.id === parentId && bomRowsParentRef.current !== parentId ? detailErrors.bom.message : undefined;
-  const whereUsedError = detailErrors.whereused?.id === parentId && whereUsedParentRef.current !== parentId ? detailErrors.whereused.message : undefined;
-  const retryDetails = (): void => { setDetailErrors({}); setDetailRetry((value) => value + 1); };
+  const bomError = bomQuery.data === undefined && !bomQuery.isFetching ? bomQuery.error?.message : undefined;
+  const whereUsedError = whereUsedQuery.data === undefined && !whereUsedQuery.isFetching ? whereUsedQuery.error?.message : undefined;
   const bomRead = {
-    loading: initialRead.loading || selectingParent || (!!parentId && bomRowsParentRef.current !== parentId && !bomError),
+    loading: initialRead.loading || selectingParent || (!!parentId && bomQuery.data === undefined && !bomError),
     error: initialRead.error ?? bomError,
-    retry: initialRead.error ? initialRead.retry : retryDetails,
+    retry: initialRead.error ? initialRead.retry : (): void => { void bomQuery.refetch(); },
   };
   const whereUsedRead = {
-    loading: initialRead.loading || selectingParent || (!!parentId && whereUsedParentRef.current !== parentId && !whereUsedError),
+    loading: initialRead.loading || selectingParent || (!!parentId && whereUsedQuery.data === undefined && !whereUsedError),
     error: initialRead.error ?? whereUsedError,
-    retry: initialRead.error ? initialRead.retry : retryDetails,
+    retry: initialRead.error ? initialRead.retry : (): void => { void whereUsedQuery.refetch(); },
   };
 
   const rawItems = useMemo(
@@ -312,15 +259,19 @@ export function BomWorkbench({
 
   // 선택된 부모의 BOM 을 서버 기준으로 재동기화 (낙관적 갱신 desync·stale bom_id 차단)
   async function reloadBom(): Promise<void> {
-    if (!parentId || selectedParentIdRef.current !== parentId) return;
-    const requestId = ++bomReadRequestId.current;
+    if (!parentId) return;
+    const queryKey = queryKeys.bom.detail(parentId);
     try {
-      const rows = await api.getBOM(parentId);
-      if (selectedParentIdRef.current !== parentId || requestId !== bomReadRequestId.current) return;
-      bomRowsParentRef.current = parentId;
-      setBomRows(rows);
+      await queryClient.cancelQueries({ queryKey, exact: true });
+      await queryClient.invalidateQueries({ queryKey, exact: true, refetchType: "none" });
+      await queryClient.fetchQuery({
+        queryKey,
+        queryFn: ({ signal }) => catalogApi.getBOM(parentId, signal),
+        staleTime: 0,
+      });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.bom.whereUsed("").slice(0, 2) });
     } catch (failure) {
-      if (selectedParentIdRef.current === parentId && requestId === bomReadRequestId.current) {
+      if (selectedParentIdRef.current === parentId) {
         onErrorRef.current(failure instanceof Error ? failure.message : "BOM 구성을 새로고침하지 못했습니다.");
       }
     }
@@ -437,43 +388,7 @@ export function BomWorkbench({
             />
           ) : undefined
         }
-        actions={
-          <div
-            role="group"
-            aria-label="BOM 보기 방식"
-            className="flex h-11 w-[168px] items-center gap-1 rounded-full border"
-            style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}
-          >
-            <Button
-              variant={mode === "edit" ? "primary" : "ghost"}
-              size="sm"
-              iconLeft={<Pencil size={13} />}
-              onClick={() => handleModeChange("edit")}
-              className="h-11 min-w-[82px] rounded-full"
-              style={
-                mode === "edit"
-                  ? { background: LEGACY_COLORS.blueSolid, color: LEGACY_COLORS.white, borderColor: "transparent" }
-                  : { background: "transparent", color: LEGACY_COLORS.muted, borderColor: "transparent" }
-              }
-            >
-              편집
-            </Button>
-            <Button
-              variant={mode === "whereused" ? "primary" : "ghost"}
-              size="sm"
-              iconLeft={<ArrowRightLeft size={13} />}
-              onClick={() => handleModeChange("whereused")}
-              className="h-11 min-w-[82px] rounded-full"
-              style={
-                mode === "whereused"
-                  ? { background: LEGACY_COLORS.blueSolid, color: LEGACY_COLORS.white, borderColor: "transparent" }
-                  : { background: "transparent", color: LEGACY_COLORS.muted, borderColor: "transparent" }
-              }
-            >
-              사용처
-            </Button>
-          </div>
-        }
+        actions={<BomViewModeControl mode={mode} onChange={handleModeChange} />}
       />
 
       {/* 메인: 좌(상위) | 중(자식추가) | 우(현재구성) */}
@@ -574,7 +489,7 @@ export function BomWorkbench({
       </div>
 
       {/* 하단: 미배치 원자재 (편집 모드에서만) */}
-      {mode === "edit" && !initialRead.loading && !initialRead.error && (
+      {mode === "edit" && (initialRead.loading || initialRead.error ? <BomUnmatchedRawsSkeleton /> : (
         <BomUnmatchedRawsDrawer
           open={unmatchedOpen}
           onOpenChange={setUnmatchedOpen}
@@ -583,7 +498,7 @@ export function BomWorkbench({
           busyItemIds={unmatchedStatusBusyItemIds}
           onStatusChange={handleUnmatchedStatusChange}
         />
-      )}
+      ))}
 
       {/* 검토 · 완료 모달 */}
       {reviewOpen && parent && (
@@ -619,3 +534,6 @@ export function BomWorkbench({
     </div>
   );
 }
+
+const EMPTY_BOM_ROWS: BOMEntry[] = [];
+const EMPTY_WHERE_USED_ROWS: BOMDetailEntry[] = [];

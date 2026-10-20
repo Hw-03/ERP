@@ -1,15 +1,17 @@
 "use client";
 
 import type { BOMEntry, Item } from "@/lib/api";
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState } from "../../common/EmptyState";
 import { BomRow } from "./BomRow";
-import { BOM_CURRENT_ROW_GRID_TEMPLATE, BomTableHeader } from "./BomTablePrimitives";
+import { BOM_CURRENT_ROW_GRID_TEMPLATE, BomPanelFrame, BomTableHeader } from "./BomTablePrimitives";
 import { AdminReadBoundary, type useAdminReadState } from "../_admin_primitives/AdminReadState";
 import { AdminTableSkeleton } from "../_admin_primitives/AdminSkeleton";
 import { SkeletonBlock } from "../../common/LoadingSkeleton";
-import { useAdminSelectionFade } from "../useAdminSelectionFade";
+import { AdminDetailViewport } from "../_admin_primitives/AdminDetailViewport";
+import { AdminVirtualRows } from "../_admin_primitives/AdminVirtualRows";
+import { useAdminScrollRestoration } from "../../_admin_hooks/useAdminSessionState";
 import transitions from "../AdminTransitions.module.css";
 
 /**
@@ -41,7 +43,8 @@ export function BomEditPanel({
   read,
   parentHeader,
 }: Props) {
-  const fadeRef = useAdminSelectionFade(read?.loading ? undefined : parent?.item_id);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useAdminScrollRestoration(`bom.edit.scroll:${parent?.item_id}`, scrollRef, !!parent && !read?.loading && !read?.error);
   if (!parent && !read?.loading && !read?.error) {
     return (
       <div
@@ -61,7 +64,7 @@ export function BomEditPanel({
   const itemMap = new Map(items.map((i) => [i.item_id, i]));
 
   return (
-    <div ref={fadeRef} className={`flex min-h-0 flex-1 flex-col ${transitions.selection}`}>
+    <div className={`flex min-h-0 flex-1 flex-col ${transitions.selection}`}>
       <div
         data-scrollbar-rail-shell
         className="relative flex min-h-0 flex-1 flex-col rounded-2xl"
@@ -73,8 +76,10 @@ export function BomEditPanel({
         >
           {parentHeader ?? <>현재 구성 {read?.loading ? <SkeletonBlock className="ml-2 h-4 w-12" /> : read?.error ? "—" : `(${bomRows.length}건)`}</>}
         </div>
-        <div className="relative min-h-0 flex-1">
+        <AdminDetailViewport selectionKey={`${parent?.item_id}:${read?.loading ? "loading" : read?.error ? "error" : "ready"}`}
+          loading={read?.loading} className="relative min-h-0 flex-1">
           <div
+            ref={scrollRef}
             data-scrollbar-rail-viewport
             className="absolute inset-y-0 left-0 right-0 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]"
           >
@@ -83,7 +88,7 @@ export function BomEditPanel({
                 variant="current"
                 gridTemplateColumns={BOM_CURRENT_ROW_GRID_TEMPLATE}
               />
-              <AdminReadBoundary read={read ?? { loading: false, error: undefined, retry: () => {} }} label="현재 구성" skeleton={<AdminTableSkeleton columns={BOM_CURRENT_ROW_GRID_TEMPLATE} count={5} rowClassName="h-[37px]" />}>
+              <AdminReadBoundary reveal={false} read={read ?? { loading: false, error: undefined, retry: () => {} }} label="현재 구성" skeleton={<AdminTableSkeleton columns={BOM_CURRENT_ROW_GRID_TEMPLATE} count={5} rowClassName="h-[37px]" />}>
               {bomRows.length === 0 ? (
                 <EmptyState
                   variant="no-data"
@@ -92,7 +97,7 @@ export function BomEditPanel({
                   description="가운데에서 하위품목을 선택해 추가하세요."
                 />
               ) : (
-                bomRows.map((r) => (
+                <AdminVirtualRows items={bomRows} getKey={(row) => row.bom_id} estimateSize={37} scrollRef={scrollRef} renderItem={(r) => (
                   <BomRow
                     key={r.bom_id}
                     row={r}
@@ -101,23 +106,13 @@ export function BomEditPanel({
                     onRequestDelete={onRequestDelete}
                     isLocked={isLocked}
                   />
-                ))
+                )} />
               )}
               </AdminReadBoundary>
             </div>
           </div>
-        </div>
-        <div data-scrollbar-rail-frame aria-hidden className="pointer-events-none absolute inset-0 z-20 rounded-2xl border" style={{ borderColor: LEGACY_COLORS.border }} />
-        <div data-scrollbar-rail-masks aria-hidden className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between">
-          <div className="flex justify-between">
-            <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 15px, var(--c-bg) 16px)" }} />
-            <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 100%, transparent 0 15px, var(--c-bg) 16px)" }} />
-          </div>
-          <div className="flex justify-between">
-            <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 0, transparent 0 15px, var(--c-bg) 16px)" }} />
-            <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 0, transparent 0 15px, var(--c-bg) 16px)" }} />
-          </div>
-        </div>
+        </AdminDetailViewport>
+        <BomPanelFrame />
       </div>
     </div>
   );

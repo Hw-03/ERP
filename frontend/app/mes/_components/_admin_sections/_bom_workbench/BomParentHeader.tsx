@@ -37,8 +37,31 @@ export function BomParentHeader({
   unavailable = false,
   embedded = false,
 }: Props) {
-  if (!parent) return loading ? <div aria-hidden="true" className="flex min-h-[58px] min-w-0 flex-1 items-center gap-3 rounded-2xl border px-4 py-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-    <SkeletonBlock className="h-6 w-10" /><div className="flex flex-1 flex-col gap-2"><SkeletonBlock className="h-4 w-1/3" /><SkeletonBlock className="h-3 w-36" /></div><SkeletonBlock className="h-9 w-28" />
+  const reviewButton = (
+    <button
+      type="button"
+      onClick={onOpenReview}
+      disabled={loading || unavailable || (childCount === 0 && !isCompleted)}
+      className="standard-hover inline-flex shrink-0 items-center gap-1.5 rounded-md border px-3 py-1.5 text-[12px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+      style={{
+        background: `color-mix(in srgb, ${LEGACY_COLORS.green} 12%, transparent)`,
+        borderColor: `color-mix(in srgb, ${LEGACY_COLORS.green} 40%, transparent)`,
+        color: LEGACY_COLORS.green,
+      }}
+      title={
+        childCount === 0 && !isCompleted
+          ? "BOM 구성이 1건 이상일 때 완료 처리 가능합니다."
+          : "검토 후 완료 처리"
+      }
+    >
+      <ClipboardCheck size={14} /> 검토 · 완료
+    </button>
+  );
+
+  if (!parent) return loading ? <div aria-hidden="true"
+    className={embedded ? "flex h-[88px] min-w-0 items-center gap-3 px-4 py-2" : "flex min-h-[58px] min-w-0 flex-1 items-center gap-3 rounded-2xl border px-4 py-2"}
+    style={{ background: embedded ? undefined : LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+    <SkeletonBlock className="h-6 w-10 shrink-0" /><div className="flex min-w-0 flex-1 flex-col gap-2"><SkeletonBlock className="h-4 w-2/3" /><SkeletonBlock className="h-3 w-1/2" /></div>{mode === "edit" && reviewButton}
   </div> : null;
 
   const statusMeta = isCompleted
@@ -64,7 +87,7 @@ export function BomParentHeader({
         borderColor: `color-mix(in srgb, ${accent} 35%, ${LEGACY_COLORS.border})`,
       }}
     >
-      <BomBadge processTypeCode={parent.process_type_code} />
+      <span className="flex w-10 shrink-0 justify-center"><BomBadge processTypeCode={parent.process_type_code} /></span>
       <div className="min-w-0 flex-1">
         <TruncatedText className="truncate text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
           {parent.item_name}
@@ -84,24 +107,7 @@ export function BomParentHeader({
           >
             {loading ? <SkeletonBlock className="h-3 w-8" /> : unavailable ? "—" : statusMeta.label}
           </span>}
-          <button
-            type="button"
-            onClick={onOpenReview}
-            disabled={loading || unavailable || (childCount === 0 && !isCompleted)}
-            className="standard-hover inline-flex shrink-0 items-center gap-1.5 rounded-md border px-3 py-1.5 text-[12px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            style={{
-              background: `color-mix(in srgb, ${LEGACY_COLORS.green} 12%, transparent)`,
-              borderColor: `color-mix(in srgb, ${LEGACY_COLORS.green} 40%, transparent)`,
-              color: LEGACY_COLORS.green,
-            }}
-            title={
-              childCount === 0 && !isCompleted
-                ? "BOM 구성이 1건 이상일 때 완료 처리 가능합니다."
-                : "검토 후 완료 처리"
-            }
-          >
-            <ClipboardCheck size={14} /> 검토 · 완료
-          </button>
+          {reviewButton}
         </div>
       )}
     </div>

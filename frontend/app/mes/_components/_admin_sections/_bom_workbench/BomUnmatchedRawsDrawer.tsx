@@ -1,12 +1,30 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useState, type ReactElement } from "react";
 import { ChevronUp, ChevronDown, Boxes, CheckCircle2 } from "lucide-react";
 import type { BomUnmatchedStatus, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TruncatedText } from "@/lib/ui";
 import { BomBadge } from "./BomBadge";
 import transitions from "../AdminTransitions.module.css";
+import { SkeletonBlock } from "../../common/LoadingSkeleton";
+
+/** 접힌 요약 행의 높이를 데이터 조회·오류 중에도 예약한다. */
+export function BomUnmatchedRawsSkeleton(): ReactElement {
+  return <div aria-hidden="true" className="mt-3 shrink-0 overflow-hidden rounded-2xl border"
+    style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+    <div className="flex min-h-14 items-center justify-between gap-3 px-4 py-2">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]"
+          style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 12%, transparent)`, color: LEGACY_COLORS.yellow }}><Boxes size={18} /></span>
+        <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>미배치 원자재</span>
+        <SkeletonBlock className="h-4 w-12" />
+        <span className="hidden truncate text-xs xl:block" style={{ color: LEGACY_COLORS.muted2 }}>BOM에 연결되지 않은 품목</span>
+      </div>
+      <SkeletonBlock className="h-4 w-12" />
+    </div>
+  </div>;
+}
 
 /**
  * 미배치 원자재 패널 — 부서 R 단계 중 어느 BOM 의 자식도 아닌 항목.

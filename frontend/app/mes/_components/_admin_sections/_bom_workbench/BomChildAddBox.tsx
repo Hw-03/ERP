@@ -1,17 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useAdminScrollRestoration, useAdminSessionState } from "../../_admin_hooks/useAdminSessionState";
 import { Plus, Check, X } from "lucide-react";
 import type { BOMEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { BomSearchInput } from "./BomSearchInput";
 import { DEPT_LETTERS, DEPT_LETTER_TO_NAME, deptColor, deptOf, stageOf, type DeptLetter, type StageLetter } from "./bomDept";
-import { BOM_EDIT_LIST_GRID_TEMPLATE, BOM_SEARCH_BAR_CLASS_NAME, BOM_FILTER_BAR_CLASS_NAME, BomTableHeader, BomTableItemRow } from "./BomTablePrimitives";
+import { BOM_EDIT_LIST_GRID_TEMPLATE, BOM_SEARCH_BAR_CLASS_NAME, BOM_FILTER_BAR_CLASS_NAME, BomPanelFrame, BomStageFilters, BomTableHeader, BomTableItemRow } from "./BomTablePrimitives";
 import { EmptyState } from "../../common";
 import { useItemSearch } from "@/lib/queries/useItemSearch";
 import { QuantityInput } from "../../common/QuantityInput";
 import { AdminReadBoundary, type useAdminReadState } from "../_admin_primitives/AdminReadState";
 import { AdminTableSkeleton } from "../_admin_primitives/AdminSkeleton";
+import { AdminVirtualRows } from "../_admin_primitives/AdminVirtualRows";
+import { AdminDetailViewport } from "../_admin_primitives/AdminDetailViewport";
 
 /**
  * 가운데 하위품목 추가 패널.
@@ -31,22 +34,18 @@ interface Props {
   isLocked?: boolean;
 }
 
-const STAGE_FILTERS: { id: "ALL" | StageLetter; label: string }[] = [
-  { id: "ALL", label: "전체" },
-  { id: "R", label: "원자재" },
-  { id: "A", label: "중간공정" },
-  { id: "F", label: "공정완료" },
-];
 
 export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false, read }: Props) {
   const { matchesItem } = useItemSearch();
-  const [search, setSearch] = useState("");
-  const [deptFilter, setDeptFilter] = useState<DeptLetter | "">("");
-  const [stageFilter, setStageFilter] = useState<"ALL" | StageLetter>("ALL");
+  const [search, setSearch] = useAdminSessionState<string>("bom.children.search", "");
+  const [deptFilter, setDeptFilter] = useAdminSessionState<DeptLetter | "">("bom.children.department", "");
+  const [stageFilter, setStageFilter] = useAdminSessionState<"ALL" | StageLetter>("bom.children.stage", "ALL");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [qtyDraft, setQtyDraft] = useState("1");
   const [busyId, setBusyId] = useState<string | null>(null);
   const qtyRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useAdminScrollRestoration("bom.children.scroll", scrollRef, !read?.loading);
 
   const childIdSet = useMemo(() => new Set(bomRows.map((r) => r.child_item_id)), [bomRows]);
 
@@ -123,11 +122,9 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
         <div className="shrink-0 text-xs font-bold uppercase tracking-widest" style={{ color: LEGACY_COLORS.muted2 }}>
           하위 품목 추가
         </div>
-        {isLocked && (
-          <span className="shrink-0 whitespace-nowrap text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+          <span aria-hidden={!isLocked || undefined} className={`shrink-0 whitespace-nowrap text-xs font-semibold ${isLocked ? "" : "invisible"}`} style={{ color: LEGACY_COLORS.muted2 }}>
             완료 해제 후 수정 가능
           </span>
-        )}
         <div className="min-w-0 flex-1">
           <BomSearchInput value={search} onChange={setSearch} bg={LEGACY_COLORS.s1 as string} />
         </div>
@@ -136,27 +133,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
       <div className={BOM_FILTER_BAR_CLASS_NAME}>
         <div className="overflow-x-auto">
           <div className="flex min-w-full w-max items-center gap-1">
-            <div role="group" aria-label="단계 필터" className="flex shrink-0 gap-1.5">
-              {STAGE_FILTERS.map((f) => {
-                const active = stageFilter === f.id;
-                return (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => setStageFilter(f.id)}
-                    aria-pressed={active}
-                    className="whitespace-nowrap rounded-md border px-2 py-1 text-xs font-semibold transition-colors"
-                    style={{
-                      background: active ? LEGACY_COLORS.blue : LEGACY_COLORS.s1,
-                      color: active ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
-                      borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-                    }}
-                  >
-                    {f.label}
-                  </button>
-                );
-              })}
-            </div>
+            <BomStageFilters value={stageFilter} onChange={setStageFilter} includeRaw />
 
             <div className="shrink-0">
               <div
@@ -204,8 +181,10 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
         </div>
       </div>
 
-      <div className="relative min-h-0 flex-1">
+      <AdminDetailViewport selectionKey={`${parent?.item_id}:${read?.loading ? "loading" : read?.error ? "error" : "ready"}`}
+        loading={read?.loading} className="relative min-h-0 flex-1">
         <div
+          ref={scrollRef}
           data-scrollbar-rail-viewport
           className="absolute inset-y-0 left-0 right-0 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]"
         >
@@ -214,11 +193,12 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
               variant="candidate"
               gridTemplateColumns={BOM_EDIT_LIST_GRID_TEMPLATE}
             />
-            <AdminReadBoundary read={read ?? { loading: false, error: undefined, retry: () => {} }} label="하위 품목 목록" skeleton={<AdminTableSkeleton columns={BOM_EDIT_LIST_GRID_TEMPLATE} count={4} rowClassName="h-[37px]" />}>
+            <AdminReadBoundary reveal={false} read={read ?? { loading: false, error: undefined, retry: () => {} }} label="하위 품목 목록" skeleton={<AdminTableSkeleton columns={BOM_EDIT_LIST_GRID_TEMPLATE} count={4} rowClassName="h-[37px]" />}>
             {candidates.length === 0 ? (
               <EmptyState variant="no-search-result" compact illustrated />
             ) : (
-              candidates.map((c) => {
+              <AdminVirtualRows items={candidates} getKey={(item) => item.item_id} estimateSize={37}
+                pinnedKeys={[expandedId, busyId].filter((id): id is string => !!id)} scrollRef={scrollRef} renderItem={(c) => {
             const already = childIdSet.has(c.item_id);
             const expanded = expandedId === c.item_id;
             const busy = busyId === c.item_id;
@@ -305,23 +285,13 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
                 )}
               </div>
             );
-              })
+              }} />
             )}
             </AdminReadBoundary>
           </div>
         </div>
-      </div>
-      <div data-scrollbar-rail-frame aria-hidden className="pointer-events-none absolute inset-0 z-20 rounded-2xl border" style={{ borderColor: LEGACY_COLORS.border }} />
-      <div data-scrollbar-rail-masks aria-hidden className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between">
-        <div className="flex justify-between">
-          <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 15px, var(--c-bg) 16px)" }} />
-          <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 100%, transparent 0 15px, var(--c-bg) 16px)" }} />
-        </div>
-        <div className="flex justify-between">
-          <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 0, transparent 0 15px, var(--c-bg) 16px)" }} />
-          <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 0, transparent 0 15px, var(--c-bg) 16px)" }} />
-        </div>
-      </div>
+      </AdminDetailViewport>
+      <BomPanelFrame />
     </div>
   );
 }

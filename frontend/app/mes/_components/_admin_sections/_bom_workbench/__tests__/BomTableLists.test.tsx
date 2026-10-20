@@ -60,6 +60,47 @@ const bomRow: BOMEntry = {
   notes: null,
 };
 
+it("limits mounted BOM parent and candidate rows for large catalogs", () => {
+  const height = vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(300);
+  const width = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
+  try {
+    const items = Array.from({ length: 1000 }, (_, index) => item({ item_id: `large-${index}`, item_name: `Large ${index}` }));
+    const { container } = render(<>
+      <BomParentList dept="ALL" items={items} allBomRows={[]} completedSet={new Set()} statusFilter="ALL" selectedId="" onSelect={vi.fn()} mode="edit" />
+      <BomChildAddBox parent={item()} items={items} bomRows={[]} onAdd={vi.fn()} />
+    </>);
+    const rows = container.querySelectorAll("[data-bom-row-surface]");
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.length).toBeLessThan(100);
+  } finally { height.mockRestore(); width.mockRestore(); }
+});
+
+it("reveals BOM rows once under an opaque snapshot while keeping its header outside the transition", () => {
+  vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
+  const bounds = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ width: 400, height: 300 } as DOMRect);
+  const animate = vi.fn(() => ({ cancel: vi.fn() }));
+  Object.defineProperty(Element.prototype, "animate", { configurable: true, value: animate });
+  try {
+    const view = (loading: boolean) => <BomEditPanel parent={item()} bomRows={loading ? [] : [bomRow]} items={[item()]}
+      read={{ loading, retry: vi.fn() }} parentHeader={<div>Result header</div>}
+      onSaveQty={vi.fn()} onRequestDelete={vi.fn()} />;
+    const { container, rerender } = render(view(true));
+    const panel = container.firstElementChild!;
+    rerender(view(false));
+    const snapshot = container.querySelector<HTMLElement>("[data-admin-detail-snapshot]");
+    expect(snapshot).toBeInTheDocument();
+    expect(snapshot).not.toContainElement(screen.getByText("Result header"));
+    expect(snapshot?.style.backgroundColor).toBe("var(--c-bg)");
+    expect(snapshot?.style.backgroundImage).toBe("linear-gradient(var(--c-s1), var(--c-s1))");
+    expect(animate).toHaveBeenCalledWith([{ opacity: 1 }, { opacity: 0 }], { duration: 220, easing: "ease-out", fill: "forwards" });
+    expect(animate).toHaveBeenCalledOnce();
+    expect(panel).toContainElement(screen.getByText("Result header"));
+    expect(panel).toContainElement(screen.getByTitle("클릭하여 수량 수정"));
+    rerender(view(false));
+    expect(animate).toHaveBeenCalledOnce();
+  } finally { bounds.mockRestore(); Reflect.deleteProperty(Element.prototype, "animate"); vi.unstubAllGlobals(); }
+});
+
 function expectStickyTableHeader(container: HTMLElement, gridTemplateColumns: string) {
   const header = [...container.querySelectorAll<HTMLElement>("div")].find((element) =>
     element.classList.contains("sticky") && element.style.gridTemplateColumns === gridTemplateColumns,

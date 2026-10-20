@@ -1,17 +1,25 @@
 "use client";
 
 import { useState, type ReactElement } from "react";
-import { ArrowRightLeft, Box, Boxes, Network, Pencil, Plus } from "lucide-react";
+import { Box, Network, Plus } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
-import { SearchInput } from "../common/SearchInput";
 import { SkeletonBlock } from "../common/LoadingSkeleton";
 import { AdminDetailCard, AdminKpiBar, AdminListPanel, AdminPageHeader } from "./_admin_primitives";
 import { AdminDetailSkeleton, AdminTableSkeleton } from "./_admin_primitives/AdminSkeleton";
 import masterStyles from "./_admin_primitives/AdminMasterData.module.css";
 import { BomStatsRow } from "./_bom_workbench/BomStatsRow";
 import { readBomWorkbenchHistoryState } from "./_bom_workbench/BomWorkbench";
-import { BOM_CURRENT_ROW_GRID_TEMPLATE, BOM_EDIT_LIST_GRID_TEMPLATE, BOM_WHERE_USED_ROW_GRID_TEMPLATE, BOM_SEARCH_BAR_CLASS_NAME, BOM_FILTER_BAR_CLASS_NAME, BomTableHeader } from "./_bom_workbench/BomTablePrimitives";
+import { BOM_EDIT_LIST_GRID_TEMPLATE, BOM_SEARCH_BAR_CLASS_NAME, BOM_FILTER_BAR_CLASS_NAME, BomPanelFrame, BomStageFilters, BomTableHeader } from "./_bom_workbench/BomTablePrimitives";
+import { BomViewModeControl } from "./_bom_workbench/BomViewModeControl";
+import { BomSearchInput } from "./_bom_workbench/BomSearchInput";
+import { BomDeptTabs } from "./_bom_workbench/BomDeptTabs";
+import { BomParentHeader } from "./_bom_workbench/BomParentHeader";
+import { BomEditPanel } from "./_bom_workbench/BomEditPanel";
+import { BomWhereUsedPanel } from "./_bom_workbench/BomWhereUsedPanel";
+import { BomUnmatchedRawsSkeleton } from "./_bom_workbench/BomUnmatchedRawsDrawer";
+import { ItemDeleteButton } from "./_master_items_parts/ItemDeleteButton";
+import type { BomDeptFilter } from "./_bom_workbench/bomDept";
 
 const noop = (): void => {};
 const ENTRY_READ = { loading: true, retry: noop };
@@ -19,7 +27,8 @@ const ITEM_TABS = [{ id: "info", label: "기본 정보" }, { id: "stock", label:
 
 /** 실제 카드·열·행 높이를 재사용하며 데이터 계산 없이 진입 화면만 표시한다. */
 export function AdminSectionEntrySkeleton({ section }: { section: "items" | "bom" }): ReactElement {
-  const [bomMode] = useState(() => typeof window === "undefined" ? "edit" : readBomWorkbenchHistoryState(window.history.state)?.mode ?? "edit");
+  const [bomNavigation] = useState(() => typeof window === "undefined" ? null : readBomWorkbenchHistoryState(window.history.state));
+  const bomMode = bomNavigation?.mode ?? "edit";
   if (section === "items") return <div className={`flex min-h-0 flex-1 flex-col ${masterStyles.workspace}`}>
     <AdminPageHeader icon={Box} title="품목 관리" summary={<AdminKpiBar loading placement="header" items={
       ["전체 품목", "정상", "부족", "품절", "삭제"].map((label, index) => ({ key: label, label, value: "", tone: [LEGACY_COLORS.blue, LEGACY_COLORS.green, LEGACY_COLORS.yellow, LEGACY_COLORS.red, LEGACY_COLORS.muted2][index] }))
@@ -32,7 +41,7 @@ export function AdminSectionEntrySkeleton({ section }: { section: "items" | "bom
           <span>품목명</span><span className="text-center">품목 코드</span><span className="text-center">상태</span>
         </div>}
       />
-      <AdminDetailCard tabs={ITEM_TABS} tabsDisabled activeTab="info" footer={<SkeletonBlock className="h-11 w-full rounded-[12px]" />}>
+      <AdminDetailCard tabs={ITEM_TABS} tabsDisabled activeTab="info" tabActions={<ItemDeleteButton disabled />} footer={<SkeletonBlock className="!block h-11 w-full rounded-[12px]" />}>
         <AdminDetailSkeleton variant="items" />
       </AdminDetailCard>
     </div>
@@ -41,43 +50,45 @@ export function AdminSectionEntrySkeleton({ section }: { section: "items" | "bom
   const editing = bomMode === "edit";
   return <div className="flex min-h-0 flex-1 flex-col">
     <AdminPageHeader icon={Network} title="BOM 관리" summary={editing ? <BomStatsRow loading placement="header" total={0} done={0} wip={0} todo={0} active="ALL" onChange={noop} /> : undefined}
-      actions={<div className="flex h-11 items-center gap-1 rounded-full p-1" style={{ background: LEGACY_COLORS.s2 }}>
-        <Button disabled variant={editing ? "primary" : "ghost"} size="sm" iconLeft={<Pencil size={14} />}>편집</Button>
-        <Button disabled variant={editing ? "ghost" : "primary"} size="sm" iconLeft={<ArrowRightLeft size={14} />}>사용처</Button>
-      </div>}
+      actions={<BomViewModeControl mode={bomMode} disabled onChange={noop} />}
     />
-    <div className="grid min-h-0 flex-1 gap-3" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
-      <BomEntryList title="상위 품목 선택" variant={editing ? "parent" : "whereused"} columns={editing ? BOM_EDIT_LIST_GRID_TEMPLATE : "40px minmax(0, 1fr) clamp(78px, 5.75vw, 110px)"} />
+    <div data-mode={bomMode} className="grid min-h-0 flex-1 gap-3" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
+      <BomEntryList title="상위 품목 선택" dept={bomNavigation?.dept ?? "ALL"} variant={editing ? "parent" : "whereused"} columns={editing ? BOM_EDIT_LIST_GRID_TEMPLATE : "40px minmax(0, 1fr) clamp(78px, 5.75vw, 110px)"} />
       {editing && <BomEntryList title="하위 품목 추가" variant="candidate" columns={BOM_EDIT_LIST_GRID_TEMPLATE} />}
-      <div className={`flex min-h-0 flex-col overflow-hidden rounded-2xl border ${editing ? "" : "col-span-2"}`} style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}>
-        <div className="flex h-[88px] shrink-0 items-center gap-3 border-b px-4" style={{ borderColor: LEGACY_COLORS.border }}>
-          <SkeletonBlock className="h-6 w-8" /><div className="flex-1"><SkeletonBlock className="h-4 w-2/3" /><SkeletonBlock className="mt-2 h-3 w-1/2" /></div>
-          {editing && <SkeletonBlock className="h-9 w-24 rounded-lg" />}
-        </div>
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <BomTableHeader variant={editing ? "current" : "usage"} gridTemplateColumns={editing ? BOM_CURRENT_ROW_GRID_TEMPLATE : BOM_WHERE_USED_ROW_GRID_TEMPLATE} />
-          <AdminTableSkeleton columns={editing ? BOM_CURRENT_ROW_GRID_TEMPLATE : BOM_WHERE_USED_ROW_GRID_TEMPLATE} count={editing ? 5 : 4} rowClassName="h-[37px]" />
-        </div>
+      <div className={`flex min-h-0 min-w-0 flex-col ${editing ? "" : "col-span-2"}`}>
+        {editing ? <BomEditPanel parent={null} bomRows={[]} items={[]} read={ENTRY_READ} onSaveQty={noop} onRequestDelete={noop}
+          parentHeader={<BomParentHeader embedded loading parent={null} mode="edit" childCount={0} isCompleted={false} onOpenReview={noop} />} />
+          : <BomWhereUsedPanel selected={null} rows={[]} items={[]} read={ENTRY_READ} onSelectParent={noop}
+            parentHeader={<BomParentHeader embedded loading parent={null} mode="whereused" childCount={0} isCompleted={false} onOpenReview={noop} />} />}
       </div>
     </div>
-    {editing && <div className="mt-3 flex min-h-14 shrink-0 items-center gap-3 rounded-2xl border px-4" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}>
-      <Boxes size={18} style={{ color: LEGACY_COLORS.yellow }} /><span className="text-sm font-bold">미배치 원자재</span><SkeletonBlock className="h-4 w-12" />
-    </div>}
+    {editing && <BomUnmatchedRawsSkeleton />}
   </div>;
 }
 
-function BomEntryList({ title, variant, columns }: {
-  title: string; variant: "parent" | "whereused" | "candidate"; columns: string;
+function BomEntryList({ title, variant, columns, dept = "ALL" }: {
+  title: string; variant: "parent" | "whereused" | "candidate"; columns: string; dept?: BomDeptFilter;
 }): ReactElement {
-  return <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
+  return <div data-scrollbar-rail-shell className="relative flex min-h-0 min-w-0 flex-col rounded-2xl" style={{ background: LEGACY_COLORS.s2 }}>
     <div className={BOM_SEARCH_BAR_CLASS_NAME} style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
       <span className="shrink-0 text-xs font-bold uppercase tracking-widest" style={{ color: LEGACY_COLORS.muted2 }}>{title}</span>
-      <SearchInput disabled value="" onChange={noop} placeholder="품목명 / 코드 검색" className="h-9 min-w-0 flex-1 !min-h-9 rounded-lg" inputProps={{ className: "!h-8" }} style={{ background: LEGACY_COLORS.s1 }} />
+      {variant === "candidate" && <span className="shrink-0 whitespace-nowrap text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>완료 해제 후 수정 가능</span>}
+      <div className="min-w-0 flex-1"><BomSearchInput disabled value="" onChange={noop} bg={LEGACY_COLORS.s1} /></div>
     </div>
-    <div className={BOM_FILTER_BAR_CLASS_NAME} aria-hidden="true"><SkeletonBlock className="h-6 w-full rounded-md" /></div>
-    <div className="min-h-0 flex-1 overflow-hidden">
+    <div className={BOM_FILTER_BAR_CLASS_NAME}>
+      <div className="overflow-x-auto"><div className="flex min-w-full w-max items-center gap-1">
+        <BomStageFilters value="ALL" onChange={noop} includeRaw={variant !== "parent"} disabled label={variant === "candidate" ? "단계 필터" : "상위 품목 단계 필터"} />
+        <BomDeptTabs value={dept} onChange={noop} disabled />
+      </div></div>
+    </div>
+    <div className="relative min-h-0 flex-1">
+      <div data-scrollbar-rail-viewport className="absolute inset-y-0 left-0 right-0 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]">
+      <div className="flex min-h-full min-w-full flex-col" style={{ background: LEGACY_COLORS.s2 }}>
       <BomTableHeader variant={variant} gridTemplateColumns={columns} />
       <AdminTableSkeleton columns={columns} count={variant === "whereused" ? 3 : 4} rowClassName="h-[37px]" />
+      </div>
+      </div>
     </div>
+    <BomPanelFrame />
   </div>;
 }
