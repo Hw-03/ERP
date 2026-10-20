@@ -5,9 +5,10 @@ import { itemSearchApi } from "@/lib/api/item-search";
 import type { ItemSearchSynonymGroup } from "@/lib/api/types/item-search";
 import { ApiError } from "@/lib/api-core";
 import { useItemSearch, useItemSearchSave } from "@/lib/queries/useItemSearch";
-import { normalizeSearchText } from "@/lib/searchText";
+import { matchesSearchFields, normalizeSearchText } from "@/lib/searchText";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { SearchConfigStatus } from "./SearchConfigStatus";
+import { SearchInput } from "./SearchInput";
 
 type TermField = { key: number; value: string };
 type Draft = { fields: TermField[]; expectedVersion?: number };
@@ -91,6 +92,8 @@ export function SynonymGroupManager() {
   const [newFields, setNewFields] = useState<TermField[]>(() => makeFields([]));
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const filteredGroups = config.synonym_groups.filter(group => matchesSearchFields(group.terms, search));
   function discardDraft(id: string): void {
     setDrafts(previous => { const next = { ...previous }; delete next[id]; return next; });
     setError(null);
@@ -119,8 +122,14 @@ export function SynonymGroupManager() {
         <button type="submit" disabled={!canCreate} className={`${buttonClass} mt-3 w-full shrink-0`} style={primaryStyle}>연결 저장</button>
       </form>
     </section>
-    {config.synonym_groups.length > 0 && <h3 className="text-sm font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>등록된 연결</h3>}
-    {config.synonym_groups.map(group => {
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2 text-sm font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+        <h3>등록된 연결</h3><span>{filteredGroups.length} / {config.synonym_groups.length}</span>
+      </div>
+      <SearchInput value={search} onChange={setSearch} ariaLabel="등록된 연결 검색" placeholder="검색어 · 다른 표현 검색" />
+    </div>
+    {filteredGroups.length === 0 && ready && <p role="status" className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>{search.trim() ? "일치하는 연결이 없습니다." : "등록된 연결이 없습니다."}</p>}
+    {filteredGroups.map(group => {
       const draft = drafts[group.group_id];
       const canUpdate = draft && ready && !pending && fieldTerms(draft.fields).length >= 2 && !termsError(draft.fields, config.synonym_groups, group.group_id);
       return <section key={group.group_id} aria-label={`검색어 연결: ${group.terms.join(", ")}`} className="rounded-[20px] border p-4" style={cardStyle}>

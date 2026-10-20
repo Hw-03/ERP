@@ -8,6 +8,8 @@ import { ApiError } from "@/lib/api-core";
 import { queryKeys } from "@/lib/queries/keys";
 import { ItemSearchAliases } from "../ItemSearchAliases";
 import { SynonymGroupManager } from "../SynonymGroupManager";
+import { ItemSearchManagementPanel } from "../ItemSearchManagementPanel";
+import { useState } from "react";
 vi.mock("@/lib/api/item-search", () => ({ itemSearchApi: { getConfig: vi.fn(), addAlias: vi.fn(), deleteAlias: vi.fn(), addGroup: vi.fn(), updateGroup: vi.fn(), deleteGroup: vi.fn() } }));
 function mount(child: React.ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -22,6 +24,45 @@ async function editConnection() {
 }
 describe("검색 관리", () => {
   beforeEach(() => { vi.resetAllMocks(); vi.mocked(itemSearchApi.getConfig).mockResolvedValue(config); });
+  it("등록된 연결의 모든 표현을 검색하고 결과 없음과 초기화를 표시한다", async () => {
+    vi.mocked(itemSearchApi.getConfig).mockResolvedValue({ ...config, synonym_groups: [
+      ...config.synonym_groups, { group_id: "board", version: 1, terms: ["B/D", "보드"] },
+    ] });
+    mount(<SynonymGroupManager />);
+    await screen.findByText("모터 ↔ motor");
+    const search = screen.getByRole("textbox", { name: "등록된 연결 검색" });
+    fireEvent.change(search, { target: { value: "MOT" } });
+    expect(screen.getByRole("region", { name: "검색어 연결: 모터, motor" })).toBeVisible();
+    expect(screen.queryByRole("region", { name: "검색어 연결: B/D, 보드" })).not.toBeInTheDocument();
+    for (const value of ["보드", "b d"]) {
+      fireEvent.change(search, { target: { value } });
+      expect(screen.getByRole("region", { name: "검색어 연결: B/D, 보드" })).toBeVisible();
+      expect(screen.queryByRole("region", { name: "검색어 연결: 모터, motor" })).not.toBeInTheDocument();
+    }
+    fireEvent.change(search, { target: { value: "없는 연결" } });
+    expect(screen.getByText("일치하는 연결이 없습니다.")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "검색어 지우기" }));
+    expect(screen.getAllByRole("region", { name: /^검색어 연결:/ })).toHaveLength(2);
+    expect(itemSearchApi.updateGroup).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])("패널을 닫았다 열면 편집 카드와 목록 검색을 초기화한다 mobile=%s", async (mobile) => {
+    function PanelHarness() {
+      const [open, setOpen] = useState(true);
+      return <><button onClick={() => setOpen(true)}>연결 패널 열기</button><ItemSearchManagementPanel open={open} onClose={() => setOpen(false)} mobile={mobile} /></>;
+    }
+    mount(<PanelHarness />);
+    const editor = await editConnection();
+    fireEvent.change(screen.getByRole("textbox", { name: "등록된 연결 검색" }), { target: { value: "motor" } });
+    fireEvent.change(editor.getByRole("textbox", { name: "검색어", exact: true }), { target: { value: "미저장 수정" } });
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.click(screen.getByRole("button", { name: "연결 패널 열기" }));
+    const card = await screen.findByRole("region", { name: "검색어 연결: 모터, motor" });
+    expect(within(card).getByRole("button", { name: "수정", exact: true })).toBeVisible();
+    expect(within(card).queryByRole("button", { name: "수정 완료" })).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "등록된 연결 검색" })).toHaveValue("");
+    expect(itemSearchApi.updateGroup).not.toHaveBeenCalled();
+  });
   it("별칭 저장 실패 후 입력을 유지하고 같은 입력으로 재시도한다", async () => {
     vi.mocked(itemSearchApi.addAlias).mockRejectedValueOnce(new Error("저장 실패")).mockResolvedValueOnce({ alias_id: "b", alias: "전동기" });
     mount(<ItemSearchAliases itemId="i" />);
@@ -97,7 +138,7 @@ describe("검색 관리", () => {
     newConnection().getAllByRole("textbox").forEach(input => expect(input).toHaveValue(""));
     expect(newConnection().getByRole("button", { name: "연결 저장" })).toBeDisabled();
     expect(itemSearchApi.addGroup).not.toHaveBeenCalled();
-    expect(screen.getAllByRole("textbox")).toHaveLength(2);
+    expect(newConnection().getAllByRole("textbox")).toHaveLength(2);
     expect(document.querySelector("textarea")).toBeNull();
   });
 
@@ -148,7 +189,7 @@ describe("검색 관리", () => {
     fireEvent.change(editor.getByRole("textbox", { name: "검색어", exact: true }), { target: { value: "다른 값" } });
     fireEvent.click(editor.getByRole("button", { name: "취소", exact: true }));
     expect(screen.getByText("모터 ↔ motor")).toBeVisible();
-    expect(screen.getAllByRole("textbox")).toHaveLength(2);
+    expect(newConnection().getAllByRole("textbox")).toHaveLength(2);
     expect(itemSearchApi.updateGroup).not.toHaveBeenCalled();
   });
 
