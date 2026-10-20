@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ItemFormFields, type ItemFormData } from "../ItemFormFields";
 
 vi.mock("../../../DepartmentsContext", () => ({
-  useDepartments: () => [{ name: "조립" }, { name: "튜브" }],
+  useDepartments: () => [{ name: "조립" }, { name: "튜브" }, { name: "창고" }],
 }));
 
 function baseForm(overrides: Partial<ItemFormData> = {}): ItemFormData {

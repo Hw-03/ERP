@@ -12,10 +12,11 @@ export function AddItemForm() {
     setAddForm,
     addItem: onAddItem,
     productModels,
+    adding,
   } = useAdminMasterItemsContext();
 
   return (
-    <div className="space-y-4">
+    <fieldset className="space-y-4" disabled={adding} aria-busy={adding}>
       <ItemFormFields
         form={addForm as ItemFormData & { initial_quantity: string }}
         setForm={setAddForm as (u: (f: ItemFormData) => ItemFormData) => void}
@@ -30,12 +31,14 @@ export function AddItemForm() {
       />
 
       <button
-        onClick={onAddItem}
+        onClick={() => void onAddItem().catch(() => {})}
+        disabled={adding || !addForm.item_name.trim()}
+        aria-busy={adding}
         className="w-full rounded-[18px] py-3 text-base font-bold text-white"
         style={{ background: LEGACY_COLORS.greenSolid }}
       >
         추가
       </button>
-    </div>
+    </fieldset>
   );
 }
