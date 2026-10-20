@@ -12,6 +12,7 @@ import {
   useUpdateEmployeeMutation,
 } from "@/lib/queries/useEmployeesQuery";
 import type { EmployeeAddForm } from "../_admin_sections/adminShared";
+import { useAdminSave } from "./useAdminSave";
 
 export type UseAdminEmployeesCommandsArgs = {
   setEmployees: (updater: (prev: Employee[]) => Employee[]) => void;
@@ -20,6 +21,10 @@ export type UseAdminEmployeesCommandsArgs = {
 };
 
 export type UseAdminEmployeesCommandsState = {
+  adding: boolean;
+  toggling: boolean;
+  deleting: boolean;
+  resettingPin: boolean;
   add: (input: EmployeeAddForm) => Promise<Employee | null>;
   toggleActive: (employee: Employee) => Promise<Employee | null>;
   delete: (employee: Employee) => Promise<{ deleted: boolean; updated: Employee | null } | null>;
@@ -35,6 +40,10 @@ export function useAdminEmployeesCommands({
   const updateMutation = useUpdateEmployeeMutation();
   const deleteMutation = useDeleteEmployeeMutation();
   const resetPinMutation = useResetEmployeePinMutation();
+  const addTask = useAdminSave<Employee | null>();
+  const toggleTask = useAdminSave<Employee | null>();
+  const deleteTask = useAdminSave<{ deleted: boolean; updated: Employee | null } | null>();
+  const pinTask = useAdminSave<boolean>();
 
   async function add(input: EmployeeAddForm): Promise<Employee | null> {
     if (!input.name.trim()) {
@@ -118,9 +127,13 @@ export function useAdminEmployeesCommands({
   }
 
   return {
-    add,
-    toggleActive,
-    delete: deleteCmd,
-    resetPin,
+    add: (input) => addTask.run(() => add(input)),
+    toggleActive: (employee) => toggleTask.run(() => toggleActive(employee)),
+    delete: (employee) => deleteTask.run(() => deleteCmd(employee)),
+    resetPin: (employee, pin) => pinTask.run(() => resetPin(employee, pin)),
+    adding: addTask.saving,
+    toggling: toggleTask.saving,
+    deleting: deleteTask.saving,
+    resettingPin: pinTask.saving,
   };
 }

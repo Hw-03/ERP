@@ -38,14 +38,14 @@ export const catalogApi = {
 
   // BOM --------------------------------------------------------------------
   getAllBOM: (signal?: AbortSignal) => fetcher<BOMDetailEntry[]>(toApiUrl("/api/bom"), signal),
-  getBOM: (parentItemId: string) => fetcher<BOMEntry[]>(toApiUrl(`/api/bom/${parentItemId}`)),
+  getBOM: (parentItemId: string, signal?: AbortSignal) => fetcher<BOMEntry[]>(toApiUrl(`/api/bom/${parentItemId}`), signal),
   getBOMTree: (parentItemId: string, options?: { departmentOrder?: "desc" }) => {
     const query = options?.departmentOrder ? `?department_order=${options.departmentOrder}` : "";
     return fetcher<BOMTreeNode>(toApiUrl(`/api/bom/${parentItemId}/tree${query}`));
   },
   /** 주어진 품목을 자식으로 사용하는 parent BOM 행. 직접 사용처(1단계). */
-  getBOMWhereUsed: (itemId: string) =>
-    fetcher<BOMDetailEntry[]>(toApiUrl(`/api/bom/where-used/${itemId}`)),
+  getBOMWhereUsed: (itemId: string, signal?: AbortSignal) =>
+    fetcher<BOMDetailEntry[]>(toApiUrl(`/api/bom/where-used/${itemId}`), signal),
 
   createBOM: (payload: {
     parent_item_id: string;

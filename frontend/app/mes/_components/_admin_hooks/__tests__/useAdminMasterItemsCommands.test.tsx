@@ -12,6 +12,7 @@ vi.mock("@/lib/queries/useItemsQuery", () => ({
 }));
 
 import { useAdminMasterItemsCommands } from "../useAdminMasterItemsCommands";
+import { itemsApi } from "@/lib/api/items";
 
 function makeClient(): QueryClient {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -33,6 +34,19 @@ const baseArgs = (over: Partial<Parameters<typeof useAdminMasterItemsCommands>[0
 });
 
 describe("useAdminMasterItemsCommands", () => {
+  it("delete failure rejects so the confirmation remains available for retry", async () => {
+    const remove = vi.spyOn(itemsApi, "softDeleteItem").mockRejectedValue(new Error("delete failed"));
+    const args = baseArgs();
+    const { result } = renderHook(() => useAdminMasterItemsCommands(args), {
+      wrapper: makeWrapper(makeClient()),
+    });
+    await act(async () => {
+      await expect(result.current.deleteItem("item-1")).rejects.toThrow("delete failed");
+    });
+    expect(args.setSelectedItem).not.toHaveBeenCalled();
+    expect(args.onError).toHaveBeenCalledWith("delete failed");
+    remove.mockRestore();
+  });
   beforeEach(() => {
     createMutateAsync.mockReset();
     reorderMutate.mockReset();
@@ -62,7 +76,7 @@ describe("useAdminMasterItemsCommands", () => {
       wrapper: makeWrapper(makeClient()),
     });
     await act(async () => {
-      result.current.add();
+      await expect(result.current.add()).rejects.toThrow();
     });
     await waitFor(() => expect(args.onError).toHaveBeenCalledWith("품목명을 입력하세요."));
     expect(createMutateAsync).not.toHaveBeenCalled();
@@ -92,7 +106,7 @@ describe("useAdminMasterItemsCommands", () => {
       }));
     });
     await act(async () => {
-      result.current.add();
+      await result.current.add();
     });
     expect(args.setItems).not.toHaveBeenCalled();
     expect(args.setSelectedItem).toHaveBeenCalled();
@@ -126,7 +140,7 @@ describe("useAdminMasterItemsCommands", () => {
       }));
     });
 
-    await act(async () => { result.current.add(); });
+    await act(async () => { await result.current.add(); });
 
     expect(createMutateAsync).toHaveBeenCalledWith(expect.objectContaining({
       supplier: "공급사",
@@ -156,7 +170,7 @@ describe("useAdminMasterItemsCommands", () => {
       }));
     });
 
-    await act(async () => { result.current.add(); });
+    await act(async () => { await expect(result.current.add()).rejects.toThrow(); });
 
     expect(args.onError).toHaveBeenCalledWith("최소 발주수량(MOQ)은 1 이상 입력하세요.");
     expect(createMutateAsync).not.toHaveBeenCalled();
@@ -181,7 +195,7 @@ describe("useAdminMasterItemsCommands", () => {
       }));
     });
 
-    await act(async () => { result.current.add(); });
+    await act(async () => { await expect(result.current.add()).rejects.toThrow(); });
 
     expect(args.onError).toHaveBeenCalledWith(errorMessage);
     expect(createMutateAsync).not.toHaveBeenCalled();
@@ -211,7 +225,7 @@ describe("useAdminMasterItemsCommands", () => {
       }));
     });
 
-    await act(async () => { result.current.add(); });
+    await act(async () => { await expect(result.current.add()).rejects.toThrow(); });
 
     expect(args.onError).toHaveBeenCalledWith(errorMessage);
     expect(createMutateAsync).not.toHaveBeenCalled();
@@ -232,7 +246,7 @@ describe("useAdminMasterItemsCommands", () => {
       }));
     });
 
-    await act(async () => { result.current.add(); });
+    await act(async () => { await expect(result.current.add()).rejects.toThrow(); });
 
     expect(args.onError).toHaveBeenCalledWith("기준 매입단가는 0 이상, 소수점 둘째 자리까지 입력하세요.");
     expect(createMutateAsync).not.toHaveBeenCalled();
@@ -253,7 +267,7 @@ describe("useAdminMasterItemsCommands", () => {
       }));
     });
 
-    await act(async () => { result.current.add(); });
+    await act(async () => { await result.current.add(); });
 
     expect(createMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ standard_purchase_price: "123.45" }));
   });
@@ -278,7 +292,7 @@ describe("useAdminMasterItemsCommands", () => {
     });
 
     await act(async () => {
-      result.current.add();
+      await result.current.add();
     });
 
     expect(createMutateAsync).toHaveBeenCalledWith(expect.objectContaining({
@@ -311,7 +325,7 @@ describe("useAdminMasterItemsCommands", () => {
     });
 
     await act(async () => {
-      result.current.add();
+      await result.current.add();
     });
 
     expect(invalidateSpy).not.toHaveBeenCalled();
@@ -330,7 +344,7 @@ describe("useAdminMasterItemsCommands", () => {
     });
 
     await act(async () => {
-      result.current.add();
+      await expect(result.current.add()).rejects.toThrow();
     });
     await waitFor(() => expect(args.onError).toHaveBeenCalledWith("사용 제품을 하나 이상 선택하세요."));
 
@@ -338,7 +352,7 @@ describe("useAdminMasterItemsCommands", () => {
       result.current.setAddForm((form) => ({ ...form, model_slots: [1] }));
     });
     await act(async () => {
-      result.current.add();
+      await expect(result.current.add()).rejects.toThrow();
     });
     await waitFor(() => expect(args.onError).toHaveBeenLastCalledWith("초기 재고 위치와 수량을 입력하세요."));
     expect(createMutateAsync).not.toHaveBeenCalled();

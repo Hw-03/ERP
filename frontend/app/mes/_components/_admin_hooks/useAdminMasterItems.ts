@@ -3,7 +3,8 @@
 // AdminMasterItemsSection 전용 wrapper hook.
 // W5: List/Form/Commands 3-hook 으로 분해 후 호환 표면 유지.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useAdminSessionState } from "./useAdminSessionState";
 import type { Item, ProductModel } from "@/lib/api";
 import { useAdminMasterItemsList } from "./useAdminMasterItemsList";
 import { useAdminMasterItemsForm } from "./useAdminMasterItemsForm";
@@ -56,7 +57,8 @@ export type AdminMasterItemsState = {
   setAddForm: (updater: (f: AddForm) => AddForm) => void;
   visibleItems: Item[];
   canReorderItems: boolean;
-  addItem: () => void;
+  addItem: () => Promise<void>;
+  adding: boolean;
   reorderItems: (ordered: Item[]) => void;
   saveItemField: (
     field: "item_name" | "spec" | "barcode" | "supplier" | "min_stock" | "unit" | "mes_code" | "process_type_code",
@@ -69,6 +71,7 @@ export type AdminMasterItemsState = {
   ) => void;
   saveItem: () => Promise<void>;
   dirty: boolean;
+  saving: boolean;
   deleteItem: (itemId: string) => Promise<void>;
   restoreItem: (itemId: string) => Promise<void>;
   productModels: ProductModel[];
@@ -84,7 +87,18 @@ export function useAdminMasterItems({
   adminPin,
   productModels,
 }: UseAdminMasterItemsArgs): AdminMasterItemsState {
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [selectedId, setSelectedId] = useAdminSessionState<string | null>("items.selection", null);
+  const [selectedItem, setSelection] = useState<Item | null>(() => items.find((item) => item.item_id === selectedId) ?? null);
+  const setSelectedItem = useCallback((item: Item | null) => {
+    setSelectedId(item?.item_id ?? null);
+    setSelection(item);
+  }, [setSelectedId]);
+  useEffect(() => {
+    if (!selectedItem && selectedId) {
+      const restored = items.find((item) => item.item_id === selectedId);
+      if (restored) setSelection(restored);
+    }
+  }, [items, selectedId, selectedItem]);
 
   const list = useAdminMasterItemsList({ items, globalSearch });
   const form = useAdminMasterItemsForm({
@@ -108,7 +122,7 @@ export function useAdminMasterItems({
     if (!selectedItem || form.dirty) return;
     const refreshedItem = items.find((item) => item.item_id === selectedItem.item_id);
     if (refreshedItem && refreshedItem !== selectedItem) setSelectedItem(refreshedItem);
-  }, [items, selectedItem, form.dirty]);
+  }, [items, selectedItem, form.dirty, setSelectedItem]);
 
   return {
     selectedItem,
@@ -122,6 +136,7 @@ export function useAdminMasterItems({
     visibleItems: list.visibleItems,
     canReorderItems: list.canReorderItems,
     addItem: commands.add,
+    adding: commands.adding,
     reorderItems: commands.reorder,
     saveItemField: form.saveField,
     updateItemFull: form.updateFull,
@@ -129,6 +144,7 @@ export function useAdminMasterItems({
     setEditForm: form.setForm,
     saveItem: form.save,
     dirty: form.dirty,
+    saving: form.saving,
     deleteItem: commands.deleteItem,
     restoreItem: commands.restoreItem,
     productModels,

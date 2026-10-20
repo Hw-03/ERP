@@ -48,6 +48,13 @@ const baseArgs = (over: Partial<Parameters<typeof useAdminDepartmentsCommands>[0
 });
 
 describe("useAdminDepartmentsCommands", () => {
+  it("keeps the add draft and rejects when creation fails", async () => {
+    const args = baseArgs({ getAddName: () => "draft" });
+    const { result } = renderHook(() => useAdminDepartmentsCommands(args), { wrapper });
+    createMutate.mockImplementation((_payload, options) => options.onError(new Error("offline")));
+    await act(async () => { await expect(result.current.add()).rejects.toThrow("offline"); });
+    expect(args.onAfterAdd).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     createMutate.mockReset();
     updateMutate.mockReset();
@@ -55,16 +62,16 @@ describe("useAdminDepartmentsCommands", () => {
     reorderMutate.mockReset();
   });
 
-  it("add — 빈 이름이면 createMutation 호출 안 함", () => {
+  it("add — 빈 이름이면 createMutation 호출 안 함", async () => {
     const args = baseArgs({ getAddName: () => "  " });
     const { result } = renderHook(() => useAdminDepartmentsCommands(args), { wrapper });
-    act(() => {
-      result.current.add();
+    await act(async () => {
+      await result.current.add();
     });
     expect(createMutate).not.toHaveBeenCalled();
   });
 
-  it("add — 이름 있으면 createMutation.mutate 호출 + onSuccess시 setDepartments", () => {
+  it("add — 이름 있으면 createMutation.mutate 호출 + onSuccess시 setDepartments", async () => {
     const args = baseArgs({ getAddName: () => "신규" });
     const { result } = renderHook(() => useAdminDepartmentsCommands(args), { wrapper });
     act(() => {
@@ -75,8 +82,8 @@ describe("useAdminDepartmentsCommands", () => {
     expect(payload.name).toBe("신규");
     expect(payload.pin).toBe("1234");
     // onSuccess 시뮬레이션
-    act(() => {
-      opts.onSuccess(D(5, "신규"));
+    await act(async () => {
+      await opts.onSuccess(D(5, "신규"));
     });
     expect(args.setDepartments).toHaveBeenCalled();
     expect(args.onAfterAdd).toHaveBeenCalled();

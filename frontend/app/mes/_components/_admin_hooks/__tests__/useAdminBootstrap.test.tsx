@@ -1,5 +1,15 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, renderHook as renderTestingHook, waitFor, type RenderHookOptions } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { queryKeys } from "@/lib/queries/keys";
+
+let client: QueryClient;
+function renderHook<Result, Props>(render: (props: Props) => Result, options?: RenderHookOptions<Props>) {
+  return renderTestingHook(render, {
+    ...options,
+    wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+  });
+}
 
 const mocks = vi.hoisted(() => ({
   revision: null as number | null,
@@ -18,6 +28,8 @@ vi.mock("@/lib/api", () => ({
     getAllBOM: mocks.getAllBOM,
   },
 }));
+vi.mock("@/lib/api/items", () => ({ itemsApi: { getItems: mocks.getItems } }));
+vi.mock("@/lib/api/catalog", () => ({ catalogApi: { getAllBOM: mocks.getAllBOM } }));
 
 vi.mock("@/lib/queries/useModelsQuery", () => ({
   useModelsQuery: () => ({ data: mocks.models }),
@@ -41,11 +53,39 @@ function deferred<T>() {
 
 describe("useAdminBootstrap realtime refresh", () => {
   beforeEach(() => {
+    client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000, gcTime: Infinity } } });
     mocks.revision = null;
     mocks.getItems.mockReset().mockResolvedValue([]);
     mocks.getEmployees.mockReset().mockResolvedValue([]);
     mocks.getDepartments.mockReset().mockResolvedValue([]);
     mocks.getAllBOM.mockReset().mockResolvedValue([]);
+  });
+  afterEach(() => client.clear());
+
+  it("reuses cached lists on reentry without waiting for another response", async () => {
+    const onError = vi.fn();
+    const first = renderHook(() => useAdminBootstrap({ unlocked: true, globalSearch: "", onError }));
+    await waitFor(() => expect(first.result.current.readStates.items.status).toBe("ready"));
+    await waitFor(() => expect(first.result.current.readStates.bom.status).toBe("ready"));
+    first.unmount();
+    const next = renderHook(() => useAdminBootstrap({ unlocked: true, globalSearch: "", onError }));
+    expect(next.result.current.readStates.items.status).toBe("ready");
+    expect(next.result.current.readStates.bom.status).toBe("ready");
+    expect(mocks.getItems).toHaveBeenCalledTimes(1);
+    expect(mocks.getAllBOM).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(next.result.current.readStates.employees.status).toBe("ready"));
+  });
+
+  it("cancels an older item read before committing a saved item to the shared cache", async () => {
+    const old = deferred<any[]>();
+    mocks.getItems.mockReturnValueOnce(old.promise);
+    const onError = vi.fn();
+    const { result } = renderHook(() => useAdminBootstrap({ unlocked: true, globalSearch: "", onError }));
+    act(() => result.current.setItems([{ item_id: "saved", item_name: "Saved" }] as any));
+    await waitFor(() => expect(result.current.items[0]?.item_name).toBe("Saved"));
+    await act(async () => { old.resolve([{ item_id: "saved", item_name: "Old" }]); await old.promise; });
+    expect(result.current.items[0]?.item_name).toBe("Saved");
+    expect(client.getQueryData(queryKeys.items.list({ limit: 2000, search: undefined }))).toEqual(result.current.items);
   });
 
   it("distinguishes an initial pending response from a successfully empty list and keeps data during refresh", async () => {
@@ -64,7 +104,7 @@ describe("useAdminBootstrap realtime refresh", () => {
   });
 
   it("ends the initial skeleton on failure and retries without treating an empty success as loading", async () => {
-    mocks.getAllBOM.mockRejectedValueOnce(new Error("BOM read failed")).mockResolvedValueOnce([]);
+    mocks.getAllBOM.mockRejectedValueOnce(new Error("BOM read failed")).mockRejectedValueOnce(new Error("BOM read failed")).mockResolvedValueOnce([]);
     const onError = vi.fn();
     const { result } = renderHook(() => useAdminBootstrap({ unlocked: true, globalSearch: "", onError }));
     await waitFor(() => expect(result.current.readStates.bom).toEqual({ status: "error", error: "BOM read failed" }));
@@ -97,7 +137,7 @@ describe("useAdminBootstrap realtime refresh", () => {
     await waitFor(() => expect(Object.values(result.current.readStates).every((read) => read.status === "ready")).toBe(true));
   });
 
-  it("refreshes items, employees and BOM rows without reloading departments on revision changes", async () => {
+  it("lets realtime invalidation refresh lists once and refreshes employees when the revision is published", async () => {
     const onError = vi.fn();
     const { rerender } = renderHook(
       () => useAdminBootstrap({ unlocked: true, globalSearch: "", onError }),
@@ -110,6 +150,12 @@ describe("useAdminBootstrap realtime refresh", () => {
       expect(mocks.getDepartments).toHaveBeenCalledTimes(1);
     });
 
+    await act(async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.items.all }),
+        client.invalidateQueries({ queryKey: queryKeys.bom.all }),
+      ]);
+    });
     mocks.revision = 1;
     rerender();
 
@@ -258,18 +304,16 @@ describe("useAdminBootstrap realtime refresh", () => {
     );
     await waitFor(() => expect(mocks.getItems).toHaveBeenCalledTimes(1));
 
-    mocks.revision = 1;
-    rerender();
+    act(() => { void client.invalidateQueries({ queryKey: queryKeys.items.all }); });
     await waitFor(() => expect(mocks.getItems).toHaveBeenCalledTimes(2));
-    mocks.revision = 2;
-    rerender();
+    act(() => { void client.invalidateQueries({ queryKey: queryKeys.items.all }); });
     await waitFor(() => expect(mocks.getItems).toHaveBeenCalledTimes(3));
 
     await act(async () => {
       newer.resolve([{ item_id: "item-1", item_name: "Newest" }]);
       await newer.promise;
     });
-    expect(result.current.items[0]?.item_name).toBe("Newest");
+    await waitFor(() => expect(result.current.items[0]?.item_name).toBe("Newest"));
 
     await act(async () => {
       older.resolve([{ item_id: "item-1", item_name: "Older" }]);
@@ -281,13 +325,13 @@ describe("useAdminBootstrap realtime refresh", () => {
   it("keeps the last successful BOM snapshot when a realtime refresh fails", async () => {
     const initialRows = [{ parent_item_id: "parent-1", child_item_id: "child-1" }];
     mocks.getAllBOM.mockResolvedValueOnce(initialRows).mockRejectedValueOnce(new Error("refresh failed"));
-    const { result, rerender } = renderHook(
-      () => useAdminBootstrap({ unlocked: true, globalSearch: "", onError: vi.fn() }),
+    const onError = vi.fn();
+    const { result } = renderHook(
+      () => useAdminBootstrap({ unlocked: true, globalSearch: "", onError }),
     );
     await waitFor(() => expect(result.current.allBomRows).toEqual(initialRows));
 
-    mocks.revision = 1;
-    rerender();
+    act(() => { void client.invalidateQueries({ queryKey: queryKeys.bom.all }); });
     await waitFor(() => expect(mocks.getAllBOM).toHaveBeenCalledTimes(2));
 
     expect(result.current.allBomRows).toEqual(initialRows);

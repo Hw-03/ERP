@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import type { ProductModel } from "@/lib/api";
+import { useAdminSave } from "./useAdminSave";
 import {
   useCreateModelMutation,
   useDeleteModelMutation,
@@ -25,8 +26,10 @@ export type UseAdminModelsCommandsState = {
   setModelAddName: (v: string) => void;
   modelAddSymbol: string;
   setModelAddSymbol: (v: string) => void;
-  add: () => void;
-  delete: (slot: number) => void;
+  add: () => Promise<void>;
+  adding: boolean;
+  delete: (slot: number) => Promise<void>;
+  deleting: boolean;
   reorder: (ordered: ProductModel[]) => void;
 };
 
@@ -40,14 +43,16 @@ export function useAdminModelsCommands({
 }: UseAdminModelsCommandsArgs): UseAdminModelsCommandsState {
   const [modelAddName, setModelAddName] = useState("");
   const [modelAddSymbol, setModelAddSymbol] = useState("");
+  const addTask = useAdminSave();
+  const deleteTask = useAdminSave();
 
   const createModelMutation = useCreateModelMutation();
   const deleteModelMutation = useDeleteModelMutation();
   const reorderModelsMutation = useReorderModelsMutation();
 
-  function add() {
-    if (!modelAddName.trim()) return;
-    createModelMutation.mutate(
+  function add(): Promise<void> {
+    if (!modelAddName.trim()) return Promise.resolve();
+    return new Promise<void>((resolve, reject) => createModelMutation.mutate(
       { model_name: modelAddName.trim(), symbol: modelAddSymbol.trim() || undefined },
       {
         onSuccess: (created) => {
@@ -55,23 +60,20 @@ export function useAdminModelsCommands({
           setModelAddName("");
           setModelAddSymbol("");
           onStatusChange(`'${created.model_name}' 모델을 추가했습니다.`);
+          resolve();
         },
-        onError: (err) => onError(err instanceof Error ? err.message : "모델 추가 실패"),
+        onError: (err) => {
+          onError(err instanceof Error ? err.message : "모델 추가 실패");
+          reject(err);
+        },
       },
-    );
+    ));
   }
 
-  function deleteCmd(slot: number) {
+  function deleteCmd(slot: number): Promise<void> {
     const model = productModels.find((m) => m.slot === slot);
-    if (!model) return;
-    if (
-      !confirm(
-        `'${model.model_name}' 모델을 삭제하시겠습니까?\n이 모델을 사용하는 품목이 있으면 삭제되지 않습니다.`,
-      )
-    ) {
-      return;
-    }
-    deleteModelMutation.mutate(
+    if (!model) return Promise.resolve();
+    return new Promise<void>((resolve, reject) => deleteModelMutation.mutate(
       { slot, pin: adminPin },
       {
         onSuccess: async () => {
@@ -83,10 +85,14 @@ export function useAdminModelsCommands({
             const detail = error instanceof Error ? error.message : "알 수 없는 오류";
             onError(`모델은 삭제했지만 직원 목록을 새로고침하지 못했습니다: ${detail}`);
           }
+          resolve();
         },
-        onError: (err) => onError(err instanceof Error ? err.message : "삭제 실패"),
+        onError: (err) => {
+          onError(err instanceof Error ? err.message : "삭제 실패");
+          reject(err);
+        },
       },
-    );
+    ));
   }
 
   function reorder(ordered: ProductModel[]) {
@@ -107,8 +113,10 @@ export function useAdminModelsCommands({
     setModelAddName,
     modelAddSymbol,
     setModelAddSymbol,
-    add,
-    delete: deleteCmd,
+    add: () => addTask.run(add),
+    adding: addTask.saving,
+    delete: (slot) => deleteTask.run(() => deleteCmd(slot)),
+    deleting: deleteTask.saving,
     reorder,
   };
 }

@@ -4,11 +4,12 @@
 // 책임: 단일 품목 편집 폼 (editForm + dirty + save).
 // + 필드 단위 즉시 저장 (saveItemField / updateItemFull) 도 form 책임 — 선택된 품목의 변경 작업.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Item } from "@/lib/api";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queries/keys";
+import { useAdminSave } from "./useAdminSave";
 import {
   normalizeStandardPurchasePrice,
   validateStockPurchaseValues,
@@ -123,6 +124,7 @@ export type UseAdminMasterItemsFormState = {
   form: ItemEditForm;
   setForm: (updater: (prev: ItemEditForm) => ItemEditForm) => void;
   dirty: boolean;
+  saving: boolean;
   save: () => Promise<void>;
   saveField: (
     field: "item_name" | "spec" | "barcode" | "supplier" | "min_stock" | "unit" | "mes_code" | "process_type_code",
@@ -140,28 +142,37 @@ export function useAdminMasterItemsForm({
   onShowSave,
 }: UseAdminMasterItemsFormArgs): UseAdminMasterItemsFormState {
   const queryClient = useQueryClient();
-  const [form, setFormState] = useState<ItemEditForm>(EMPTY_ITEM_EDIT_FORM);
-  const [dirty, setDirty] = useState(false);
+  const saveTask = useAdminSave();
+  const selectedId = useRef(selectedItem?.item_id);
+  useEffect(() => {
+    selectedId.current = selectedItem?.item_id;
+    return () => { selectedId.current = undefined; };
+  }, [selectedItem?.item_id]);
+  const [form, setFormState] = useState<ItemEditForm>(() => selectedItem ? itemToEditForm(selectedItem) : EMPTY_ITEM_EDIT_FORM);
+  const [base, setBase] = useState(form);
+  const dirty = Object.entries(form).some(([key, value]) => key === "model_slots"
+    ? form.model_slots.length !== base.model_slots.length || form.model_slots.some((slot) => !base.model_slots.includes(slot))
+    : value !== base[key as keyof ItemEditForm]);
 
   // 품목 선택 시 form 채우기
   useEffect(() => {
     if (selectedItem) {
       setFormState(itemToEditForm(selectedItem));
-      setDirty(false);
+      setBase(itemToEditForm(selectedItem));
     } else {
       setFormState(EMPTY_ITEM_EDIT_FORM);
-      setDirty(false);
+      setBase(EMPTY_ITEM_EDIT_FORM);
     }
   }, [selectedItem?.item_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!selectedItem || dirty) return;
     setFormState(itemToEditForm(selectedItem));
+    setBase(itemToEditForm(selectedItem));
   }, [selectedItem, dirty]);
 
   function setForm(updater: (prev: ItemEditForm) => ItemEditForm) {
     setFormState(updater);
-    setDirty(true);
   }
 
   async function save(): Promise<void> {
@@ -169,7 +180,7 @@ export function useAdminMasterItemsForm({
     const stockPurchaseError = validateStockPurchaseValues(form);
     if (stockPurchaseError) {
       onError(stockPurchaseError);
-      return;
+      throw new Error(stockPurchaseError);
     }
     const standardPurchasePrice = normalizeStandardPurchasePrice(form.standard_purchase_price);
     try {
@@ -195,16 +206,18 @@ export function useAdminMasterItemsForm({
       };
       const updated = await api.updateItem(selectedItem.item_id, payload);
       setItems((current) => current.map((it) => (it.item_id === updated.item_id ? updated : it)));
-      setSelectedItem(updated);
-      // 백엔드 응답으로 form 갱신 — 새 mes_code 가 폼에 반영되도록.
-      // useEffect deps 가 selectedItem.item_id 라 같은 부품 갱신은 발화 안 함 → 명시 호출 필요.
-      setFormState(itemToEditForm(updated));
-      setDirty(false);
+      // 저장 도중 다른 품목으로 이동했다면 그 품목의 입력과 선택을 유지한다.
+      if (selectedId.current === updated.item_id) {
+        setSelectedItem(updated);
+        setFormState(itemToEditForm(updated));
+        setBase(itemToEditForm(updated));
+      }
       void queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
       onStatusChange(`${updated.item_name} 정보를 저장했습니다.`);
       onShowSave?.("저장됐습니다.");
     } catch (error) {
       onError(error instanceof Error ? error.message : "저장에 실패했습니다.");
+      throw error;
     }
   }
 
@@ -219,7 +232,7 @@ export function useAdminMasterItemsForm({
         : { [field]: value || undefined };
       const updated = await api.updateItem(selectedItem.item_id, payload);
       setItems((current) => current.map((it) => (it.item_id === updated.item_id ? updated : it)));
-      setSelectedItem(updated);
+      if (selectedId.current === updated.item_id) setSelectedItem(updated);
       onStatusChange(`${updated.item_name} 정보를 저장했습니다.`);
       void queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
       onShowSave?.("저장됐습니다.");
@@ -233,7 +246,7 @@ export function useAdminMasterItemsForm({
     try {
       const updated = await api.updateItem(selectedItem.item_id, payload);
       setItems((current) => current.map((it) => (it.item_id === updated.item_id ? updated : it)));
-      setSelectedItem(updated);
+      if (selectedId.current === updated.item_id) setSelectedItem(updated);
       onStatusChange(`${updated.item_name} 정보를 저장했습니다.`);
       void queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
       onShowSave?.("저장됐습니다.");
@@ -246,7 +259,8 @@ export function useAdminMasterItemsForm({
     form,
     setForm,
     dirty,
-    save,
+    saving: saveTask.saving,
+    save: () => saveTask.run(save),
     saveField: (f, v) => void _saveField(f, v),
     updateFull: (p) => void _updateFull(p),
   };

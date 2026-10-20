@@ -62,6 +62,6 @@ export function useReorderModelsMutation() {
   return useMutation({
     mutationFn: (payload: Parameters<typeof catalogApi.reorderModels>[0]) =>
       catalogApi.reorderModels(payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.models.all }),
+    onSettled: () => qc.invalidateQueries({ queryKey: queryKeys.models.all }),
   });
 }
