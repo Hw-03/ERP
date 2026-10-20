@@ -467,7 +467,7 @@ function StocktakeWorkspace({ token, operator, enabled, variant }: { token: stri
   }
   return <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2" style={{ "--stocktake-header-top": `${headerTop}px` } as CSSProperties}>
     <div className={`shrink-0 space-y-2 empty:hidden ${variant === "mobile" ? "px-3" : "pr-4"}`}>{recovery}{alerts}</div>
-    {showIdle && <div className={`min-h-0 flex-1 overflow-y-auto ${variant === "mobile" ? "px-3 pb-4" : "pr-4 pb-4"}`}>
+    {showIdle && <div className={`min-h-0 flex-1 overflow-y-auto ${variant === "mobile" ? "px-3 pb-4" : "pr-4"}`}>
       <StocktakeIdlePanel summary={latestSummary.data?.summary} loading={latestSummary.isPending} error={latestSummary.error}
         disabled={busy || !!unknown} onRetry={() => void latestSummary.refetch()}
         onStart={canManageRounds ? () => openRoundManagement("", true) : undefined}
