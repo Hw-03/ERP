@@ -11,13 +11,13 @@ const context = {
   modelAddSymbol: "",
   setModelAddSymbol: vi.fn(),
   addModel: vi.fn(),
-  deleteModel: vi.fn(),
+  deleteModel: vi.fn().mockResolvedValue(undefined),
   editForm: { model_name: "DX3000", symbol: "A" },
   setEditForm: vi.fn(),
   editDirty: false,
   editSaving: false,
   initEditForm: vi.fn(),
-  saveModel: vi.fn(),
+  saveModel: vi.fn().mockResolvedValue(undefined),
   reorderModels: vi.fn(),
 };
 
@@ -32,6 +32,24 @@ function findByClasses(container: HTMLElement, ...classes: string[]) {
 }
 
 describe("AdminModelsSection", () => {
+  it("guards model selection and keeps the draft when saving fails", async () => {
+    const original = context.productModels;
+    context.productModels = [...original, { slot: 2, symbol: "B", model_name: "OTHER", is_reserved: false }];
+    context.editDirty = true;
+    context.saveModel.mockRejectedValueOnce(new Error("offline"));
+    try {
+      render(<DirtyGuardProvider><AdminModelsSection items={[]} allBomRows={[]} /></DirtyGuardProvider>);
+      fireEvent.click(screen.getByRole("row", { name: /OTHER/ }));
+      expect(screen.getByRole("button", { name: "계속 작성" })).toBeInTheDocument();
+      expect(screen.getByRole("row", { name: /DX3000/ })).toHaveAttribute("aria-selected", "true");
+      fireEvent.click(screen.getByRole("button", { name: "저장하고 이동" }));
+      await waitFor(() => expect(screen.getByRole("button", { name: "저장하고 이동" })).toBeEnabled());
+      expect(screen.getByRole("row", { name: /DX3000/ })).toHaveAttribute("aria-selected", "true");
+    } finally {
+      context.productModels = original;
+      context.editDirty = false;
+    }
+  });
   it("예약된 목록 열과 상세 필드를 보여 주고 최초 조회 후 실제 내용으로 전환한다", async () => {
     const retry = vi.fn();
     const view = (ready: boolean) => <AdminReadProvider value={{ states: Object.fromEntries(Object.keys(INITIAL_ADMIN_READ_STATES).map((key) => [key, { status: ready ? "ready" : "pending" }])) as typeof INITIAL_ADMIN_READ_STATES, retry }}>

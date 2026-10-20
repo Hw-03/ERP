@@ -14,6 +14,7 @@ const context = {
   selectedDept: assembly,
   setSelectedDept: vi.fn(),
   setDirty: vi.fn(),
+  dirty: false,
 };
 const defaultDepartments = [assembly];
 
@@ -21,6 +22,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   context.departments = defaultDepartments;
   context.selectedDept = assembly;
+  context.dirty = false;
 });
 
 vi.mock("../AdminDepartmentsContext", () => ({
@@ -32,6 +34,19 @@ vi.mock("../../DepartmentsContext", () => ({
 }));
 
 describe("AdminDepartmentsSection", () => {
+  it("keeps the selected department while unsaved edits await a navigation decision", () => {
+    context.departments = [assembly, { ...assembly, id: 2, name: "튜브" }];
+    context.dirty = true;
+    const { container } = render(
+      <DirtyGuardProvider>
+        <AdminDepartmentsSection employees={[]} items={[]} adminPin="0000" setDepartments={vi.fn()} onStatusChange={vi.fn()} onError={vi.fn()} />
+      </DirtyGuardProvider>,
+    );
+    context.setSelectedDept.mockClear();
+    fireEvent.click(container.querySelector("[data-admin-department-row='2']")!);
+    expect(context.setSelectedDept).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "계속 작성" })).toBeInTheDocument();
+  });
   it("최초 조회에서는 부서 값과 조작 버튼을 표시하지 않고 자리를 예약한다", () => {
     render(<AdminReadProvider value={{ states: INITIAL_ADMIN_READ_STATES, retry: vi.fn() }}>
       <DirtyGuardProvider><AdminDepartmentsSection employees={[]} items={[]} adminPin="0000" setDepartments={vi.fn()} onStatusChange={vi.fn()} onError={vi.fn()} /></DirtyGuardProvider>

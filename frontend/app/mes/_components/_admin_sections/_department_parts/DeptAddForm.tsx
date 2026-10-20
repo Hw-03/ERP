@@ -6,12 +6,14 @@ export function DeptAddForm({
   value,
   onChange,
   onSubmit,
+  busy = false,
 }: {
   value: string;
   onChange: (v: string) => void;
   onSubmit: () => void;
+  busy?: boolean;
 }) {
-  const canSubmit = Boolean(value.trim());
+  const canSubmit = Boolean(value.trim()) && !busy;
   return (
     <form
       className="flex max-w-[420px] flex-col gap-3"
@@ -26,6 +28,7 @@ export function DeptAddForm({
         </label>
         <input
           id="dept-add-name"
+          disabled={busy}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="예: 설계"

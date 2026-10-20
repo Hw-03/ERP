@@ -1,6 +1,8 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DeptDetailView } from "../_department_parts/DeptDetailView";
+import type { Employee } from "@/lib/api";
+import { api } from "@/lib/api";
 
 vi.mock("@/lib/api", () => ({
   api: { updateDepartment: vi.fn() },
@@ -15,6 +17,31 @@ vi.mock("@/lib/ui/ConfirmModal", () => ({
 }));
 
 describe("DeptDetailView", () => {
+  it("returns the save promise and rejects on failure without discarding the draft", async () => {
+    const failure = new Error("저장 실패");
+    vi.mocked(api.updateDepartment).mockRejectedValueOnce(failure);
+    const onSaveRef = vi.fn();
+    const setSelectedDept = vi.fn();
+    render(<DeptDetailView dept={{ id: 1, name: "조립", display_order: 1, is_active: true, color_hex: "#2f74e7" }} adminPin="0000"
+      empCount={0} itemCount={0} deptEmployees={[]} onSetDepartments={vi.fn()} setSelectedDept={setSelectedDept}
+      onStatusChange={vi.fn()} onError={vi.fn()} onToggleActive={vi.fn()} onRequestDelete={vi.fn()} onSaveRef={onSaveRef} />);
+    fireEvent.change(screen.getByRole("textbox", { name: "부서명" }), { target: { value: "수정 이름" } });
+    await act(async () => {
+      await expect(onSaveRef.mock.lastCall![0]()).rejects.toBe(failure);
+    });
+    expect(setSelectedDept).not.toHaveBeenCalled();
+    expect(screen.getByRole("textbox", { name: "부서명" })).toHaveValue("수정 이름");
+  });
+  it("소속 직원을 색상 카드 앞에 배치하고 모든 직원을 표시한다", () => {
+    const employees = Array.from({ length: 7 }, (_, index) => ({ employee_id: `employee-${index}`, name: `직원 ${index}`, role: "사원", is_active: true }) as Employee);
+    render(<DeptDetailView dept={{ id: 1, name: "조립", display_order: 1, is_active: true, color_hex: "#2f74e7" }} adminPin="0000"
+      empCount={employees.length} itemCount={0} deptEmployees={employees} onSetDepartments={vi.fn()} setSelectedDept={vi.fn()}
+      onStatusChange={vi.fn()} onError={vi.fn()} onToggleActive={vi.fn()} onRequestDelete={vi.fn()} />);
+    employees.forEach(employee => expect(screen.getByText(employee.name)).toBeInTheDocument());
+    expect(screen.queryByText(/더보기/)).not.toBeInTheDocument();
+    const employeesCard = screen.getByText("소속 직원 (7명)").parentElement!;
+    expect(employeesCard.nextElementSibling).toContainElement(screen.getByText("색상"));
+  });
   it("starts the palette closed and exposes it through an accessible button", () => {
     render(
       <DeptDetailView

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useAdminSessionState } from "../_admin_hooks/useAdminSessionState";
 import { GripVertical, Layers, Plus, Save, Trash2, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { BOMDetailEntry, Item, ProductModel } from "@/lib/api";
@@ -15,7 +16,7 @@ import {
   AdminPageHeader,
 } from "./_admin_primitives";
 import { useAdminModelsContext } from "./AdminModelsContext";
-import { useRegisterDirty } from "@/lib/ui/dirty-guard";
+import { useLocalDirtyGuard, useRegisterDirty } from "@/lib/ui/dirty-guard";
 import styles from "./_admin_primitives/AdminMasterData.module.css";
 import { AdminReadBoundary, useAdminReadState } from "./_admin_primitives/AdminReadState";
 import { AdminDetailSkeleton, AdminTableSkeleton } from "./_admin_primitives/AdminSkeleton";
@@ -36,7 +37,9 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
     modelAddSymbol,
     setModelAddSymbol,
     addModel,
+    adding,
     deleteModel,
+    deleting,
     editForm,
     setEditForm,
     editDirty,
@@ -46,19 +49,19 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
     reorderModels,
   } = ctx;
 
-  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
+  const [selectedSlot, setSelectedSlot] = useAdminSessionState<number | null>("models.selection", null);
   const [addMode, setAddMode] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 
-  useRegisterDirty(
-    "models",
-    editDirty,
-    async () => {
-      if (selectedSlot != null) {
-        await Promise.resolve(saveModel(selectedSlot));
-      }
-    },
-  );
+  const saveSelected = async (): Promise<void> => {
+    if (addMode) {
+      if (!modelAddName.trim()) throw new Error("모델명을 입력하세요.");
+      await addModel();
+    } else if (selectedSlot != null) await saveModel(selectedSlot);
+  };
+  const dirty = addMode ? Boolean(modelAddName || modelAddSymbol) : editDirty;
+  useRegisterDirty("models", dirty, saveSelected);
+  const { confirmNavigation } = useLocalDirtyGuard(dirty, saveSelected);
   // 드래그 reorder 상태 — 부서 reorder 와 달리 정렬 키가 slot.
   const [dragSlot, setDragSlot] = useState<number | null>(null);
   const [dropTargetSlot, setDropTargetSlot] = useState<number | null>(null);
@@ -120,7 +123,7 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
     if (addMode) return;
     const first = inUse[0] ?? productModels[0];
     if (first) setSelectedSlot(first.slot);
-  }, [selectedSlot, addMode, inUse, productModels]);
+  }, [selectedSlot, addMode, inUse, productModels, setSelectedSlot]);
 
   const selected = useMemo(
     () => productModels.find((m) => m.slot === selectedSlot) ?? null,
@@ -154,19 +157,23 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
   }, [allBomRows, linkedItems, selected]);
 
   function handleSelectModel(slot: number) {
-    setAddMode(false);
-    setSelectedSlot((current) => (current === slot ? null : slot));
+    if (selectedSlot === slot && !addMode) return;
+    confirmNavigation(() => {
+      setAddMode(false);
+      setSelectedSlot(slot);
+    });
   }
 
   function handleStartAdd() {
-    setAddMode(true);
-    setSelectedSlot(null);
+    confirmNavigation(() => {
+      setAddMode(true);
+      setSelectedSlot(null);
+    });
   }
 
   function handleSubmitAdd() {
     if (!modelAddName.trim()) return;
-    addModel();
-    setAddMode(false);
+    void addModel().then(() => setAddMode(false)).catch(() => {});
   }
 
   function handleDelete(slot: number) {
@@ -175,9 +182,10 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
 
   function handleConfirmDelete() {
     if (deleteTarget === null) return;
-    deleteModel(deleteTarget);
-    if (selectedSlot === deleteTarget) setSelectedSlot(null);
-    setDeleteTarget(null);
+    void deleteModel(deleteTarget).then(() => {
+      if (selectedSlot === deleteTarget) setSelectedSlot(null);
+      setDeleteTarget(null);
+    }).catch(() => {});
   }
 
   const deleteTargetModel = deleteTarget !== null ? productModels.find((m) => m.slot === deleteTarget) : null;
@@ -327,17 +335,20 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
               modelAddSymbol={modelAddSymbol}
               setModelAddSymbol={setModelAddSymbol}
               onSubmit={handleSubmitAdd}
+              busy={adding}
             />
           ) : selected ? (
+            <fieldset className="contents" disabled={editSaving} aria-busy={editSaving}>
             <ModelDetailView
               model={selected}
-              headerActions={<Button variant="primary" size="md" className="h-11 min-w-[88px]" iconLeft={<Save className="h-4 w-4" />} disabled={!editDirty || editSaving} loading={editSaving} onClick={() => saveModel(selected.slot)}>저장</Button>}
+              headerActions={<Button variant="primary" size="md" className="h-11 min-w-[88px]" iconLeft={<Save className="h-4 w-4" />} disabled={!editDirty || editSaving} loading={editSaving} onClick={() => void saveModel(selected.slot).catch(() => {})}>저장</Button>}
               linkedItems={linkedItems}
               linkedBomCount={linkedBomCount}
               editForm={editForm}
               setEditForm={setEditForm}
               onRequestDelete={() => handleDelete(selected.slot)}
             />
+            </fieldset>
           ) : (
             <div className="flex min-h-full flex-col">
               <EmptyState
@@ -357,16 +368,18 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
         open={deleteTarget !== null}
         title={`'${deleteTargetModel?.model_name?.trim() || "미등록 모델"}' 모델을 삭제하시겠습니까?`}
         tone="danger"
-        cautionMessage="이 작업은 되돌릴 수 없습니다. 연결된 BOM·품목 매핑이 해제됩니다."
+        cautionMessage="이 작업은 되돌릴 수 없습니다. 이 모델을 사용하는 품목이 있으면 삭제되지 않습니다."
         confirmLabel="삭제"
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleConfirmDelete}
+        busy={deleting}
       />
     </>
   );
 }
 
 interface ModelAddFormProps {
+  busy?: boolean;
   modelAddName: string;
   setModelAddName: (v: string) => void;
   modelAddSymbol: string;
@@ -380,8 +393,9 @@ function ModelAddForm({
   modelAddSymbol,
   setModelAddSymbol,
   onSubmit,
+  busy = false,
 }: ModelAddFormProps) {
-  const canSubmit = Boolean(modelAddName.trim());
+  const canSubmit = Boolean(modelAddName.trim()) && !busy;
   return (
     <form
       className="flex max-w-[440px] flex-col gap-3"
@@ -396,6 +410,7 @@ function ModelAddForm({
         </label>
         <input
           value={modelAddName}
+          disabled={busy}
           onChange={(e) => setModelAddName(e.target.value)}
           placeholder="예: ADX8000"
           className="min-h-11 w-full rounded-[12px] border px-3 py-2.5 text-[14px] outline-none focus:border-[var(--c-blue)]"
@@ -412,6 +427,7 @@ function ModelAddForm({
         </label>
         <input
           value={modelAddSymbol}
+          disabled={busy}
           onChange={(e) => setModelAddSymbol(e.target.value.slice(0, 5))}
           placeholder="자동 생성"
           className="min-h-11 w-full rounded-[12px] border px-3 py-2.5 text-[14px] outline-none focus:border-[var(--c-blue)]"

@@ -40,7 +40,7 @@ const context: any = {
   cancelConfirm: vi.fn(),
   editForm: {},
   setEditForm: vi.fn(),
-  saveEmployee: vi.fn(),
+  saveEmployee: vi.fn().mockResolvedValue(undefined),
   pinResetTarget: null,
   pinResetAdminPin: "",
   setPinResetAdminPin: vi.fn(),
@@ -82,6 +82,26 @@ describe("AdminEmployeesSection", () => {
     expect(screen.getByTestId("admin-detail-skeleton")).toBeInTheDocument();
     expect(screen.queryByText(/직원을 선택하세요/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "직원 추가" })).toBeDisabled();
+  });
+  it("지연된 첫 조회도 상세를 숨기지 않고 이전 스켈레톤에서 전환한다", () => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
+    const animate = vi.fn(() => ({ cancel: vi.fn() }));
+    Object.defineProperty(Element.prototype, "animate", { configurable: true, value: animate });
+    const bounds = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ width: 800, height: 600, left: 500, top: 280 } as DOMRect);
+    const readyStates = Object.fromEntries(Object.keys(INITIAL_ADMIN_READ_STATES).map((key) => [key, { status: "ready" }])) as typeof INITIAL_ADMIN_READ_STATES;
+    const view = (ready: boolean) => <AdminReadProvider value={{ states: ready ? readyStates : INITIAL_ADMIN_READ_STATES, retry: vi.fn() }}><DirtyGuardProvider><AdminEmployeesSection /></DirtyGuardProvider></AdminReadProvider>;
+    try {
+      const { container, rerender, unmount } = render(view(false));
+      context.selectedEmployee = defaultEmployee;
+      context.editForm = { ...defaultEmployee, phone: "", hidden_sidebar_tabs: [], as_research_approver: false };
+      rerender(view(true));
+      const snapshot = container.querySelector("[data-admin-detail-snapshot]")!;
+      expect(snapshot.querySelector("[data-testid='admin-detail-skeleton']")).toBeInTheDocument();
+      expect(container.querySelector("[data-admin-detail-content] [data-testid='admin-detail-skeleton']")).toBeNull();
+      expect(screen.getByRole("textbox", { name: "이름" })).toHaveValue(defaultEmployee.name);
+      expect(animate.mock.contexts.some((element) => element.hasAttribute("data-admin-detail-content"))).toBe(false);
+      unmount();
+    } finally { bounds.mockRestore(); Reflect.deleteProperty(Element.prototype, "animate"); vi.unstubAllGlobals(); }
   });
   it.each(["ㄱㄱㅎ", "ㄱㄱㅎ ㅈㄹ", "ㅈㅇㅈ", "김건호 조립"])("직원 이름·부서·직급을 초성과 조합 검색으로 찾는다: %s", (query) => {
     context.employees = [defaultEmployee, { ...defaultEmployee, employee_id: "emp-2", name: "박서연", department: "출하", role: "대리" }];
@@ -158,7 +178,10 @@ describe("AdminEmployeesSection", () => {
 
     render(<DirtyGuardProvider><AdminEmployeesSection /></DirtyGuardProvider>);
 
-    expect(screen.getByRole("checkbox", { name: "AS·연구 승인 권한" })).toBeInTheDocument();
+    const approval = screen.getByRole("radiogroup", { name: "AS·연구 승인 권한" });
+    expect(within(approval).getByRole("radio", { name: "없음" })).toBeChecked();
+    fireEvent.click(within(approval).getByRole("radio", { name: "승인" }));
+    expect(context.setEditForm.mock.calls[0][0](context.editForm)).toEqual({ ...context.editForm, as_research_approver: true });
   });
 
   it("직원 표 행은 세 gridcell과 키보드 선택을 제공한다", () => {
@@ -214,7 +237,8 @@ describe("AdminEmployeesSection", () => {
     expect(saveButton.querySelector("svg")).toHaveClass("h-4", "w-4");
     context.saveEmployee.mockClear();
     fireEvent.click(saveButton);
-    expect(context.saveEmployee).toHaveBeenCalledOnce();
+    expect(saveButton).toBeDisabled();
+    expect(context.saveEmployee).not.toHaveBeenCalled();
   });
 
   it("legacy 부서/직급은 목록과 선택 헤더에서 표준 직급으로 표시한다", () => {
