@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { ArrowDownToLine, ArrowUpFromLine, ChevronDown, ChevronUp, Equal, Layers, MapPin } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
+import { ioDirectionTone, ioSurfaceStyle } from "./ioVisualTheme";
 import type { IoBundle, IoInternalUseBomMode, IoLine, IoSubType, Item } from "./types";
 import { IoLineRow, isOutgoing, expectedAfter } from "./IoLineRow";
 import { formatQty } from "@/lib/mes/format";
@@ -76,7 +77,7 @@ export function IoBundleCard({
   pullSelected,
   onTogglePull,
 }: Props) {
-  const tone = LEGACY_COLORS.blue;
+  const tone = ioDirectionTone(subType);
   const linePullSelectable = (line: IoLine) =>
     !!pullEnabled && line.included && line.shortage > 0;
   // React Hook 규칙: 조건부 early return 전에 호출해야 하므로 항상 선언.
@@ -235,10 +236,7 @@ export function IoBundleCard({
     <article
       data-io-bundle
       className="rounded-[18px] border-2 p-4"
-      style={{
-        background: tint(tone, 6),
-        borderColor: tint(tone, 40),
-      }}
+      style={ioSurfaceStyle(tone)}
     >
       <div
         data-io-bundle-header
@@ -257,7 +255,7 @@ export function IoBundleCard({
       >
         <div data-io-identity className="min-w-0 pr-12 lg:pr-0">
           <div className="flex min-w-0 items-start gap-2 text-left">
-            <Layers className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
+            <Layers className="h-5 w-5 shrink-0" style={{ color: tone }} />
             <ExpandableItemName
               name={bundle.title}
               className="text-base font-black leading-tight"
@@ -357,9 +355,9 @@ export function IoBundleCard({
                     }}
                     className={`standard-hover min-h-[44px] flex-1 rounded-[10px] border px-2 py-2 text-sm font-black whitespace-normal transition-[transform,filter,opacity] active:scale-[0.98] disabled:opacity-50 ${mode === "parent_with_returns" ? "min-w-[168px]" : "h-11 min-w-[100px]"}`}
                     style={{
-                      background: active ? tint(LEGACY_COLORS.blue, 16) : LEGACY_COLORS.s2,
-                      borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-                      color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
+                      background: active ? tint(tone, 8) : LEGACY_COLORS.s2,
+                      borderColor: active ? tone : LEGACY_COLORS.border,
+                      color: active ? tone : LEGACY_COLORS.muted2,
                     }}
                   >
                     {INTERNAL_USE_BOM_MODE_LABEL[mode]}

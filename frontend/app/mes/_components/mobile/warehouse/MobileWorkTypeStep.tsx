@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { ioDirectionTone, ioSelectionStyle } from "../../_warehouse_v2/ioVisualTheme";
 import presentation from "../mobilePresentation.module.css";
 import { tint } from "@/lib/mes/colorUtils";
 import { departmentDisplayColor, MES_DEPARTMENT_COLORS } from "@/lib/mes-department";
@@ -163,12 +164,7 @@ export function MobileSubTypeStep({
                   onClick={() => onDeptIoDirectionChange(dir)}
                   className={`${presentation.directionChoice} ${presentation.illustratedChoice}`}
                   aria-pressed={active}
-                  style={{
-                    background: tint(color, active ? 16 : 7),
-                    borderColor: active ? color : tint(color, 25),
-                    borderWidth: active ? 2 : 1,
-                    color: active ? color : LEGACY_COLORS.text,
-                  }}
+                  style={ioSelectionStyle(color, active)}
                 >
                   <span>{dir === "in" ? "입고" : "출고"}</span>
                   <Image
@@ -203,19 +199,15 @@ export function MobileSubTypeStep({
           {subRows.map((row) => {
             const active = subType === row.id && (workType !== "warehouse_io" || deptIoDirection != null);
             const illustrated = workType === "warehouse_io";
-            const tone = workType === "warehouse_io" && row.id === "warehouse_to_dept" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
+            const tone = ioDirectionTone(row.id);
             return (
               <button
                 key={row.id}
                 type="button"
+                aria-pressed={active}
                 onClick={() => onSubTypeChange(row.id)}
                 className={`${illustrated ? presentation.illustratedChoice : "flex items-center justify-center"} min-h-[56px] rounded-[14px] border px-3 py-3 text-center transition-[transform] active:scale-95`}
-                style={{
-                  background: illustrated ? tint(tone, active ? 16 : 7) : active ? tint(tone, 14) : LEGACY_COLORS.s2,
-                  borderColor: active ? tone : illustrated ? tint(tone, 25) : LEGACY_COLORS.border,
-                  borderWidth: illustrated ? (active ? 2 : 1) : undefined,
-                  color: active ? tone : illustrated ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
-                }}
+                style={ioSelectionStyle(tone, active)}
               >
                 <span className="text-xl font-bold leading-tight">{row.label}</span>
                 {illustrated && (

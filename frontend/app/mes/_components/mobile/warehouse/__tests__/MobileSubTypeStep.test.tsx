@@ -30,7 +30,7 @@ describe("MobileSubTypeStep", () => {
     expect(screen.queryByRole("button", { name: "조립" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "입고" }).querySelector("img")).toHaveAttribute("src", "/images/warehouse/dexray-stock-in.webp");
     expect(screen.getByRole("button", { name: "출고" }).querySelector("img")).toHaveAttribute("src", "/images/warehouse/dexray-stock-out.webp");
-    expect(screen.getByRole("button", { name: "입고" }).style.background).toBe(tint(LEGACY_COLORS.blue, 7));
+    expect(screen.getByRole("button", { name: "입고" }).style.background).toBe(tint(LEGACY_COLORS.blue, 4, LEGACY_COLORS.s1));
     expect(screen.getByRole("button", { name: "출고" }).style.borderColor).toBe(tint(LEGACY_COLORS.red, 25));
   });
 
@@ -56,7 +56,7 @@ describe("MobileSubTypeStep", () => {
     expect(screen.queryByRole("button", { name: "튜브" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "창고 → 부서" }).querySelector("img")).toHaveAttribute("src", "/images/warehouse/dexray-stock-out.webp");
     expect(screen.getByRole("button", { name: "부서 → 창고" }).querySelector("img")).toHaveAttribute("src", "/images/warehouse/dexray-stock-in.webp");
-    expect(screen.getByRole("button", { name: "창고 → 부서" }).style.background).toBe(tint(LEGACY_COLORS.red, 7));
+    expect(screen.getByRole("button", { name: "창고 → 부서" }).style.background).toBe(tint(LEGACY_COLORS.red, 4, LEGACY_COLORS.s1));
   });
 
   it("부서 입출고는 모바일에서도 대상 부서 선택 없이 방향만 표시한다", () => {
@@ -78,8 +78,8 @@ describe("MobileSubTypeStep", () => {
     expect(screen.getByRole("button", { name: "출고" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "입고" }).querySelector("img")).toHaveAttribute("src", "/images/warehouse/dexray-stock-in.webp");
     expect(screen.getByRole("button", { name: "출고" }).querySelector("img")).toHaveAttribute("src", "/images/warehouse/dexray-stock-out.webp");
-    expect(screen.getByRole("button", { name: "입고" }).style.background).toBe(tint(LEGACY_COLORS.blue, 16));
-    expect(screen.getByRole("button", { name: "출고" }).style.background).toBe(tint(LEGACY_COLORS.red, 7));
+    expect(screen.getByRole("button", { name: "입고" }).style.background).toBe(tint(LEGACY_COLORS.blue, 8, LEGACY_COLORS.s1));
+    expect(screen.getByRole("button", { name: "출고" }).style.background).toBe(tint(LEGACY_COLORS.red, 4, LEGACY_COLORS.s1));
     expect(screen.queryByText("방향")).not.toBeInTheDocument();
     expect(screen.queryByText("대상 부서")).not.toBeInTheDocument();
   });
@@ -120,7 +120,7 @@ it("원자재 입출고 방향에도 PC와 같은 덱스레이를 표시한다",
 
   expect(screen.getByRole("button", { name: "입고" }).querySelector("img")).toHaveAttribute("src", "/images/warehouse/dexray-stock-in.webp");
   expect(screen.getByRole("button", { name: "출고" }).querySelector("img")).toHaveAttribute("src", "/images/warehouse/dexray-stock-out.webp");
-  expect(screen.getByRole("button", { name: "입고" }).style.background).toBe(tint(LEGACY_COLORS.blue, 7));
+  expect(screen.getByRole("button", { name: "입고" }).style.background).toBe(tint(LEGACY_COLORS.blue, 4, LEGACY_COLORS.s1));
   expect(screen.getByRole("button", { name: "출고" }).style.borderColor).toBe(tint(LEGACY_COLORS.red, 25));
   fireEvent.click(screen.getByRole("button", { name: "출고" }));
   expect(onSelect).toHaveBeenCalledWith("outbound_supplier");

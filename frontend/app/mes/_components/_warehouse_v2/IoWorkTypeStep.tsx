@@ -8,6 +8,7 @@ import { tint } from "@/lib/mes/colorUtils";
 import { departmentDisplayColor, MES_DEPARTMENT_COLORS } from "@/lib/mes-department";
 import { DesktopWorkHubCard } from "../common/DesktopWorkHubCard";
 import styles from "../common/IoWorkCard.module.css";
+import { ioDirectionTone, ioSelectionStyle } from "./ioVisualTheme";
 import type { IoSubType, IoWorkType, OperatorLike } from "./types";
 import { IO_SUB_TYPES, IO_WORK_TYPES, canSeeWorkType, deptVisibility, isExitWorkType, requiresDepartments, type DeptIoDirection } from "./ioWorkType";
 
@@ -187,7 +188,7 @@ export function IoSubTypeStep({
           {subRows.map((row) => {
             const isWarehouse = workType === "warehouse_io";
             const active = subType === row.id && (!isWarehouse || deptIoDirection != null);
-            const tone = isWarehouse && row.id === "warehouse_to_dept" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
+            const tone = ioDirectionTone(row.id);
             return (
               <button
                 key={row.id}
@@ -195,13 +196,8 @@ export function IoSubTypeStep({
                 onClick={() => onSubTypeChange(row.id)}
                 aria-pressed={active}
                 title={row.description}
-                className={`${styles.selection} standard-hover no-btn-inset h-full min-h-[120px] border px-6 py-6 hover:shadow-md`}
-                style={{
-                  background: tint(tone, active ? 16 : 7),
-                  borderColor: active ? tone : tint(tone, 25),
-                  borderWidth: active ? 2 : 1,
-                  color: active ? tone : LEGACY_COLORS.text,
-                }}
+                className={`${styles.selection} no-btn-inset h-full min-h-[120px] border px-6 py-6 hover:shadow-md`}
+                style={ioSelectionStyle(tone, active)}
               >
                 <span className={`${styles.subTypeTitle} ${isWarehouse ? styles.warehouseTitle : ""} font-black`}>{row.label}</span>
                 {workType === "warehouse_io" && (
@@ -355,13 +351,8 @@ export function DirectionCard({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`${styles.selection} ${styles.direction} h-full min-h-[96px] border p-4 hover:shadow-md sm:p-6`}
-      style={{
-        background: tint(activeColor, active ? 16 : 7),
-        borderColor: active ? activeColor : tint(activeColor, 25),
-        borderWidth: active ? 2 : 1,
-        color: active ? activeColor : LEGACY_COLORS.text,
-      }}
+      className={`${styles.selection} ${styles.direction} no-btn-inset h-full min-h-[96px] border p-4 hover:shadow-md sm:p-6`}
+      style={ioSelectionStyle(activeColor, active)}
     >
       <div className={`${styles.directionTitle} font-black`}>
         {variant === "process" && prefixLabel !== "" && (

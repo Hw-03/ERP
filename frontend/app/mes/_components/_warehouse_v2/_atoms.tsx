@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Check, Pencil } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { AppSelect, type AppSelectOption } from "../common/AppSelect";
+import { ioSurfaceStyle } from "./ioVisualTheme";
 
 // ─────────────────────── 내부 atom: LabeledSelect ──────────────────
 
@@ -58,6 +59,7 @@ export function WizardStepCard({
   summary,
   onChange,
   accent,
+  surfaceTone,
   chrome,
   chromeOnly = false,
   fill = false,
@@ -69,6 +71,7 @@ export function WizardStepCard({
   summary?: React.ReactNode;
   onChange?: () => void;
   accent?: string;
+  surfaceTone?: string;
   chrome?: React.ReactNode;
   chromeOnly?: boolean;
   /** active 상태에서 부모 flex 컬럼 안에서 남은 세로 공간을 모두 차지 (기본 false). */
@@ -94,8 +97,7 @@ export function WizardStepCard({
       <section
         className={`rounded-[24px] border p-4 lg:p-6${fill ? " flex flex-1 flex-col min-h-0" : ""}`}
         style={{
-          backgroundColor: LEGACY_COLORS.s1,
-          borderColor: LEGACY_COLORS.border,
+          ...ioSurfaceStyle(surfaceTone),
           ...animStyle,
         }}
       >
