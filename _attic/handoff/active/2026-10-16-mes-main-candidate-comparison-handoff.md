@@ -2,6 +2,7 @@
 
 ## 2026-10-20 추가 main 결합 진행
 
+- CI 후속: 후보5f5be8fb push 완료. run39366613242는7job성공, general298통과/2실패/1flaky. 재고2실패는62ab7305의 닫힌 상세 선택표시 해제와 테스트 true기대 불일치였다. inventory-expectations만 false+재열기/true 검증으로 수정, 해당2+관련왕복1=3건 Linux 재시도0통과·ESLint통과. 현재 원장 binding hash/선언 및 닫힘조건2단언 갱신 중(`refresh-inventory-ci-binding.mjs`, `followup-ci-inventory-ledger.log`). 다음은 결과 확인→관련파일만커밋/push→새HEAD CI. 제품수정/빌드재실행 없음. SHELL02 shipping은 인보이스 입력칸 미발견 후 retry통과, 원인 미확정. 로그 `followup-ci-failed.log`와 기존 실패를 보존한다.
 - 최신 안전 지점: main e55918bc/62ab7305를 후보에만 결합한faa27b1c/ed12b9b0, E2E 수정56e84518 로컬 완료. 관리자50·불량모바일66·내역출하6 통과, Vitest249+37·backend7·타입/ESLint·원장 생성/check 통과. 별도 Linux 최종 빌드3,431,520바이트(3.273MiB), 3.30MiB 게이트/도구3검사 통과. 다음은 문서/원장 커밋→후보 push→정확한 HEAD CI 확인. 제품 추가 수정 없음, 과거 AS/BOM 미확정 상태 유지.
 - 사용자 승인: 새 main도 후보에 결합·영향 검사·후보 커밋/푸시·최종 CI. main·직원·예약은 변경 금지.
 - 시작 후보63206756, 결합 main e55918bc(추가7커밋). 후보만 merge --no-commit 진행, 테스트8파일 충돌을 양쪽 추가 단언을 보존해 해결했다. 제품 충돌은 없으며 실제 화면 간격/높이·최근 내역 배지 변경이 포함된다.

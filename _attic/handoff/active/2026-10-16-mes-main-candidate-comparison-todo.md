@@ -10,6 +10,8 @@
 - [x] CP3 (2026-10-19) 격리 production에서 OR 검색·창고 격리/복귀/취소·관리자 BOM 저장/취소 확인. 사용자 원 DB 해시 불변·3038 production 복원.
 - [ ] CP4 후보 브랜치 푸시·최종 CI·결과 기록.
 
+최신 CI 후속(2026-10-20):5f5be8fb의39366613242는7job성공/general298통과·재고2실패·출하초안1flaky. 재고2건은 main62ab7305의 상세닫힘 선택표시 해제에 테스트를 맞추지 못한 것이며, false와 재열기/true를 함께 확인하도록 수정했다. 해당2+관련왕복1=3건 및 ESLint 통과. 제품/빌드 불변으로 기존7job·빌드 재사용. 새후속commit/push·CI는 진행 중, 출하초안 간헐 실패 원인은 미확정이다.
+
 CP4 진행(2026-10-20): 이전 CI39336151664는 일반 E2E46실패/1재시도통과/254통과, 다른7job성공. 추가 승인으로 main e55918bc·62ab7305를 후보에 결합(faa27b1c·ed12b9b0), UI 테스트만 현재 화면에 맞춘56e84518을 작성했다. 관련 Vitest286·실사커서7·E2E122조건(관리자50/내역출하6/불량모바일66)·타입/ESLint·원장 연결 검사·최종 production 빌드3.273MiB 통과. 근거는 R의followup-*이며 과거 실패·실행 기록 보존. 후보 푸시와 새 최종 HEAD CI는 아직 미완료다.
 
 2026-10-20 사용자 승인으로3.30MiB 한도 적용, 실제3.271MiB 게이트 통과. CP4 병합 커밋·후보 push·CI 진행. 원문 `_attic/runtime/integration-main-20261019/`. 백엔드375·관련 프론트·타입/ESLint/production 빌드/DB 사본 보존 통과. 원 사용자3038/8038은 기존 DB로 production 복원했고 임시 QA3039는 종료했다. main·직원·예약은 변경하지 않는다. 상세: [통합 결과](../../../docs/superpowers/plans/2026-10-19-mes-candidate-main-integration-results.md).

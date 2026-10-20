@@ -125759,7 +125759,7 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "ITEM01 실제 PC·모바일 새로고침은 검색·품목·열림과 닫힘을 서버 재조회로 복원",
           "assertion": "await expect(search(page)).toHaveValue(item.item_name);",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
           "line": 41
         }
       ],
@@ -125852,6 +125852,13 @@
           "assertion": "await expect(search(page)).toHaveValue(item.item_name);",
           "sourceHash": "0497f043420f71690fee00aeced4174f6141e4b826584beb72f60e7ff5da64a7",
           "line": 41
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "ITEM01 실제 PC·모바일 새로고침은 검색·품목·열림과 닫힘을 서버 재조회로 복원",
+          "assertion": "await expect(search(page)).toHaveValue(item.item_name);",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 41
         }
       ]
     },
@@ -125863,7 +125870,7 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "ITEM01 실제 PC·모바일 새로고침은 검색·품목·열림과 닫힘을 서버 재조회로 복원",
           "assertion": "expect(reads).toBeGreaterThan(0);",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
           "line": 41
         },
         {
@@ -126005,6 +126012,13 @@
           "assertion": "expect(result.current.displayItem?.item_id).toBe(item.item_id);",
           "sourceHash": "b57ebdf95749cbe97c58fdde64e4aadfc4fa7a9e1830695521146f87c8e7423b",
           "line": 35
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "ITEM01 실제 PC·모바일 새로고침은 검색·품목·열림과 닫힘을 서버 재조회로 복원",
+          "assertion": "expect(reads).toBeGreaterThan(0);",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 41
         }
       ]
     },
@@ -126016,7 +126030,7 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "ITEM01 실제 PC·모바일 새로고침은 검색·품목·열림과 닫힘을 서버 재조회로 복원",
           "assertion": "await expect(detail(page, item.item_name)).toBeVisible();",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
           "line": 41
         }
       ],
@@ -126109,6 +126123,13 @@
           "assertion": "await expect(detail(page, item.item_name)).toBeVisible();",
           "sourceHash": "0497f043420f71690fee00aeced4174f6141e4b826584beb72f60e7ff5da64a7",
           "line": 41
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "ITEM01 실제 PC·모바일 새로고침은 검색·품목·열림과 닫힘을 서버 재조회로 복원",
+          "assertion": "await expect(detail(page, item.item_name)).toBeVisible();",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 41
         }
       ]
     },
@@ -126120,14 +126141,14 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "ITEM01 실제 PC·모바일 새로고침은 검색·품목·열림과 닫힘을 서버 재조회로 복원",
           "assertion": "await expect(detail(page, item.item_name)).toBeHidden();",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
           "line": 41
         },
         {
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "ITEM01 실제 PC·모바일 새로고침은 검색·품목·열림과 닫힘을 서버 재조회로 복원",
-          "assertion": "await expect(row(page, item.item_name)).toHaveAttribute(\"aria-pressed\", \"true\");",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "assertion": "await expect(row(page, item.item_name)).toHaveAttribute(\"aria-pressed\", \"false\");",
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
           "line": 41
         }
       ],
@@ -126234,6 +126255,20 @@
           "assertion": "await expect(row(page, item.item_name)).toHaveAttribute(\"aria-pressed\", \"true\");",
           "sourceHash": "0497f043420f71690fee00aeced4174f6141e4b826584beb72f60e7ff5da64a7",
           "line": 41
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "ITEM01 실제 PC·모바일 새로고침은 검색·품목·열림과 닫힘을 서버 재조회로 복원",
+          "assertion": "await expect(detail(page, item.item_name)).toBeHidden();",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 41
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "ITEM01 실제 PC·모바일 새로고침은 검색·품목·열림과 닫힘을 서버 재조회로 복원",
+          "assertion": "await expect(row(page, item.item_name)).toHaveAttribute(\"aria-pressed\", \"true\");",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 41
         }
       ]
     },
@@ -126245,8 +126280,8 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "ITEM01 다른 직원 로그인은 앞 직원의 검색·선택 상세를 노출하지 않음",
           "assertion": "await expect(search(page)).toHaveValue(\"\");",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 70
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 74
         },
         {
           "file": "frontend/app/mes/_components/_hooks/__tests__/useInventoryViewState.test.tsx",
@@ -126387,6 +126422,13 @@
           "assertion": "expect(result.current.detailOpen).toBe(false);",
           "sourceHash": "b57ebdf95749cbe97c58fdde64e4aadfc4fa7a9e1830695521146f87c8e7423b",
           "line": 65
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "ITEM01 다른 직원 로그인은 앞 직원의 검색·선택 상세를 노출하지 않음",
+          "assertion": "await expect(search(page)).toHaveValue(\"\");",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 70
         }
       ]
     },
@@ -126398,14 +126440,14 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "ITEM01 실제 PC·모바일 새로고침은 검색·품목·열림과 닫힘을 서버 재조회로 복원",
           "assertion": "await expect(detail(page, item.item_name).getByRole(\"tabpanel\", { name: \"최근 내역\", exact: true })).toBeVisible();",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
           "line": 41
         },
         {
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "ITEM01 실제 PC·모바일 새로고침은 검색·품목·열림과 닫힘을 서버 재조회로 복원",
-          "assertion": "await expect(row(page, item.item_name)).toHaveAttribute(\"aria-pressed\", \"true\");",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "assertion": "await expect(row(page, item.item_name)).toHaveAttribute(\"aria-pressed\", \"false\");",
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
           "line": 41
         }
       ],
@@ -126512,6 +126554,20 @@
           "assertion": "await expect(row(page, item.item_name)).toHaveAttribute(\"aria-pressed\", \"true\");",
           "sourceHash": "0497f043420f71690fee00aeced4174f6141e4b826584beb72f60e7ff5da64a7",
           "line": 41
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "ITEM01 실제 PC·모바일 새로고침은 검색·품목·열림과 닫힘을 서버 재조회로 복원",
+          "assertion": "await expect(detail(page, item.item_name).getByRole(\"tabpanel\", { name: \"최근 내역\", exact: true })).toBeVisible();",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 41
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "ITEM01 실제 PC·모바일 새로고침은 검색·품목·열림과 닫힘을 서버 재조회로 복원",
+          "assertion": "await expect(row(page, item.item_name)).toHaveAttribute(\"aria-pressed\", \"true\");",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 41
         }
       ]
     },
@@ -126523,15 +126579,15 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "ITEM01 다른 직원 로그인은 앞 직원의 검색·선택 상세를 노출하지 않음",
           "assertion": "expect(current.employee_id).toBe(actors.other.employee_id);",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 70
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 74
         },
         {
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "ITEM02 404·권한·통신 오류 주입은 삭제와 구분하고 같은 품목 재시도로 복구",
           "assertion": "await expect(detail(page, item.item_name).getByRole(\"button\", { name: \"출고\", exact: true })).toBeDisabled();",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 168
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 175
         }
       ],
       "execution": {
@@ -126636,6 +126692,20 @@
           "selector": "ITEM02 404·권한·통신 오류 주입은 삭제와 구분하고 같은 품목 재시도로 복구",
           "assertion": "await expect(detail(page, item.item_name).getByRole(\"button\", { name: \"출고\", exact: true })).toBeDisabled();",
           "sourceHash": "0497f043420f71690fee00aeced4174f6141e4b826584beb72f60e7ff5da64a7",
+          "line": 168
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "ITEM01 다른 직원 로그인은 앞 직원의 검색·선택 상세를 노출하지 않음",
+          "assertion": "expect(current.employee_id).toBe(actors.other.employee_id);",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 70
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "ITEM02 404·권한·통신 오류 주입은 삭제와 구분하고 같은 품목 재시도로 복구",
+          "assertion": "await expect(detail(page, item.item_name).getByRole(\"button\", { name: \"출고\", exact: true })).toBeDisabled();",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
           "line": 168
         }
       ]
@@ -126859,8 +126929,8 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "ITEM02 미사용 품목의 실제 삭제 SSE는 상세·이력 조회를 유지하고 작업만 차단",
           "assertion": "await expect(detail(page, item.item_name)).toContainText(\"삭제된 품목입니다. 입출고 작업을 할 수 없습니다.\");",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 83
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 87
         }
       ],
       "execution": {
@@ -126951,6 +127021,13 @@
           "selector": "ITEM02 미사용 품목의 실제 삭제 SSE는 상세·이력 조회를 유지하고 작업만 차단",
           "assertion": "await expect(detail(page, item.item_name)).toContainText(\"삭제된 품목입니다. 입출고 작업을 할 수 없습니다.\");",
           "sourceHash": "0497f043420f71690fee00aeced4174f6141e4b826584beb72f60e7ff5da64a7",
+          "line": 83
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "ITEM02 미사용 품목의 실제 삭제 SSE는 상세·이력 조회를 유지하고 작업만 차단",
+          "assertion": "await expect(detail(page, item.item_name)).toContainText(\"삭제된 품목입니다. 입출고 작업을 할 수 없습니다.\");",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
           "line": 83
         }
       ]
@@ -127067,15 +127144,15 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "ITEM02 과거 삭제 품목의 기존 거래는 서버·최근 내역에서 보존되고 신규 요청은 거부",
           "assertion": "await expect(panel.getByRole(\"tabpanel\", { name: \"최근 내역\", exact: true })).toContainText(\"초기 재고 등록\");",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 104
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 108
         },
         {
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "ITEM02 과거 삭제 품목의 기존 거래는 서버·최근 내역에서 보존되고 신규 요청은 거부",
           "assertion": "expect(await (await request.get(historyUrl)).json()).toEqual(before);",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 104
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 108
         }
       ],
       "execution": {
@@ -127245,6 +127322,20 @@
           "assertion": "expect(await (await request.get(historyUrl)).json()).toEqual(before);",
           "sourceHash": "0497f043420f71690fee00aeced4174f6141e4b826584beb72f60e7ff5da64a7",
           "line": 104
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "ITEM02 과거 삭제 품목의 기존 거래는 서버·최근 내역에서 보존되고 신규 요청은 거부",
+          "assertion": "await expect(panel.getByRole(\"tabpanel\", { name: \"최근 내역\", exact: true })).toContainText(\"초기 재고 등록\");",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 104
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "ITEM02 과거 삭제 품목의 기존 거래는 서버·최근 내역에서 보존되고 신규 요청은 거부",
+          "assertion": "expect(await (await request.get(historyUrl)).json()).toEqual(before);",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 104
         }
       ]
     },
@@ -127353,15 +127444,15 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "ITEM02 404·권한·통신 오류 주입은 삭제와 구분하고 같은 품목 재시도로 복구",
           "assertion": "await expect(detail(page, item.item_name)).toContainText(message);",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 168
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 175
         },
         {
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "ITEM02 404·권한·통신 오류 주입은 삭제와 구분하고 같은 품목 재시도로 복구",
           "assertion": "await expect(detail(page, item.item_name)).not.toContainText(\"삭제된 품목입니다\");",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 168
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 175
         }
       ],
       "execution": {
@@ -127467,6 +127558,20 @@
           "assertion": "await expect(detail(page, item.item_name)).not.toContainText(\"삭제된 품목입니다\");",
           "sourceHash": "0497f043420f71690fee00aeced4174f6141e4b826584beb72f60e7ff5da64a7",
           "line": 168
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "ITEM02 404·권한·통신 오류 주입은 삭제와 구분하고 같은 품목 재시도로 복구",
+          "assertion": "await expect(detail(page, item.item_name)).toContainText(message);",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 168
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "ITEM02 404·권한·통신 오류 주입은 삭제와 구분하고 같은 품목 재시도로 복구",
+          "assertion": "await expect(detail(page, item.item_name)).not.toContainText(\"삭제된 품목입니다\");",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 168
         }
       ]
     },
@@ -127485,8 +127590,8 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "ITEM02 404·권한·통신 오류 주입은 삭제와 구분하고 같은 품목 재시도로 복구",
           "assertion": "await expect(detail(page, item.item_name).getByRole(\"button\", { name: \"출고\", exact: true })).toBeDisabled();",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 168
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 175
         }
       ],
       "execution": {
@@ -127620,6 +127725,13 @@
           "assertion": "await expect(detail(page, item.item_name).getByRole(\"button\", { name: \"출고\", exact: true })).toBeDisabled();",
           "sourceHash": "0497f043420f71690fee00aeced4174f6141e4b826584beb72f60e7ff5da64a7",
           "line": 168
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "ITEM02 404·권한·통신 오류 주입은 삭제와 구분하고 같은 품목 재시도로 복구",
+          "assertion": "await expect(detail(page, item.item_name).getByRole(\"button\", { name: \"출고\", exact: true })).toBeDisabled();",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 168
         }
       ]
     },
@@ -127631,15 +127743,15 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "ITEM02 404·권한·통신 오류 주입은 삭제와 구분하고 같은 품목 재시도로 복구",
           "assertion": "await expect(detail(page, item.item_name).getByRole(\"button\", { name: \"출고\", exact: true })).toBeEnabled();",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 168
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 175
         },
         {
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "ITEM02 404·권한·통신 오류 주입은 삭제와 구분하고 같은 품목 재시도로 복구",
           "assertion": "await expect(detail(page, item.item_name)).not.toContainText(message);",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 168
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 175
         }
       ],
       "execution": {
@@ -127744,6 +127856,20 @@
           "selector": "ITEM02 404·권한·통신 오류 주입은 삭제와 구분하고 같은 품목 재시도로 복구",
           "assertion": "await expect(detail(page, item.item_name)).not.toContainText(message);",
           "sourceHash": "0497f043420f71690fee00aeced4174f6141e4b826584beb72f60e7ff5da64a7",
+          "line": 168
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "ITEM02 404·권한·통신 오류 주입은 삭제와 구분하고 같은 품목 재시도로 복구",
+          "assertion": "await expect(detail(page, item.item_name).getByRole(\"button\", { name: \"출고\", exact: true })).toBeEnabled();",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 168
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "ITEM02 404·권한·통신 오류 주입은 삭제와 구분하고 같은 품목 재시도로 복구",
+          "assertion": "await expect(detail(page, item.item_name)).not.toContainText(message);",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
           "line": 168
         }
       ]
@@ -127928,15 +128054,15 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "DASHBOARD01 실제 KPI·목록은 PA·PF 제외 동일 모집단이며 검색0·초기화가 일치",
           "assertion": "await expect(row(page, pf.item_name)).toHaveCount(0);",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 186
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 193
         },
         {
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "DASHBOARD01 실제 KPI·목록은 PA·PF 제외 동일 모집단이며 검색0·초기화가 일치",
           "assertion": "await expect(page.getByRole(\"button\", { name: /전체 0 전체 .*PA·PF 제외/ })).toBeVisible();",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 186
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 193
         }
       ],
       "execution": {
@@ -128042,6 +128168,20 @@
           "assertion": "await expect(page.getByRole(\"button\", { name: /전체 0 전체 .*PA·PF 제외/ })).toBeVisible();",
           "sourceHash": "0497f043420f71690fee00aeced4174f6141e4b826584beb72f60e7ff5da64a7",
           "line": 186
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "DASHBOARD01 실제 KPI·목록은 PA·PF 제외 동일 모집단이며 검색0·초기화가 일치",
+          "assertion": "await expect(row(page, pf.item_name)).toHaveCount(0);",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 186
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "DASHBOARD01 실제 KPI·목록은 PA·PF 제외 동일 모집단이며 검색0·초기화가 일치",
+          "assertion": "await expect(page.getByRole(\"button\", { name: /전체 0 전체 .*PA·PF 제외/ })).toBeVisible();",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 186
         }
       ]
     },
@@ -128053,15 +128193,15 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "DASHBOARD01 실제 KPI·목록은 PA·PF 제외 동일 모집단이며 검색0·초기화가 일치",
           "assertion": "await expect(page.getByText(\"현재 조건에 맞는 자재가 없습니다\", { exact: true })).toBeVisible();",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 186
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 193
         },
         {
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "DASHBOARD01 실제 KPI·목록은 PA·PF 제외 동일 모집단이며 검색0·초기화가 일치",
           "assertion": "await expect(search(page)).toHaveValue(\"\");",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 186
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 193
         }
       ],
       "execution": {
@@ -128167,6 +128307,20 @@
           "assertion": "await expect(search(page)).toHaveValue(\"\");",
           "sourceHash": "0497f043420f71690fee00aeced4174f6141e4b826584beb72f60e7ff5da64a7",
           "line": 186
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "DASHBOARD01 실제 KPI·목록은 PA·PF 제외 동일 모집단이며 검색0·초기화가 일치",
+          "assertion": "await expect(page.getByText(\"현재 조건에 맞는 자재가 없습니다\", { exact: true })).toBeVisible();",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 186
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "DASHBOARD01 실제 KPI·목록은 PA·PF 제외 동일 모집단이며 검색0·초기화가 일치",
+          "assertion": "await expect(search(page)).toHaveValue(\"\");",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 186
         }
       ]
     },
@@ -128178,22 +128332,22 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "DASHBOARD01 부서·모델·공정 AND/OR와 실제 더 보기는 같은 품목 집합",
           "assertion": "await expect(rows).toHaveCount(0);",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 219
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 226
         },
         {
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "DASHBOARD01 부서·모델·공정 AND/OR와 실제 더 보기는 같은 품목 집합",
           "assertion": "await expect(page.getByRole(\"button\", { name: /전체 101 전체/ })).toBeVisible();",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 219
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 226
         },
         {
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "DASHBOARD01 부서·모델·공정 AND/OR와 실제 더 보기는 같은 품목 집합",
           "assertion": "await expect(page.getByRole(\"button\", { name: /전체 100 전체/ })).toBeVisible();",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 219
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 226
         }
       ],
       "execution": {
@@ -128313,6 +128467,27 @@
           "assertion": "await expect(page.getByRole(\"button\", { name: /전체 100 전체/ })).toBeVisible();",
           "sourceHash": "0497f043420f71690fee00aeced4174f6141e4b826584beb72f60e7ff5da64a7",
           "line": 219
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "DASHBOARD01 부서·모델·공정 AND/OR와 실제 더 보기는 같은 품목 집합",
+          "assertion": "await expect(rows).toHaveCount(0);",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 219
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "DASHBOARD01 부서·모델·공정 AND/OR와 실제 더 보기는 같은 품목 집합",
+          "assertion": "await expect(page.getByRole(\"button\", { name: /전체 101 전체/ })).toBeVisible();",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 219
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "DASHBOARD01 부서·모델·공정 AND/OR와 실제 더 보기는 같은 품목 집합",
+          "assertion": "await expect(page.getByRole(\"button\", { name: /전체 100 전체/ })).toBeVisible();",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 219
         }
       ]
     },
@@ -128324,22 +128499,22 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "DASHBOARD01 부서·모델·공정 AND/OR와 실제 더 보기는 같은 품목 집합",
           "assertion": "expect(expanded.slice(0, 100)).toEqual(initial);",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 219
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 226
         },
         {
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "DASHBOARD01 부서·모델·공정 AND/OR와 실제 더 보기는 같은 품목 집합",
           "assertion": "expect(new Set(actualNames)).toEqual(new Set(names));",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 219
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 226
         },
         {
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "DASHBOARD01 부서·모델·공정 AND/OR와 실제 더 보기는 같은 품목 집합",
           "assertion": "expect(actualNames).toHaveLength(new Set(actualNames).size);",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 219
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 226
         }
       ],
       "execution": {
@@ -128459,6 +128634,27 @@
           "assertion": "expect(actualNames).toHaveLength(new Set(actualNames).size);",
           "sourceHash": "0497f043420f71690fee00aeced4174f6141e4b826584beb72f60e7ff5da64a7",
           "line": 219
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "DASHBOARD01 부서·모델·공정 AND/OR와 실제 더 보기는 같은 품목 집합",
+          "assertion": "expect(expanded.slice(0, 100)).toEqual(initial);",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 219
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "DASHBOARD01 부서·모델·공정 AND/OR와 실제 더 보기는 같은 품목 집합",
+          "assertion": "expect(new Set(actualNames)).toEqual(new Set(names));",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 219
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "DASHBOARD01 부서·모델·공정 AND/OR와 실제 더 보기는 같은 품목 집합",
+          "assertion": "expect(actualNames).toHaveLength(new Set(actualNames).size);",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 219
         }
       ]
     },
@@ -128470,14 +128666,14 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "ITEM01 실제 PC·모바일 새로고침은 검색·품목·열림과 닫힘을 서버 재조회로 복원",
           "assertion": "await expect(search(page)).toHaveValue(item.item_name);",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
           "line": 41
         },
         {
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "ITEM01 실제 PC·모바일 새로고침은 검색·품목·열림과 닫힘을 서버 재조회로 복원",
           "assertion": "await expect(row(page, item.item_name)).toHaveAttribute(\"aria-pressed\", \"true\");",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
           "line": 41
         }
       ],
@@ -128584,6 +128780,20 @@
           "assertion": "await expect(row(page, item.item_name)).toHaveAttribute(\"aria-pressed\", \"true\");",
           "sourceHash": "0497f043420f71690fee00aeced4174f6141e4b826584beb72f60e7ff5da64a7",
           "line": 41
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "ITEM01 실제 PC·모바일 새로고침은 검색·품목·열림과 닫힘을 서버 재조회로 복원",
+          "assertion": "await expect(search(page)).toHaveValue(item.item_name);",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 41
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "ITEM01 실제 PC·모바일 새로고침은 검색·품목·열림과 닫힘을 서버 재조회로 복원",
+          "assertion": "await expect(row(page, item.item_name)).toHaveAttribute(\"aria-pressed\", \"true\");",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 41
         }
       ]
     },
@@ -128595,22 +128805,22 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "DASHBOARD02 CACHE01 실제 격리품 이동·내역 탭 왕복은 검색·선택·받은 내역을 보존",
           "assertion": "await expect(search(page)).toHaveValue(item.item_name);",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 269
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 276
         },
         {
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "DASHBOARD02 CACHE01 실제 격리품 이동·내역 탭 왕복은 검색·선택·받은 내역을 보존",
           "assertion": "await expect(detail(page, item.item_name)).toBeVisible();",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 269
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 276
         },
         {
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "DASHBOARD02 CACHE01 실제 격리품 이동·내역 탭 왕복은 검색·선택·받은 내역을 보존",
           "assertion": "await expect(row(page, item.item_name)).toHaveAttribute(\"aria-pressed\", \"true\");",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 269
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 276
         }
       ],
       "execution": {
@@ -128730,6 +128940,27 @@
           "assertion": "await expect(row(page, item.item_name)).toHaveAttribute(\"aria-pressed\", \"true\");",
           "sourceHash": "0497f043420f71690fee00aeced4174f6141e4b826584beb72f60e7ff5da64a7",
           "line": 269
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "DASHBOARD02 CACHE01 실제 격리품 이동·내역 탭 왕복은 검색·선택·받은 내역을 보존",
+          "assertion": "await expect(search(page)).toHaveValue(item.item_name);",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 269
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "DASHBOARD02 CACHE01 실제 격리품 이동·내역 탭 왕복은 검색·선택·받은 내역을 보존",
+          "assertion": "await expect(detail(page, item.item_name)).toBeVisible();",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 269
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "DASHBOARD02 CACHE01 실제 격리품 이동·내역 탭 왕복은 검색·선택·받은 내역을 보존",
+          "assertion": "await expect(row(page, item.item_name)).toHaveAttribute(\"aria-pressed\", \"true\");",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 269
         }
       ]
     },
@@ -128741,29 +128972,29 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "DASHBOARD02 최근 작업은 한국어로 표시하며 사진과 부분 조회 실패를 닫아도 검색·선택 유지",
           "assertion": "await expect.poll(() => lightbox.locator(\"img\").evaluate((element: HTMLImageElement) => element.complete && element.naturalWidth > 0)).toBe(true);",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 135
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 139
         },
         {
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "DASHBOARD02 최근 작업은 한국어로 표시하며 사진과 부분 조회 실패를 닫아도 검색·선택 유지",
           "assertion": "await expect(panel).toBeVisible();",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 135
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 139
         },
         {
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "DASHBOARD02 최근 작업은 한국어로 표시하며 사진과 부분 조회 실패를 닫아도 검색·선택 유지",
           "assertion": "await expect(search(page)).toHaveValue(item.item_name);",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 135
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 139
         },
         {
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "DASHBOARD02 최근 작업은 한국어로 표시하며 사진과 부분 조회 실패를 닫아도 검색·선택 유지",
           "assertion": "await expect(row(page, item.item_name)).toHaveAttribute(\"aria-pressed\", \"true\");",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 135
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 139
         }
       ],
       "execution": {
@@ -128896,6 +129127,34 @@
           "selector": "DASHBOARD02 최근 작업은 한국어로 표시하며 사진과 부분 조회 실패를 닫아도 검색·선택 유지",
           "assertion": "await expect(row(page, item.item_name)).toHaveAttribute(\"aria-pressed\", \"true\");",
           "sourceHash": "0497f043420f71690fee00aeced4174f6141e4b826584beb72f60e7ff5da64a7",
+          "line": 135
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "DASHBOARD02 최근 작업은 한국어로 표시하며 사진과 부분 조회 실패를 닫아도 검색·선택 유지",
+          "assertion": "await expect.poll(() => lightbox.locator(\"img\").evaluate((element: HTMLImageElement) => element.complete && element.naturalWidth > 0)).toBe(true);",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 135
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "DASHBOARD02 최근 작업은 한국어로 표시하며 사진과 부분 조회 실패를 닫아도 검색·선택 유지",
+          "assertion": "await expect(panel).toBeVisible();",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 135
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "DASHBOARD02 최근 작업은 한국어로 표시하며 사진과 부분 조회 실패를 닫아도 검색·선택 유지",
+          "assertion": "await expect(search(page)).toHaveValue(item.item_name);",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 135
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "DASHBOARD02 최근 작업은 한국어로 표시하며 사진과 부분 조회 실패를 닫아도 검색·선택 유지",
+          "assertion": "await expect(row(page, item.item_name)).toHaveAttribute(\"aria-pressed\", \"true\");",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
           "line": 135
         }
       ]
@@ -129862,8 +130121,8 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "CACHE01 실제 목록은 배경503 중 유지하고 재시도 후 새 재고를 반영",
           "assertion": "await expect(row(page, item.item_name)).toContainText(\"13\");",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 202
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 209
         }
       ],
       "execution": {
@@ -129955,6 +130214,13 @@
           "assertion": "await expect(row(page, item.item_name)).toContainText(\"13\");",
           "sourceHash": "0497f043420f71690fee00aeced4174f6141e4b826584beb72f60e7ff5da64a7",
           "line": 202
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "CACHE01 실제 목록은 배경503 중 유지하고 재시도 후 새 재고를 반영",
+          "assertion": "await expect(row(page, item.item_name)).toContainText(\"13\");",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 202
         }
       ]
     },
@@ -129966,15 +130232,15 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "CACHE01 실제 목록은 배경503 중 유지하고 재시도 후 새 재고를 반영",
           "assertion": "await expect(page.getByTestId(\"inventory-skeleton-row\")).toHaveCount(0);",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 202
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 209
         },
         {
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "CACHE01 실제 목록은 배경503 중 유지하고 재시도 후 새 재고를 반영",
           "assertion": "await expect(row(page, item.item_name)).toContainText(\"부족\");",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 202
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 209
         }
       ],
       "execution": {
@@ -130080,6 +130346,20 @@
           "assertion": "await expect(row(page, item.item_name)).toContainText(\"부족\");",
           "sourceHash": "0497f043420f71690fee00aeced4174f6141e4b826584beb72f60e7ff5da64a7",
           "line": 202
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "CACHE01 실제 목록은 배경503 중 유지하고 재시도 후 새 재고를 반영",
+          "assertion": "await expect(page.getByTestId(\"inventory-skeleton-row\")).toHaveCount(0);",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 202
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "CACHE01 실제 목록은 배경503 중 유지하고 재시도 후 새 재고를 반영",
+          "assertion": "await expect(row(page, item.item_name)).toContainText(\"부족\");",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 202
         }
       ]
     },
@@ -130091,15 +130371,15 @@
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "DASHBOARD02 CACHE01 실제 격리품 이동·내역 탭 왕복은 검색·선택·받은 내역을 보존",
           "assertion": "await expect(historySearch).toHaveValue(item.item_name);",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 269
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 276
         },
         {
           "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
           "selector": "DASHBOARD02 CACHE01 실제 격리품 이동·내역 탭 왕복은 검색·선택·받은 내역을 보존",
           "assertion": "expect(await historyRows.allTextContents()).toEqual(before);",
-          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
-          "line": 269
+          "sourceHash": "5ab7778f212a9ca4b7c3e09d6333f79cbe08455b389ecfcbbf2da43d12ef302b",
+          "line": 276
         }
       ],
       "execution": {
@@ -130204,6 +130484,20 @@
           "selector": "DASHBOARD02 CACHE01 실제 격리품 이동·내역 탭 왕복은 검색·선택·받은 내역을 보존",
           "assertion": "expect(await historyRows.allTextContents()).toEqual(before);",
           "sourceHash": "0497f043420f71690fee00aeced4174f6141e4b826584beb72f60e7ff5da64a7",
+          "line": 269
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "DASHBOARD02 CACHE01 실제 격리품 이동·내역 탭 왕복은 검색·선택·받은 내역을 보존",
+          "assertion": "await expect(historySearch).toHaveValue(item.item_name);",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
+          "line": 269
+        },
+        {
+          "file": "frontend/tests/e2e/inventory-expectations.spec.ts",
+          "selector": "DASHBOARD02 CACHE01 실제 격리품 이동·내역 탭 왕복은 검색·선택·받은 내역을 보존",
+          "assertion": "expect(await historyRows.allTextContents()).toEqual(before);",
+          "sourceHash": "de0c86f87dd4fa87c8be1014a161b9c0fe23a6489f6a78abc33340fdda12445a",
           "line": 269
         }
       ]

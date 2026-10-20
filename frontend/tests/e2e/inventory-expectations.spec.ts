@@ -60,11 +60,15 @@ test("ITEM01 실제 PC·모바일 새로고침은 검색·품목·열림과 닫�
   await page.reload();
   await expect(search(page)).toHaveValue(item.item_name);
   await expect(detail(page, item.item_name)).toBeHidden();
-  await expect(row(page, item.item_name)).toHaveAttribute("aria-pressed", "true");
+  await expect(row(page, item.item_name)).toHaveAttribute("aria-pressed", "false");
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.reload();
   await expect(search(page)).toHaveValue(item.item_name);
   await expect(detail(page, item.item_name)).toBeHidden();
+  await expect(row(page, item.item_name)).toHaveAttribute("aria-pressed", "false");
+  await row(page, item.item_name).click();
+  await expect(detail(page, item.item_name)).toBeVisible();
+  await expect(row(page, item.item_name)).toHaveAttribute("aria-pressed", "true");
 });
 
 test("ITEM01 다른 직원 로그인은 앞 직원의 검색·선택 상세를 노출하지 않음", async ({ page, request, actors }) => {
@@ -161,8 +165,11 @@ test("DASHBOARD02 최근 작업은 한국어로 표시하며 사진과 부분 �
   await expect(history).not.toContainText("RECEIVE");
   await panel.getByRole("button", { name: "패널 닫기", exact: true }).click();
   await expect(search(page)).toHaveValue(item.item_name);
-  await expect(row(page, item.item_name)).toHaveAttribute("aria-pressed", "true");
+  await expect(row(page, item.item_name)).toHaveAttribute("aria-pressed", "false");
   await expect(page).toHaveURL(/tab=dashboard/);
+  await row(page, item.item_name).click();
+  await expect(panel).toBeVisible();
+  await expect(row(page, item.item_name)).toHaveAttribute("aria-pressed", "true");
 });
 
 test("ITEM02 404·권한·통신 오류 주입은 삭제와 구분하고 같은 품목 재시도로 복구", async ({ page, request, actors }) => {

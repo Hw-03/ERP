@@ -2,6 +2,8 @@
 
 **2026-10-20 현재 판정: main62ab7305까지 후보 통합·국소 검증·production 빌드3.273MiB 완료, 후보 푸시·최종 CI 진행. main과 직원 환경은 변경하지 않았다.**
 
+후보5f5be8fb의 [CI39366613242](https://github.com/Hw-03/ERP/actions/runs/39366613242)는7job성공·일반E2E실패(298통과/2실패/1재시도통과)로 끝났다. 확정2실패는62ab7305의 `selected && detailOpen` 변경에 맞추지 못한 재고 E2E였다. 닫힌 상세의 `aria-pressed=false`와 다시 열 때의 상세/선택 복원을 함께 검증하도록 테스트만 수정했다. Linux 최종 제품 사본에서 해당2건과 같은 파일의 관련 왕복1건이 재시도0으로 통과했다(`followup-ci-inventory-fix.log`). ESLint도 통과했으며 제품 소스/빌드가 동일하므로 기존7job·빌드 근거를 재사용한다. 기대값 원문/과거 바인딩과 실패 원문 `followup-ci-failed.log`를 보존한다. 출하 초안 `SHELL02 shipping`의 인보이스 입력칸 미발견은 첫 실행 실패 후 재시도 통과한 간헐 사건이며 원인 미확정으로 남긴다. 새 수정 HEAD의 CI는 별도 확인한다.
+
 병합 커밋 `c2f8d3f5` 후보 push 완료. [첫 CI](https://github.com/Hw-03/ERP/actions/runs/39335133787)의 프론트3파일11실패는 main에서 바뀐 정렬 버튼/격리 목록 문구와 후보 테스트의 이전 선택자, 새 권한 회수 훅의 mock 누락이었다. 실제 정렬·Back/Forward·화면 유지 단언은 유지하고 테스트3파일만 수정했다. 국소39건 통과(`ci-fix-local.log`), 제품 코드 변경 없음. 이 세 파일은 기대값 registry의 실행 대상이 아니어서 연결 파일 갱신은 없다. 최종 수정 HEAD의 CI는 별도 확인한다.
 
 후보 `codex/mes-main-candidate-comparison-20261016`에 main `9824903eee733e352b90bdf381bd08b8373271ef`를 결합해 커밋·푸시했다. 과거 출하 BOM 입력 손실과 AS 연결 종료 사건의 원인은 계속 미확정이며 이번 관리자 BOM 결함과 동일 원인으로 단정하지 않는다.
