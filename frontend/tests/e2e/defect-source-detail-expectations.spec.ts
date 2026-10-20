@@ -71,7 +71,7 @@ for (const scenario of [
     await picker.getByRole("combobox").first().click();
     await page.getByRole("listbox").getByRole("option", { name: "전체", exact: true }).click();
     await picker.getByPlaceholder("품목명 · 품목 코드").fill(item.mes_code!);
-    await expect(picker.getByRole("columnheader", { name: scenario.source === "warehouse" ? "창고 가용" : "부서 가용", exact: true })).toBeVisible();
+    await expect(picker.getByRole("columnheader", { name: scenario.source === "warehouse" ? "창고 가용 재고" : "부서 가용 재고", exact: true })).toBeVisible();
     const row = picker.getByTestId(`defect-picker-row-${item.item_id}`);
     await expect(row.getByRole("cell").nth(2)).toHaveText(scenario.source === "warehouse" ? "11" : "7");
     await expect(row).toContainText(item.item_name);

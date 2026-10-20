@@ -50,7 +50,7 @@ test.describe("불량 확정 기대값의 독립 브라우저 조건", () => {
         const before = await stockEvidence(page.request, seed.rawItem.item_id);
         await openCart(page, action, source);
         const picker = page.getByTestId("defect-picker-pane").filter({ visible: true });
-        await expect(picker.getByRole("columnheader", { name: source === "창고 재고" ? "창고 가용" : "부서 가용" })).toBeVisible();
+        await expect(picker.getByRole("columnheader", { name: source === "창고 재고" ? "창고 가용 재고" : "부서 가용 재고", exact: true })).toBeVisible();
         await addItem(page, seed.rawItem);
         expect(await page.evaluate(() => history.state.source)).toBe(source === "창고 재고" ? "warehouse" : "production");
         const row = picker.getByTestId(`defect-picker-row-${seed.rawItem.item_id}`);
@@ -61,7 +61,7 @@ test.describe("불량 확정 기대값의 독립 브라우저 조건", () => {
         await page.getByRole("button", { name: "수량·처리 정보 →", exact: true }).click();
         const cart = page.getByTestId("defect-cart-panel").filter({ visible: true });
         if (action === "격리 등록") await expect(cart.getByText(`${seed.rawItem.mes_code} · ${source === "창고 재고" ? "창고" : "튜브"}`, { exact: true })).toBeVisible();
-        else await expect(cart).toContainText(`자동 부서 · ${source === "창고 재고" ? "창고" : "튜브"}`);
+        else await expect(cart).toContainText(`부서 · ${source === "창고 재고" ? "창고" : "튜브"}`);
         expect(await stockEvidence(page.request, seed.rawItem.item_id)).toEqual(before);
       });
     }
@@ -194,7 +194,7 @@ test.describe("불량 확정 기대값의 독립 브라우저 조건", () => {
           && url.searchParams.get("model") === modelName
           && url.searchParams.get("process_step") === "R";
       });
-      await page.getByRole("group", { name: "조회 기간" }).filter({ visible: true }).getByRole("button", { name: period, exact: true }).click();
+      await page.getByRole("group", { name: "집계 단위", exact: true }).filter({ visible: true }).getByRole("button", { name: period, exact: true }).click();
       const url = new URL((await response).url());
       expect(url.searchParams.getAll("department")).toEqual([departmentName]);
       expect(url.searchParams.getAll("model")).toEqual([modelName]);

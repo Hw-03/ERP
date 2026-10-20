@@ -225,7 +225,7 @@ test("DEFECT-BULK-RETURN 창고 일괄반품 업체필수·숨김경합 전체�
   await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "조립", exact: true }).click();
   await rows(page, item).getByRole("button", { name: "처리", exact: true }).click();
   await expect(page.getByRole("button", { name: /^반품(?: |$)/ }).filter({ visible: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "목록", exact: true }).filter({ visible: true }).click();
+  await page.getByRole("button", { name: "격리 목록", exact: true }).filter({ visible: true }).click();
   await page.getByRole("button", { name: "작업 선택", exact: true }).filter({ visible: true }).click();
   await openList(page, false, false, false);
   await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "창고", exact: true }).click();

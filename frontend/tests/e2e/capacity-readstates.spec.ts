@@ -64,7 +64,7 @@ const scenarios: ReadScenario[] = [
       for (let index = 0; index < 4; index += 1) await zero.click();
       await page.getByRole("navigation", { name: "관리자 섹션" }).getByRole("button", { name: "직원 관리", exact: true }).click();
     },
-    loading: (page) => page.getByRole("status", { name: "관리자 데이터를 불러오는 중", exact: true }),
+    loading: (page) => page.getByRole("status", { name: "직원 목록 불러오는 중", exact: true }),
     emptyLabel: "직원이 없습니다.", searchLabel: "이름·부서·직급 검색", noResultsLabel: "검색 결과가 없습니다." },
 ];
 

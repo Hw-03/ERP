@@ -89,7 +89,7 @@ for (const source of ["warehouse", "production"] as const) {
       await page.getByRole("button", { name: "수량·처리 정보 →", exact: true }).click();
       const cart = page.getByTestId("defect-cart-panel").filter({ visible: true });
       if (action === "격리 등록") await expect(cart.getByText(`${item.mes_code} · ${source === "warehouse" ? "창고" : "튜브"}`, { exact: true })).toBeVisible();
-      else await expect(cart).toContainText(`자동 부서 · ${source === "warehouse" ? "창고" : "튜브"}`);
+      else await expect(cart).toContainText(`부서 · ${source === "warehouse" ? "창고" : "튜브"}`);
       await cart.getByRole("spinbutton").fill("2");
       await reason(page, "외관 불량");
       const memo = `실행 독립 메모 ${randomUUID().slice(0, 6)}`;
@@ -213,7 +213,7 @@ for (const source of ["warehouse", "production"] as const) {
       await cart.getByRole("button", { name: "사유 카테고리 선택", exact: true }).nth(index).click();
       await page.getByRole("dialog", { name: "사유 카테고리", exact: true }).getByRole("button", { name: "기타", exact: true }).click();
     }
-    for (let index = 0; index < 2; index++) await expect(cart.getByRole("textbox", { name: "메모", exact: true }).nth(index).locator("..")).toContainText("기타를 선택하면 메모를 입력하세요.");
+    for (let index = 0; index < 2; index++) await expect(cart.getByRole("textbox", { name: "메모", exact: true }).nth(index).locator("..")).toContainText("기타 사유를 메모에 입력해 주세요.");
     await expect(submit).toBeDisabled();
     await expect(page.getByRole("dialog", { name: "즉시 폐기 확인" })).toHaveCount(0);
     expect(calls).toEqual([]);

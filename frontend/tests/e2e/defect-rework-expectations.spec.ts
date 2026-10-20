@@ -43,7 +43,7 @@ test("DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상�
   await expect(picker).toBeVisible();
   expect(await page.evaluate(() => history.state.source)).toBe("production");
   await picker.getByPlaceholder("품목명 · 품목 코드").fill(family);
-  await expect(picker.getByRole("columnheader", { name: "부서 가용", exact: true })).toBeVisible();
+  await expect(picker.getByRole("columnheader", { name: "부서 가용 재고", exact: true })).toBeVisible();
   for (const child of parts.slice(2)) await expect(picker.getByTestId(`defect-picker-row-${child.item_id}`)).toHaveCount(0);
   for (const parent of parts.slice(0, 2)) {
     const option = picker.getByTestId(`defect-picker-row-${parent.item_id}`);
@@ -55,7 +55,7 @@ test("DEFECT-REWORK 8.5-01/03 8.8-01/02/03 PC-DELTA-DEFECT-04 실제 단일 상�
   await expect(cart.getByRole("spinbutton")).toHaveCount(1);
   await expect(cart).toContainText(parts[1].item_name);
   await expect(cart).not.toContainText(parts[0].item_name);
-  await expect(cart).toContainText("자동 부서 · 조립");
+  await expect(cart).toContainText("부서 · 조립");
   await expect(cart.getByRole("combobox")).toHaveCount(0);
   await cart.getByRole("spinbutton").fill("4");
   await expect(page.getByRole("button", { name: "BOM 확인 →", exact: true })).toBeDisabled();

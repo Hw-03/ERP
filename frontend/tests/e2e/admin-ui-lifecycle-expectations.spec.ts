@@ -24,7 +24,8 @@ async function openAdmin(page: Page, actors: CommonActors, section: string): Pro
 async function saveWarehouseRole(page: Page, employee: Employee, role: "없음" | "정" | "부"): Promise<void> {
   await page.locator(`[data-admin-employee-row="${employee.employee_id}"]`).click();
   await page.getByText("창고 결재 역할", { exact: true }).locator("..").getByRole("combobox").click();
-  await page.getByRole("option", { name: role, exact: true }).click();
+  const label = { 없음: "없음 · 기본 작업만 수행", 정: "정 · 창고 주담당 결재", 부: "부 · 보조 결재 가능" }[role];
+  await page.getByRole("option", { name: label, exact: true }).click();
   const saved = page.waitForResponse((response) => response.url().endsWith(`/api/employees/${employee.employee_id}`) && response.request().method() === "PUT");
   await page.getByRole("button", { name: "저장", exact: true }).click();
   expect((await saved).status()).toBe(200);

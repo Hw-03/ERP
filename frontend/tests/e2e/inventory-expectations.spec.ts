@@ -121,7 +121,7 @@ test("ITEM02 과거 삭제 품목의 기존 거래는 서버·최근 내역에�
   const panel = detail(page, item.item_name);
   await expect(panel).toContainText("삭제된 품목입니다.");
   await panel.getByRole("tab", { name: "최근 내역", exact: true }).click();
-  await expect(panel.getByRole("tabpanel", { name: "최근 내역", exact: true })).toContainText("원자재 입고");
+  await expect(panel.getByRole("tabpanel", { name: "최근 내역", exact: true })).toContainText("초기 재고 등록");
   expect(await (await request.get(historyUrl)).json()).toEqual(before);
   const rejected = await request.post("/api/io/preview", { data: {
     requester_employee_id: actors.requester.employee_id, work_type: "warehouse_io", sub_type: "warehouse_to_dept",
@@ -156,7 +156,7 @@ test("DASHBOARD02 최근 작업은 한국어로 표시하며 사진과 부분 �
   await page.unroute("**/api/inventory/transactions/display-groups?**");
   await panel.getByRole("button", { name: "다시 시도", exact: true }).click();
   const history = panel.getByRole("tabpanel", { name: "최근 내역", exact: true });
-  await expect(history).toContainText("원자재 입고");
+  await expect(history).toContainText("초기 재고 등록");
   await expect(history).not.toContainText("INITIAL_STOCK");
   await expect(history).not.toContainText("RECEIVE");
   await panel.getByRole("button", { name: "패널 닫기", exact: true }).click();

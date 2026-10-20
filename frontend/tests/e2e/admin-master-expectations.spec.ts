@@ -60,8 +60,9 @@ test("8.19-07 실제 이름·분류 변경은 당시 품목·현재 연결과 �
   if (await itemRow.getAttribute("aria-selected") !== "true") await itemRow.click();
   const changedName = `${name}-현재`;
   await page.getByPlaceholder("예: 텅스텐 필라멘트").fill(changedName);
-  await page.getByPlaceholder("예: 텅스텐 필라멘트").locator("..").locator("..").getByRole("combobox").first().click();
-  await page.getByRole("option", { name: "HR — 고압 원자재", exact: true }).click();
+  await page.getByRole("combobox", { name: "부서", exact: true }).click();
+  await page.getByRole("option", { name: "고압 (H)", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "공정 단계", exact: true })).toHaveText("원자재 (R)");
   await expect(page.locator("[aria-readonly]")).toHaveText(/^3-HR-\d{4}$/);
   const currentCode = await page.locator("[aria-readonly]").innerText();
   const saving = page.waitForResponse((response) => response.url().endsWith(`/api/items/${item.item_id}`) && response.request().method() === "PUT");

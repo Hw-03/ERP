@@ -47,7 +47,7 @@ test("DEFECT-OTHER-LIVE 1920x1080 둘째 사유를 기타로 바꿔도 입력 �
   await page.getByRole("dialog", { name: "사유 카테고리", exact: true }).getByRole("button", { name: "기타", exact: true }).click();
   const submit = page.getByRole("button", { name: "격리하기 (2건) →", exact: true }).filter({ visible: true });
   await expect(submit).toBeDisabled();
-  await expect(second.getByText("기타를 선택하면 메모를 입력하세요.", { exact: true }).first()).toBeVisible();
+  await expect(second.getByText("기타 사유를 메모에 입력해 주세요.", { exact: true }).first()).toBeVisible();
   for (const control of [
     second.getByRole("spinbutton"),
     second.getByRole("button", { name: "사유 카테고리 선택", exact: true }),
@@ -62,7 +62,7 @@ test("DEFECT-OTHER-LIVE 1920x1080 둘째 사유를 기타로 바꿔도 입력 �
     expect(box!.width).toBeGreaterThan(0);
   }
   await second.getByRole("textbox", { name: "메모", exact: true }).fill("둘째 기타 상세");
-  await expect(second.getByText("기타를 선택하면 메모를 입력하세요.", { exact: true })).toHaveCount(0);
+  await expect(second.getByText("기타 사유를 메모에 입력해 주세요.", { exact: true })).toHaveCount(0);
   await expect(submit).toBeEnabled();
   await second.getByRole("button", { name: "구형", exact: true }).click();
   await second.getByRole("spinbutton").fill("2");

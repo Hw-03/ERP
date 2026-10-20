@@ -101,7 +101,7 @@ test("SHIP-CANCEL-INTEGRITY PC-DELTA-SHIPPING-07 취소 원건 정역거래와 �
   const result = await (await diagnosis).json();
   const samples = result.checks.flatMap((check: { samples: unknown[] }) => check.samples);
   expect(samples.filter((sample: unknown) => JSON.stringify(sample).includes(created.request_id))).toEqual([]);
-  await expect(page.locator(".admin-integrity-summary")).toContainText(`발견 문제 ${result.blocking_count + result.warning_count}건`);
+  await expect(page.locator(".admin-integrity-summary").getByLabel(`발견 문제 ${result.blocking_count + result.warning_count}건`, { exact: true })).toHaveText(`${result.blocking_count + result.warning_count}건`);
   await expect(page.locator(".admin-integrity-results li").filter({ hasText: created.request_id })).toHaveCount(0);
   expect(await (await request.get(`/api/shipping/requests/${created.request_id}`, { headers })).json()).toEqual(cancelled);
   const ready = await request.get("http://127.0.0.1:8021/health/ready"); expect(ready.status()).toBe(200);

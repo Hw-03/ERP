@@ -107,8 +107,8 @@ test.describe("관리자 원자 기대의 실제 화면 회귀", () => {
     await expect(page.getByRole("combobox", { name: /등급|ADMIN|MANAGER|STAFF/ })).toHaveCount(0);
     const newName = `역할 검수 ${randomUUID().slice(0, 6)}`;
     await page.getByRole("textbox", { name: "이름", exact: true }).fill(newName);
-    await chooseOption(page, "창고 결재 역할", "부");
-    await chooseOption(page, "부서 결재 역할", "정");
+    await chooseOption(page, "창고 결재 역할", "부 · 보조 결재 가능");
+    await chooseOption(page, "부서 결재 역할", "정 · 부서 주담당 결재");
     await page.getByRole("checkbox", { name: "AS·연구 승인 권한", exact: true }).check();
     const saved = page.waitForResponse((response) => response.url().endsWith(`/api/employees/${actors.requester.employee_id}`) && response.request().method() === "PUT");
     await page.getByRole("button", { name: "저장", exact: true }).click();

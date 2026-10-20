@@ -58,7 +58,7 @@ for (const mobile of [false, true]) {
       } else {
         await expect(page.getByRole("button", { name: /^전체 폐기/ }).filter({ visible: true })).toBeVisible();
       }
-      await page.getByRole("button", { name: "목록", exact: true }).filter({ visible: true }).click();
+      await page.getByRole("button", { name: mobile && !entry.storage ? "목록" : "격리 목록", exact: true }).filter({ visible: true }).click();
       await page.getByRole("button", { name: /^(?:← )?작업 선택$/, exact: true }).filter({ visible: true }).click();
     }
     const afterReply = await request.get("/api/defects/locations");

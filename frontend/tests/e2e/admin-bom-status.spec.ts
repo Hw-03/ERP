@@ -36,7 +36,7 @@ test("PC-DELTA-BOMUNMATCHED-01 실제 상태 저장·재진입·분류복원과 
   const status = (label: string) => page.getByRole("checkbox", { name: `${before.item_name} (${before.mes_code}) ${label}`, exact: true });
   for (const [label, value] of [["보류", "HOLD"], ["중복", "DUPLICATE"], ["불용", "DISUSED"], ["불용", null]] as const) {
     const saved = page.waitForResponse((response) => response.url().endsWith(`/api/items/${id}/bom-unmatched-status`) && response.request().method() === "PATCH");
-    await status(label).click();
+    await status(label).locator("..").click();
     expect((await saved).status()).toBe(200);
     await expect(status(label)).toBeChecked({ checked: value !== null });
     const current = await item(request, id);
@@ -47,14 +47,14 @@ test("PC-DELTA-BOMUNMATCHED-01 실제 상태 저장·재진입·분류복원과 
     await open(page);
     await expect(status(label)).toBeChecked({ checked: value !== null });
   }
-  await status("보류").click();
+  await status("보류").locator("..").click();
   await expect(status("보류")).toBeChecked();
   const held = await item(request, id);
   expect(held.bom_unmatched_status).toBe("HOLD");
   const endpoint = `**/api/items/${id}/bom-unmatched-status`;
   // Only the failed response is injected. Every successful state is written to the real fixture API.
   await page.route(endpoint, (route) => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ detail: "미배치 상태 저장 검수 실패" }) }));
-  await status("중복").click();
+  await status("중복").locator("..").click();
   await expect(page.locator('[role="alert"]:not(#__next-route-announcer__)')).toContainText("미배치 상태 저장 검수 실패");
   await expect(status("보류")).toBeChecked();
   await expect(status("중복")).not.toBeChecked();
@@ -63,7 +63,7 @@ test("PC-DELTA-BOMUNMATCHED-01 실제 상태 저장·재진입·분류복원과 
   expect(await (await request.get(`/api/inventory/transactions?item_id=${id}`)).json()).toEqual(logs);
   await page.unroute(endpoint);
   const retry = page.waitForResponse((response) => response.url().endsWith(`/api/items/${id}/bom-unmatched-status`) && response.request().method() === "PATCH");
-  await status("중복").click();
+  await status("중복").locator("..").click();
   expect((await retry).status()).toBe(200);
   await expect(status("중복")).toBeChecked();
   expect((await item(request, id)).bom_unmatched_status).toBe("DUPLICATE");

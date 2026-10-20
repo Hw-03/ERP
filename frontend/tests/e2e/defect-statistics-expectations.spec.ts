@@ -62,6 +62,18 @@ async function reportAfter(page: Page, action: () => Promise<unknown>, filters: 
   return response!.json();
 }
 
+/** 화면에 재진입해 서버 집계를 다시 읽고 저장된 조회 조건도 검증한다. */
+async function revisitStatistics(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "작업 선택", exact: true }).click();
+  await page.getByRole("button").filter({ hasText: "불량 통계", visible: true }).click();
+}
+
+/** PC에서 접힌 비교 표와 집계 기준을 실제 사용자 동작으로 연다. */
+async function openStatisticsDetails(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "이전 기간 상세", exact: true }).click();
+  await page.getByRole("button", { name: "집계 기준", exact: true }).click();
+}
+
 test("DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위·필터 유지·분류변경과 부분전량 복귀", async ({ page, request, actors }) => {
   const data = await fixture(request, actors);
   await loginUi(page, actors.requester);
@@ -75,11 +87,12 @@ test("DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위
   expect(original.summary).toMatchObject({ quantity: 18, record_count: 6 });
   expect(original.items.map((row: { item_id: string; quantity: number; record_count: number }) => ({ id: row.item_id, qty: row.quantity, count: row.record_count })))
     .toEqual(data.items.map(item => ({ id: item.item_id, qty: 9, count: 3 })));
+  await openStatisticsDetails(page);
   const categories = page.getByRole("table", { name: "최초 발생 분류별 집계", exact: true });
   await expect(categories.getByRole("row")).toHaveText([
     "최초 분류발생 수량발생 건수이전 수량이전 건수", "불량4개2건0개0건", "B급6개2건0개0건", "구형8개2건0개0건",
   ]);
-  const card = page.getByRole("article").filter({ has: page.getByText("전체 발생 수량", { exact: true }) });
+  const card = page.getByRole("article").filter({ has: page.getByText("전체 등록 수량", { exact: true }) });
   await expect(card).toContainText("18개"); await expect(card).toContainText("6건 등록");
   await expect(page.getByText(/발생 시각의 원래 수량과 최초 발생 분류/)).toBeVisible();
   for (const collection of [original.categories, original.items, original.reasons, original.departments, original.timeline]) {
@@ -98,24 +111,29 @@ test("DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위
   const ranked = page.getByRole("table", { name: "품목 비교 목록", exact: true }).getByRole("row").filter({ has: page.getByRole("button") });
   expect(await ranked.getByRole("button").allTextContents()).toEqual(original.items.map((row: { label: string; mes_code: string }) => row.label + row.mes_code));
   for (const row of await ranked.all()) {
-    await expect(row.getByRole("cell").nth(1)).toHaveText("9개");
+    await expect(row.getByRole("cell").nth(1)).toHaveText("9개불량 2B급 3구형 4");
     await expect(row.getByRole("cell").nth(2)).toHaveText("3건");
   }
   await page.getByRole("button", { name: "선택 기간 상세", exact: true }).click();
   const bars = page.locator(".recharts-bar-rectangle path");
   // Recharts moves the bar after switching periods; a stationary pointer can
   // remain over yesterday even though the final bar and API quantity are correct.
-  const hoverChartQuantity = async (quantity: number): Promise<void> => {
+  const hoverChartQuantity = async (quantity: number, categoryQuantities: [number, number, number]): Promise<void> => {
     await expect.poll(async () => {
-      await bars.hover();
+      await bars.last().hover();
       return page.locator(".recharts-tooltip-wrapper").textContent();
-    }).toContain(`발생 수량 : ${quantity}`);
+    }).toContain(`조회 합계${quantity}개`);
+    for (const [index, label] of ["불량", "B급", "구형"].entries()) {
+      await expect(page.locator(".recharts-tooltip-wrapper")).toContainText(`${label}${categoryQuantities[index]}개`);
+    }
   };
-  await expect(bars).toHaveCount(1);
-  await hoverChartQuantity(18);
+  await expect(bars).toHaveCount(3);
+  await hoverChartQuantity(18, [4, 6, 8]);
   await expect(page.locator(".recharts-tooltip-wrapper")).toContainText("18");
-  const repeated = await report(() => page.getByRole("button", { name: "새로고침", exact: true }).click());
+  const repeated = await report(() => revisitStatistics(page));
   expect(repeated.items).toEqual(original.items);
+  await openStatisticsDetails(page);
+  await page.getByRole("button", { name: "선택 기간 상세", exact: true }).click();
   await page.getByRole("button", { name: "필터 펼치기", exact: true }).click();
   filters.department = "튜브";
   let filtered = await report(() => page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "튜브", exact: true }).click());
@@ -134,14 +152,14 @@ test("DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위
   await expect(selectedReason.getByText("9개", { exact: true })).toBeVisible();
   await expect(selectedReason.getByText("100% · 3건", { exact: true })).toBeVisible();
   await expect(ranked).toHaveCount(1);
-  await expect(ranked.getByRole("cell").nth(1)).toHaveText("9개");
+  await expect(ranked.getByRole("cell").nth(1)).toHaveText("9개불량 2B급 3구형 4");
   await expect(ranked.getByRole("cell").nth(2)).toHaveText("3건");
-  await expect(bars).toHaveCount(1);
-  await hoverChartQuantity(9);
+  await expect(bars).toHaveCount(3);
+  await hoverChartQuantity(9, [2, 3, 4]);
   await expect(page.locator(".recharts-tooltip-wrapper")).toContainText("9");
   for (const label of ["주간", "연간", "월간"]) {
     filters.period = ({ 주간: "week", 연간: "year", 월간: "month" } as Record<string, string>)[label];
-    const result = await report(() => page.getByRole("group", { name: "조회 기간" }).getByRole("button", { name: label, exact: true }).click());
+    const result = await report(() => page.getByRole("group", { name: "집계 단위", exact: true }).getByRole("button", { name: label, exact: true }).click());
     expect(result.summary).toMatchObject({ quantity: 9, record_count: 3 });
     expect(result.departments.map((row: { label: string }) => row.label)).toEqual(["튜브"]);
     await expect(page.getByRole("button", { name: "부서 튜브 ×", exact: true })).toBeVisible();
@@ -159,10 +177,11 @@ test("DEFECT-STATS 8.11-01/03/04/05/06/07 최초 세분류·카드 차트 순위
       qty: quantity, dept: "튜브", reason_category: "검사 통과", reason_memo: "발생 통계 불변 검수",
     } });
     expect(restored.status(), await restored.text()).toBe(200);
-    const unchanged = await report(() => page.getByRole("button", { name: "새로고침", exact: true }).click());
+    const unchanged = await report(() => revisitStatistics(page));
     expect(unchanged.summary).toEqual(filtered.summary);
     expect(unchanged.categories).toEqual(filtered.categories);
     expect(unchanged.items).toEqual(filtered.items);
+    await openStatisticsDetails(page);
     await expect(categories.getByRole("row")).toHaveText([
       "최초 분류발생 수량발생 건수이전 수량이전 건수", "불량2개1건0개0건", "B급3개1건0개0건", "구형4개1건0개0건",
     ]);

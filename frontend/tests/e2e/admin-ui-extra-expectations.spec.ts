@@ -25,7 +25,7 @@ async function openAdmin(page: Page, actors: CommonActors, section: string): Pro
 }
 
 async function fillNewItem(page: Page, name: string): Promise<void> {
-  await page.getByRole("button", { name: "추가", exact: true }).click();
+  await page.getByRole("button", { name: "품목 추가", exact: true }).click();
   await page.getByPlaceholder("예: 텅스텐 필라멘트").fill(name);
   await page.getByRole("button", { name: /DX3000 \(3\)/ }).click();
   await page.getByRole("button", { name: "+ 위치 추가", exact: true }).click();
@@ -109,17 +109,17 @@ test("8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지
   const displayedIds = await rows.evaluateAll((elements) => elements.map((element) => element.getAttribute("data-item-id")));
   expect(new Set(displayedIds).size).toBe(population.length);
   expect([...displayedIds].sort()).toEqual(population.map((item) => item.item_id).sort());
-  const total = page.getByText("전체 품목", { exact: true }).locator("..");
-  await expect(total).toContainText(String(population.length));
+  const total = page.getByText("전체 품목", { exact: true }).and(page.locator(':not([aria-hidden="true"] *)')).locator("..");
+  await expect(total).toHaveText(`전체 품목${population.length}`);
   for (const item of [population[0], population[population.length - 1]]) {
-    await page.getByPlaceholder("품목명, 코드 검색").fill(item.mes_code ?? item.item_name);
+    await page.getByRole("textbox", { name: "품목명, 코드 검색", exact: true }).fill(item.mes_code ?? item.item_name);
     const row = page.locator(`[data-item-id="${item.item_id}"]`);
     await expect(row).toBeVisible();
     if (await row.getAttribute("aria-selected") !== "true") await row.click();
     await expect(page.getByPlaceholder("예: 텅스텐 필라멘트")).toHaveValue(item.item_name);
     await expect(page.locator("[aria-readonly]")).toHaveText(item.mes_code!);
   }
-  await page.getByPlaceholder("품목명, 코드 검색").fill("");
+  await page.getByRole("textbox", { name: "품목명, 코드 검색", exact: true }).fill("");
   await expect(rows).toHaveCount(population.length);
 });
 
@@ -410,7 +410,11 @@ test("PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 �
   await page.locator(`[data-log-id="${logs[0].log_id}"]`).first().click();
   const detail = page.locator(`[data-history-detail-log-id="${logs[0].log_id}"]`);
   await expect(detail).toBeVisible();
-  await expect(detail.getByTestId("history-stock-movement-summary")).toContainText(/창고.*0\s*20/);
+  await expect(detail.getByTestId("history-stock-movement-summary")).toContainText("초기 등록창고");
+  const stockGroup = detail.getByRole("button", { name: "창고 재고 · 1품목 · +20", exact: true });
+  await expect(stockGroup).toBeVisible();
+  if (await stockGroup.getAttribute("aria-expanded") === "false") await stockGroup.click();
+  await expect(detail.getByLabel("창고 재고 0 +20→20 EA", { exact: true })).toBeVisible();
   await expect(detail.getByTestId("history-participant-row")).toContainText(actors.approver.name);
   await expect(detail.getByTestId("history-participant-row")).toContainText(formatHistoryDateTimeLong(logs[0].created_at));
   expect((await read<Item>(request, `/api/items/${item.item_id}`)).warehouse_qty).toBe(20);

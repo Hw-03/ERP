@@ -41,8 +41,9 @@ test("8.19-05 실제 모델·카테고리 변경의 정확한 미리보기와 �
   expect(modelResult.status()).toBe(200);
   expect((await modelResult.json()).mes_code).toBe(modelPreview);
   await expect(row).toContainText(modelPreview);
-  await page.getByPlaceholder("예: 텅스텐 필라멘트").locator("..").locator("..").getByRole("combobox").first().click();
-  await page.getByRole("option", { name: "HR — 고압 원자재", exact: true }).click();
+  await page.getByRole("combobox", { name: "부서", exact: true }).click();
+  await page.getByRole("option", { name: "고압 (H)", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "공정 단계", exact: true })).toHaveText("원자재 (R)");
   await expect(preview).toHaveText(new RegExp(`^${second.symbol}-HR-\\d{4}$`));
   const categoryPreview = await preview.innerText();
   const categoryWrite = page.waitForResponse((response) => response.url().endsWith(`/api/items/${item.item_id}`) && response.request().method() === "PUT");
@@ -61,7 +62,7 @@ test("8.19-05 미리보기 조회 실패는 생성하지 않고 입력을 보존
   const before = await (await request.get("/api/items?limit=2000")).json();
   const name = `조회실패코드${randomUUID().slice(0, 8)}`;
   await page.route("**/api/items/code-preview?**", (route) => route.fulfill({ status: 503, json: { detail: "코드 조회 검수 실패" } }));
-  await page.getByRole("button", { name: "추가", exact: true }).click();
+  await page.getByRole("button", { name: "품목 추가", exact: true }).click();
   await page.getByPlaceholder("예: 텅스텐 필라멘트").fill(name);
   await page.getByRole("button", { name: /DX3000 \(3\)/ }).click();
   await page.getByRole("button", { name: "+ 위치 추가", exact: true }).click();

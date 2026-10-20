@@ -34,10 +34,10 @@ async function openList(page: Page) {
   await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "전체", exact: true }).click();
 }
 
-async function expandItemRecords(page: Page, itemName: string) {
+async function expandItemRecords(page: Page, itemName: string, department: string) {
   const summary = page
     .getByTestId("defect-item-group-summary")
-    .filter({ hasText: itemName });
+    .filter({ has: page.getByRole("button", { name: `${department} ${itemName} 격리 2건`, exact: true }), visible: true });
   await expect(summary).toHaveCount(1);
   if (await summary.getAttribute("aria-expanded") !== "true") {
     await summary.getByRole("button", { name: new RegExp(`${itemName} 격리`) }).click();
@@ -164,7 +164,7 @@ test.describe("불량 격리 건별 원장", () => {
     await page.goto("/mes?tab=defect");
     await expect(page.getByRole("button").filter({ hasText: "격리 목록", visible: true })).toBeVisible({ timeout: 30_000 });
     await openList(page);
-    await expandItemRecords(page, item.item_name);
+    await expandItemRecords(page, item.item_name, department);
 
     const visibleRows = page
       .getByRole("article", { name: `${item.item_name} 격리 기록` })
@@ -193,7 +193,7 @@ test.describe("불량 격리 건별 원장", () => {
     expect(recovery.request().postDataJSON()).toMatchObject({ record_id: firstRecord.record_id, qty: 2, reason_category: null, reason_category_id: null, reason_memo: "검사 완료 후 일부 정상 복귀" });
     await expect(page.getByRole("button").filter({ hasText: "격리 목록", visible: true })).toBeVisible();
     await openList(page);
-    await expandItemRecords(page, item.item_name);
+    await expandItemRecords(page, item.item_name, department);
 
     const rowsAfterPartial = page
       .getByRole("article", { name: `${item.item_name} 격리 기록` })
@@ -219,7 +219,7 @@ test.describe("불량 격리 건별 원장", () => {
 
     await page.reload();
     await openList(page);
-    await expandItemRecords(page, item.item_name);
+    await expandItemRecords(page, item.item_name, department);
     const refreshedSecondRow = page
       .getByRole("article", { name: `${item.item_name} 격리 기록` })
       .filter({ visible: true })
@@ -271,7 +271,7 @@ test.describe("불량 격리 건별 원장", () => {
 
     await page.reload();
     await openList(page);
-    await expandItemRecords(page, item.item_name);
+    await expandItemRecords(page, item.item_name, department);
     const completedRow = page
       .getByRole("article", { name: `${item.item_name} 격리 기록` })
       .filter({ visible: true })
@@ -450,7 +450,7 @@ test.describe("불량 격리 건별 원장", () => {
           await nativeMove("back", "storage");
           await expect(storageSearch).toBeVisible();
           await openRestore();
-          await page.getByRole("button", { name: "목록", exact: true }).filter({ visible: true }).click();
+          await page.getByRole("button", { name: "격리 목록", exact: true }).filter({ visible: true }).click();
           await expect.poll(() => page.evaluate(() => history.state?.defect)).toBe("storage");
           await openRestore();
           await page.getByRole("spinbutton").filter({ visible: true }).fill(String(restoreQty));

@@ -37,9 +37,9 @@ async function openBom(page: Page, actors: CommonActors, parent: Part) {
   }
   await navigation.getByRole("button", { name: "BOM 관리", exact: true }).click();
   const parentList = page.getByText("상위 품목 선택", { exact: true }).locator("..").locator("..");
-  await parentList.getByPlaceholder("품목명 / 코드 검색").fill(parent.item_name);
+  await parentList.getByRole("textbox", { name: "품목명 / 코드 검색", exact: true }).fill(parent.item_name);
   await parentList.locator("button[data-bom-row-surface]").filter({ hasText: parent.item_name }).click();
-  await expect(page.getByText("현재 구성 (2건)", { exact: true })).toBeVisible();
+  await expect(page.getByText(/ · 현재 구성 \(2건\)$/)).toBeVisible();
 }
 function childRow(page: Page, name: string) {
   return page.locator("div[data-bom-row-surface]").filter({ hasText: name });
@@ -170,8 +170,9 @@ test("BOM 8.19-17 부서 상태별 모집단·완료 구성·사용처 건수와
     { label: "미착수", rows: parents.filter((item: { item_id: string; bom_completed_at: string | null }) => !item.bom_completed_at && !withChildren.has(item.item_id)) },
   ];
   await openBom(page, actors, fixture.parent);
+  await page.getByTestId("bom-department-filters").getByRole("button", { name: "조립", exact: true }).click();
   const parentList = page.getByText("상위 품목 선택", { exact: true }).locator("..").locator("..");
-  const search = parentList.getByPlaceholder("품목명 / 코드 검색");
+  const search = parentList.getByRole("textbox", { name: "품목명 / 코드 검색", exact: true });
   await search.fill("");
   for (const population of populations) {
     const card = page.getByRole("button", { name: new RegExp(`^${population.label}\\s*${population.rows.length}$`) });
@@ -182,7 +183,7 @@ test("BOM 8.19-17 부서 상태별 모집단·완료 구성·사용처 건수와
   }
   await page.getByRole("button", { name: new RegExp(`^완료\\s*${populations[1].rows.length}$`) }).click();
   await parentList.locator("button[data-bom-row-surface]").filter({ hasText: completed.parent.item_name }).click();
-  await expect(page.getByText("현재 구성 (2건)", { exact: true })).toBeVisible();
+  await expect(page.getByText(/ · 현재 구성 \(2건\)$/)).toBeVisible();
   for (const child of completed.children) {
     await expect(childRow(page, child.item_name).getByTitle("클릭하여 수량 수정")).toHaveText("2EA");
     await expect(childRow(page, child.item_name).getByTitle("클릭하여 수량 수정")).toBeDisabled();
@@ -194,7 +195,7 @@ test("BOM 8.19-17 부서 상태별 모집단·완료 구성·사용처 건수와
   const selected = parentList.locator("button[data-bom-row-surface]").filter({ hasText: fixture.parent.item_name });
   await selected.click();
   await page.getByRole("group", { name: "BOM 보기 방식" }).getByRole("button", { name: "사용처", exact: true }).click();
-  await expect(page.getByText("사용처 (1건)", { exact: true })).toBeVisible();
+  await expect(page.getByText(/ · 사용처 \(1건\)$/)).toBeVisible();
   const used = page.getByTitle("이 부모로 이동 (편집 모드)");
   await expect(used).toHaveCount(1);
   await expect(used).toContainText(extras[0].item_name);
@@ -204,6 +205,6 @@ test("BOM 8.19-17 부서 상태별 모집단·완료 구성·사용처 건수와
   await expect(page.getByTestId("bom-department-filters").getByRole("button", { name: "조립", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(parentList.getByRole("button", { name: "중간공정", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(selected).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByText("현재 구성 (2건)", { exact: true })).toBeVisible();
+  await expect(page.getByText(/ · 현재 구성 \(2건\)$/)).toBeVisible();
   expect(await (await request.get("/api/bom")).json()).toEqual(allRows);
 });

@@ -211,8 +211,8 @@ test.describe("관리자 내보내기·진단의 최종 파일과 읽기 전용 
         await expect(issue).toContainText("수동 검토 필요");
         await expect(issue).toContainText("이 화면에서는 복구하지 않습니다.");
       }
-      await expect(page.locator(".admin-integrity-summary")).toContainText(`발견 문제 ${result.blocking_count + result.warning_count}건`);
-      await expect(page.locator(".admin-integrity-summary")).toContainText(`차단 ${result.blocking_count}건 · 경고 ${result.warning_count}건`);
+      await expect(page.locator(".admin-integrity-summary").getByLabel(`발견 문제 ${result.blocking_count + result.warning_count}건`, { exact: true })).toHaveText(`${result.blocking_count + result.warning_count}건`);
+      await expect(page.getByText(`차단 ${result.blocking_count}건 · 경고 ${result.warning_count}건`, { exact: true })).toBeVisible();
       await expect(page.getByText("발견된 정합성 문제가 없습니다.", { exact: true })).toHaveCount(0);
       await expect(page.getByRole("button", { name: /복구|적용/ })).toHaveCount(0);
       const identities = await issues.locator(".admin-integrity-issue-meta span:nth-child(2)").allTextContents();

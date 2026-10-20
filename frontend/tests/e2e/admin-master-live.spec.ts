@@ -49,8 +49,9 @@ test("PC-DELTA-ADMIN-01 품목 수정은 다른 직원의 열린 입출고 후�
     if (await row.getAttribute("aria-selected") !== "true") await row.click();
     const name = `${before.item_name}-새이름`;
     await page.getByPlaceholder("예: 텅스텐 필라멘트").fill(name);
-    await page.getByPlaceholder("예: 텅스텐 필라멘트").locator("..").locator("..").getByRole("combobox").first().click();
-    await page.getByRole("option", { name: "HR — 고압 원자재", exact: true }).click();
+    await page.getByRole("combobox", { name: "부서", exact: true }).click();
+    await page.getByRole("option", { name: "고압 (H)", exact: true }).click();
+    await expect(page.getByRole("combobox", { name: "공정 단계", exact: true })).toHaveText("원자재 (R)");
     await expect(page.locator("[aria-readonly]")).toHaveText(/^3-HR-\d{4}$/);
     const code = await page.locator("[aria-readonly]").innerText();
     const saved = page.waitForResponse((response) => response.url().endsWith(`/api/items/${id}`) && response.request().method() === "PUT");
