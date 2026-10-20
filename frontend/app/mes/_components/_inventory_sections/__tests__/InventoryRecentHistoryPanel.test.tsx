@@ -371,16 +371,31 @@ describe("InventoryRecentHistoryPanel", () => {
     expect(screen.queryByText("UNMAPPED")).not.toBeInTheDocument();
   });
 
-  it.each([false, true])("생산 작업의 자재 최근 내역도 생산 입고와 취소를 구분한다 mobile=%s", async (mobile) => {
-    getPage.mockResolvedValue(makePage([
+  it.each([false, true])("생산 자재는 이력의 구성품 배지를 재사용하고 취소를 구분한다 mobile=%s", async (mobile) => {
+    const logs = [
       makeLog({ log_id: "production-input", transaction_type: "BACKFLUSH", history_batch: { work_type: "process", sub_type: "produce" } }),
       makeLog({ log_id: "production-cancel", transaction_type: "BACKFLUSH", operation_kind: "CANCELLATION", history_batch: { work_type: "process", sub_type: "produce" } }),
       makeLog({ log_id: "quantity-adjustment", transaction_type: "BACKFLUSH", history_batch: { work_type: "process", sub_type: "produce", display_transaction_type: "ADJUST" } }),
-    ]));
+    ];
+    getPage.mockResolvedValue({ ...makePage([]), groups: logs.map((log, index) => ({
+      type: "operation", key: `operation-${index}`, logs: index < 2
+        ? [makeLog({ item_id: "product", log_id: `product-${index}`, transaction_type: "PRODUCE", operation_role: "PRODUCT_OUTPUT" }), log]
+        : [log],
+    })) });
     renderPanel(makeItem(), mobile);
-    expect(await screen.findByText("생산 입고")).toBeVisible();
-    expect(screen.getByText("생산 입고 취소")).toBeVisible();
+    expect(await screen.findByText("구성품")).toBeVisible();
+    expect(screen.getByText("구성품 취소")).toBeVisible();
     expect(screen.getByText("부서 입출고")).toBeVisible();
+    for (const row of screen.getAllByRole("listitem")) {
+      expect(row.querySelector(".inventory-recent-main > span")).toHaveClass("w-32", "h-6", "justify-center");
+    }
+  });
+
+  it.each([false, true])("품목 필터로 부모 거래가 빠져도 자재 역할의 구성품 배지를 유지한다 mobile=%s", async (mobile) => {
+    getPage.mockResolvedValue(makePage([makeLog({ transaction_type: "BACKFLUSH", operation_role: "COMPONENT_INPUT", history_batch: { work_type: "process", sub_type: "produce" } })]));
+    renderPanel(makeItem(), mobile);
+    expect(await screen.findByText("구성품")).toBeVisible();
+    expect(screen.queryByText("생산 입고")).not.toBeInTheDocument();
   });
 
   it("최초 조회 실패는 재시도하고 빈 목록은 별도 빈 상태를 표시한다", async () => {

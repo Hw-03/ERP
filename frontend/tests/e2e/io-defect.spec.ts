@@ -57,7 +57,7 @@ test.describe("불량 — 격리 / 해제", () => {
       .getByRole("row", { name: /E2E원자재튜브/ })
       .getByRole("button", { name: /장바구니에 추가/ })
       .click();
-    await page.getByRole("button", { name: "수량·처리 정보 →", exact: true }).click();
+    await page.getByRole("button", { name: "수량·처리 정보 →", exact: true }).filter({ visible: true }).click();
     // 장바구니: 수량 + 사유 카테고리
     await page.getByPlaceholder("예: 3").fill("5");
     // 사유 마스터 선택 다이얼로그에서 활성 카테고리를 선택한다.

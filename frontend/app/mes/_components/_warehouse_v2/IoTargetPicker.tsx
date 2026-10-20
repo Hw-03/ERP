@@ -457,22 +457,25 @@ export function IoTargetPicker({
       {/* 필터 + 순서 편집 토글 */}
       <div className="flex shrink-0 flex-col gap-2">
         {/* 항목 9 — 모바일은 필터 그리드를 전폭 한 줄로(순서 편집 버튼은 아래 행). 데스크톱(lg)은 기존 인라인. */}
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div className="grid grid-cols-3 gap-2 lg:flex-1 lg:grid-cols-[1fr_1fr_1fr_2fr]" style={{ opacity: editMode ? 0.4 : 1, pointerEvents: editMode ? "none" : undefined }}>
             <LabeledSelect
               label="부서"
+              triggerClassName="lg:h-10 lg:min-h-10"
               value={dept}
               onChange={(department) => updateFilters({ ...activeFilters, department })}
               options={deptOptions}
             />
             <LabeledSelect
               label="모델"
+              triggerClassName="lg:h-10 lg:min-h-10"
               value={model}
               onChange={(nextModel) => updateFilters({ ...activeFilters, model: nextModel })}
               options={modelOptions}
             />
             <LabeledSelect
               label="단계"
+              triggerClassName="lg:h-10 lg:min-h-10"
               value={stage}
               onChange={(nextStage) => updateFilters({ ...activeFilters, stage: nextStage })}
               options={STAGE_OPTIONS}
@@ -486,17 +489,17 @@ export function IoTargetPicker({
                 검색
               </span>
               <SearchInput value={search} onChange={onSearchChange} placeholder="품목명 · 품목 코드"
-                ariaLabel="품목 검색" className="rounded-[10px] px-2" />
+                ariaLabel="품목 검색" className="rounded-[10px] px-2 lg:h-10 lg:min-h-10" />
             </label>
           </div>
           {operator?.employee_id && (
             // 항목 4-5 — 순서 편집은 드래그 UX 라 모바일에서 숨김(PC 만 노출). 기능 코드는 보존.
-            <div className="hidden shrink-0 self-end pb-0.5 lg:block">
+            <div className="hidden shrink-0 self-end lg:block">
               {editMode ? (
                 <button
                   type="button"
                   onClick={cancelEditMode}
-                  className="standard-hover rounded-[10px] border px-2.5 py-1.5 text-[12px] font-bold transition-colors"
+                  className="standard-hover h-10 rounded-[10px] border px-2.5 text-[12px] font-bold transition-colors"
                   style={{
                     background: LEGACY_COLORS.s2,
                     borderColor: LEGACY_COLORS.border,
@@ -509,7 +512,7 @@ export function IoTargetPicker({
                 <button
                   type="button"
                   onClick={enterEditMode}
-                  className="standard-hover flex items-center gap-1 rounded-[10px] border px-2.5 py-1.5 text-[12px] font-bold transition-colors"
+                  className="standard-hover flex h-10 items-center gap-1 rounded-[10px] border px-2.5 text-[12px] font-bold transition-colors"
                   style={{
                     background: LEGACY_COLORS.s2,
                     borderColor: LEGACY_COLORS.border,

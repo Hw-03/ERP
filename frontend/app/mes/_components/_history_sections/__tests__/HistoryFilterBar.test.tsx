@@ -25,7 +25,7 @@ function renderFilterBar(flatSurface?: boolean, mobile?: boolean) {
 }
 
 describe("HistoryFilterBar", () => {
-  it.each([false, true])("updates search while preserving the IME draft (mobile: %s)", (mobile) => {
+  it.each([false, true])("updates search during IME composition and on completion (mobile: %s)", (mobile) => {
     const setSearch = vi.fn();
     render(<HistoryFilterBar search="" setSearch={setSearch} dateFilter="MONTH" setDateFilter={vi.fn()}
       filterPanelOpen={false} onToggleFilterPanel={vi.fn()} activeFilterCount={0}

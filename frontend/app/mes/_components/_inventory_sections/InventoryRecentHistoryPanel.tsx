@@ -10,8 +10,8 @@ import { useItemHistoryPagesQuery } from "@/lib/queries/useItemHistoryPagesQuery
 import { Button } from "@/lib/ui/Button";
 import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
 import { formatHistoryDate, parseUtc } from "../_history_sections/historyFormat";
-import { getHistoryListOperationLabel } from "../_history_sections/historyPresentation";
-import { FlowBadge, StockSnapshotContent } from "../_history_sections/historyTableHelpers";
+import { getHistoryListOperationLabel, getReferenceBatchLinePresentation, getReferenceBatchPresentation, type ReferenceBatchLinePresentation } from "../_history_sections/historyPresentation";
+import { FlowBadge, getHistoryGroupSummary, StockSnapshotContent, TONE_COLOR } from "../_history_sections/historyTableHelpers";
 import { isReworkOperation } from "../_history_sections/transactionTaxonomy";
 import mobileStyles from "./InventoryRecentHistoryPanel.module.css";
 import { historyDisplayLogs } from "../_history_sections/stocktakeHistory";
@@ -20,22 +20,37 @@ import { InventoryOperationDetail, operationSummary } from "../_history_sections
 import { inventoryOperationLabel } from "../_history_sections/inventoryOperationPresentation";
 
 type RecentEntry = { key: string; effectiveAt: string; createdAt: string } & (
-  { log: TransactionLog; operation?: never } | { log?: never; operation: InventoryOperation }
+  { log: TransactionLog; linePresentation?: ReferenceBatchLinePresentation; operation?: never } | { log?: never; operation: InventoryOperation }
 );
 
 /** 전체 작업 중 현재 품목의 행만 중복 없이 날짜순으로 표시한다. */
 function getRecentEntries(pages: TransactionDisplayGroupPage[], itemId: string): RecentEntry[] {
   const logs = new Map<string, TransactionLog>();
   const operations = new Map<string, InventoryOperation>();
+  const linePresentations = new Map<string, ReferenceBatchLinePresentation>();
   for (const page of pages) {
     for (const log of historyDisplayLogs(page.groups)) {
-      if (log.item_id === itemId) logs.set(log.log_id, log);
+      if (log.item_id !== itemId) continue;
+      logs.set(log.log_id, log);
+      // 품목 필터로 부모 행이 빠진 응답도 원장에 기록된 자재 역할을 보존한다.
+      if (log.operation_role === "COMPONENT_INPUT" || log.operation_role?.startsWith("REWORK_CHILD_")) {
+        const { kind } = getReferenceBatchPresentation([log]);
+        linePresentations.set(log.log_id, getReferenceBatchLinePresentation(log, kind));
+      }
     }
     for (const group of page.groups) if (group.operation) operations.set(group.operation.operationId, group.operation);
+    for (const group of page.groups) {
+      if (!["operation", "batch", "op_batch"].includes(group.type) || group.logs.length < 2) continue;
+      const { primaryLog } = getHistoryGroupSummary({ type: "operation", operationId: group.key, logs: group.logs });
+      const { kind } = getReferenceBatchPresentation(group.logs);
+      for (const log of group.logs) {
+        if (log.log_id !== primaryLog.log_id) linePresentations.set(log.log_id, getReferenceBatchLinePresentation(log, kind));
+      }
+    }
   }
   const representedIds = new Set([...logs.values()].map(log => log.operation_id));
   const entries: RecentEntry[] = [
-    ...[...logs.values()].map(log => ({ key: log.log_id, effectiveAt: log.requested_at ?? log.created_at, createdAt: log.created_at, log })),
+    ...[...logs.values()].map(log => ({ key: log.log_id, effectiveAt: log.requested_at ?? log.created_at, createdAt: log.created_at, log, linePresentation: linePresentations.get(log.log_id) })),
     ...[...operations.values()].filter(operation => !representedIds.has(operation.operationId))
       .map(operation => ({ key: operation.operationId, effectiveAt: operation.effectiveAt, createdAt: operation.effectiveAt, operation })),
   ];
@@ -63,6 +78,7 @@ function normalizeHistoryLabel(label: string): string {
 function RecentLine({
   type,
   label,
+  linePresentation,
   log,
   context,
   effectiveAt,
@@ -72,6 +88,7 @@ function RecentLine({
 }: {
   type: TransactionType;
   label: string;
+  linePresentation?: ReferenceBatchLinePresentation;
   log: TransactionLog | null;
   context: string;
   effectiveAt: string;
@@ -79,11 +96,14 @@ function RecentLine({
   mobilePresentation?: boolean;
   onSelect: (id: string) => void;
 }): ReactNode {
-  const color = log && isReworkOperation(log) ? LEGACY_COLORS.red : log ? historyOperationColor(log, type) : transactionColor(type);
+  const color = linePresentation ? TONE_COLOR[linePresentation.tone] : log && isReworkOperation(log) ? LEGACY_COLORS.red : log ? historyOperationColor(log, type) : transactionColor(type);
+  const badgeLabel = linePresentation
+    ? `${linePresentation.label}${log?.operation_kind === "CANCELLATION" ? " 취소" : ""}`
+    : label;
   return (
     <li data-cancelled={cancelled || undefined}>
       <div className="inventory-recent-main">
-        <FlowBadge type={type} label={label} color={color} variant="panel" />
+        <FlowBadge type={type} operation={log ?? undefined} label={badgeLabel} color={color} />
         <time dateTime={effectiveAt}>{formatHistoryDate(effectiveAt)}</time>
       </div>
       <div className="inventory-recent-body">
@@ -104,7 +124,7 @@ function HistoryRows({ entries, mobilePresentation, onSelect }: { entries: Recen
       {entries.map((entry) => {
         const operation = entry.operation;
         if (operation) return <li key={entry.key} data-cancelled={operation.effectiveStatus === "cancelled" || undefined}>
-        <div className="inventory-recent-main"><strong>{inventoryOperationLabel(operation)}</strong><time dateTime={entry.effectiveAt}>{formatHistoryDate(entry.effectiveAt)}</time></div>
+        <div className="inventory-recent-main"><FlowBadge type={null} operation={{ operation_domain: operation.domain, operation_action: operation.action }} label={inventoryOperationLabel(operation)} color={LEGACY_COLORS.muted2} /><time dateTime={entry.effectiveAt}>{formatHistoryDate(entry.effectiveAt)}</time></div>
         <div className="inventory-recent-body">
           <p>{operationSummary(operation)}</p>
           <div className="inventory-recent-meta">{[operation.department, operation.actorName].filter(Boolean).join(" · ")}</div>
@@ -124,6 +144,7 @@ function HistoryRows({ entries, mobilePresentation, onSelect }: { entries: Recen
           mobilePresentation={mobilePresentation}
           type={log.transaction_type}
           label={getHistoryLabel(log)}
+          linePresentation={entry.linePresentation}
           log={log}
           context={[log.department, requester]
             .filter((value): value is string => Boolean(value?.trim()))

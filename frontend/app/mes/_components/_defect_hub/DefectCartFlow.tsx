@@ -419,7 +419,7 @@ export function DefectCartFlow({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
+    <div className={`flex h-full min-h-0 flex-col ${step === 2 ? "gap-2" : "gap-3"} overflow-hidden`}>
       <h2 ref={headingRef} tabIndex={-1} className="sr-only">{title}</h2>
       {!(step === 2 && itemPickerFullscreen) && <DefectFlowStepper action={mode === "add" ? "add" : directAction} source={source} currentStep={step} busy={busy} onMenuSelect={() => goToStep(0)} onStepSelect={goToStep} />}
 

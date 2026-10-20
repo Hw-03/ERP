@@ -108,14 +108,14 @@ describe("DesktopDefectView realtime refresh", () => {
     expect(await screen.findByRole("button", { name: "Process D-001" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "필터 고정" }));
-    fireEvent.click(screen.getByRole("button", { name: "오래된 순" }));
+    fireEvent.click(within(screen.getByRole("group", { name: "정렬" })).getByRole("button", { name: "오래된 순" }));
     fireEvent.click(screen.getByRole("button", { name: "내가 격리" }));
     expect(screen.queryByRole("button", { name: "Process D-001" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "필터 초기화" }));
     expect(screen.getByRole("button", { name: "Process D-001" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "내가 격리" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("checkbox", { name: "필터 고정" })).toBeChecked();
-    expect(screen.getByRole("button", { name: "오래된 순" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(screen.getByRole("group", { name: "정렬" })).getByRole("button", { name: "오래된 순", pressed: true })).toBeInTheDocument();
   });
   it("B급만 있는 경우 격리 데이터가 없는 상태를 표시한다", async () => {
     mocks.listDefects.mockResolvedValueOnce([{ ...location, management_category: "B_GRADE" }]);
@@ -211,13 +211,13 @@ describe("DesktopDefectView realtime refresh", () => {
     expect(screen.getByText("1년 이상 ⚠").parentElement).toHaveTextContent("2건");
 
     fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
-    fireEvent.click(screen.getByRole("button", { name: "최신 순" }));
+    fireEvent.click(within(screen.getByRole("group", { name: "정렬" })).getByRole("button", { name: "최신 순" }));
     expect(await screen.findByRole("button", { name: "Process TARGET-NEW" })).toBeInTheDocument();
     let processButtons = screen.getAllByRole("button", { name: /Process TARGET-/ });
     expect(processButtons[0]).toHaveTextContent("TARGET-NEW");
     expect(processButtons[1]).toHaveTextContent("TARGET-OLD");
-    fireEvent.click(screen.getByRole("button", { name: "오래된 순" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "오래된 순" })).toHaveAttribute("aria-pressed", "true"));
+    fireEvent.click(within(screen.getByRole("group", { name: "정렬" })).getByRole("button", { name: "오래된 순" }));
+    expect(within(screen.getByRole("group", { name: "정렬" })).getByRole("button", { name: "오래된 순", pressed: true })).toBeInTheDocument();
     processButtons = screen.getAllByRole("button", { name: /Process TARGET-/ });
     expect(processButtons[0]).toHaveTextContent("TARGET-OLD");
     expect(processButtons[1]).toHaveTextContent("TARGET-NEW");
@@ -416,7 +416,7 @@ describe("DesktopDefectView realtime refresh", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
     expect(await screen.findByRole("checkbox", { name: "필터 고정" })).toBeChecked();
-    expect(screen.getByRole("button", { name: "오래된 순" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(screen.getByRole("group", { name: "정렬" })).getByRole("button", { name: "오래된 순", pressed: true })).toBeInTheDocument();
     const departmentFilters = screen.getByRole("group", { name: "부서 구분" });
     expect(await within(departmentFilters).findByRole("button", { name: operator.department })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "내가 격리" })).toHaveAttribute("aria-pressed", "true");
