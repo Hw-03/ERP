@@ -24,6 +24,8 @@
 
 ## 실행 기준
 
+2026-10-20 후속 승인: 대기 중 새로 추가된 main `e55918bc12d854d2ce58ebf3b62e385cd4ff21e0`까지 동일 후보에 병합한다. 후보 시작점은 `632067568e2e6eec463fa6f8b2ed6e2db0a80e68`이다. 추가 변경의 직접 소비자 검사와 이전 CI 실패 묶음만 국소 확인하고 후보에 커밋·푸시한 최종 HEAD의 CI를 확인한다. main과 직원 서버·DB·예약은 변경하지 않는다.
+
 최초 후보 `63d4ed59acf223e6cad62b3a360d905825d92021`. 실행 fetch의 main은 `9824903eee733e352b90bdf381bd08b8373271ef`이며 계획 당시49ad542d에 빈 WAL 백업 오탐 수정1건이 추가됐다. 이 커밋까지 통합한다.
 
 로컬 원문/복원 자료는 `_attic/runtime/integration-main-20261019/`에 보존한다. 선행53개 파일·diff·DB 온라인 백업은 `preflight.json`, `working-files/`, `working.patch`, `review-before.db`. 원 DB revision은 `20261015_0047`.
