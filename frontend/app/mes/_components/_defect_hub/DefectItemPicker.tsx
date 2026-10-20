@@ -236,16 +236,17 @@ export function DefectItemPicker({
 
   const filterGridClass = `grid min-w-0 flex-1 grid-cols-3 items-end gap-2 ${mobilePresentation ? "" : "lg:grid-cols-[1fr_1fr_1fr_2fr]"}`;
   const searchFieldClass = `col-span-3 flex min-w-0 flex-col gap-0.5 ${mobilePresentation ? "" : "lg:col-span-1"}`;
+  const filterTriggerClass = mobilePresentation ? undefined : "lg:h-10 lg:min-h-10";
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col gap-3">
       {/* 필터 + 순서 편집 토글 */}
       <div className="flex shrink-0 flex-col gap-2">
-        <div data-testid="defect-picker-toolbar" className="flex h-[50px] items-end justify-between gap-2">
+        <div data-testid="defect-picker-toolbar" className={`flex h-[50px] items-end justify-between gap-2 ${mobilePresentation ? "" : "lg:h-auto"}`}>
           <div className={filterGridClass} style={{ opacity: editMode ? 0.4 : 1, pointerEvents: editMode ? "none" : undefined }}>
-            <LabeledSelect label="부서" value={dept} onChange={setDept} options={DEPT_OPTIONS} />
-            <LabeledSelect label="모델" value={model} onChange={setModel} options={modelOptions} />
-            <LabeledSelect label="단계" value={stage} onChange={setStage} options={STAGE_OPTIONS} />
+            <LabeledSelect label="부서" value={dept} onChange={setDept} options={DEPT_OPTIONS} triggerClassName={filterTriggerClass} />
+            <LabeledSelect label="모델" value={model} onChange={setModel} options={modelOptions} triggerClassName={filterTriggerClass} />
+            <LabeledSelect label="단계" value={stage} onChange={setStage} options={STAGE_OPTIONS} triggerClassName={filterTriggerClass} />
             {/* 모바일: 검색을 아래 전체폭 줄로(드롭다운 폭 확보). 데스크톱(lg): 기존 4열 인라인. */}
             <label className={searchFieldClass}>
               <span
@@ -255,8 +256,7 @@ export function DefectItemPicker({
                 검색
               </span>
               <SearchInput value={search} onChange={setSearch} placeholder="품목명 · 품목 코드"
-                ariaLabel="검색" className={mobilePresentation ? "rounded-[10px] px-2" : "rounded-[10px] px-2 lg:h-[30px] lg:min-h-0 lg:[&_button]:h-7 lg:[&_button]:min-h-0 lg:[&_button]:min-w-7"}
-                inputProps={{ className: mobilePresentation ? undefined : "lg:h-7" }} />
+                ariaLabel="검색" className={mobilePresentation ? "rounded-[10px] px-2" : "rounded-[10px] px-2 lg:h-10 lg:min-h-10"} />
             </label>
           </div>
           {!mobilePresentation && operator?.employee_id && (
@@ -266,7 +266,7 @@ export function DefectItemPicker({
                 <button
                   type="button"
                   onClick={cancelEditMode}
-                  className="standard-hover h-[34px] rounded-[10px] border px-2.5 py-1.5 text-[12px] font-bold transition-colors"
+                  className="standard-hover h-10 rounded-[10px] border px-2.5 text-[12px] font-bold transition-colors"
                   style={{
                     background: LEGACY_COLORS.s2,
                     borderColor: LEGACY_COLORS.border,
@@ -279,7 +279,7 @@ export function DefectItemPicker({
                 <button
                   type="button"
                   onClick={enterEditMode}
-                  className="standard-hover flex h-[34px] items-center gap-1 rounded-[10px] border px-2.5 py-1.5 text-[12px] font-bold transition-colors"
+                  className="standard-hover flex h-10 items-center gap-1 rounded-[10px] border px-2.5 text-[12px] font-bold transition-colors"
                   style={{
                     background: LEGACY_COLORS.s2,
                     borderColor: LEGACY_COLORS.border,

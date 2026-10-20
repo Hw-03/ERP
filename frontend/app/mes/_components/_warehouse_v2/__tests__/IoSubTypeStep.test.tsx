@@ -43,6 +43,7 @@ describe("IoSubTypeStep", () => {
       expect(image).toHaveAttribute("fetchpriority", "high");
       expect(image).not.toHaveAttribute("srcset");
     }
+    expect(screen.queryByText("세부 작업")).not.toBeInTheDocument();
   });
 
   it("수량보정 방향은 입고·출고 DEXRAY 그림을 제목 뒤에 표시한다", () => {
@@ -114,6 +115,7 @@ describe("IoSubTypeStep", () => {
 
     expect(onDirectionChange).toHaveBeenNthCalledWith(1, "in");
     expect(onDirectionChange).toHaveBeenNthCalledWith(2, "out");
+    expect(screen.queryByText("방향")).not.toBeInTheDocument();
     expect(screen.queryByText("대상 부서")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "조립" })).not.toBeInTheDocument();
   });
@@ -135,6 +137,7 @@ describe("IoSubTypeStep", () => {
 
     expect(screen.getByRole("button", { name: "생산 입고" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "분해 출고" })).toBeInTheDocument();
+    expect(screen.queryByText("방향")).not.toBeInTheDocument();
     expect(screen.queryByText("대상 부서")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "조립" })).not.toBeInTheDocument();
   });

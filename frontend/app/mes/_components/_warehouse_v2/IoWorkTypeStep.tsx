@@ -126,7 +126,6 @@ export function IoSubTypeStep({
   if (workType === "warehouse_adjust") {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <Step2Label label="방향" />
         <div className="grid min-h-0 flex-1 grid-cols-2 gap-4">
           <DirectionCard
             dir="in"
@@ -149,7 +148,6 @@ export function IoSubTypeStep({
   if (workType === "process") {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <Step2Label label="방향" />
         <div className="grid min-h-0 flex-1 grid-cols-2 gap-4">
           <DirectionCard
             dir="in"
@@ -180,7 +178,6 @@ export function IoSubTypeStep({
     <div className="grid h-full min-h-0 gap-6" style={{ gridTemplateRows: nonProcessRows }}>
       {/* 세부 작업 칩 */}
       <div className="flex min-h-0 flex-col">
-        <Step2Label label="세부 작업" />
         <div
           className="grid min-h-0 flex-1 gap-4"
           style={{

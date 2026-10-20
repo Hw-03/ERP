@@ -12,11 +12,13 @@ export function LabeledSelect({
   value,
   onChange,
   options,
+  triggerClassName,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: AppSelectOption[];
+  triggerClassName?: string;
 }) {
   return (
     <label className="flex flex-col gap-0.5">
@@ -28,6 +30,7 @@ export function LabeledSelect({
         onChange={onChange}
         options={options}
         size="sm"
+        triggerClassName={triggerClassName}
         triggerStyle={{ fontSize: "0.875rem" }}
       />
     </label>
@@ -97,7 +100,7 @@ export function WizardStepCard({
         }}
       >
         {chromeOnly ? (
-          chrome ? <header className="mb-5">{chrome}</header> : null
+          chrome ? <header className="mb-5 lg:mb-2">{chrome}</header> : null
         ) : (
           <header className={chrome ? "mb-5 flex items-start gap-3" : "mb-5 flex items-center gap-3"}>
             <span

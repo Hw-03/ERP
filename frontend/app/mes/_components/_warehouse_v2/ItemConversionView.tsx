@@ -250,7 +250,7 @@ export function ItemConversionWorkView({
 
   return (
     <section
-      className="flex h-full min-h-0 flex-col gap-3"
+      className="flex h-full min-h-0 flex-col gap-3 lg:gap-2"
       data-testid="item-conversion-work"
     >
       <ItemConversionStepChrome
@@ -587,7 +587,7 @@ function CandidatePanel({
           disabled={disabled}
           onChange={onQuery}
           placeholder={placeholder}
-          className="min-h-12"
+          className="min-h-12 lg:h-10 lg:min-h-10"
         />
       <div data-testid={`item-conversion-${kind}-candidate-shell`} className="relative min-h-0 flex-1">
         <div
