@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from decimal import Decimal
 from typing import Optional
 
 from fastapi import Request
@@ -23,7 +22,6 @@ from app.services.dept_hierarchy import can_approve_department
 from app.services.io_persist import ensure_stock_request_batch_is_mutable, sync_batch_from_stock_request
 from app.services.pin_auth import verify_pin
 from app.services.inventory_conflicts import InventoryConflict
-from app.services.work_reservation_errors import WorkReservationError
 from app.services.stocktake_guard import prepare_items
 from app.services.sr_execution import (
     _execute_all_lines,
@@ -41,66 +39,6 @@ from app.services.sr_execution import (
 
 class FailedApprovalError(Exception):
     """승인 실행 실패. internal-use는 잠금 UoW, 일반 요청은 별도 UoW에 기록한다."""
-
-
-def _prelock_linked_reservations(db: Session, request: StockRequest) -> list[StockRequest]:
-    """형제 요청의 모든 재고 부모와 셀을 첫 release/execute 전에 함께 잠근다."""
-    from app.services import internal_use_approval
-
-    requests = (db.query(StockRequest).filter_by(operation_batch_id=request.operation_batch_id).all()
-                if request.operation_batch_id is not None else [request])
-    internal_use_approval.prelock_reservation_sources(db, requests)
-    return requests
-
-
-def _validate_saved_request_plan(db: Session, request: StockRequest) -> None:
-    """새 예약 snapshot은 승인 전에 검증하고, snapshot 없는 과거 승인은 보존한다."""
-    if request.operation_batch_id is None:
-        _prelock_linked_reservations(db, request)
-        return
-    batch = db.query(IoBatch).filter_by(batch_id=request.operation_batch_id).one()
-    if batch.effective_plan is None:
-        _prelock_linked_reservations(db, request)
-        return
-    if batch.effective_plan is not None:
-        from app.services.io_reservations import validate_saved_plan
-        from app.services import internal_use_approval
-        from app.services.stock_availability import AvailabilityCell, figures_for_cells
-        from app.services.sr_reservation import aggregate_reservations
-
-        plan = validate_saved_plan(db, batch)
-        requests = db.query(StockRequest).filter_by(operation_batch_id=batch.batch_id).all()
-        internal_use_approval.prelock_reservation_sources(db, requests, extra_plan=plan)
-        open_requests = [row for row in requests if row.status in {
-            StockRequestStatusEnum.SUBMITTED, StockRequestStatusEnum.RESERVED}]
-        open_line_ids = {str(line.operation_line_id) for row in open_requests for line in row.lines}
-        needed = {}
-        identities = {}
-        for effect in plan["effects"]:
-            source = effect["from"]
-            if source is None or effect["operation_line_id"] not in open_line_ids:
-                continue
-            item_id = uuid.UUID(effect["item_id"])
-            cell = AvailabilityCell.warehouse(item_id) if source["bucket"] == "warehouse" else AvailabilityCell.location(item_id, source["department"])
-            needed[cell] = needed.get(cell, Decimal(0)) + Decimal(effect["quantity"])
-            identities[cell] = {key: effect[key] for key in ("item_id", "item_name", "mes_code", "unit")}
-        credit = {}
-        for group in aggregate_reservations(line for row in open_requests if row.status == StockRequestStatusEnum.RESERVED for line in row.lines):
-            cell = AvailabilityCell.warehouse(group.item_id) if group.department is None else AvailabilityCell.location(group.item_id, group.department, group.status)
-            credit[cell] = group.quantity
-        figures = figures_for_cells(db, needed, lock_allocations=True)
-        shortages = []
-        for cell, quantity in sorted(needed.items(), key=lambda pair: pair[0].sort_key):
-            available = figures[cell].available + credit.get(cell, Decimal(0))
-            if available < quantity:
-                shortages.append({**identities[cell], "location": {
-                    "bucket": "warehouse" if cell.department is None else "production", "department": cell.department},
-                    "required_quantity": int(quantity), "available_quantity": int(available),
-                    "shortage_quantity": int(quantity - available)})
-        if shortages:
-            raise WorkReservationError("STOCK_SHORTAGE", "승인할 재고가 부족합니다.", 422, {
-                "shortages": [f"{row['item_name']}: {row['shortage_quantity']} 부족" for row in shortages],
-                "reservation_shortages": shortages})
 
 
 def _settle_internal_use_or_fail(
@@ -121,7 +59,7 @@ def _settle_internal_use_or_fail(
                 requests=requests,
                 actor=actor,
             )
-    except (InventoryConflict, WorkReservationError, PermissionError):
+    except InventoryConflict:
         raise
     except Exception as exc:
         raise FailedApprovalError(str(exc)) from exc
@@ -158,7 +96,6 @@ def approve_request(
             raise ValueError("창고 결재가 필요하지 않은 요청입니다.")
         if request.status not in (StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED):
             raise ValueError(f"승인할 수 없는 상태입니다: {request.status.value}")
-        _validate_saved_request_plan(db, request)
         if request.approved_at is None:
             now = datetime.utcnow()
             request.approved_by_employee_id = approver.employee_id
@@ -175,9 +112,6 @@ def approve_request(
         raise ValueError(f"승인할 수 없는 상태입니다: {request.status.value}")
     if not request.requires_warehouse_approval:
         raise ValueError("승인이 필요하지 않은 요청입니다.")
-    if request.approved_at is not None:
-        return request
-    _validate_saved_request_plan(db, request)
 
     now = datetime.utcnow()
     # 창고 결재 기록 (감사용 — dept 결재 대기 중에도 노출).
@@ -260,7 +194,6 @@ def approve_request_department(
         batch, requests, request = internal_use_approval.locked_request(db, request)
         if request.status not in (StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED):
             raise ValueError(f"승인할 수 없는 상태입니다: {request.status.value}")
-        _validate_saved_request_plan(db, request)
         if request.department_approved_at is None:
             now = datetime.utcnow()
             request.department_approved_by_employee_id = approver.employee_id
@@ -276,7 +209,6 @@ def approve_request_department(
         raise ValueError(f"승인할 수 없는 상태입니다: {request.status.value}")
     if request.department_approved_by_employee_id is not None:
         raise ValueError("이미 부서 결재가 완료된 요청입니다.")
-    _validate_saved_request_plan(db, request)
 
     now = datetime.utcnow()
     request.department_approved_by_employee_id = approver.employee_id
@@ -417,7 +349,6 @@ def reject_request(
     if request.status not in (StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED):
         raise ValueError(f"반려할 수 없는 상태입니다: {request.status.value}")
 
-    _prelock_linked_reservations(db, request)
     release_reservation(db, request)
 
     now = datetime.utcnow()
@@ -495,7 +426,6 @@ def reject_request_department(
         raise ValueError(f"반려할 수 없는 상태입니다: {request.status.value}")
 
     # source-aware RESERVED 라인의 창고/부서 위치 점유를 원복한다.
-    _prelock_linked_reservations(db, request)
     release_reservation(db, request)
 
     now = datetime.utcnow()
@@ -535,7 +465,6 @@ def approve_request_as_research(
         raise ValueError("AS·연구 결재가 필요하지 않은 요청입니다.")
     if request.status not in (StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED):
         raise ValueError(f"승인할 수 없는 상태입니다: {request.status.value}")
-    _validate_saved_request_plan(db, request)
     if request.as_research_approved_at is None:
         now = datetime.utcnow()
         request.as_research_approved_by_employee_id = approver.employee_id
@@ -623,7 +552,6 @@ def cancel_request(
     ):
         raise ValueError(f"취소할 수 없는 상태입니다: {request.status.value}")
 
-    _prelock_linked_reservations(db, request)
     release_reservation(db, request)
 
     now = datetime.utcnow()

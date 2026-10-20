@@ -42,8 +42,7 @@ AS·연구 사용출고의 BOM 차감 방식은 `상·하위 차감`, `하위만
 첫 반려 시 남은 연결 요청을 취소하고 모든 예약을 해제하며 실재고를 바꾸지 않는다.
 
 - `useIoPreview.ts`: BOM 전개 미리보기
-- `useIoDraft.ts`, `useIoDraftRestore.ts`: 작업 중 저장·전량 예약과 복원. 신규 저장 키를 유지하며 기존 작업 수정·삭제·제출에는 관측 버전을 전달한다.
-- `useWarehousePullReturn.ts`: 부족한 원작업의 저장 없이 창고 작업으로 이동하고 현재 작성 세션의 원작업 입력·예약 버전·생성/제출 키를 복원한다. 창고 이동 승인 대기는 도착 재고에 포함하지 않는다.
+- `useIoDraft.ts`, `useIoDraftRestore.ts`: 임시저장과 복원
 - `useIoSubmit.ts`: 최종 제출
 - `useIoUrlSync.ts`: 단계 URL 동기화
 - `useIoPreselect.ts`: 대시보드 등에서 진입할 때 사전 선택 처리
@@ -59,7 +58,7 @@ AS·연구 사용출고의 BOM 차감 방식은 `상·하위 차감`, `하위만
 이번 리뷰 준비 작업에서는 아래 구조 변경을 하지 않습니다. 입출고는 실제 재고 수량을 바꾸는 핵심 흐름이므로,
 권동환 사원이 코드를 본 뒤 경계를 함께 정하고 진행하는 편이 안전합니다.
 
-- `IoComposeView.tsx`: layout 보정, 업무 계산 로직 분리 후보
+- `IoComposeView.tsx`: autosave, layout 보정, 업무 계산 로직 분리 후보
 - `IoTargetPicker.tsx`: 필터, 정렬, 테이블 렌더링 분리 후보
 
 수정 전에는 `warehouseFlow.golden.test.ts`와 관련 백엔드 입출고 테스트를 먼저 확인하세요.

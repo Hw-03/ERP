@@ -113,7 +113,6 @@ app = FastAPI(
         {"name": "Admin Audit", "description": "관리자 액션 감사로그 조회 (마스터/설정 변경)."},
         {"name": "Admin Integrity", "description": "관리자용 재고·취소 원장 정합성 읽기 전용 진단."},
         {"name": "Admin Export", "description": "관리자용 생산 이력 내보내기."},
-        {"name": "Admin Work Reservations", "description": "관리자용 작업 예약 조회와 취소."},
         {"name": "Assembly Checklists", "description": "조립 체크리스트 관리."},
         {"name": "Client Events", "description": "클라이언트 이벤트 수집."},
         {"name": "Daily Work Reports", "description": "일일 작업 보고서 관리."},
@@ -225,14 +224,6 @@ def _rid(request: Request) -> str:
 
 
 from app.services.inventory_conflicts import InventoryConflict
-from app.services.work_reservation_errors import WorkReservationError
-
-
-@app.exception_handler(WorkReservationError)
-def _work_reservation_error_handler(request: Request, exc: WorkReservationError) -> JSONResponse:
-    """Keep conflict and committed-failure metadata identical across reservation APIs."""
-    return JSONResponse(status_code=exc.status_code,
-                        content=_error_payload(exc.code, exc.message, extra=exc.extra))
 
 
 @app.exception_handler(InventoryConflict)
@@ -347,8 +338,6 @@ app.include_router(admin_audit_csv.router, prefix="/api/admin", tags=["Admin Aud
 app.include_router(admin_audit_ledger.router, prefix="/api/admin", tags=["Admin Audit"])
 app.include_router(admin_activity_audit.router, prefix="/api/admin", tags=["Admin Audit"])
 app.include_router(admin_inventory_integrity.router, prefix="/api/admin", tags=["Admin Integrity"])
-from app.routers import admin_work_reservations
-app.include_router(admin_work_reservations.router, prefix="/api/admin/work-reservations", tags=["Admin Work Reservations"])
 app.include_router(admin_production_log.router, prefix="/api/admin", tags=["Admin Export"])
 app.include_router(stock_requests.router, prefix="/api/stock-requests", tags=["Stock Requests"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])

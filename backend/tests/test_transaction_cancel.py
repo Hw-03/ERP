@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 from decimal import Decimal
-import uuid
 
 import pytest
 from sqlalchemy.orm import Session
@@ -21,7 +20,6 @@ from app.models import (
     InventoryLocation,
     LocationStatusEnum,
     Supplier,
-    SystemSetting,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -103,7 +101,6 @@ def _receive_v2(client, db_session, item, requester: Employee, quantity: int):
     res = client.post(
         "/api/io/submit",
         json={
-            "client_request_id": str(uuid.uuid4()),
             "requester_employee_id": str(requester.employee_id),
             "work_type": "receive",
             "sub_type": "receive_supplier",
@@ -577,7 +574,6 @@ def test_cancel_internal_use_restores_warehouse_total(client, db_session, make_i
     submitted = client.post(
         "/api/io/submit",
         json={
-            "client_request_id": str(uuid.uuid4()),
             "requester_employee_id": str(actor.employee_id),
             "work_type": "internal_use",
             "sub_type": "internal_use_out",
@@ -633,7 +629,6 @@ def test_cancel_internal_use_batch_restores_all_items(
     submitted = client.post(
         "/api/io/submit",
         json={
-            "client_request_id": str(uuid.uuid4()),
             "requester_employee_id": str(actor.employee_id),
             "work_type": "internal_use",
             "sub_type": "internal_use_out",
@@ -1039,7 +1034,6 @@ def test_cancel_batch_rolls_back_first_reversal_when_second_reversal_fails(
     submitted = client.post(
         "/api/io/submit",
         json={
-            "client_request_id": str(uuid.uuid4()),
             "requester_employee_id": str(actor.employee_id),
             "work_type": "internal_use",
             "sub_type": "internal_use_out",
@@ -1349,7 +1343,6 @@ def test_cancel_io_v2_receive_restores(client, db_session, make_item):
     res = client.post(
         "/api/io/submit",
         json={
-            "client_request_id": str(uuid.uuid4()),
             "requester_employee_id": str(requester.employee_id),
             "work_type": "receive",
             "sub_type": "receive_supplier",
@@ -1484,17 +1477,14 @@ def test_cancel_idempotent_double(client, db_session, make_item):
 
 
 @pytest.mark.parametrize("cancel_as", ["requester", "approver", "other"])
-@pytest.mark.parametrize("cancel_endpoint", ["transaction", "operation"])
 def test_cancel_approved_adjustment_uses_batch_requester(
-    client, db_session: Session, make_item, cancel_as: str, cancel_endpoint: str,
+    client, db_session: Session, make_item, cancel_as: str,
 ) -> None:
     """승인 처리자의 ID가 기록되어도 배치 요청자는 본인 거래를 취소한다."""
     item = make_item(name="Approved adjustment", process_type_code="AF")
     requester = _make_employee(db_session, code="ADJ-REQ")
     approver = _make_employee(db_session, code="ADJ-APR", department_role="primary")
     other = _make_employee(db_session, code="ADJ-OTHER", name=requester.name)
-    if cancel_endpoint == "operation":
-        db_session.add(SystemSetting(setting_key="inventory_operation_cutover_at", setting_value="2026-01-01T00:00:00"))
     db_session.commit()
     payload = {
         "requester_employee_id": str(requester.employee_id),
@@ -1508,7 +1498,6 @@ def test_cancel_approved_adjustment_uses_batch_requester(
     })
     assert preview.status_code == 200, preview.text
     submitted = client.post("/api/io/submit", json={
-        "client_request_id": str(uuid.uuid4()),
         **payload, "notes": "Adjustment cancellation regression", "bundles": preview.json()["bundles"],
     })
     assert submitted.status_code == 201, submitted.text
@@ -1526,65 +1515,10 @@ def test_cancel_approved_adjustment_uses_batch_requester(
     assert _cells(db_session, item.item_id)[1] == 7
 
     actor = {"requester": requester, "approver": approver, "other": other}[cancel_as]
-    if cancel_endpoint == "operation":
-        preview = client.post(f"/api/inventory/operations/{log.operation_id}/cancel/preview")
-        assert preview.status_code == 200, preview.text
-        response = client.post(f"/api/inventory/operations/{log.operation_id}/cancel", json={
-            "employee_code": actor.employee_code, "pin": "0000", "reason": "Requester cancellation",
-            "plan_hash": preview.json()["plan_hash"],
-        })
-    else:
-        response = _cancel(client, log.log_id, code=actor.employee_code)
+    response = _cancel(client, log.log_id, code=actor.employee_code)
 
     assert response.status_code == (403 if cancel_as == "other" else 200), response.text
     assert _cells(db_session, item.item_id)[1] == (7 if cancel_as == "other" else 0)
-
-
-@pytest.mark.parametrize("cancel_as", ["requester", "other", "former_approver"])
-def test_cancel_approved_warehouse_operation_uses_requester_and_reverses_once(
-    client, db_session: Session, make_item, cancel_as: str,
-) -> None:
-    """승인자의 실행 기록도 요청자가 취소하며 타인·중복 취소는 재고를 바꾸지 않는다."""
-    item = make_item(name="Warehouse requester cancellation", process_type_code="AR", warehouse_qty=Decimal("10"))
-    requester = _make_employee(db_session, code="OP-WH-REQ")
-    approver = _make_employee(db_session, code="OP-WH-APR", warehouse_role="primary")
-    other = _make_employee(db_session, code="OP-WH-OTHER", name=requester.name)
-    db_session.add(SystemSetting(setting_key="inventory_operation_cutover_at", setting_value="2026-01-01T00:00:00"))
-    db_session.commit()
-    payload = {
-        "requester_employee_id": str(requester.employee_id),
-        "work_type": "warehouse_io", "sub_type": "warehouse_to_dept",
-        "to_department": DepartmentEnum.ASSEMBLY.value,
-    }
-    preview = client.post("/api/io/preview", json={
-        **payload, "targets": [{"source_kind": "direct_item", "item_id": str(item.item_id), "quantity": 2}],
-    })
-    assert preview.status_code == 200, preview.text
-    submitted = client.post("/api/io/submit", json={
-        **payload, "client_request_id": str(uuid.uuid4()), "bundles": preview.json()["bundles"],
-    })
-    assert submitted.status_code == 201, submitted.text
-    approved = _approve(client, submitted.json()["stock_request_id"], approver)
-    assert approved.status_code == 200, approved.text
-    log = db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).one()
-    assert log.producer_employee_id == approver.employee_id
-    assert log.operation_batch_id is not None
-    assert _cells(db_session, item.item_id)[:2] == (8, 10)
-    approver.warehouse_role = "none"
-    db_session.commit()
-    actor = {"requester": requester, "other": other, "former_approver": approver}[cancel_as]
-    preview = client.post(f"/api/inventory/operations/{log.operation_id}/cancel/preview")
-    assert preview.status_code == 200, preview.text
-    command = {"employee_code": actor.employee_code, "pin": "0000", "reason": "Requester cancellation",
-               "plan_hash": preview.json()["plan_hash"]}
-    response = client.post(f"/api/inventory/operations/{log.operation_id}/cancel", json=command)
-    assert response.status_code == (200 if cancel_as == "requester" else 403), response.text
-    assert _cells(db_session, item.item_id)[:2] == ((10, 10) if cancel_as == "requester" else (8, 10))
-    if cancel_as == "requester":
-        repeated = client.post(f"/api/inventory/operations/{log.operation_id}/cancel", json=command)
-        assert repeated.status_code in (409, 422), repeated.text
-        assert _cells(db_session, item.item_id)[:2] == (10, 10)
-        assert db_session.query(TransactionLog).filter(TransactionLog.reverses_log_id == log.log_id).count() == 1
 
 
 def test_cancel_non_self_non_approver_forbidden(client, db_session, make_item):

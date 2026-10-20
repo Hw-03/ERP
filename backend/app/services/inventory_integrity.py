@@ -25,7 +25,6 @@ from app.models import (
     InventoryOperationKindEnum,
     InventoryOperationStatusEnum,
     IoBatch,
-    IoDraftReservation,
     Item,
     LocationStatusEnum,
     ShippingAllocation,
@@ -49,11 +48,9 @@ from app.schemas.inventory_integrity import (
 )
 from app.services.business_correction_lineage import effect_was_corrected, is_correction
 from app.services.inventory_integrity_engine import (
-    DraftReservationState,
     IntegrityFinding,
     InventoryIntegritySnapshot,
     InventoryState,
-    IoBatchState,
     LocationState,
     OperationEvidenceState,
     OperationState,
@@ -745,15 +742,13 @@ def _setting_datetime(db: Session, key: str) -> Optional[datetime]:
 
 
 def _collect_integrity_snapshot(db: Session) -> InventoryIntegritySnapshot:
-    """재고와 승인·작업 예약 원장을 같은 읽기 트랜잭션에서 정규화한다."""
+    """Friday 0033의 실제 행을 같은 읽기 트랜잭션에서 정규화한다."""
 
     items = db.query(Item.item_id, Item.deleted_at).all()
     inventories = db.query(Inventory).all()
     locations = db.query(InventoryLocation).all()
     stock_requests = db.query(StockRequest).all()
     stock_request_lines = db.query(StockRequestLine).all()
-    io_batches = db.query(IoBatch).all()
-    draft_reservations = db.query(IoDraftReservation).all()
     shipping_requests = db.query(ShippingRequest).all()
     shipping_allocations = db.query(ShippingAllocation).all()
     angle_ids = {str(row[0]) for row in db.query(WarehouseAngle.id).all()}
@@ -857,25 +852,6 @@ def _collect_integrity_snapshot(db: Session) -> InventoryIntegritySnapshot:
         if deleted_at is None
     )
     return InventoryIntegritySnapshot(
-        io_batches=tuple(
-            IoBatchState(
-                batch_id=str(row.batch_id),
-                status=str(row.status),
-                reservation_status=str(row.reservation_status),
-            )
-            for row in io_batches
-        ),
-        draft_reservations=tuple(
-            DraftReservationState(
-                reservation_id=str(row.reservation_id),
-                batch_id=str(row.batch_id),
-                item_id=str(row.item_id),
-                source_bucket=str(row.source_bucket),
-                source_department=str(row.source_department),
-                quantity=Decimal(str(row.quantity)),
-            )
-            for row in draft_reservations
-        ),
         item_ids=item_ids,
         active_item_ids=active_item_ids,
         inventories=tuple(

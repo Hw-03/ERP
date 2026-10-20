@@ -56,11 +56,11 @@ vi.mock("@/lib/queries/useBomQuery", () => ({
   useBomListQuery: () => bomQuery,
 }));
 vi.mock("../../../_warehouse_v2/useIoWorkState", () => ({ useIoWorkState: () => state }));
-vi.mock("../../../_warehouse_v2/useIoDraftRestore", () => ({ useIoDraftRestore: ({ draftToRestore, autosaveBatchIdRef }: { draftToRestore?: { batch_id: string }; autosaveBatchIdRef: { current: string | null } }) => { if (draftToRestore) autosaveBatchIdRef.current = draftToRestore.batch_id; } }));
-vi.mock("../../../_warehouse_v2/useIoDraft", () => ({ useIoDraft: () => ({ drafting: false, saveDraft, captureSession: () => vi.fn(), resetSession: vi.fn(), submitDraft: vi.fn() }) }));
+vi.mock("../../../_warehouse_v2/useIoDraftRestore", () => ({ useIoDraftRestore: () => {} }));
+vi.mock("../../../_warehouse_v2/useIoDraft", () => ({ useIoDraft: () => ({ drafting: false, saveDraft }) }));
 vi.mock("../../../_warehouse_v2/useIoPreview", () => ({ useIoPreview: () => ({ previewing: false, previewTarget }) }));
 vi.mock("../../../_warehouse_v2/useIoSubmit", () => ({
-  useIoSubmit: () => ({ submitting: false, run: (work: () => Promise<unknown>) => work(), submit, resetSession: vi.fn(), captureSession: () => vi.fn() }),
+  useIoSubmit: () => ({ submitting: false, run: (work: () => Promise<unknown>) => work(), submit }),
 }));
 vi.mock("../MobileWorkTypeStep", () => ({
   MobileWorkTypeStep: () => null,
@@ -362,11 +362,11 @@ describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
     expect(screen.getByTestId("mobile-picker-filter-state")).toHaveTextContent("ALL|전체|ALL|");
   });
 
-  it("명시적 저장 실패 시 원 작업을 유지하고 preview를 시작하지 않는다", async () => {
+  it("저장 실패 시 원 작업을 유지하고 preview를 시작하지 않는다", async () => {
     saveDraft.mockRejectedValue(new Error("초안 저장 실패"));
     renderWizard();
 
-    fireEvent.click(screen.getByRole("button", { name: "모바일 임시저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "부족 품목 가져오기" }));
 
     await waitFor(() => expect(screen.getByText("초안 저장 실패")).toBeInTheDocument());
     expect(previewTarget).not.toHaveBeenCalled();
@@ -390,7 +390,7 @@ describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
 
   it("모든 preview 성공 뒤에만 원 draftId 제거를 요청하고 새 작업으로 전환한다", async () => {
     const onDraftSaved = vi.fn();
-    render(<MobileIoComposeWizard globalSearch="" operator={operator} items={[]} setItems={vi.fn()} onStatusChange={vi.fn()} onDraftSaved={onDraftSaved} restoreDraft={{ batch_id: "source-draft", work_type: "process", sub_type: "produce", bundles: state.bundles } as never} />);
+    renderWizard(onDraftSaved);
 
     fireEvent.click(screen.getByRole("button", { name: "부족 품목 가져오기" }));
 
@@ -433,7 +433,7 @@ describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
     expect(onDraftSaved).not.toHaveBeenCalled();
   });
 
-  it("새 composition 뒤 늦게 끝난 명시적 저장이 다음 저장 ID와 알림을 오염시키지 않는다", async () => {
+  it("새 composition 뒤 늦게 끝난 pull 저장이 다음 저장 ID와 알림을 오염시키지 않는다", async () => {
     const pendingSave = deferred<{ batch_id: string }>();
     const onDraftSaved = vi.fn();
     const onStatusChange = vi.fn();
@@ -446,7 +446,7 @@ describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
       .mockResolvedValueOnce({ batch_id: "new-draft" });
     const view = renderWizard(onDraftSaved, onStatusChange);
 
-    fireEvent.click(screen.getByRole("button", { name: "모바일 임시저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "부족 품목 가져오기" }));
     await waitFor(() => expect(saveDraft).toHaveBeenCalledTimes(1));
 
     state.step = 2;
@@ -477,7 +477,7 @@ describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
     await waitFor(() => expect(onDraftSaved).toHaveBeenCalledWith("new-draft", 4));
   });
 
-  it("명시적 저장 대기 중 수량 편집을 보존하고 오래된 저장 부수효과를 버린다", async () => {
+  it("pull 저장 대기 중 수량 편집을 보존하고 오래된 저장 부수효과를 버린다", async () => {
     const pendingSave = deferred<{ batch_id: string }>();
     const onDraftSaved = vi.fn();
     const onStatusChange = vi.fn();
@@ -490,7 +490,7 @@ describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
     saveDraft.mockReturnValueOnce(pendingSave.promise);
     const view = renderWizard(onDraftSaved, onStatusChange, onDirtyChange);
 
-    fireEvent.click(screen.getByRole("button", { name: "모바일 임시저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "부족 품목 가져오기" }));
     await waitFor(() => expect(saveDraft).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByRole("button", { name: "모바일 첫 품목 수량 변경" }));
     view.rerender(<MobileIoComposeWizard globalSearch="" operator={operator} items={[]} setItems={vi.fn()} onStatusChange={onStatusChange} onDraftSaved={onDraftSaved} onDirtyChange={onDirtyChange} />);
@@ -525,7 +525,7 @@ describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
       .mockResolvedValueOnce({ batch_id: "stale-content-draft" });
     const view = renderWizard(onDraftSaved, onStatusChange);
 
-    fireEvent.click(screen.getByRole("button", { name: "모바일 임시저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "부족 품목 가져오기" }));
     await waitFor(() => expect(saveDraft).toHaveBeenCalledTimes(1));
     expect(saveDraft.mock.calls[0][0]).toEqual(expect.objectContaining({ batchId: null }));
     fireEvent.click(screen.getByRole("button", { name: "모바일 첫 품목 수량 변경" }));

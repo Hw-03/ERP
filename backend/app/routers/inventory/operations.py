@@ -24,7 +24,6 @@ from app.models import (
     Employee,
     InventoryOperation,
     InventoryOperationKindEnum,
-    IoBatch,
     Item,
     StocktakeApplication,
     StocktakeApplicationLine,
@@ -288,7 +287,6 @@ def _verified_canceller(
     employee_code: str,
     pin: str,
 ) -> Employee:
-    """배치 요청자를 본인으로 판정하고, 배치가 없는 직접 작업만 실행자를 사용한다."""
     employee = db.query(Employee).filter(Employee.employee_code == employee_code).one_or_none()
     if employee is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
@@ -296,19 +294,7 @@ def _verified_canceller(
         raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 작업을 취소할 수 없습니다.")
     if not verify_pin(employee.pin_hash, pin):
         raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
-    requester_ids = {
-        requester_id
-        for (requester_id,) in db.query(IoBatch.requester_employee_id)
-        .join(TransactionLog, TransactionLog.operation_batch_id == IoBatch.batch_id)
-        .filter(TransactionLog.operation_id == operation.operation_id)
-        .distinct()
-        .all()
-    }
-    is_self = (
-        requester_ids == {employee.employee_id}
-        if requester_ids
-        else operation.actor_employee_id == employee.employee_id
-    )
+    is_self = operation.actor_employee_id == employee.employee_id
     is_approver = (
         (employee.warehouse_role or "none").lower() != "none"
         or (employee.department_role or "none").lower() != "none"

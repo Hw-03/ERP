@@ -372,7 +372,7 @@ export function IoConfirmStep({
       {/* 액션 푸터 — Step4(IoBundleCart 126줄) 와 동일: 모바일 하단 sticky + 페이지 배경, PC(lg)는 정적·대형 그대로. */}
       <div data-io-confirm-actions className="sticky bottom-0 z-20 -mx-3 mt-auto flex flex-col gap-2 bg-[var(--c-bg)] px-4 pb-0 pt-2 lg:static lg:mx-0 lg:gap-3 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-1">
         {/* blocker */}
-        {blockerText && !submitting && !saving && (
+        {blockerText && (
           <div
             className="rounded-[16px] border px-4 py-3 text-center text-sm font-bold"
             style={{

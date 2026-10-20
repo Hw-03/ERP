@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ClipboardList } from "lucide-react";
-import { api, type IoBatch, type StockRequest } from "@/lib/api";
+import type { IoBatch, StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState } from "../common";
 import { ReadFailure } from "../common/ReadState";
@@ -51,24 +51,6 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, onContinu
   const [revertTarget, setRevertTarget] = useState<StockRequest | null>(null);
   const [revertPin, setRevertPin] = useState("");
   const [revertError, setRevertError] = useState<string | null>(null);
-  const [revertRevision, setRevertRevision] = useState<number | null>(null);
-  const [revertLoading, setRevertLoading] = useState(false);
-
-  useEffect(() => {
-    setRevertRevision(null);
-    if (!revertTarget) return;
-    if (!revertTarget.operation_batch_id) { setRevertError("연결된 작업을 확인할 수 없습니다."); return; }
-    let cancelled = false;
-    setRevertLoading(true);
-    void api.getBatch(revertTarget.operation_batch_id).then((batch) => {
-      if (cancelled) return;
-      if (!Number.isInteger(batch.revision)) { setRevertError("작업 버전을 확인할 수 없습니다. 목록을 다시 불러오세요."); return; }
-      setRevertRevision(batch.revision!);
-    }).catch((error: unknown) => {
-      if (!cancelled) setRevertError(error instanceof Error ? error.message : "작업을 확인하지 못했습니다.");
-    }).finally(() => { if (!cancelled) setRevertLoading(false); });
-    return () => { cancelled = true; };
-  }, [revertTarget]);
 
   useEffect(() => {
     onEmptyStateChange?.(loading || (items.length === 0 && !loadError));
@@ -105,13 +87,12 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, onContinu
   };
 
   const submitRevert = () => {
-    if (!revertTarget || !revertPin.trim() || revertMutation.isPending || revertLoading) return;
-    if (revertRevision === null) { setRevertError("작업 버전을 확인한 뒤 다시 시도하세요."); return; }
+    if (!revertTarget || !revertPin.trim() || revertMutation.isPending) return;
     setRevertError(null);
     revertMutation.mutate(
       {
         requestId: revertTarget.request_id,
-        payload: { actor_employee_id: revertTarget.requester_employee_id, pin: revertPin, expected_revision: revertRevision },
+        payload: { actor_employee_id: revertTarget.requester_employee_id, pin: revertPin },
       },
       {
         onSuccess: (draft) => {
@@ -121,8 +102,6 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, onContinu
         },
         onError: (err) => {
           setRevertError(err instanceof Error ? err.message : "수정 전환에 실패했습니다.");
-          void refetch();
-          if (revertTarget.operation_batch_id) void api.getBatch(revertTarget.operation_batch_id).catch(() => {});
         },
       },
     );
@@ -206,12 +185,12 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, onContinu
         tone="normal"
         confirmLabel="수정 시작"
         cancelLabel="닫기"
-        busy={revertMutation.isPending || revertLoading}
+        busy={revertMutation.isPending}
         onClose={closeRevert}
         onConfirm={submitRevert}
       >
         <p className="mb-3 text-sm" style={{ color: LEGACY_COLORS.text }}>
-          결재 요청을 작업 중으로 되돌립니다
+          결재 요청을 작성 중으로 되돌립니다
         </p>
         {revertError && (
           <p className="mb-2 text-xs" style={{ color: LEGACY_COLORS.red }}>

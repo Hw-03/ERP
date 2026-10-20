@@ -79,22 +79,22 @@ export const ioApi = {
       toApiUrl(`/api/io/drafts?requester_employee_id=${encodeURIComponent(employeeId)}`),
     ),
 
-  deleteDraft: (batchId: string, employeeId: string, expectedRevision?: number) =>
+  deleteDraft: (batchId: string, employeeId: string) =>
     deleteJson<void>(
       toApiUrl(
-        `/api/io/draft/${encodeURIComponent(batchId)}?requester_employee_id=${encodeURIComponent(employeeId)}${expectedRevision === undefined ? "" : `&expected_revision=${expectedRevision}`}`,
+        `/api/io/draft/${batchId}?requester_employee_id=${encodeURIComponent(employeeId)}`,
       ),
     ),
 
   submit: (payload: IoDraftPayload) =>
     postJson<IoSubmitResponse>(toApiUrl("/api/io/submit"), payload),
 
-  submitDraft: (batchId: string, employeeId: string, expectedRevision?: number) =>
+  submitDraft: (batchId: string, employeeId: string) =>
     postJson<IoSubmitResponse>(
       toApiUrl(
         `/api/io/draft/${encodeURIComponent(batchId)}/submit?requester_employee_id=${encodeURIComponent(employeeId)}`,
       ),
-      expectedRevision === undefined ? {} : { expected_revision: expectedRevision },
+      {},
     ),
 
   getBatch: (batchId: string, opts?: { signal?: AbortSignal }) =>

@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 from decimal import Decimal
-import uuid
 
 import pytest
 from sqlalchemy import event
@@ -76,7 +75,6 @@ def _w2d_request(client, requester, item, to_dept: str = "조립") -> dict:
     res = client.post(
         "/api/io/submit",
         json={
-            "client_request_id": str(uuid.uuid4()),
             "requester_employee_id": str(requester.employee_id),
             "work_type": "warehouse_io",
             "sub_type": "warehouse_to_dept",
@@ -824,7 +822,6 @@ def test_arrived_notification_rolls_back_with_request(client, db_session, make_i
     res = client.post(
         "/api/io/submit",
         json={
-            "client_request_id": str(uuid.uuid4()),
             "requester_employee_id": str(requester.employee_id),
             "work_type": "warehouse_io",
             "sub_type": "warehouse_to_dept",

@@ -13,7 +13,6 @@ import { stockRequestsApi } from "@/lib/api/stock-requests";
 import { ioApi } from "@/lib/api/io";
 import { STALE_TIME } from "./client";
 import { queryKeys } from "./keys";
-import { invalidateWorkReservationQueries, shouldRefreshWorkReservations } from "./workReservationInvalidation";
 
 /** 직원 draft 장바구니(재고요청 draft + IO draft 합본) */
 export function useDraftCartQuery(employeeId: string | null) {
@@ -47,11 +46,9 @@ export function useDeleteStockRequestDraftMutation() {
 export function useDeleteIoDraftMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ batchId, employeeId, expectedRevision }: { batchId: string; employeeId: string; expectedRevision: number }) =>
-      ioApi.deleteDraft(batchId, employeeId, expectedRevision),
-    onSuccess: () => invalidateWorkReservationQueries(qc),
-    onError: (error) => {
-      if (shouldRefreshWorkReservations(error)) void invalidateWorkReservationQueries(qc);
-    },
+    mutationFn: ({ batchId, employeeId }: { batchId: string; employeeId: string }) =>
+      ioApi.deleteDraft(batchId, employeeId),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all }),
   });
 }

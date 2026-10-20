@@ -4,7 +4,7 @@
  * warehouseFlow.golden 의 makeBundle/makeLine 픽스처 패턴을 따른다.
  * collectShortageItemIds: included && shortage>0 수집, 선택 없으면 전체, item_id dedupe.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import type { IoBundle, IoLine } from "@/lib/api/types/io";
 import { collectShortageItemIds, shortageLines } from "../pullFromWarehouse";
 
@@ -47,23 +47,6 @@ function makeBundle(overrides: Partial<IoBundle> & { lines?: IoLine[] } = {}): I
 }
 
 describe("shortageLines", () => {
-  it("커스텀 출고 BOM의 원본 입고 행 대신 실제 출고 부서 가용량을 읽는다", () => {
-    const child = makeLine({ line_id: "child", origin: "bom_auto", quantity: 2, bom_expected: 3,
-      from_bucket: "none", to_bucket: "production", to_department: "고압", shortage: 0 });
-    const bundle = makeBundle({ source_kind: "bom_parent", quantity: 1, lines: [makeLine({ quantity: 1 }), child] });
-    const getAvailable = vi.fn((line: IoLine) => line.from_bucket === "production" && line.from_department === "고압" ? 1 : 20);
-    expect(shortageLines([bundle], "disassemble", getAvailable)).toEqual([child]);
-    expect(getAvailable).toHaveBeenCalledWith(expect.objectContaining({ line_id: "child", direction: "out", from_bucket: "production", from_department: "고압" }));
-    expect(child.from_bucket).toBe("none");
-    expect(child.shortage).toBe(0);
-  });
-
-  it("커스텀 입고로 바뀐 BOM 하위는 과거 부족량이 있어도 가져오기 대상이 아니다", () => {
-    const bundle = makeBundle({ source_kind: "bom_parent", quantity: 1, lines: [makeLine({ quantity: 1 }),
-      makeLine({ origin: "bom_auto", quantity: 2, bom_expected: 3, direction: "out", from_bucket: "production", from_department: "고압", shortage: 9 })] });
-    expect(shortageLines([bundle], "produce", () => 0)).toEqual([]);
-  });
-
   it("included && shortage>0 인 라인만", () => {
     const bundles = [
       makeBundle({

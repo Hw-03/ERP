@@ -1,6 +1,4 @@
 "use client";
-import { useQueryClient } from "@tanstack/react-query";
-import { invalidateWorkReservationQueries } from "@/lib/queries/workReservationInvalidation";
 import { ReadLoading } from "./common/ReadState";
 import { useDesktopTabHome } from "./DesktopTabHome";
 
@@ -51,8 +49,7 @@ export function DesktopWarehouseView({
   onItemPickerFullscreenChange?: (fullscreen: boolean) => void;
 }) {
   const revision = useRealtimeRevision();
-  const reservationQueryClient = useQueryClient();
-  const { employees, items, inventoryQueryState, productModels, loadFailure, setItems, refreshItems } = useWarehouseData({
+  const { employees, items, productModels, loadFailure, setItems } = useWarehouseData({
     globalSearch,
     onStatusChange,
   });
@@ -426,8 +423,6 @@ export function DesktopWarehouseView({
               employees={employees}
               items={items}
               productModels={productModels}
-              inventoryQueryState={inventoryQueryState}
-              onRefreshItems={refreshItems}
               setItems={setItems}
               preselectedItem={preselectedItem}
               restoreDraft={restoreIoDraft}
@@ -451,14 +446,11 @@ export function DesktopWarehouseView({
                 setUrlDraftPending(false);
                 setUrlDraftRestoreError(null);
               }}
-              onReservationChanged={() => invalidateWorkReservationQueries(reservationQueryClient, { throwOnError: true })}
               onDraftSaved={(batchId, step, persistInUrl) => {
                 if (persistInUrl === false) {
                   clearWarehouseDraftRestore(batchId, setRestoreIoDraft, restoredUrlDraftRef);
                   return;
                 }
-                // 현재 작성기가 이미 가진 저장 결과를 URL 복원으로 다시 마운트하지 않는다.
-                restoredUrlDraftRef.current = batchId;
                 persistWarehouseDraftUrl(batchId, step);
               }}
             />}

@@ -27,7 +27,6 @@ from app.models import (
 from app.services import io_actions
 from app.services import stock_request_actions
 from app.services.pin_auth import DEFAULT_PIN_HASH
-from app.services.work_reservation_errors import WorkReservationError
 
 
 def _setup_draft(make_session):
@@ -104,11 +103,6 @@ def _setup_draft(make_session):
             origin="direct",
         )
     )
-    session.flush()
-    from app.services.io_effective_plan import build_effective_plan
-    from app.services.io_reservations import replace_reservations
-    batch.revision = 1
-    replace_reservations(session, batch, build_effective_plan(session, batch))
     session.commit()
     ids = (batch.batch_id, requester.employee_id, item.item_id)
     session.close()
@@ -199,10 +193,9 @@ def test_concurrent_existing_draft_submit_applies_exactly_one_effect(
                 session,
                 batch_id=batch_id,
                 requester_employee_id=requester_id,
-                expected_revision=1,
             )
             successes.append("ok")
-        except (ValueError, WorkReservationError) as exc:
+        except ValueError as exc:
             failures.append(str(exc))
         finally:
             session.close()
@@ -264,7 +257,6 @@ def test_revert_to_draft_reloads_clicked_request_after_router_preread(
             request=preread_request,
             requester=requester,
             pin="0000",
-            expected_revision=0,
         )
     router_session.close()
 

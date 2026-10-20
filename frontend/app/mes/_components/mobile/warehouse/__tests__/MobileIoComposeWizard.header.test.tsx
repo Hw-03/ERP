@@ -58,7 +58,7 @@ vi.mock("../../../_warehouse_v2/useIoDraftRestore", () => ({
 vi.mock("../../../_warehouse_v2/useIoDraft", () => ({
   useIoDraft: () => ({
     drafting: false,
-    saveDraft, captureSession: () => vi.fn(), resetSession: vi.fn(), submitDraft: (batchId: string, employeeId: string) => api.submitDraft(batchId, employeeId, 7),
+    saveDraft,
   }),
 }));
 
@@ -67,7 +67,7 @@ vi.mock("../../../_warehouse_v2/useIoPreview", () => ({
 }));
 
 vi.mock("../../../_warehouse_v2/useIoSubmit", () => ({
-  useIoSubmit: () => ({ submitting: false, run: (work: () => Promise<unknown>) => work(), submit: vi.fn(), resetSession: vi.fn(), captureSession: () => vi.fn() }),
+  useIoSubmit: () => ({ submitting: false, run: (work: () => Promise<unknown>) => work(), submit: vi.fn() }),
 }));
 
 vi.mock("../../../_warehouse_v2/IoConfirmStep", () => ({
@@ -132,7 +132,7 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
       render(<MobileIoComposeWizard globalSearch="" operator={{ employee_id: "mobile-employee", name: "작업자", department: "조립", warehouse_role: "none" }} items={[]}
         setItems={vi.fn()} onStatusChange={vi.fn()} restoreDraft={{ batch_id: "mobile-defect-draft" } as never} />);
       fireEvent.click(screen.getByRole("button", { name: "모바일 제출" }));
-      await waitFor(() => expect(api.submitDraft).toHaveBeenCalledWith("mobile-defect-draft", "mobile-employee", 7));
+      await waitFor(() => expect(api.submitDraft).toHaveBeenCalledWith("mobile-defect-draft", "mobile-employee"));
       expect(saveDraft).toHaveBeenCalledWith(expect.objectContaining({ reasonCategoryId: "category-updated", reasonCategory: "가공 이상", notes: "편집 메모", batchId: "mobile-defect-draft" }));
     } finally { Object.assign(reasonState, previous); delete reasonState.reasonCategory; delete reasonState.reasonCategoryId; }
   });
@@ -385,7 +385,6 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
       expect(api.submitDraft).toHaveBeenCalledWith(
         "mobile-operator-switch-draft",
         currentOperator.employee_id,
-        7,
       );
     });
   });
@@ -465,7 +464,7 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
       });
 
       await waitFor(() => {
-        expect(api.submitDraft).toHaveBeenCalledWith("edited-mobile-draft", currentOperator.employee_id, 7);
+        expect(api.submitDraft).toHaveBeenCalledWith("edited-mobile-draft", currentOperator.employee_id);
       });
     } finally {
       Object.assign(wizardState, originalState);

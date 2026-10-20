@@ -4,19 +4,6 @@ import * as inventoryFilter from "../inventoryFilter";
 
 const { matchesInventoryCategoryFilters, matchesSearch } = inventoryFilter;
 
-describe("inventoryFilter reservation status", () => {
-  it.each([
-    [1, "LOW"],
-    [0, "ZERO"],
-    [5, "NORMAL"],
-  ] as const)("uses available quantity %s for %s while physical stock remains 214", (available, expected) => {
-    const item = { quantity: 214, available_quantity: available, min_stock: 5 } as Item;
-    for (const status of ["NORMAL", "LOW", "ZERO"] as const) {
-      expect(inventoryFilter.matchesKpi(item, status)).toBe(status === expected);
-    }
-  });
-});
-
 describe("inventoryFilter matchesSearch", () => {
   it("inherits normalized item search for the dashboard inventory path", () => {
     const item = { item_name: "Dashboard Item", mes_code: "6-AF/01.2" } as Item;

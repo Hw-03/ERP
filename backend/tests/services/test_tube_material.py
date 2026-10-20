@@ -7,7 +7,6 @@ from app.models import DepartmentEnum, Employee, Inventory, Supplier, Transactio
 from app.schemas import IoSubmitRequest
 from app.schemas.io import IoPreviewTarget
 from app.services import io_actions, io_draft, io_preview
-from app.services.work_reservation_errors import WorkReservationError
 
 
 def _actor(db):
@@ -25,7 +24,7 @@ def _payload(db, make_item, *, outbound=False):
     db.flush()
     subtype = "tube_outbound_supplier" if outbound else "tube_receive_supplier"
     preview = io_preview.preview(db, work_type="tube_material", sub_type=subtype, targets=[IoPreviewTarget(item_id=item.item_id, quantity=2)])
-    payload = IoSubmitRequest(client_request_id=str(uuid.uuid4()), requester_employee_id=actor.employee_id, supplier_id=supplier.supplier_id, notes="외부 발송" if outbound else None, **{key: preview[key] for key in ("work_type", "sub_type", "bundles")})
+    payload = IoSubmitRequest(requester_employee_id=actor.employee_id, supplier_id=supplier.supplier_id, notes="외부 발송" if outbound else None, **{key: preview[key] for key in ("work_type", "sub_type", "bundles")})
     return actor, item, supplier, payload
 
 
@@ -72,11 +71,8 @@ def test_tube_draft_empty_allowed_but_supplier_required(db_session):
     supplier = Supplier(name="초안 업체", normalized_name="초안 업체", scope="tube")
     db_session.add(supplier)
     db_session.flush()
-    payload = IoSubmitRequest(client_request_id=str(uuid.uuid4()), requester_employee_id=actor.employee_id, work_type="tube_material", sub_type="tube_receive_supplier", supplier_id=supplier.supplier_id, bundles=[])
-    draft = io_draft.save_draft(db_session, payload)
-    assert draft["status"] == "draft"
-    payload.batch_id = draft["batch_id"]
-    payload.expected_revision = draft["revision"]
+    payload = IoSubmitRequest(requester_employee_id=actor.employee_id, work_type="tube_material", sub_type="tube_receive_supplier", supplier_id=supplier.supplier_id, bundles=[])
+    assert io_draft.save_draft(db_session, payload)["status"] == "draft"
     payload.supplier_id = None
     with pytest.raises(ValueError, match="공급업체"):
         io_draft.save_draft(db_session, payload)
@@ -144,7 +140,7 @@ def test_disabled_tube_department_cannot_start_or_submit(db_session, make_item, 
             elif boundary == "submit":
                 io_actions.submit(db_session, payload)
             else:
-                io_actions.submit_existing_draft(db_session, batch_id=draft["batch_id"], requester_employee_id=actor.employee_id, expected_revision=draft["revision"])
+                io_actions.submit_existing_draft(db_session, batch_id=draft["batch_id"], requester_employee_id=actor.employee_id)
 
 
 @pytest.mark.parametrize("code,department,expected", [("TR", "튜브", "tube"), ("TA", "튜브", "warehouse"), ("TR", "창고", "warehouse")])
@@ -198,18 +194,9 @@ def test_tube_outbound_shortage_is_atomic_with_multiple_items(db_session, make_i
     second_bundle.lines[0].item_id = second.item_id
     payload.bundles.append(second_bundle)
     db_session.commit()
-    with pytest.raises(WorkReservationError) as error:
+    with pytest.raises(ValueError, match="재고 부족"):
         io_actions.submit(db_session, payload)
-    assert error.value.code == "STOCK_SHORTAGE"
-    assert error.value.status_code == 422
-    shortages = error.value.extra["reservation_shortages"]
-    assert len(shortages) == 1
-    assert shortages[0]["item_id"] == str(second.item_id)
-    assert shortages[0]["required_quantity"] == 2
-    assert shortages[0]["available_quantity"] == 1
-    assert shortages[0]["shortage_quantity"] == 1
     assert first_location.quantity == 5 and second_location.quantity == 5
-    assert first_location.pending_quantity == 0 and second_location.pending_quantity == 4
     assert db_session.query(TransactionLog).filter(TransactionLog.item_id.in_([first.item_id, second.item_id])).count() == 0
 
 

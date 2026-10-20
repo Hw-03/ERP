@@ -53,8 +53,6 @@ export interface IoComposeViewProps {
   operator: OperatorLike | null;
   employees: Employee[];
   items: Item[];
-  inventoryQueryState?: IoInventoryQueryState;
-  onRefreshItems?: () => Promise<void>;
   productModels?: ProductModel[];
   setItems: (items: Item[]) => void;
   preselectedItem?: Item | null;
@@ -67,7 +65,6 @@ export interface IoComposeViewProps {
   entryIntent?: IoEntryIntent | null;
   onStatusChange: (status: string) => void;
   onSubmitSuccess?: () => void;
-  onReservationChanged?: () => void | Promise<void>;
   /** 새 유형 선택 시 저장한 초안의 부모 복원 추적만 해제한다. */
   onNewWork?: () => void;
   onItemConversionFocusChange?: (focused: boolean) => void;
@@ -79,14 +76,4 @@ export interface IoComposeViewProps {
     step: IoStep,
     persistInUrl?: boolean,
   ) => void;
-}
-
-/** 배열 구조 공유와 별개로 재고 조회의 성공 경계를 식별한다. */
-export interface IoInventoryQueryState {
-  queryKey: string;
-  isInvalidated: boolean;
-  isSuccess: boolean;
-  isFetching: boolean;
-  dataUpdatedAt: number;
-  dataUpdateCount: number;
 }

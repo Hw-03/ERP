@@ -33,18 +33,12 @@ export function safeQty(item: Item): number {
   return isNaN(n) ? 0 : n;
 }
 
-/** 예약을 제외한 가용 수량으로 행 상태·KPI·상세 헤더를 함께 판정한다. */
-export function safeAvailableQty(item: Item): number {
-  const n = Number(item.available_quantity);
-  return isNaN(n) ? 0 : n;
-}
-
 export function matchesSearch(item: Item, keyword: string): boolean {
   return matchesItemSearch(item, keyword);
 }
 
 export function matchesKpi(item: Item, kpi: KpiFilter): boolean {
-  const qty = safeAvailableQty(item);
+  const qty = safeQty(item);
   const min = getMinStock(item);
   if (kpi === "NORMAL") return qty > 0 && qty >= min;
   if (kpi === "LOW") return qty > 0 && qty < min;

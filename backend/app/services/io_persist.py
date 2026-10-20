@@ -22,7 +22,7 @@ from app.models import (
     StockRequest,
     StockRequestStatusEnum,
 )
-from app.schemas.io import IoBundlePayload, IoDraftUpsert
+from app.schemas.io import IoBundlePayload
 from app.services.bom_stock_policy import (
     BOM_STOCK_EXEMPT_NOTE,
     BOM_AUTO_ORIGIN,
@@ -441,7 +441,6 @@ def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None) -> dict:
         # 옛 데이터 회귀 보완 — BOM 부모 bundle 인데 자식 라인이 누락된 경우 BOM 마스터로 보충.
         if (
             db is not None
-            and batch.effective_plan is None
             and bundle.source_kind == "bom_parent"
             and bundle.source_item_id is not None
         ):
@@ -479,10 +478,6 @@ def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None) -> dict:
             approver_name = summary["approver_name"] or batch.requester_name
     return {
         "batch_id": batch.batch_id,
-        "revision": batch.revision,
-        "reservation_status": batch.reservation_status,
-        "reservation_issue": batch.reservation_issue,
-        "effective_plan": batch.effective_plan,
         "work_type": batch.work_type,
         "sub_type": batch.sub_type,
         "status": batch.status,
@@ -600,7 +595,6 @@ def _persist_batch(
         work_type=payload.work_type,
         sub_type=payload.sub_type,
         status=status,
-        reservation_status="needs_reservation" if status == "draft" else "inactive",
         requester_employee_id=requester.employee_id,
         requester_name=requester.name,
         requester_department=_enum_value(requester.department) or "",
@@ -700,12 +694,10 @@ def _merge_duplicate_manual_bundles(
     return merged
 
 
-def _add_bundles_and_lines(db: Session, batch: IoBatch, payload: IoDraftUpsert) -> None:
+def _add_bundles_and_lines(db: Session, batch: IoBatch, payload) -> None:
     """payload.bundles → IoBundle/IoLine 적재. 신규 생성(_persist_batch)과
     draft in-place 갱신(io_draft.save_draft)이 공유하는 단일 적재 루프."""
-    # Reservation effects retain every operation_line_id; only the ledger aggregates cells.
-    bundles = payload.bundles if batch.status == "draft" else _merge_duplicate_manual_bundles(payload.bundles)
-    for incoming_bundle in bundles:
+    for incoming_bundle in _merge_duplicate_manual_bundles(payload.bundles):
         bundle = IoBundle(
             bundle_id=incoming_bundle.bundle_id,
             batch_id=batch.batch_id,
@@ -840,10 +832,6 @@ def sync_batch_from_stock_requests(
         batch.status = "rejected"
         batch.completed_at = None
 
-    batch.reservation_status = "needs_reservation" if batch.status == "draft" else "inactive"
-    batch.reservation_issue = {
-        "code": "returned_after_rejection", "message": "반려된 작업입니다. 다시 저장해 재고를 확보해 주세요.", "shortages": [],
-    } if batch.status == "draft" else None
     batch.requires_approval = any(
         request.requires_warehouse_approval
         or request.requires_department_approval

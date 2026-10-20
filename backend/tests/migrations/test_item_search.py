@@ -19,7 +19,7 @@ def test_search_migration_is_empty_and_matches_registered_models(tmp_path):
     try:
         with engine.connect() as connection:
             assert schema_differences(connection) == ()
-            assert connection.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one() == "20261020_0047"
+            assert connection.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one() == "20261014_0046"
             for table in ["item_aliases", "item_synonym_groups", "item_synonym_terms"]:
                 assert connection.exec_driver_sql(f"SELECT count(*) FROM {table}").scalar_one() == 0
     finally:

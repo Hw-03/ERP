@@ -78,7 +78,6 @@ def _submit_final_pf_production(
     submitted = client.post(
         "/api/io/submit",
         json={
-            "client_request_id": str(uuid.uuid4()),
             "requester_employee_id": requester_employee_id,
             "work_type": "process",
             "sub_type": "produce",

@@ -10,7 +10,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.schemas.common import UtcDatetime
 from app.schemas.inventory import InventoryLocationResponse
 from app.schemas.weekly import BackflushDetail
-from app.schemas.work_reservations import InventoryReservationSummary
 
 
 class InitialLocationInput(BaseModel):
@@ -121,7 +120,6 @@ class DefectiveStockBreakdown(BaseModel):
 
 
 class ItemWithInventory(ItemResponse):
-    work_reservations: InventoryReservationSummary
     quantity: Optional[int] = 0
     warehouse_qty: int = 0
     production_total: int = 0

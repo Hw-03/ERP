@@ -264,7 +264,6 @@ export function DesktopInventoryRightPanel({
                 canReceive={canReceive}
                 imageFilename={imageFilename}
                 actionsDisabled={actionsDisabled}
-                showWorkStatus
               />}
             </div>
           ) : activeTab === "history" && selectedItem && displayItem && selectedItem.item_id === displayItem.item_id ? (

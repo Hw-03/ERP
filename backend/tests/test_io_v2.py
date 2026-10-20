@@ -5,7 +5,6 @@ from decimal import Decimal
 from typing import Callable
 
 import pytest
-from httpx import Response
 from sqlalchemy.orm import Session
 from starlette.testclient import TestClient
 
@@ -18,7 +17,6 @@ from app.models import (
     InventoryOperationRoleEnum,
     IoBatch,
     IoBundle,
-    IoDraftReservation,
     IoLine,
     Item,
     LocationStatusEnum,
@@ -36,23 +34,6 @@ from app.models import (
 )
 from app.services import shipping as shipping_svc
 from app.services.pin_auth import DEFAULT_PIN_HASH
-
-
-def _put_draft(client: TestClient, *, json: dict) -> Response:
-    """Add a fresh creation key; callers supply observed revisions for updates."""
-    payload = dict(json)
-    if payload.get("batch_id") is None:
-        payload.setdefault("client_request_id", str(uuid.uuid4()))
-    else:
-        assert "expected_revision" in payload
-    return client.put("/api/io/draft", json=payload)
-
-
-def _submit(client: TestClient, *, json: dict) -> Response:
-    """Legacy workflow cases use an explicit creation key as the frontend now does."""
-    payload = dict(json)
-    payload.setdefault("client_request_id", str(uuid.uuid4()))
-    return client.post("/api/io/submit", json=payload)
 
 
 def _parent_return_payload(
@@ -98,11 +79,11 @@ def test_parent_with_returns_draft_and_approval_execute_once(
     payload, parent, child, untouched, _, warehouse, department, _ = _parent_return_payload(
         client, db_session, make_item, make_bom,
     )
-    draft = _put_draft(client, json=payload)
+    draft = client.put("/api/io/draft", json=payload)
     assert draft.status_code == 200, draft.text
     assert draft.json()["bundles"][0]["internal_use_bom_mode"] == "parent_with_returns"
     submitted = client.post(
-        f"/api/io/draft/{draft.json()['batch_id']}/submit", json={"expected_revision": draft.json()["revision"]},
+        f"/api/io/draft/{draft.json()['batch_id']}/submit",
         params={"requester_employee_id": payload["requester_employee_id"]},
     )
     assert submitted.status_code == 201, submitted.text
@@ -135,7 +116,7 @@ def test_parent_with_returns_first_rejection_cancels_entire_batch(
     payload, parent, child, _, _, warehouse, department, _ = _parent_return_payload(
         client, db_session, make_item, make_bom, mixed=mixed,
     )
-    submitted = _submit(client, json=payload)
+    submitted = client.post("/api/io/submit", json=payload)
     assert submitted.status_code == 201, submitted.text
     requests = db_session.query(StockRequest).all()
     outbound = next(row for row in requests if row.requires_warehouse_approval)
@@ -167,8 +148,7 @@ def test_parent_with_returns_first_rejection_cancels_entire_batch(
     assert db_session.query(TransactionLog).count() == 0
     assert db_session.query(Inventory).filter_by(item_id=parent.item_id).one().warehouse_qty == 10
     assert all(row.pending_quantity == 0 for row in db_session.query(Inventory).all())
-    assert all(row.quantity == 0 and row.pending_quantity == 0 for row in
-               db_session.query(InventoryLocation).filter_by(item_id=child.item_id))
+    assert db_session.query(InventoryLocation).filter_by(item_id=child.item_id).count() == 0
     assert db_session.query(Notification).filter_by(is_read=False, type="approval_request").count() == 0
 
 
@@ -198,7 +178,7 @@ def test_parent_with_returns_rejects_tampered_draft_without_writes(
         child_line["bom_auto_token"] = "0" * 64
     else:
         child_line["item_id"] = str(make_item().item_id)
-    response = _put_draft(client, json=payload)
+    response = client.put("/api/io/draft", json=payload)
     assert response.status_code == 422, response.text
     assert db_session.query(IoBatch).count() == 0
     assert db_session.query(StockRequest).count() == 0
@@ -214,7 +194,7 @@ def test_parent_with_returns_self_approval_waits_for_every_kind(
     requester.warehouse_role = "primary" if self_kind in {"warehouse", "all"} else "none"
     requester.department_role = "primary" if self_kind in {"department", "all"} else "none"
     db_session.commit()
-    submitted = _submit(client, json=payload)
+    submitted = client.post("/api/io/submit", json=payload)
     assert submitted.status_code == 201, submitted.text
     requests = db_session.query(StockRequest).all()
     outbound = next(row for row in requests if row.requires_warehouse_approval)
@@ -224,8 +204,7 @@ def test_parent_with_returns_self_approval_waits_for_every_kind(
     assert db_session.query(TransactionLog).count() == (2 if self_kind == "all" else 0)
     if self_kind != "all":
         assert db_session.query(Inventory).filter_by(item_id=parent.item_id).one().warehouse_qty == 10
-        assert all(row.quantity == 0 and row.pending_quantity == 0 for row in
-               db_session.query(InventoryLocation).filter_by(item_id=child.item_id))
+        assert db_session.query(InventoryLocation).filter_by(item_id=child.item_id).count() == 0
         approve = _approve_department_request if self_kind == "warehouse" else _approve_stock_request
         pending, actor = (returned, department) if self_kind == "warehouse" else (outbound, warehouse)
         result = approve(client, pending.request_id, actor)
@@ -241,7 +220,7 @@ def test_parent_with_returns_department_source_consumes_parent_and_returns_child
     )
     parent_location = make_location(parent.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("5"))
     db_session.commit()
-    submitted = _submit(client, json=payload)
+    submitted = client.post("/api/io/submit", json=payload)
     assert submitted.status_code == 201, submitted.text
     request = db_session.query(StockRequest).one()
     assert request.requires_department_approval is True
@@ -273,7 +252,7 @@ def test_parent_with_returns_special_rejection_cancels_other_kinds(
     })
     assert response.status_code == 200, response.text
     payload["bundles"].extend(response.json()["bundles"])
-    submitted = _submit(client, json=payload)
+    submitted = client.post("/api/io/submit", json=payload)
     assert submitted.status_code == 201, submitted.text
     requests = db_session.query(StockRequest).all()
     assert len(requests) == 3
@@ -293,8 +272,7 @@ def test_parent_with_returns_special_rejection_cancels_other_kinds(
     assert outbound.approved_at is not None and returned.department_approved_at is not None
     assert location.quantity == 5 and location.pending_quantity == 0
     assert db_session.query(Inventory).filter_by(item_id=parent.item_id).one().warehouse_qty == 10
-    assert all(row.quantity == 0 and row.pending_quantity == 0 for row in
-               db_session.query(InventoryLocation).filter_by(item_id=child.item_id))
+    assert db_session.query(InventoryLocation).filter_by(item_id=child.item_id).count() == 0
     assert db_session.query(TransactionLog).count() == 0
     assert db_session.query(Notification).filter_by(is_read=False, type="approval_request").count() == 0
 
@@ -307,7 +285,7 @@ def test_parent_with_returns_rejection_release_failure_rolls_back_savepoint_and_
     payload, parent, _, _, _, _, department, _ = _parent_return_payload(
         client, db_session, make_item, make_bom,
     )
-    assert _submit(client, json=payload).status_code == 201
+    assert client.post("/api/io/submit", json=payload).status_code == 201
     returned = db_session.query(StockRequest).filter_by(requires_department_approval=True).one()
     release = internal_use_approval.release_reservation
     cleanup = sr_approval._release_pending_best_effort
@@ -344,7 +322,7 @@ def test_parent_with_returns_completion_cancel_is_atomic_and_checks_returned_sto
     payload, parent, child, _, requester, warehouse, department, _ = _parent_return_payload(
         client, db_session, make_item, make_bom,
     )
-    assert _submit(client, json=payload).status_code == 201
+    assert client.post("/api/io/submit", json=payload).status_code == 201
     outbound = db_session.query(StockRequest).filter_by(requires_warehouse_approval=True).one()
     returned = db_session.query(StockRequest).filter_by(requires_department_approval=True).one()
     assert _approve_stock_request(client, outbound.request_id, warehouse).status_code == 200
@@ -387,7 +365,7 @@ def test_forged_stock_exempt_flag_cannot_hide_invalid_incoming_item(
     else:
         hidden.process_type_code = "TF"
     db_session.commit()
-    result = _submit(client, json={
+    result = client.post("/api/io/submit", json={
         "requester_employee_id": str(requester.employee_id), "work_type": "receive",
         "sub_type": "receive_supplier", "supplier_id": str(supplier.supplier_id), "bundles": bundles,
     })
@@ -419,11 +397,10 @@ def test_receive_supplier_revalidates_all_items_before_any_write(
     payload.update(supplier_id=str(supplier.supplier_id), bundles=preview.json()["bundles"])
     batch_id = None
     if entry in {"draft_update", "draft_submit"}:
-        saved = _put_draft(client, json=payload)
+        saved = client.put("/api/io/draft", json=payload)
         assert saved.status_code == 200, saved.text
         batch_id = saved.json()["batch_id"]
         payload["batch_id"] = batch_id
-        payload["expected_revision"] = saved.json()["revision"]
     if invalid == "deleted":
         stale.deleted_at = datetime.utcnow()
     else:
@@ -432,12 +409,12 @@ def test_receive_supplier_revalidates_all_items_before_any_write(
     if entry == "preview":
         result = client.post("/api/io/preview", json=preview_payload)
     elif entry in {"draft", "draft_update"}:
-        result = _put_draft(client, json=payload)
+        result = client.put("/api/io/draft", json=payload)
     elif entry == "draft_submit":
-        result = client.post(f"/api/io/draft/{batch_id}/submit", json={"expected_revision": saved.json()["revision"]},
+        result = client.post(f"/api/io/draft/{batch_id}/submit",
                              params={"requester_employee_id": str(requester.employee_id)})
     else:
-        result = _submit(client, json=payload)
+        result = client.post("/api/io/submit", json=payload)
     assert result.status_code == 422, result.text
     assert ("삭제" if invalid == "deleted" else "원자재") in result.text
     assert db_session.query(TransactionLog).count() == 0
@@ -666,8 +643,8 @@ def test_shipping_request_id_is_rejected_for_new_io_submission_and_draft(
         "shipping_request_id": str(request.request_id),
         "bundles": preview.json()["bundles"],
     }
-    submitted = _submit(client, json=payload)
-    drafted = _put_draft(client, json=payload)
+    submitted = client.post("/api/io/submit", json=payload)
+    drafted = client.put("/api/io/draft", json=payload)
 
     assert submitted.status_code == 422, submitted.text
     assert "shipping_request_id" in submitted.text
@@ -714,7 +691,9 @@ def test_shipping_request_id_is_rejected_regardless_of_request_status(
     )
     assert preview.status_code == 200, preview.text
 
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
             "sub_type": "produce",
@@ -765,7 +744,7 @@ def test_legacy_shipping_linked_draft_is_readable_but_cannot_be_updated_submitte
         "to_department": DepartmentEnum.SHIPPING.value,
         "bundles": preview.json()["bundles"],
     }
-    saved = _put_draft(client, json=payload)
+    saved = client.put("/api/io/draft", json=payload)
     assert saved.status_code == 200, saved.text
     batch_id = saved.json()["batch_id"]
     batch = db_session.query(IoBatch).filter(IoBatch.batch_id == uuid.UUID(batch_id)).one()
@@ -776,13 +755,13 @@ def test_legacy_shipping_linked_draft_is_readable_but_cannot_be_updated_submitte
     assert readable.status_code == 200, readable.text
     assert readable.json()["shipping_request_id"] == str(shipping_request.request_id)
 
-    update_payload = {**payload, "batch_id": batch_id, "expected_revision": saved.json()["revision"]}
-    updated = _put_draft(client, json=update_payload)
+    update_payload = {**payload, "batch_id": batch_id}
+    updated = client.put("/api/io/draft", json=update_payload)
     assert updated.status_code == 422, updated.text
     assert "조회만" in updated.text
 
     submitted = client.post(
-        f"/api/io/draft/{batch_id}/submit", json={"expected_revision": saved.json()["revision"]},
+        f"/api/io/draft/{batch_id}/submit",
         params={"requester_employee_id": str(requester.employee_id)},
     )
     assert submitted.status_code == 422, submitted.text
@@ -790,7 +769,7 @@ def test_legacy_shipping_linked_draft_is_readable_but_cannot_be_updated_submitte
 
     deleted = client.delete(
         f"/api/io/draft/{batch_id}",
-        params={"expected_revision": saved.json()["revision"], "requester_employee_id": str(requester.employee_id)},
+        params={"requester_employee_id": str(requester.employee_id)},
     )
     assert deleted.status_code == 422, deleted.text
     assert "조회만" in deleted.text
@@ -813,7 +792,7 @@ def test_delete_io_draft_is_idempotent(client, db_session):
     db_session.add(batch)
     db_session.commit()
 
-    params = {"requester_employee_id": str(requester.employee_id), "expected_revision": batch.revision}
+    params = {"requester_employee_id": str(requester.employee_id)}
     first = client.delete(f"/api/io/draft/{batch.batch_id}", params=params)
     repeated = client.delete(f"/api/io/draft/{batch.batch_id}", params=params)
 
@@ -837,7 +816,7 @@ def test_delete_io_draft_preserves_owner_and_status_guards(client, db_session):
 
     forbidden = client.delete(
         f"/api/io/draft/{batch.batch_id}",
-        params={"expected_revision": batch.revision, "requester_employee_id": str(intruder.employee_id)},
+        params={"requester_employee_id": str(intruder.employee_id)},
     )
     assert forbidden.status_code == 403
 
@@ -845,10 +824,9 @@ def test_delete_io_draft_preserves_owner_and_status_guards(client, db_session):
     db_session.commit()
     not_draft = client.delete(
         f"/api/io/draft/{batch.batch_id}",
-        params={"expected_revision": batch.revision, "requester_employee_id": str(owner.employee_id)},
+        params={"requester_employee_id": str(owner.employee_id)},
     )
-    assert not_draft.status_code == 409
-    assert not_draft.json()["detail"]["code"] == "WORK_STATE_CONFLICT"
+    assert not_draft.status_code == 422
 
 
 @pytest.mark.parametrize(
@@ -864,7 +842,6 @@ def test_internal_use_unauthorized_write_rejected_without_preview(
     response = getattr(client, method)(
         path,
         json={
-            "client_request_id": str(uuid.uuid4()),
             "requester_employee_id": str(requester.employee_id),
             "work_type": "internal_use",
             "sub_type": "internal_use_out",
@@ -892,14 +869,13 @@ def test_internal_use_unauthorized_existing_draft_update_rejected(
         "to_department": "AS",
         "bundles": _internal_use_bundles(item),
     }
-    saved = _put_draft(client, json=payload)
+    saved = client.put("/api/io/draft", json=payload)
     assert saved.status_code == 200, saved.text
 
     requester.department = DepartmentEnum.ASSEMBLY.value
     db_session.commit()
     payload["batch_id"] = saved.json()["batch_id"]
-    payload["expected_revision"] = saved.json()["revision"]
-    updated = _put_draft(client, json=payload)
+    updated = client.put("/api/io/draft", json=payload)
     assert updated.status_code == 403, updated.text
 
 
@@ -917,7 +893,9 @@ def test_internal_use_fresh_submit_rejects_work_sub_type_tampering(
         department=DepartmentEnum.AS,
     )
     db_session.commit()
-    response = _submit(client, json={
+    response = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": work_type,
             "sub_type": sub_type,
@@ -938,7 +916,9 @@ def test_internal_use_fresh_submit_rejects_invalid_destination(
         department=DepartmentEnum.AS,
     )
     db_session.commit()
-    response = _submit(client, json={
+    response = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "internal_use",
             "sub_type": "internal_use_out",
@@ -962,7 +942,9 @@ def test_internal_use_warehouse_manager_roles_can_preview_and_submit(
     db_session.commit()
     preview = _preview_internal_use(client, requester, item, to_department="연구")
     assert preview.status_code == 200, preview.text
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "internal_use",
             "sub_type": "internal_use_out",
@@ -1002,7 +984,9 @@ def test_internal_use_submit_reserves_then_approval_consumes_only_warehouse(
         line["to_department"],
     ) == ("out", "warehouse", None, "none", "AS")
 
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "internal_use",
             "sub_type": "internal_use_out",
@@ -1183,8 +1167,8 @@ def test_internal_use_bom_draft_without_mode_keeps_unselected_child_as_no_change
     assert child_line["included"] is False
     assert child_line["exclusion_note"] == "변동 없음"
 
-    drafted = _put_draft(
-        client,
+    drafted = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "internal_use",
@@ -1228,11 +1212,11 @@ def test_internal_use_bom_draft_allows_unselected_mode_but_fresh_submit_rejects_
         "to_department": "AS",
         "bundles": bundles,
     }
-    saved = _put_draft(client, json=payload)
+    saved = client.put("/api/io/draft", json=payload)
     assert saved.status_code == 200, saved.text
     assert saved.json()["bundles"][0]["internal_use_bom_mode"] is None
 
-    submitted = _submit(client, json=payload)
+    submitted = client.post("/api/io/submit", json=payload)
     assert submitted.status_code == 422, submitted.text
     assert "차감 방식" in submitted.text
 
@@ -1291,8 +1275,8 @@ def test_internal_use_stock_exempt_bom_child_can_be_drafted_and_submitted(
     assert exempt_line["included"] is False
     assert exempt_line["selected"] is False
 
-    drafted = _put_draft(
-        client,
+    drafted = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "internal_use",
@@ -1304,7 +1288,7 @@ def test_internal_use_stock_exempt_bom_child_can_be_drafted_and_submitted(
     assert drafted.status_code == 200, drafted.text
 
     submitted = client.post(
-        f"/api/io/draft/{drafted.json()['batch_id']}/submit", json={"expected_revision": drafted.json()["revision"]},
+        f"/api/io/draft/{drafted.json()['batch_id']}/submit",
         params={"requester_employee_id": str(requester.employee_id)},
     )
     assert submitted.status_code == 201, submitted.text
@@ -1360,7 +1344,9 @@ def test_internal_use_parent_and_children_splits_outbound_and_return_approvals(
     )
     assert preview.status_code == 200, preview.text
 
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "internal_use",
             "sub_type": "internal_use_out",
@@ -1495,7 +1481,9 @@ def test_internal_use_rejects_bom_mode_changed_after_preview(
     bundles = preview.json()["bundles"]
     bundles[0]["internal_use_bom_mode"] = "parent_and_children"
 
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "internal_use",
             "sub_type": "internal_use_out",
@@ -1554,8 +1542,8 @@ def test_internal_use_bom_draft_rejects_tampered_child_state(
     child_line = next(line for line in bundles[0]["lines"] if line["origin"] == "bom_auto")
     child_line[field] = value
 
-    drafted = _put_draft(
-        client,
+    drafted = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "internal_use",
@@ -1613,8 +1601,8 @@ def test_internal_use_bom_draft_rejects_parent_quantity_inconsistent_with_bundle
         child_line["quantity"] = 6
         child_line["bom_expected"] = 6
 
-    drafted = _put_draft(
-        client,
+    drafted = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "internal_use",
@@ -1662,7 +1650,9 @@ def test_internal_use_submit_rejects_tampered_child_quantity_without_creating_ba
     bundles = preview.json()["bundles"]
     bundles[0]["lines"][0]["quantity"] = 7
 
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "internal_use",
             "sub_type": "internal_use_out",
@@ -1735,7 +1725,9 @@ def test_internal_use_rejected_return_stays_unapplied_and_batch_is_partial(
         },
     )
     assert preview.status_code == 200, preview.text
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "internal_use",
             "sub_type": "internal_use_out",
@@ -1843,7 +1835,9 @@ def test_internal_use_children_only_consumes_selected_children_without_parent_ch
         },
     )
     assert preview.status_code == 200, preview.text
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "internal_use",
             "sub_type": "internal_use_out",
@@ -1930,7 +1924,9 @@ def test_internal_use_bom_child_uses_actual_child_process_for_special_approval(
         },
     )
     assert preview.status_code == 200, preview.text
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "internal_use",
             "sub_type": "internal_use_out",
@@ -1965,7 +1961,9 @@ def test_internal_use_rejects_unauthorized_requester_and_tampered_line(
     assert preview.status_code == 200, preview.text
     bundles = preview.json()["bundles"]
     bundles[0]["lines"][0]["from_department"] = "조립"
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(manager.employee_id),
             "work_type": "internal_use",
             "sub_type": "internal_use_out",
@@ -2002,7 +2000,9 @@ def test_internal_use_manual_origin_still_requires_warehouse_approval(
     )
     assert preview.status_code == 200, preview.text
 
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "internal_use",
             "sub_type": "internal_use_out",
@@ -2029,8 +2029,8 @@ def test_internal_use_saved_draft_rechecks_permission_at_submit(
     db_session.commit()
     preview = _preview_internal_use(client, requester, item, to_department="연구")
     assert preview.status_code == 200, preview.text
-    saved = _put_draft(
-        client,
+    saved = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "internal_use",
@@ -2044,7 +2044,7 @@ def test_internal_use_saved_draft_rechecks_permission_at_submit(
     requester.department = DepartmentEnum.ASSEMBLY.value
     db_session.commit()
     submitted = client.post(
-        f"/api/io/draft/{saved.json()['batch_id']}/submit", json={"expected_revision": saved.json()["revision"]},
+        f"/api/io/draft/{saved.json()['batch_id']}/submit",
         params={"requester_employee_id": str(requester.employee_id)},
     )
     assert submitted.status_code == 403, submitted.text
@@ -2144,7 +2144,9 @@ def test_io_submit_approval_uses_only_included_lines(client, db_session, make_it
     bundles[0]["lines"][1]["included"] = False
     bundles[0]["lines"][1]["exclusion_note"] = "이번 작업 제외"
 
-    res = _submit(client, json={
+    res = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "warehouse_io",
             "sub_type": "warehouse_to_dept",
@@ -2189,7 +2191,9 @@ def test_io_submit_receive_is_immediate(client, db_session, make_item):
     )
     assert preview.status_code == 200, preview.json()
 
-    res = _submit(client, json={
+    res = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "receive",
             "sub_type": "receive_supplier",
@@ -2234,7 +2238,9 @@ def test_io_submit_receive_rejects_non_warehouse_requester_without_mutation(
     )
     assert preview.status_code == 200, preview.text
 
-    response = _submit(client, json={
+    response = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": submitted_work_type,
             "sub_type": "receive_supplier",
@@ -2279,7 +2285,9 @@ def test_io_submit_shortage_message_includes_contributing_parents(
     )
     assert preview.status_code == 200, preview.json()
     # 각 부모 BOM 자식 2 + 2 = 4 요청, 재고 3 → 부족 1
-    res = _submit(client, json={
+    res = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "warehouse_io",
             "sub_type": "warehouse_to_dept",
@@ -2332,7 +2340,9 @@ def test_io_submit_warehouse_to_dept_links_all_logs_to_batch(
     )
     assert preview.status_code == 200, preview.json()
 
-    res = _submit(client, json={
+    res = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "warehouse_io",
             "sub_type": "warehouse_to_dept",
@@ -2353,10 +2363,10 @@ def test_io_submit_warehouse_to_dept_links_all_logs_to_batch(
     )
 
 
-def test_warehouse_approval_preserves_reservation_when_live_route_changes(
+def test_warehouse_approval_reroutes_linked_batch_lines_from_live_item_code(
     client, db_session, make_item
 ):
-    """저장 계획의 경로가 바뀌면 실행하지 않고 이전 승인 예약을 보존한다."""
+    """창고 결재 후 batch 이력도 request 실행 경로와 같은 live 부서를 보존한다."""
     item = make_item(name="창고 결재 코드 변경", process_type_code="AR", warehouse_qty=Decimal("3"))
     requester = _make_employee(db_session, code="BATCH-LIVE-REQ")
     approver = _make_employee(
@@ -2373,7 +2383,9 @@ def test_warehouse_approval_preserves_reservation_when_live_route_changes(
         },
     )
     assert preview.status_code == 200, preview.text
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "warehouse_io",
             "sub_type": "warehouse_to_dept",
@@ -2390,19 +2402,15 @@ def test_warehouse_approval_preserves_reservation_when_live_route_changes(
         json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
     )
 
-    assert approved.status_code == 409, approved.text
-    assert approved.json()["detail"]["code"] == "WORK_PLAN_CHANGED"
+    assert approved.status_code == 200, approved.text
     db_session.expire_all()
     request = db_session.query(StockRequest).one()
     batch = db_session.query(IoBatch).one()
-    assert request.status == StockRequestStatusEnum.RESERVED
-    assert request.lines[0].to_department == DepartmentEnum.ASSEMBLY
+    assert request.status == StockRequestStatusEnum.COMPLETED
+    assert request.lines[0].to_department == DepartmentEnum.TUBE
     assert batch.from_department is None
-    assert batch.to_department == DepartmentEnum.ASSEMBLY.value
-    assert batch.bundles[0].lines[0].to_department == DepartmentEnum.ASSEMBLY.value
-    assert batch.revision == 1
-    assert db_session.query(Inventory).filter_by(item_id=item.item_id).one().pending_quantity == 1
-    assert db_session.query(TransactionLog).count() == 0
+    assert batch.to_department == DepartmentEnum.TUBE.value
+    assert batch.bundles[0].lines[0].to_department == DepartmentEnum.TUBE.value
 
 
 def test_io_submit_draft_endpoint_completes_batch(client, db_session, make_item):
@@ -2428,8 +2436,8 @@ def test_io_submit_draft_endpoint_completes_batch(client, db_session, make_item)
     )
     assert preview.status_code == 200, preview.json()
 
-    draft_res = _put_draft(
-        client,
+    draft_res = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "receive",
@@ -2448,7 +2456,7 @@ def test_io_submit_draft_endpoint_completes_batch(client, db_session, make_item)
 
     submit_res = client.post(
         f"/api/io/draft/{batch_id}/submit"
-        f"?requester_employee_id={requester.employee_id}", json={"expected_revision": draft_res.json()["revision"]},
+        f"?requester_employee_id={requester.employee_id}",
     )
     assert submit_res.status_code == 201, submit_res.json()
     assert submit_res.json()["status"] == "completed"
@@ -2467,7 +2475,7 @@ def test_io_submit_draft_endpoint_completes_batch(client, db_session, make_item)
     assert db_session.query(IoBatch).count() == 1
 
 
-def test_io_draft_read_credits_own_reservation_but_public_preview_does_not(
+def test_io_draft_recomputes_department_shortage_with_pending(
     client, db_session, make_item, make_location
 ):
     item = make_item(name="Draft production pending", process_type_code="AR")
@@ -2498,8 +2506,8 @@ def test_io_draft_read_credits_own_reservation_but_public_preview_does_not(
     assert preview.status_code == 200, preview.json()
     assert preview.json()["bundles"][0]["lines"][0]["shortage"] == 0
 
-    saved = _put_draft(
-        client,
+    saved = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "warehouse_io",
@@ -2510,8 +2518,7 @@ def test_io_draft_read_credits_own_reservation_but_public_preview_does_not(
     )
     assert saved.status_code == 200, saved.json()
 
-    # Own reservation 8 plus another reservation 2 must not exceed physical 10.
-    location.pending_quantity = Decimal("10")
+    location.pending_quantity = Decimal("3")
     db_session.commit()
     fetched = client.get(
         "/api/io/draft",
@@ -2523,15 +2530,7 @@ def test_io_draft_read_credits_own_reservation_but_public_preview_does_not(
     )
 
     assert fetched.status_code == 200, fetched.json()
-    assert fetched.json()["bundles"][0]["lines"][0]["shortage"] == 0
-    public_preview = client.post("/api/io/preview", json={
-        "requester_employee_id": str(requester.employee_id),
-        "work_type": "warehouse_io", "sub_type": "dept_to_warehouse",
-        "from_department": DepartmentEnum.ASSEMBLY.value,
-        "targets": [{"source_kind": "direct_item", "item_id": str(item.item_id), "quantity": 8}],
-    })
-    assert public_preview.status_code == 200, public_preview.text
-    assert public_preview.json()["bundles"][0]["lines"][0]["shortage"] == 8
+    assert fetched.json()["bundles"][0]["lines"][0]["shortage"] == 1
 
 
 @pytest.mark.parametrize(
@@ -2545,7 +2544,6 @@ def test_io_draft_keeps_manual_warehouse_transfer_route(
     client,
     db_session,
     make_item,
-    make_location,
     sub_type,
     department_field,
     expected_from_bucket,
@@ -2553,12 +2551,6 @@ def test_io_draft_keeps_manual_warehouse_transfer_route(
 ):
     """창고↔부서 단품은 manual 편집 상태여도 이동 경로로 저장한다."""
     item = make_item(name="수동 창고 반입", process_type_code="TR")
-    inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
-    if sub_type == "dept_to_warehouse":
-        make_location(item.item_id, department=DepartmentEnum.TUBE, quantity=Decimal("2"))
-    else:
-        inventory.warehouse_qty = Decimal("2")
-    inventory.quantity = Decimal("2")
     requester = _make_employee(db_session, code="IO-MANUAL-DEPT-TO-WH")
     db_session.commit()
 
@@ -2578,8 +2570,8 @@ def test_io_draft_keeps_manual_warehouse_transfer_route(
     bundle["lines"][0]["origin"] = "manual"
     bundle["lines"][0]["edited"] = True
 
-    saved = _put_draft(
-        client,
+    saved = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "warehouse_io",
@@ -2621,8 +2613,8 @@ def test_io_draft_replaces_spoofed_automatic_department_route(
     bundles = preview.json()["bundles"]
     bundles[0]["lines"][0]["to_department"] = DepartmentEnum.TUBE.value
 
-    saved = _put_draft(
-        client,
+    saved = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "warehouse_io",
@@ -2657,8 +2649,8 @@ def test_io_draft_read_marks_legacy_department_route_as_normalized(
         },
     )
     assert preview.status_code == 200, preview.json()
-    saved = _put_draft(
-        client,
+    saved = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "warehouse_io",
@@ -2669,14 +2661,6 @@ def test_io_draft_read_marks_legacy_department_route_as_normalized(
         },
     )
     assert saved.status_code == 200, saved.json()
-    legacy = db_session.get(IoBatch, uuid.UUID(saved.json()["batch_id"]))
-    legacy.effective_plan = None
-    legacy.creation_payload_hash = None
-    legacy.reservation_status = "needs_reservation"
-    legacy.reservation_issue = {"code": "legacy_unprocessed"}
-    legacy.revision = 0
-    db_session.query(IoDraftReservation).filter_by(batch_id=legacy.batch_id).delete(synchronize_session=False)
-    db_session.query(Inventory).filter_by(item_id=item.item_id).one().pending_quantity = Decimal("0")
     stored = db_session.query(IoLine).one()
     stored.to_department = DepartmentEnum.TUBE.value
     db_session.commit()
@@ -2735,7 +2719,9 @@ def test_io_submit_mixed_code_departments_keeps_one_batch_and_request(
         str(tube_child.item_id): DepartmentEnum.TUBE.value,
     }
 
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "warehouse_io",
             "sub_type": "warehouse_to_dept",
@@ -2782,12 +2768,12 @@ def test_io_submit_idempotent_with_client_request_id(client, db_session, make_it
         "bundles": preview.json()["bundles"],
     }
 
-    first = _submit(client, json=payload)
+    first = client.post("/api/io/submit", json=payload)
     assert first.status_code == 201, first.json()
     first_batch_id = first.json()["batch"]["batch_id"]
 
     # 같은 키로 재제출 (더블클릭 / 네트워크 retry 시나리오)
-    second = _submit(client, json=payload)
+    second = client.post("/api/io/submit", json=payload)
     assert second.status_code == 201, second.json()
     assert second.json()["batch"]["batch_id"] == first_batch_id
 
@@ -2820,7 +2806,7 @@ def test_production_adjustment_self_approval_uses_independent_department_role(
         "targets": [{"source_kind": "manual", "item_id": str(item.item_id), "quantity": "1"} for item in items],
     })
     assert preview.status_code == 200, preview.json()
-    response = _submit(client, json={
+    response = client.post("/api/io/submit", json={
         "requester_employee_id": str(requester.employee_id), "work_type": "process", "sub_type": sub_type,
         "notes": "생산부 역할 분리", "bundles": preview.json()["bundles"],
     })
@@ -2879,7 +2865,9 @@ def test_io_immediate_adjust_in_increases_production_quantity(
     assert line["to_bucket"] == "production"
     assert line["from_bucket"] == "none"
 
-    res = _submit(client, json={
+    res = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
             "sub_type": "adjust_in",
@@ -2936,8 +2924,8 @@ def test_bomless_process_direct_item_uses_result_route(
     endpoint = line["to_department"] if sub_type == "produce" else line["from_department"]
     assert endpoint == DepartmentEnum.ASSEMBLY.value
 
-    drafted = _put_draft(
-        client,
+    drafted = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
@@ -2947,7 +2935,7 @@ def test_bomless_process_direct_item_uses_result_route(
     )
     assert drafted.status_code == 200, drafted.text
     submitted = client.post(
-        f"/api/io/draft/{drafted.json()['batch_id']}/submit", json={"expected_revision": drafted.json()["revision"]},
+        f"/api/io/draft/{drafted.json()['batch_id']}/submit",
         params={"requester_employee_id": str(requester.employee_id)},
     )
 
@@ -2965,7 +2953,7 @@ def test_bomless_process_direct_item_uses_result_route(
     assert location.quantity == expected_quantity
 
 
-def test_io_submit_preserves_duplicate_manual_operation_lines(
+def test_io_submit_merges_duplicate_manual_single_item_bundles(
     client, db_session, make_item, make_location
 ):
     item = make_item(name="Duplicate Adj In", warehouse_qty=Decimal("0"))
@@ -3002,7 +2990,9 @@ def test_io_submit_preserves_duplicate_manual_operation_lines(
         ],
     }
 
-    response = _submit(client, json={
+    response = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
             "sub_type": "adjust_in",
@@ -3013,17 +3003,18 @@ def test_io_submit_preserves_duplicate_manual_operation_lines(
     )
 
     assert response.status_code == 201, response.json()
-    assert db_session.query(IoBundle).count() == 2
-    assert db_session.query(IoLine).count() == 2
-    assert {str(line.line_id) for line in db_session.query(IoLine)} == {
-        first_bundle["lines"][0]["line_id"], duplicate_bundle["lines"][0]["line_id"]}
-    assert sum(line.quantity for line in db_session.query(IoLine)) == Decimal("2")
+    assert db_session.query(IoBundle).count() == 1
+    assert db_session.query(IoLine).count() == 1
+    persisted_bundle = db_session.query(IoBundle).one()
+    persisted_line = db_session.query(IoLine).one()
+    assert persisted_bundle.quantity == Decimal("2")
+    assert persisted_line.quantity == Decimal("2")
     tx = db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).all()
-    assert len(tx) == 2
-    assert sum(log.quantity_change for log in tx) == Decimal("2")
+    assert len(tx) == 1
+    assert tx[0].quantity_change == Decimal("2")
 
 
-def test_io_draft_resave_and_submit_preserves_duplicate_manual_operation_lines(
+def test_io_draft_resave_and_submit_merges_duplicate_manual_single_item_bundles(
     client, db_session, make_item, make_location
 ):
     item = make_item(name="Draft Duplicate Adj In", warehouse_qty=Decimal("0"))
@@ -3055,8 +3046,8 @@ def test_io_draft_resave_and_submit_preserves_duplicate_manual_operation_lines(
         "lines": [{**first_bundle["lines"][0], "line_id": str(uuid.uuid4())}],
     }
 
-    saved = _put_draft(
-        client,
+    saved = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
@@ -3079,23 +3070,17 @@ def test_io_draft_resave_and_submit_preserves_duplicate_manual_operation_lines(
     )
     assert fetched.status_code == 200, fetched.json()
     fetched_bundles = fetched.json()["bundles"]
-    assert len(fetched_bundles) == 2
-    assert sum(Decimal(str(bundle["quantity"])) for bundle in fetched_bundles) == Decimal("2")
-    effects = fetched.json()["effective_plan"]["effects"]
-    assert len(effects) == 2
-    assert {effect["operation_line_id"] for effect in effects} == {
-        first_bundle["lines"][0]["line_id"], duplicate_bundle["lines"][0]["line_id"],
-    }
+    assert len(fetched_bundles) == 1
+    assert Decimal(str(fetched_bundles[0]["quantity"])) == Decimal("2")
 
-    resaved = _put_draft(
-        client,
+    resaved = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
             "sub_type": "adjust_in",
             "to_department": DepartmentEnum.ASSEMBLY.value,
             "batch_id": batch_id,
-            "expected_revision": saved.json()["revision"],
             "notes": "draft duplicate merge",
             "bundles": fetched_bundles,
         },
@@ -3104,17 +3089,19 @@ def test_io_draft_resave_and_submit_preserves_duplicate_manual_operation_lines(
     assert resaved.json()["batch_id"] == batch_id
 
     submitted = client.post(
-        f"/api/io/draft/{batch_id}/submit", json={"expected_revision": resaved.json()["revision"]},
+        f"/api/io/draft/{batch_id}/submit",
         params={"requester_employee_id": str(requester.employee_id)},
     )
     assert submitted.status_code == 201, submitted.json()
-    assert db_session.query(IoBundle).count() == 2
-    assert db_session.query(IoLine).count() == 2
-    assert sum(bundle.quantity for bundle in db_session.query(IoBundle)) == Decimal("2")
-    assert sum(line.quantity for line in db_session.query(IoLine)) == Decimal("2")
+    assert db_session.query(IoBundle).count() == 1
+    assert db_session.query(IoLine).count() == 1
+    persisted_bundle = db_session.query(IoBundle).one()
+    persisted_line = db_session.query(IoLine).one()
+    assert persisted_bundle.quantity == Decimal("2")
+    assert persisted_line.quantity == Decimal("2")
     tx = db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).all()
-    assert len(tx) == 2
-    assert sum(row.quantity_change for row in tx) == Decimal("2")
+    assert len(tx) == 1
+    assert tx[0].quantity_change == Decimal("2")
 
 
 def _manual_produce_payload(requester: Employee, item) -> dict:
@@ -3154,7 +3141,7 @@ def test_io_submit_rejects_manual_produce_payload(client, db_session, make_item)
     requester = _make_employee(db_session)
     db_session.commit()
 
-    response = _submit(client, json=_manual_produce_payload(requester, item))
+    response = client.post("/api/io/submit", json=_manual_produce_payload(requester, item))
 
     assert response.status_code == 422, response.json()
     assert "수량보정 입고" in str(response.json())
@@ -3167,7 +3154,7 @@ def test_io_draft_rejects_manual_produce_payload(client, db_session, make_item):
     requester = _make_employee(db_session)
     db_session.commit()
 
-    response = _put_draft(client, json=_manual_produce_payload(requester, item))
+    response = client.put("/api/io/draft", json=_manual_produce_payload(requester, item))
 
     assert response.status_code == 422, response.json()
     assert "수량보정 입고" in str(response.json())
@@ -3176,15 +3163,13 @@ def test_io_draft_rejects_manual_produce_payload(client, db_session, make_item):
 
 @pytest.mark.parametrize("manual_first", [False, True])
 def test_io_draft_normalizes_mixed_production_inbound_regardless_of_selection_order(
-    client, db_session, make_item, make_bom, make_location, manual_first
+    client, db_session, make_item, make_bom, manual_first
 ):
     """BOM 생산입고와 낱개 보정입고는 한 draft에 저장하고 대표 subtype은 produce다."""
     parent = make_item(name="Mixed Produce Parent", process_type_code="AF")
     component = make_item(name="Mixed Produce Component", process_type_code="AR")
     manual_item = make_item(name="Mixed Produce Manual", process_type_code="AF")
     make_bom(parent.item_id, component.item_id, Decimal("1"))
-    make_location(component.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("1"))
-    db_session.query(Inventory).filter_by(item_id=component.item_id).one().quantity = Decimal("1")
     requester = _make_employee(db_session)
     db_session.commit()
 
@@ -3207,8 +3192,8 @@ def test_io_draft_normalizes_mixed_production_inbound_regardless_of_selection_or
     if manual_first:
         bundles.reverse()
 
-    saved = _put_draft(
-        client,
+    saved = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
@@ -3280,12 +3265,14 @@ def test_io_submit_mixed_production_inbound_requires_memo_and_dept_approval(
         "bundles": bundles,
     }
 
-    missing_memo = _submit(client, json=payload)
+    missing_memo = client.post("/api/io/submit", json=payload)
     assert missing_memo.status_code == 422, missing_memo.json()
     assert "메모" in str(missing_memo.json())
     assert db_session.query(IoBatch).count() == 0
 
-    submitted = _submit(client, json={**payload, "notes": "생산 중 낱개 입고 보정"},
+    submitted = client.post(
+        "/api/io/submit",
+        json={**payload, "notes": "생산 중 낱개 입고 보정"},
     )
     assert submitted.status_code == 201, submitted.text
     assert submitted.json()["status"] in {"submitted", "reserved"}
@@ -3327,16 +3314,12 @@ def test_io_submit_mixed_production_inbound_requires_memo_and_dept_approval(
     }
 
 
-def test_io_draft_normalizes_mixed_disassembly_outbound(client, db_session, make_item, make_bom, make_location):
+def test_io_draft_normalizes_mixed_disassembly_outbound(client, db_session, make_item, make_bom):
     """분해 출고도 BOM 방향을 대표 subtype으로 사용하고 낱개는 adjust로 보존한다."""
     parent = make_item(name="Mixed Disassembly Parent", process_type_code="AF")
     component = make_item(name="Mixed Disassembly Component", process_type_code="AR")
     manual_item = make_item(name="Mixed Disassembly Manual", process_type_code="AF")
     make_bom(parent.item_id, component.item_id, Decimal("1"))
-    make_location(parent.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("1"))
-    db_session.query(Inventory).filter_by(item_id=parent.item_id).one().quantity = Decimal("1")
-    make_location(manual_item.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("1"))
-    db_session.query(Inventory).filter_by(item_id=manual_item.item_id).one().quantity = Decimal("1")
     requester = _make_employee(db_session)
     db_session.commit()
 
@@ -3356,8 +3339,8 @@ def test_io_draft_normalizes_mixed_disassembly_outbound(client, db_session, make
     assert bom_preview.status_code == 200, bom_preview.text
     assert manual_preview.status_code == 200, manual_preview.text
 
-    saved = _put_draft(
-        client,
+    saved = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
@@ -3421,7 +3404,9 @@ def test_io_submit_mixed_disassembly_outbound_waits_for_approval_and_logs_correc
     assert bom_preview.status_code == 200, bom_preview.text
     assert manual_preview.status_code == 200, manual_preview.text
 
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
             "sub_type": "adjust_out",
@@ -3447,14 +3432,12 @@ def test_io_submit_mixed_disassembly_outbound_waits_for_approval_and_logs_correc
     assert logs[manual_item.item_id].operation_role == InventoryOperationRoleEnum.CORRECTION
 
 
-def test_io_draft_normalizes_tampered_mixed_manual_bundle(client, db_session, make_item, make_bom, make_location):
+def test_io_draft_normalizes_tampered_mixed_manual_bundle(client, db_session, make_item, make_bom):
     """BOM에 섞인 낱개 위조 경로도 서버가 코드 기준 경로로 덮어쓴다."""
     parent = make_item(name="Mixed Tamper Parent", process_type_code="AF")
     component = make_item(name="Mixed Tamper Component", process_type_code="AR")
     manual_item = make_item(name="Mixed Tamper Manual", process_type_code="AF")
     make_bom(parent.item_id, component.item_id, Decimal("1"))
-    make_location(component.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("1"))
-    db_session.query(Inventory).filter_by(item_id=component.item_id).one().quantity = Decimal("1")
     requester = _make_employee(db_session)
     db_session.commit()
 
@@ -3476,8 +3459,8 @@ def test_io_draft_normalizes_tampered_mixed_manual_bundle(client, db_session, ma
     manual_bundle = manual_preview.json()["bundles"][0]
     manual_bundle["lines"][0]["direction"] = "in"
 
-    normalized = _put_draft(
-        client,
+    normalized = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
@@ -3506,8 +3489,8 @@ def test_io_process_draft_rejects_direct_item_adjustment_bundle(
     requester = _make_employee(db_session)
     db_session.commit()
 
-    response = _put_draft(
-        client,
+    response = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
@@ -3559,8 +3542,8 @@ def test_io_process_adjustment_subtype_rejects_direct_in_out_bundle(
     requester = _make_employee(db_session)
     db_session.commit()
 
-    response = _put_draft(
-        client,
+    response = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
@@ -3619,7 +3602,9 @@ def test_io_process_submit_rejects_direct_item_adjustment_bundle(client, db_sess
     bundle["source_kind"] = "direct_item"
     bundle["lines"][0]["origin"] = "direct"
 
-    response = _submit(client, json={
+    response = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
             "sub_type": "adjust_in",
@@ -3655,8 +3640,8 @@ def test_io_draft_normalizes_tampered_manual_adjustment_bundle(
     else:
         bundle["lines"][0]["from_bucket"] = "warehouse"
 
-    response = _put_draft(
-        client,
+    response = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
@@ -3720,8 +3705,8 @@ def test_io_draft_mixed_production_uses_requested_target_department(
     assert bom_preview.status_code == 200, bom_preview.text
     assert manual_preview.status_code == 200, manual_preview.text
 
-    saved = _put_draft(
-        client,
+    saved = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
@@ -3736,7 +3721,7 @@ def test_io_draft_mixed_production_uses_requested_target_department(
     assert saved.json()["sub_type"] == "produce"
 
     submitted = client.post(
-        f"/api/io/draft/{saved.json()['batch_id']}/submit", json={"expected_revision": saved.json()["revision"]},
+        f"/api/io/draft/{saved.json()['batch_id']}/submit",
         params={"requester_employee_id": str(requester.employee_id)},
     )
     assert submitted.status_code == 201, submitted.text
@@ -3782,7 +3767,9 @@ def test_io_mixed_production_department_approval_uses_target_department(
     )
     assert bom_preview.status_code == 200, bom_preview.text
     assert manual_preview.status_code == 200, manual_preview.text
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id), "work_type": "process",
             "sub_type": "adjust_in", "to_department": DepartmentEnum.TUNING.value,
             "notes": "튜닝 대상 생산 보정",
@@ -3860,7 +3847,9 @@ def test_io_mixed_target_department_primary_requester_can_self_approve(
     assert bom_preview.status_code == 200, bom_preview.text
     assert manual_preview.status_code == 200, manual_preview.text
 
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id), "work_type": "process",
             "sub_type": "adjust_in", "to_department": DepartmentEnum.TUNING.value,
             "notes": "타부서 자가승인",
@@ -3911,7 +3900,7 @@ def test_io_process_rejects_unknown_source_kind_from_http_payload(
             }],
         }],
     }
-    response = _put_draft(client, json=payload) if endpoint == "draft" else _submit(client, json=payload)
+    response = client.put("/api/io/draft", json=payload) if endpoint == "draft" else client.post("/api/io/submit", json=payload)
     assert response.status_code == 422, response.json()
     assert db_session.query(IoBatch).count() == 0
 
@@ -3956,9 +3945,9 @@ def test_io_process_rejects_invalid_original_sub_type_before_bom_normalization(
         }],
     }
     response = (
-        _put_draft(client, json=payload)
+        client.put("/api/io/draft", json=payload)
         if endpoint == "draft"
-        else _submit(client, json=payload)
+        else client.post("/api/io/submit", json=payload)
     )
 
     assert response.status_code == 422, response.json()
@@ -4008,9 +3997,9 @@ def test_io_process_rejects_missing_bom_parent_line(
         }],
     }
     response = (
-        _put_draft(client, json=payload)
+        client.put("/api/io/draft", json=payload)
         if endpoint == "draft"
-        else _submit(client, json=payload)
+        else client.post("/api/io/submit", json=payload)
     )
 
     assert response.status_code == 422, response.json()
@@ -4040,8 +4029,8 @@ def test_io_process_draft_rejects_unknown_origin_in_bom_payload(
     assert preview.status_code == 200, preview.text
     bundle = preview.json()["bundles"][0]
     next(line for line in bundle["lines"] if line["origin"] != "direct")["origin"] = "forged"
-    response = _put_draft(
-        client,
+    response = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id), "work_type": "process",
             "sub_type": "produce", "to_department": DepartmentEnum.ASSEMBLY.value,
@@ -4054,20 +4043,17 @@ def test_io_process_draft_rejects_unknown_origin_in_bom_payload(
 
 @pytest.mark.parametrize("sub_type", ["adjust_in", "adjust_out"])
 def test_io_process_manual_adjustment_uses_item_code_without_target_department(
-    client, db_session, make_item, make_location, sub_type
+    client, db_session, make_item, sub_type
 ):
     """입고·출고 모두 process manual 대상 부서를 생략할 수 없다."""
     item = make_item(name=f"Missing target {sub_type}")
-    if sub_type == "adjust_out":
-        make_location(item.item_id, department=DepartmentEnum.TUBE, quantity=Decimal("1"))
-        db_session.query(Inventory).filter_by(item_id=item.item_id).one().quantity = Decimal("1")
     requester = _make_employee(db_session)
     db_session.commit()
     from_bucket, to_bucket = (
         ("none", "production") if sub_type == "adjust_in" else ("production", "none")
     )
-    response = _put_draft(
-        client,
+    response = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id), "work_type": "process",
             "sub_type": sub_type, "notes": "대상 부서 누락",
@@ -4110,8 +4096,8 @@ def test_io_draft_rejects_manual_origin_forged_in_bom_bundle(
     assert preview.status_code == 200, preview.text
     bundle = preview.json()["bundles"][0]
     next(line for line in bundle["lines"] if line["origin"] != "direct")["origin"] = "manual"
-    response = _put_draft(
-        client,
+    response = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id), "work_type": "process",
             "sub_type": "produce", "to_department": DepartmentEnum.ASSEMBLY.value,
@@ -4145,21 +4131,19 @@ def test_io_non_process_payload_keeps_produce_manual_source_rejection(
             }],
         }],
     }
-    response = _put_draft(client, json=payload) if endpoint == "draft" else _submit(client, json=payload)
+    response = client.put("/api/io/draft", json=payload) if endpoint == "draft" else client.post("/api/io/submit", json=payload)
     assert response.status_code == 422, response.json()
     assert db_session.query(IoBatch).count() == 0
 
 
 def test_io_draft_normalizes_mixed_manual_department_different_from_requested_target(
-    client, db_session, make_item, make_bom, make_location
+    client, db_session, make_item, make_bom
 ):
     """대상이 튜닝인 생산입고에 조립 낱개 라인을 변조해 섞을 수 없다."""
     parent = make_item(name="Target Tamper Parent", process_type_code="AF")
     component = make_item(name="Target Tamper Component", process_type_code="AR")
     manual_item = make_item(name="Target Tamper Manual", process_type_code="AF")
     make_bom(parent.item_id, component.item_id, Decimal("1"))
-    make_location(component.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("1"))
-    db_session.query(Inventory).filter_by(item_id=component.item_id).one().quantity = Decimal("1")
     requester = _make_employee(db_session, department=DepartmentEnum.ASSEMBLY)
     db_session.commit()
 
@@ -4190,8 +4174,8 @@ def test_io_draft_normalizes_mixed_manual_department_different_from_requested_ta
     manual_bundle = manual_preview.json()["bundles"][0]
     manual_bundle["lines"][0]["to_department"] = DepartmentEnum.ASSEMBLY.value
 
-    normalized = _put_draft(
-        client,
+    normalized = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
@@ -4243,7 +4227,9 @@ def test_io_immediate_adjust_out_decreases_production_quantity(
     assert line["from_bucket"] == "production"
     assert line["to_bucket"] == "none"
 
-    res = _submit(client, json={
+    res = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
             "sub_type": "adjust_out",
@@ -4318,7 +4304,9 @@ def test_8_16_03_warehouse_adjust_in_changes_only_warehouse_stock(
     assert line["to_department"] is None
     assert line["origin"] == "direct"
 
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "warehouse_adjust",
             "sub_type": "warehouse_adjust_in",
@@ -4413,7 +4401,9 @@ def test_8_16_03_warehouse_adjust_out_changes_only_warehouse_stock(
     assert line["from_bucket"] == "warehouse"
     assert line["to_bucket"] == "none"
 
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "warehouse_adjust",
             "sub_type": "warehouse_adjust_out",
@@ -4472,7 +4462,9 @@ def test_8_16_03_warehouse_adjust_handles_multiple_direct_items_without_bom_expa
     assert all(bundle["source_kind"] == "direct_item" for bundle in bundles)
     assert all(len(bundle["lines"]) == 1 for bundle in bundles)
 
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "warehouse_adjust",
             "sub_type": "warehouse_adjust_in",
@@ -4532,8 +4524,8 @@ def test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths(
         "bundles": manager_preview.json()["bundles"],
     }
 
-    drafted = _put_draft(client, json=payload)
-    submitted = _submit(client, json=payload)
+    drafted = client.put("/api/io/draft", json=payload)
+    submitted = client.post("/api/io/submit", json=payload)
 
     assert drafted.status_code == 403, drafted.text
     assert submitted.status_code == 403, submitted.text
@@ -4566,7 +4558,9 @@ def test_8_16_03_warehouse_adjust_out_rejects_stock_shortage_without_partial_cha
     assert preview.status_code == 200, preview.text
     assert Decimal(str(preview.json()["bundles"][0]["lines"][0]["shortage"])) == Decimal("1")
 
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "warehouse_adjust",
             "sub_type": "warehouse_adjust_out",
@@ -4634,7 +4628,9 @@ def test_8_16_03_warehouse_adjust_rejects_multiple_shortages_atomically(
     assert preview.status_code == 200, preview.text
     assert [bundle["lines"][0]["shortage"] for bundle in preview.json()["bundles"]] == [2, 2]
 
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "warehouse_adjust",
             "sub_type": "warehouse_adjust_out",
@@ -4695,7 +4691,9 @@ def test_io_produce_component_sources_from_home_dept(
     assert board_line["origin"] == "bom_auto"
     assert Decimal(str(board_line["shortage"])) == Decimal("0")
 
-    res = _submit(client, json={
+    res = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
             "sub_type": "produce",
@@ -4761,7 +4759,9 @@ def test_io_submit_adjust_out_blocks_on_shortage(
     )
     assert preview.status_code == 200, preview.json()
 
-    res = _submit(client, json={
+    res = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
             "sub_type": "adjust_out",
@@ -4821,8 +4821,8 @@ def test_io_submit_without_client_request_id_skips_idempotency(client, db_sessio
             "bundles": preview.json()["bundles"],
         }
 
-    first = _submit(client, json=_fresh_payload())
-    second = _submit(client, json=_fresh_payload())
+    first = client.post("/api/io/submit", json=_fresh_payload())
+    second = client.post("/api/io/submit", json=_fresh_payload())
     assert first.status_code == 201
     assert second.status_code == 201
     assert first.json()["batch"]["batch_id"] != second.json()["batch"]["batch_id"]
@@ -4850,7 +4850,7 @@ def _preview_receive_bundles(client, requester, item, qty: str = "3"):
     return res.json()["bundles"]
 
 
-def _put_receive_draft(client, requester, bundles, supplier_id, batch_id=None, *, expected_revision=None):
+def _put_receive_draft(client, requester, bundles, supplier_id, batch_id=None):
     body = {
         "requester_employee_id": str(requester.employee_id),
         "work_type": "receive",
@@ -4860,8 +4860,7 @@ def _put_receive_draft(client, requester, bundles, supplier_id, batch_id=None, *
     }
     if batch_id is not None:
         body["batch_id"] = batch_id
-        body["expected_revision"] = expected_revision
-    return _put_draft(client, json=body)
+    return client.put("/api/io/draft", json=body)
 
 
 def test_io_preview_rejects_fractional_quantity_without_persisting(
@@ -4921,7 +4920,6 @@ def test_io_write_rejects_fractional_quantity_without_persisting(
     response = getattr(client, method)(
         path,
         json={
-            "client_request_id": str(uuid.uuid4()),
             "requester_employee_id": str(requester.employee_id),
             "work_type": "receive",
             "sub_type": "receive_supplier",
@@ -4935,7 +4933,7 @@ def test_io_write_rejects_fractional_quantity_without_persisting(
     assert db_session.query(IoLine).count() == 0
 
 
-def test_legacy_io_draft_reads_recalculate_shortage_from_current_inventory(
+def test_io_draft_reads_recalculate_shortage_from_current_inventory(
     client, db_session, make_item, make_location, make_bom
 ):
     """작성 중 응답은 저장 당시 부족값이 아니라 현재 출발 위치 재고를 사용한다."""
@@ -4972,13 +4970,8 @@ def test_legacy_io_draft_reads_recalculate_shortage_from_current_inventory(
     assert preview_component["from_department"] == DepartmentEnum.TUBE.value
     assert preview_component["shortage"] == 2
 
-    location = make_location(component.item_id, department=DepartmentEnum.TUBE, quantity=Decimal("2"))
-    component_inventory = db_session.query(Inventory).filter_by(item_id=component.item_id).one()
-    component_inventory.quantity = Decimal("2")
-    db_session.commit()
-
-    saved = _put_draft(
-        client,
+    saved = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
@@ -4990,21 +4983,15 @@ def test_legacy_io_draft_reads_recalculate_shortage_from_current_inventory(
     assert saved.status_code == 200, saved.json()
     batch_id = saved.json()["batch_id"]
     saved_line_id = preview_component["line_id"]
-    # Model a pre-reservation draft with stale saved shortage, not an active reservation.
-    legacy = db_session.get(IoBatch, uuid.UUID(batch_id))
-    legacy.effective_plan = None
-    legacy.creation_payload_hash = None
-    legacy.reservation_status = "needs_reservation"
-    legacy.reservation_issue = {"code": "legacy_unprocessed"}
-    legacy.revision = 0
-    db_session.query(IoDraftReservation).filter_by(batch_id=legacy.batch_id).delete(synchronize_session=False)
-    location.pending_quantity = Decimal("0")
-    db_session.get(IoLine, uuid.UUID(saved_line_id)).shortage = Decimal("2")
-    db_session.commit()
     saved_updated_at = (
         db_session.query(IoBatch).filter(IoBatch.batch_id == batch_id).one().updated_at
     )
 
+    location = make_location(
+        component.item_id,
+        department=DepartmentEnum.TUBE,
+        quantity=Decimal("2"),
+    )
     component_inventory = (
         db_session.query(Inventory).filter(Inventory.item_id == component.item_id).one()
     )
@@ -5098,7 +5085,7 @@ def test_io_draft_save_with_batch_id_updates_in_place(client, db_session, make_i
     assert first.status_code == 200, first.json()
     batch_id = first.json()["batch_id"]
 
-    again = _put_receive_draft(client, requester, bundles, supplier.supplier_id, batch_id=batch_id, expected_revision=first.json()["revision"])
+    again = _put_receive_draft(client, requester, bundles, supplier.supplier_id, batch_id=batch_id)
     assert again.status_code == 200, again.json()
     assert again.json()["batch_id"] == batch_id
 
@@ -5121,13 +5108,13 @@ def test_io_draft_update_others_batch_forbidden(client, db_session, make_item):
     batch_id = first.json()["batch_id"]
 
     res = _put_receive_draft(
-        client, other, _preview_receive_bundles(client, other, item), supplier.supplier_id, batch_id=batch_id, expected_revision=first.json()["revision"]
+        client, other, _preview_receive_bundles(client, other, item), supplier.supplier_id, batch_id=batch_id
     )
     assert res.status_code == 403, res.json()
 
 
-def test_io_draft_update_unknown_batch_not_found(client, db_session, make_item):
-    """존재하지 않는 batch_id로 갱신 시도 시 404."""
+def test_io_draft_update_unknown_batch_unprocessable(client, db_session, make_item):
+    """존재하지 않는 batch_id로 갱신 시도 시 422."""
     item = make_item(name="Draft Unknown", warehouse_qty=Decimal("0"))
     requester = _make_employee(db_session, warehouse_role="primary")
     supplier = _make_active_supplier(db_session)
@@ -5139,9 +5126,8 @@ def test_io_draft_update_unknown_batch_not_found(client, db_session, make_item):
         _preview_receive_bundles(client, requester, item),
         supplier.supplier_id,
         batch_id=str(uuid.uuid4()),
-        expected_revision=0,
     )
-    assert res.status_code == 404, res.json()
+    assert res.status_code == 422, res.json()
 
 
 # ---------------------------------------------------------------------------
@@ -5176,7 +5162,7 @@ def test_io_submit_requires_memo_for_department_single_adjustment(
     if notes is not None:
         payload["notes"] = notes
 
-    response = _submit(client, json=payload)
+    response = client.post("/api/io/submit", json=payload)
 
     assert response.status_code == 422, response.json()
     assert "메모" in str(response.json())
@@ -5198,7 +5184,9 @@ def test_io_submit_with_memo_keeps_department_approval_request_and_notes(
     )
     assert preview.status_code == 200, preview.text
 
-    response = _submit(client, json={
+    response = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
             "sub_type": "adjust_in",
@@ -5240,12 +5228,12 @@ def test_io_draft_submission_requires_memo_without_changing_draft(
         "bundles": preview.json()["bundles"],
     }
 
-    drafted = _put_draft(client, json=payload)
+    drafted = client.put("/api/io/draft", json=payload)
     assert drafted.status_code == 200, drafted.text
     batch_id = drafted.json()["batch_id"]
 
     rejected = client.post(
-        f"/api/io/draft/{batch_id}/submit", json={"expected_revision": drafted.json()["revision"]},
+        f"/api/io/draft/{batch_id}/submit",
         params={"requester_employee_id": str(requester.employee_id)},
     )
 
@@ -5257,11 +5245,13 @@ def test_io_draft_submission_requires_memo_without_changing_draft(
     assert db_session.query(StockRequest).count() == 0
     assert db_session.query(TransactionLog).count() == 0
 
-    updated = _put_draft(client, json={**payload, "batch_id": batch_id, "expected_revision": drafted.json()["revision"], "notes": "재고 실사 차이"},
+    updated = client.put(
+        "/api/io/draft",
+        json={**payload, "batch_id": batch_id, "notes": "재고 실사 차이"},
     )
     assert updated.status_code == 200, updated.text
     submitted = client.post(
-        f"/api/io/draft/{batch_id}/submit", json={"expected_revision": updated.json()["revision"]},
+        f"/api/io/draft/{batch_id}/submit",
         params={"requester_employee_id": str(requester.employee_id)},
     )
     assert submitted.status_code == 201, submitted.text
@@ -5337,14 +5327,14 @@ def test_io_default_process_bom_allows_blank_memo_and_completes_immediately(
     }
 
     if submit_existing_draft:
-        drafted = _put_draft(client, json=payload)
+        drafted = client.put("/api/io/draft", json=payload)
         assert drafted.status_code == 200, drafted.text
         response = client.post(
-            f"/api/io/draft/{drafted.json()['batch_id']}/submit", json={"expected_revision": drafted.json()["revision"]},
+            f"/api/io/draft/{drafted.json()['batch_id']}/submit",
             params={"requester_employee_id": str(requester.employee_id)},
         )
     else:
-        response = _submit(client, json=payload)
+        response = client.post("/api/io/submit", json=payload)
 
     assert response.status_code == 201, response.text
     assert response.json()["status"] == "completed"
@@ -5365,7 +5355,9 @@ def test_io_submit_custom_process_bom_requires_nonblank_memo_before_persisting(
     db_session.query(Inventory).filter(Inventory.item_id == component.item_id).one().quantity = Decimal("5")
     db_session.commit()
 
-    response = _submit(client, json={
+    response = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
             "sub_type": "produce",
@@ -5401,12 +5393,12 @@ def test_io_draft_submit_custom_process_bom_requires_memo_without_changing_draft
         "bundles": _preview_custom_produce_bundles(client, requester, parent, component),
     }
 
-    drafted = _put_draft(client, json=payload)
+    drafted = client.put("/api/io/draft", json=payload)
     assert drafted.status_code == 200, drafted.text
     batch_id = drafted.json()["batch_id"]
 
     rejected = client.post(
-        f"/api/io/draft/{batch_id}/submit", json={"expected_revision": drafted.json()["revision"]},
+        f"/api/io/draft/{batch_id}/submit",
         params={"requester_employee_id": str(requester.employee_id)},
     )
 
@@ -5418,11 +5410,13 @@ def test_io_draft_submit_custom_process_bom_requires_memo_without_changing_draft
     assert db_session.query(StockRequest).count() == 0
     assert db_session.query(TransactionLog).count() == 0
 
-    updated = _put_draft(client, json={**payload, "batch_id": batch_id, "expected_revision": drafted.json()["revision"], "notes": "커스텀 BOM 사유"},
+    updated = client.put(
+        "/api/io/draft",
+        json={**payload, "batch_id": batch_id, "notes": "커스텀 BOM 사유"},
     )
     assert updated.status_code == 200, updated.text
     submitted = client.post(
-        f"/api/io/draft/{batch_id}/submit", json={"expected_revision": updated.json()["revision"]},
+        f"/api/io/draft/{batch_id}/submit",
         params={"requester_employee_id": str(requester.employee_id)},
     )
     assert submitted.status_code == 201, submitted.text
@@ -5461,8 +5455,8 @@ def test_process_draft_keeps_exempt_bom_child_when_live_code_changes_before_save
 
     child.process_type_code = "TR"
     db_session.commit()
-    drafted = _put_draft(
-        client,
+    drafted = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
@@ -5483,7 +5477,7 @@ def test_process_draft_keeps_exempt_bom_child_when_live_code_changes_before_save
     assert saved_child["included"] is False
 
     submitted = client.post(
-        f"/api/io/draft/{drafted.json()['batch_id']}/submit", json={"expected_revision": drafted.json()["revision"]},
+        f"/api/io/draft/{drafted.json()['batch_id']}/submit",
         params={"requester_employee_id": str(requester.employee_id)},
     )
 
@@ -5520,8 +5514,8 @@ def test_process_draft_submit_keeps_exempt_bom_child_after_live_code_change(
         },
     )
     assert preview.status_code == 200, preview.text
-    drafted = _put_draft(
-        client,
+    drafted = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
@@ -5541,7 +5535,7 @@ def test_process_draft_submit_keeps_exempt_bom_child_after_live_code_change(
     child.process_type_code = "TR"
     db_session.commit()
     submitted = client.post(
-        f"/api/io/draft/{drafted.json()['batch_id']}/submit", json={"expected_revision": drafted.json()["revision"]},
+        f"/api/io/draft/{drafted.json()['batch_id']}/submit",
         params={"requester_employee_id": str(requester.employee_id)},
     )
 
@@ -5579,8 +5573,8 @@ def test_legacy_process_draft_reopen_autosave_keeps_exempt_bom_child(
         },
     )
     assert preview.status_code == 200, preview.text
-    drafted = _put_draft(
-        client,
+    drafted = client.put(
+        "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
@@ -5596,13 +5590,6 @@ def test_legacy_process_draft_reopen_autosave_keeps_exempt_bom_child(
         if line["item_id"] == str(child.item_id)
     )
 
-    legacy = db_session.get(IoBatch, uuid.UUID(drafted.json()["batch_id"]))
-    legacy.effective_plan = None
-    legacy.creation_payload_hash = None
-    legacy.reservation_status = "needs_reservation"
-    legacy.reservation_issue = {"code": "legacy_unprocessed"}
-    legacy.revision = 0
-    assert db_session.query(IoDraftReservation).filter_by(batch_id=legacy.batch_id).count() == 0
     child.process_type_code = "TR"
     db_session.commit()
     reopened = client.get(
@@ -5628,11 +5615,10 @@ def test_legacy_process_draft_reopen_autosave_keeps_exempt_bom_child(
     assert reopened_child["bom_stock_exempt"] is True
     assert reopened_child["included"] is False
 
-    autosaved = _put_draft(
-        client,
+    autosaved = client.put(
+        "/api/io/draft",
         json={
             "batch_id": payload["batch_id"],
-            "expected_revision": payload["revision"],
             "requester_employee_id": str(requester.employee_id),
             "work_type": payload["work_type"],
             "sub_type": payload["sub_type"],
@@ -5695,11 +5681,11 @@ def test_io_explicitly_excluded_positive_bom_child_requires_memo_and_department_
     }
 
     if submit_existing_draft:
-        drafted = _put_draft(client, json=payload)
+        drafted = client.put("/api/io/draft", json=payload)
         assert drafted.status_code == 200, drafted.text
         batch_id = drafted.json()["batch_id"]
         rejected = client.post(
-            f"/api/io/draft/{batch_id}/submit", json={"expected_revision": drafted.json()["revision"]},
+            f"/api/io/draft/{batch_id}/submit",
             params={"requester_employee_id": str(requester.employee_id)},
         )
         assert rejected.status_code == 422, rejected.json()
@@ -5707,19 +5693,19 @@ def test_io_explicitly_excluded_positive_bom_child_requires_memo_and_department_
         assert db_session.query(IoBatch).filter(IoBatch.batch_id == batch_id).one().status == "draft"
         assert db_session.query(StockRequest).count() == 0
         assert db_session.query(TransactionLog).count() == 0
-        accepted = _put_draft(client, json={**payload, "batch_id": batch_id, "expected_revision": drafted.json()["revision"], "notes": "구성품 제외"})
+        accepted = client.put("/api/io/draft", json={**payload, "batch_id": batch_id, "notes": "구성품 제외"})
         assert accepted.status_code == 200, accepted.text
         response = client.post(
-            f"/api/io/draft/{batch_id}/submit", json={"expected_revision": accepted.json()["revision"]},
+            f"/api/io/draft/{batch_id}/submit",
             params={"requester_employee_id": str(requester.employee_id)},
         )
     else:
-        rejected = _submit(client, json=payload)
+        rejected = client.post("/api/io/submit", json=payload)
         assert rejected.status_code == 422, rejected.json()
         assert db_session.query(IoBatch).count() == 0
         assert db_session.query(StockRequest).count() == 0
         assert db_session.query(TransactionLog).count() == 0
-        response = _submit(client, json={**payload, "notes": "구성품 제외"})
+        response = client.post("/api/io/submit", json={**payload, "notes": "구성품 제외"})
 
     assert response.status_code == 201, response.text
     assert response.json()["requires_approval"] is True
@@ -5758,7 +5744,7 @@ def test_io_stale_bom_child_with_server_token_requires_memo_then_creates_departm
     }
 
     if submit_existing_draft:
-        drafted = _put_draft(client, json=payload)
+        drafted = client.put("/api/io/draft", json=payload)
         assert drafted.status_code == 200, drafted.text
         batch_id = drafted.json()["batch_id"]
     db_session.query(BOM).filter(
@@ -5769,28 +5755,27 @@ def test_io_stale_bom_child_with_server_token_requires_memo_then_creates_departm
 
     if submit_existing_draft:
         rejected = client.post(
-            f"/api/io/draft/{batch_id}/submit", json={"expected_revision": drafted.json()["revision"]},
+            f"/api/io/draft/{batch_id}/submit",
             params={"requester_employee_id": str(requester.employee_id)},
         )
-        assert rejected.status_code == 409, rejected.json()
-        assert rejected.json()["detail"]["code"] == "WORK_PLAN_CHANGED"
+        assert rejected.status_code == 422, rejected.json()
         db_session.expire_all()
         assert db_session.query(IoBatch).filter(IoBatch.batch_id == batch_id).one().status == "draft"
         assert db_session.query(StockRequest).count() == 0
         assert db_session.query(TransactionLog).count() == 0
-        accepted = _put_draft(client, json={**payload, "batch_id": batch_id, "expected_revision": drafted.json()["revision"], "notes": "미리보기 후 구성 삭제"})
+        accepted = client.put("/api/io/draft", json={**payload, "batch_id": batch_id, "notes": "미리보기 후 구성 삭제"})
         assert accepted.status_code == 200, accepted.text
         response = client.post(
-            f"/api/io/draft/{batch_id}/submit", json={"expected_revision": accepted.json()["revision"]},
+            f"/api/io/draft/{batch_id}/submit",
             params={"requester_employee_id": str(requester.employee_id)},
         )
     else:
-        rejected = _submit(client, json=payload)
+        rejected = client.post("/api/io/submit", json=payload)
         assert rejected.status_code == 422, rejected.json()
         assert db_session.query(IoBatch).count() == 0
         assert db_session.query(StockRequest).count() == 0
         assert db_session.query(TransactionLog).count() == 0
-        response = _submit(client, json={**payload, "notes": "미리보기 후 구성 삭제"})
+        response = client.post("/api/io/submit", json={**payload, "notes": "미리보기 후 구성 삭제"})
 
     assert response.status_code == 201, response.text
     assert response.json()["requires_approval"] is True
@@ -5834,7 +5819,7 @@ def test_io_stale_custom_produce_rejects_missing_or_changed_bom_auto_token(
         "bundles": bundles,
     }
     if submit_existing_draft:
-        drafted = _put_draft(client, json=payload)
+        drafted = client.put("/api/io/draft", json=payload)
         assert drafted.status_code == 200, drafted.text
         batch_id = drafted.json()["batch_id"]
     db_session.query(BOM).filter(
@@ -5845,15 +5830,14 @@ def test_io_stale_custom_produce_rejects_missing_or_changed_bom_auto_token(
 
     if submit_existing_draft:
         response = client.post(
-            f"/api/io/draft/{batch_id}/submit", json={"expected_revision": drafted.json()["revision"]},
+            f"/api/io/draft/{batch_id}/submit",
             params={"requester_employee_id": str(requester.employee_id)},
         )
-        assert response.status_code == 409, response.json()
-        assert response.json()["detail"]["code"] == "WORK_PLAN_CHANGED"
+        assert response.status_code == 422, response.json()
         db_session.expire_all()
         assert db_session.query(IoBatch).filter(IoBatch.batch_id == batch_id).one().status == "draft"
     else:
-        response = _submit(client, json=payload)
+        response = client.post("/api/io/submit", json=payload)
         assert response.status_code == 422, response.json()
         assert db_session.query(IoBatch).count() == 0
 
@@ -5915,30 +5899,32 @@ def test_io_no_effect_custom_bom_keeps_department_approval_for_fresh_and_draft(
     }
 
     if submit_existing_draft:
-        drafted = _put_draft(client, json=payload)
+        drafted = client.put("/api/io/draft", json=payload)
         assert drafted.status_code == 200, drafted.text
         batch_id = drafted.json()["batch_id"]
         rejected = client.post(
-            f"/api/io/draft/{batch_id}/submit", json={"expected_revision": drafted.json()["revision"]},
+            f"/api/io/draft/{batch_id}/submit",
             params={"requester_employee_id": str(requester.employee_id)},
         )
         assert rejected.status_code == 422, rejected.json()
         db_session.expire_all()
         assert db_session.query(IoBatch).filter(IoBatch.batch_id == batch_id).one().status == "draft"
         assert db_session.query(StockRequest).count() == 0
-        response = _put_draft(client, json={**payload, "batch_id": batch_id, "expected_revision": drafted.json()["revision"], "notes": "구성품 무반영 결재"},
+        response = client.put(
+            "/api/io/draft",
+            json={**payload, "batch_id": batch_id, "notes": "구성품 무반영 결재"},
         )
         assert response.status_code == 200, response.text
         response = client.post(
-            f"/api/io/draft/{batch_id}/submit", json={"expected_revision": response.json()["revision"]},
+            f"/api/io/draft/{batch_id}/submit",
             params={"requester_employee_id": str(requester.employee_id)},
         )
     else:
-        rejected = _submit(client, json=payload)
+        rejected = client.post("/api/io/submit", json=payload)
         assert rejected.status_code == 422, rejected.json()
         assert db_session.query(IoBatch).count() == 0
         assert db_session.query(StockRequest).count() == 0
-        response = _submit(client, json={**payload, "notes": "구성품 무반영 결재"})
+        response = client.post("/api/io/submit", json={**payload, "notes": "구성품 무반영 결재"})
 
     assert response.status_code == 201, response.text
     assert response.json()["requires_approval"] is True
@@ -5995,7 +5981,9 @@ def test_io_no_effect_custom_bom_department_approval_endpoints_keep_inventory_un
         if line["item_id"] == str(child.item_id)
     )["included"] = False
 
-    submitted = _submit(client, json={
+    submitted = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "process",
             "sub_type": sub_type,
@@ -6063,7 +6051,9 @@ def test_io_submit_rolls_back_fully_on_shortage(client, db_session, make_item, m
     )
     assert preview.status_code == 200, preview.json()
 
-    res = _submit(client, json={
+    res = client.post(
+        "/api/io/submit",
+        json={
             "requester_employee_id": str(requester.employee_id),
             "work_type": "warehouse_io",
             "sub_type": "warehouse_to_dept",

@@ -51,9 +51,6 @@ import {
 } from "../../_warehouse_v2/bomSync";
 import { useIoDraftRestore } from "../../_warehouse_v2/useIoDraftRestore";
 import { useIoDraft } from "../../_warehouse_v2/useIoDraft";
-import { ownerReservationAvailable } from "../../_warehouse_v2/ownerReservationAvailable";
-import { useWarehousePullReturn } from "../../_warehouse_v2/useWarehousePullReturn";
-import { WorkReservationNotice } from "../../_warehouse_v2/WorkReservationNotice";
 import { useIoPreview } from "../../_warehouse_v2/useIoPreview";
 import { useIoSubmit } from "../../_warehouse_v2/useIoSubmit";
 import { useIoWorkState, type IoStep } from "../../_warehouse_v2/useIoWorkState";
@@ -77,6 +74,7 @@ import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { useBomListQuery } from "@/lib/queries/useBomQuery";
 import { LoadFailureCard } from "../../common/LoadFailureCard";
 import { useIoPreselect } from "../../_warehouse_v2/useIoPreselect";
+import { ioLineAvailable } from "@/lib/mes/inventory";
 import { setAuditScreen } from "@/lib/activity-audit-context";
 import { sendClientEvent } from "@/lib/client-events";
 import {
@@ -106,8 +104,6 @@ export function MobileIoComposeWizard({
   globalSearch,
   operator,
   items,
-  inventoryQueryState,
-  onRefreshItems,
   productModels = [],
   setItems,
   preselectedItem,
@@ -118,7 +114,6 @@ export function MobileIoComposeWizard({
   entryIntent,
   onStatusChange,
   onSubmitSuccess,
-  onReservationChanged,
   onDirtyChange,
   flushDraftRef,
   onStepChange,
@@ -159,12 +154,6 @@ export function MobileIoComposeWizard({
   );
   const bomParentsLoaded = bomListQuery.isSuccess;
   const bomRevisionRef = useRef(revision);
-  const reservationOwnerRef = useRef(draftToRestore);
-  const autosaveBatchIdRef = useRef<string | null>(null);
-  const sessionCreationKeyRef = useRef<string | null>(null);
-  const draftSession = useIoDraft(draftToRestore, restoreNonce, onReservationChanged, sessionCreationKeyRef, { inventorySnapshot: items, inventoryQueryState, realtimeRevision: revision, employeeId });
-  const { drafting, saveDraft } = draftSession;
-  reservationOwnerRef.current = draftSession.currentReservationBatch;
   const state = useIoWorkState(defaultWorkType, operator?.department, getAvailable);
   const itemAddBlocked = state.workType !== "tube_material" && (bomListQuery.isPending || bomListQuery.isError);
   const materialOutbound = isMaterialWorkType(state.workType) && state.materialDirectionSelected && (state.subType === "outbound_supplier" || state.subType === "tube_outbound_supplier");
@@ -218,6 +207,8 @@ export function MobileIoComposeWizard({
   const restoredDraftRef = useRef<string | null>(null);
   // 마지막으로 복원을 발동시킨 '이어서 하기' nonce — 같은 draft 재선택 재발동 판정용.
   const restoredNonceRef = useRef<number | null>(null);
+  const autosaveBatchIdRef = useRef<string | null>(null);
+
   const latestBundlesRef = useRef<IoBundle[]>(state.bundles);
   latestBundlesRef.current = state.bundles;
   const latestDraftFieldsRef = useRef({
@@ -264,16 +255,9 @@ export function MobileIoComposeWizard({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entryIntent]);
 
-  const { previewing, previewTarget } = useIoPreview(() => autosaveBatchIdRef.current);
-  const { submitting, run, submit, resetSession: resetSubmitSession, captureSession: captureSubmitSession } = useIoSubmit(onReservationChanged, draftSession.refreshAfterFailure, sessionCreationKeyRef);
-  const warehouseReturn = useWarehousePullReturn(state, autosaveBatchIdRef, () => {
-    const restoreDraftSession = draftSession.captureSession();
-    const restoreSubmitSession = captureSubmitSession();
-    return () => { restoreDraftSession(); restoreSubmitSession(); };
-  }, (batchId, step, replacedBatchId) => {
-    if (batchId) onDraftSaved?.(batchId, step);
-    else if (replacedBatchId) onDraftSaved?.(replacedBatchId, step, false);
-  });
+  const { previewing, previewTarget } = useIoPreview();
+  const { drafting, saveDraft } = useIoDraft();
+  const { submitting, run, submit } = useIoSubmit();
 
   useEffect(() => {
     setSearch(globalSearch);
@@ -307,13 +291,16 @@ export function MobileIoComposeWizard({
   // 4단계 진입 시 재고 스냅샷 갱신 — 취소·승인 등으로 재고가 바뀐 뒤 재추가할 때 stale 표시 방지.
   useEffect(() => {
     if (state.step !== 4) return;
-    void onRefreshItems?.().catch(() => {});
-  }, [state.step, onRefreshItems]);
+    api.getItems({ limit: 2000, search: globalSearch.trim() || undefined })
+      .then(setItems)
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.step, globalSearch]);
 
   // 작성 중(담은 묶음 있음) 여부를 상위(MobileWarehouseScreen)에 보고 — 섹션 이탈 가드용.
   useEffect(() => {
-    onDirtyChange?.(warehouseReturn.pending || state.bundles.length > 0);
-  }, [state.bundles.length, warehouseReturn.pending, onDirtyChange]);
+    onDirtyChange?.(state.bundles.length > 0);
+  }, [state.bundles.length, onDirtyChange]);
 
   // 이탈 직전 상위가 draft autosave 를 즉시 flush 할 수 있게 핸들을 노출(700ms 디바운스
   // 창에서 마지막 변경이 유실되지 않도록). 매 렌더 최신 클로저로 갱신, 언마운트 시 해제.
@@ -321,7 +308,6 @@ export function MobileIoComposeWizard({
     if (!flushDraftRef) return;
     flushDraftRef.current = async () => {
       try {
-        if (warehouseReturn.pending) throw new Error("보관 중인 원작업으로 돌아가 저장한 뒤 이동하세요.");
         await saveCurrentDraft();
       } catch (err) {
         const message = err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.";
@@ -428,7 +414,7 @@ export function MobileIoComposeWizard({
   function getAvailable(line: IoLine): number | null {
     const item = items.find((row) => row.item_id === line.item_id);
     if (!item) return null;
-    return ownerReservationAvailable(item, line, autosaveBatchIdRef.current === reservationOwnerRef.current?.batch_id ? reservationOwnerRef.current : null);
+    return ioLineAvailable(item, line);
   }
 
   async function refreshInternalUseBom(
@@ -458,8 +444,6 @@ export function MobileIoComposeWizard({
   // (안 하면 다음 저장이 이전 draft 를 덮어써 손실.)
   function beginNewCompositionSlot() {
     bumpOperationGeneration();
-    draftSession.resetSession();
-    resetSubmitSession();
     autosaveBatchIdRef.current = null;
     // 새 작업 슬롯 — 복원 추적 해제. 같은 '이어서 작업' 재선택 시 재복원 보장.
     restoredDraftRef.current = null;
@@ -555,28 +539,23 @@ export function MobileIoComposeWizard({
       return;
     }
     if (!employeeId || !operator?.department) return;
-    const itemIds = collectShortageItemIds(state.bundles, pullSelected, state.subType, getAvailable);
+    const itemIds = collectShortageItemIds(state.bundles, pullSelected);
     if (itemIds.length === 0) return;
-    if (warehouseReturn.pending) { setError("보관 중인 원작업으로 먼저 돌아가세요."); return; }
-    const restoreOriginal = warehouseReturn.capture();
-    const originalBatchId = autosaveBatchIdRef.current;
     try {
       await runWarehousePull(
         operationRefs,
         pullingRef,
         setPulling,
         itemIds,
-        async () => originalBatchId ?? "local-composition",
+        () => saveCurrentDraft(false),
         async (itemId) => (await previewTarget({
           employeeId,
-          ownerBatchId: null,
           workType: "warehouse_io",
           subType: "warehouse_to_dept",
           target: { source_kind: "manual", item_id: itemId, quantity: 1 },
         })).bundles,
-        (_originalSessionId, newBundles) => {
-          if (originalBatchId) onDraftSaved?.(originalBatchId, state.step, false);
-          warehouseReturn.retain(restoreOriginal);
+        (savedDraftId, newBundles) => {
+          onDraftSaved?.(savedDraftId, state.step, false);
           state.setWorkType("warehouse_io");
           state.setSubType("warehouse_to_dept");
           beginNewCompositionSlot();
@@ -635,13 +614,13 @@ export function MobileIoComposeWizard({
       setError,
       state.goTo,
       setResult,
-      () => { state.reset(); draftSession.resetSession(); resetSubmitSession(); },
+      state.reset,
       resetTargetPickerFilters,
       onStatusChange,
-      async () => { await onRefreshItems?.(); },
+      () => api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
       setItems,
       onSubmitSuccess,
-      (draftId) => draftSession.submitDraft(draftId, employeeId),
+      (draftId) => api.submitDraft(draftId, employeeId),
       (draftId) => {
         restoredDraftRef.current = null;
         restoredNonceRef.current = null;
@@ -719,9 +698,6 @@ export function MobileIoComposeWizard({
 
   return (
     <div className={`flex h-full min-h-0 flex-1 flex-col ${panelStyles.touchScope} ${panelStyles.composeScope}`} style={{ background: surfaceTone ? tint(surfaceTone, 3, LEGACY_COLORS.s1) : LEGACY_COLORS.bg }}>
-      <WorkReservationNotice batch={draftSession.savedBatch} latestBatch={draftSession.latestBatch}
-        busy={drafting || submitting || previewing || pulling}
-        onReturn={warehouseReturn.resume ? () => { bumpOperationGeneration(); warehouseReturn.resume?.(); } : null} />
       {/* 진행 안내는 본문 밖에 두어 스크롤 중에도 현재 단계를 유지한다. */}
       {step > 1 && (
         <div
@@ -895,7 +871,7 @@ export function MobileIoComposeWizard({
             pullCount={
               pullSelected.size > 0
                 ? pullSelected.size
-                : shortageLines(state.bundles, state.subType, getAvailable).length
+                : shortageLines(state.bundles).length
             }
             onToggleLine={(bundleId, lineId) => {
               const bundle = state.bundles.find((row) => row.bundle_id === bundleId);

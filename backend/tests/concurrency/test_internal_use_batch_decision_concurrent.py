@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -40,18 +39,11 @@ from app.services.pin_auth import DEFAULT_PIN_HASH
 
 
 @pytest.fixture()
-def postgres_make_session(monkeypatch):
+def postgres_make_session():
     """격리 schema에서 실제 PostgreSQL row/advisory lock 경합을 실행한다."""
     database_url = os.getenv("TEST_POSTGRES_URL", "").strip()
     if not database_url:
         pytest.skip("TEST_POSTGRES_URL이 없어 PostgreSQL 경합 검증을 건너뜁니다.")
-    # The root conftest forces the application's default engine to safe SQLite.
-    # These legacy imports must match the injected PG sessions as in production.
-    for module_name in (
-        "inv_base", "inv_effect", "sr_execution", "dept_adjustment",
-        "inventory_operation_cancellation", "legacy_inventory_operation_adoption",
-    ):
-        monkeypatch.setattr(importlib.import_module(f"app.services.{module_name}"), "_is_sqlite", False)
     schema_name = f"test_internal_use_{uuid.uuid4().hex}"
     admin_engine = create_engine(database_url, poolclass=NullPool)
     with admin_engine.begin() as connection:
@@ -169,7 +161,6 @@ def _setup(make_session):
     )
     session.commit()
     payload = IoSubmitRequest(
-        client_request_id=str(uuid.uuid4()),
         requester_employee_id=requester.employee_id,
         work_type="internal_use",
         sub_type="internal_use_out",

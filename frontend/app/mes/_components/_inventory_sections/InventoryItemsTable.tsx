@@ -123,11 +123,6 @@ export function InventoryItemsTable({
         </div>
       )}
       {loading && <span role="status" aria-busy="true" className="sr-only">재고 데이터를 불러오는 중입니다...</span>}
-      {!loading && filteredItems.some((item) => item.work_reservations) && <p className="mb-2 flex items-start gap-2 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-        <span aria-hidden="true" className="mt-1 h-1.5 w-5 shrink-0 rounded-full" style={{ backgroundColor: LEGACY_COLORS.green,
-          backgroundImage: `repeating-linear-gradient(135deg, transparent 0 3px, ${LEGACY_COLORS.s1} 3px 5px)` }} />
-        <span className="break-keep [overflow-wrap:anywhere]">사선은 예약된 수량입니다. 입고·생산 예정은 사용 가능 재고에 포함하지 않습니다.</span>
-      </p>}
       <InventoryTable columns={headerColumns} compact={compact} loading={loading}>
             {loading ? Array.from({ length: skeletonRowCount }, (_, index) => (
               <tr key={index} data-testid="inventory-skeleton-row" aria-hidden="true" className={compact ? "h-[98px]" : undefined}>

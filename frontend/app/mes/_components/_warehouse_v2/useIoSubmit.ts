@@ -1,18 +1,12 @@
-import { useRef, useState, type MutableRefObject } from "react";
+import { useRef, useState } from "react";
 import { api, type IoBundle, type IoSubType, type IoWorkType } from "@/lib/api";
-import { makeClientRequestId } from "@/lib/uuid";
 import { ApiError } from "@/lib/api-core";
+import { makeClientRequestId } from "@/lib/uuid";
 
-export function useIoSubmit(onReservationChanged?: () => void | Promise<void>, onCommittedFailure?: (batchId: string) => Promise<void>, sessionCreationKey?: MutableRefObject<string | null>) {
+export function useIoSubmit() {
   const [submitting, setSubmitting] = useState(false);
   const inFlightRef = useRef(false);
-  const standaloneCreationKey = useRef<string | null>(null);
-  const clientRequestIdRef = sessionCreationKey ?? standaloneCreationKey;
-  const generation = useRef(0);
-
-  async function refreshReservations(): Promise<void> {
-    try { await onReservationChanged?.(); } catch { /* 조회 오류가 확정된 제출 결과를 바꾸지 않는다. */ }
-  }
+  const clientRequestIdRef = useRef<string | null>(null);
 
   async function run<T>(work: () => Promise<T>): Promise<T | undefined> {
     if (inFlightRef.current) return undefined;
@@ -43,7 +37,6 @@ export function useIoSubmit(onReservationChanged?: () => void | Promise<void>, o
     if (!clientRequestIdRef.current) {
       clientRequestIdRef.current = makeClientRequestId();
     }
-    const submittedGeneration = generation.current;
     try {
       const result = await api.submit({
         requester_employee_id: payload.employeeId,
@@ -62,22 +55,16 @@ export function useIoSubmit(onReservationChanged?: () => void | Promise<void>, o
         bundles: payload.bundles,
       });
       // 성공 시 키 폐기 — 다음 폼 세션은 새 UUID
-      if (submittedGeneration === generation.current) clientRequestIdRef.current = null;
-      await refreshReservations();
+      clientRequestIdRef.current = null;
       return result;
     } catch (err) {
-      await refreshReservations();
-      if (submittedGeneration === generation.current && err instanceof ApiError && err.extra?.state_committed === true && typeof err.extra.batch_id === "string") {
-        await onCommittedFailure?.(err.extra.batch_id);
+      // 503(과부하)는 같은 키로 재시도 가능하도록 유지. 그 외 실패도 사용자가 수정 후 재제출하므로 키 폐기.
+      if (!(err instanceof ApiError) || !err.isUnavailable) {
+        clientRequestIdRef.current = null;
       }
       throw err;
     }
   }
 
-  function resetSession(): void { generation.current += 1; clientRequestIdRef.current = null; }
-  function captureSession(): () => void {
-    const key = clientRequestIdRef.current;
-    return () => { generation.current += 1; clientRequestIdRef.current = key; };
-  }
-  return { submitting, run, submit, resetSession, captureSession };
+  return { submitting, run, submit };
 }

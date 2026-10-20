@@ -137,7 +137,7 @@ def _active_allocations(
     )
     if lock and db.get_bind().dialect.name == "postgresql":
         query = query.with_for_update()
-    return query.populate_existing().all()
+    return query.all()
 
 
 def figures_for_cells(
@@ -170,7 +170,7 @@ def figures_for_cells(
     figures: dict[AvailabilityCell, AvailabilityFigure] = {}
     for cell in ordered_cells:
         if cell.department is None:
-            inventory = db.query(Inventory).filter(Inventory.item_id == cell.item_id).populate_existing().one()
+            inventory = db.query(Inventory).filter(Inventory.item_id == cell.item_id).one()
             physical = _decimal(inventory.warehouse_qty)
             pending = _decimal(inventory.pending_quantity)
         else:
@@ -181,7 +181,6 @@ def figures_for_cells(
                     InventoryLocation.department == cell.department,
                     InventoryLocation.status == cell.status,
                 )
-                .populate_existing()
                 .one_or_none()
             )
             physical = _decimal(location.quantity if location is not None else None)

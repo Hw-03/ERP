@@ -198,39 +198,6 @@ function MixedProcessMemoHarness({ subType }: { subType: "produce" | "disassembl
 }
 
 describe("IoConfirmStep", () => {
-  it.each([
-    { submitting: true, saving: false, mobilePresentation: false },
-    { submitting: false, saving: true, mobilePresentation: false },
-    { submitting: true, saving: false, mobilePresentation: true },
-    { submitting: false, saving: true, mobilePresentation: true },
-  ])("처리 중 부족 안내를 숨기고 종료 후 입력과 실제 차단을 유지한다: %s", (pending) => {
-    const onSubmit = vi.fn();
-    const onSaveDraft = vi.fn();
-    function Harness({ submitting, saving, hasShortage }: { submitting: boolean; saving: boolean; hasShortage: boolean }) {
-      const [notes, setNotes] = useState("기존 메모");
-      return <IoConfirmStep workType="warehouse_io" subType="warehouse_to_dept" bundles={[bundle]}
-        notes={notes} hasShortage={hasShortage} hasInvalidQuantity={false} submitting={submitting} saving={saving}
-        approvalKind="none" mobilePresentation={pending.mobilePresentation} onNotesChange={setNotes}
-        onSubmit={onSubmit} onSaveDraft={onSaveDraft} />;
-    }
-    const view = render(<Harness submitting={false} saving={false} hasShortage={false} />);
-    expect(screen.getByRole("button", { name: /즉시 반영하기/ })).toBeEnabled();
-
-    view.rerender(<Harness submitting={pending.submitting} saving={pending.saving} hasShortage />);
-    expect(screen.queryByText(/재고 부족 라인이 있어 제출할 수 없습니다/)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: pending.submitting ? "처리 중..." : /즉시 반영하기/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: pending.saving ? "저장 중..." : "저장" })).toBeDisabled();
-    fireEvent.change(screen.getByRole("textbox"), { target: { value: "처리 중 추가한 메모" } });
-
-    view.rerender(<Harness submitting={false} saving={false} hasShortage />);
-    expect(screen.getByText(/재고 부족 라인이 있어 제출할 수 없습니다/)).toBeInTheDocument();
-    expect(screen.getByRole("textbox")).toHaveValue("처리 중 추가한 메모");
-    expect(screen.getByRole("button", { name: /즉시 반영하기/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "저장" })).toBeEnabled();
-    expect(onSubmit).not.toHaveBeenCalled();
-    expect(onSaveDraft).not.toHaveBeenCalled();
-  });
-
   it("8.17-05, 8.17-07: 원자재 입고 낱개 최종 확인은 BOM이나 결재 요청으로 표시하지 않는다", () => {
     render(
       <IoConfirmStep

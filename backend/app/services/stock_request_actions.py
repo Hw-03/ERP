@@ -23,8 +23,6 @@ from app.services._tx import transactional
 from app.services.io_persist import ensure_batch_is_mutable
 from app.services.pin_auth import verify_pin
 from app.services.sr_validation import LineInput
-from app.services import io_reservations, work_reservation_lifecycle as lifecycle
-from app.services.work_reservation_errors import WorkReservationError
 
 
 def create_request(
@@ -68,37 +66,22 @@ def _record_failed_approval(
     request_id: uuid.UUID,
     approver_id: uuid.UUID,
     reason: str,
-    expected_revision: int | None,
-    expected_status: StockRequestStatusEnum,
-) -> WorkReservationError | None:
+) -> None:
     """실패한 승인 결과만 첫 실행과 분리된 트랜잭션으로 기록한다."""
     with transactional(db):
-        batch, requests, request = lifecycle.lock_request_context(db, request_id)
-        if batch is not None:
-            io_reservations.check_revision(batch, expected_revision)
-        if request.status != expected_status:
-            raise WorkReservationError("WORK_STATE_CONFLICT", "요청 상태가 변경되어 승인 실패를 기록하지 않았습니다.", extra={
-                "request_id": str(request_id), "current_status": request.status.value,
-                "batch_id": str(batch.batch_id) if batch else None,
-                "current_revision": batch.revision if batch else None,
-            })
+        request_query = db.query(StockRequest).filter(
+            StockRequest.request_id == request_id
+        )
+        if db.bind is not None and db.bind.dialect.name != "sqlite":
+            request_query = request_query.with_for_update()
+        request = request_query.one()
         approver = db.query(Employee).filter(Employee.employee_id == approver_id).one()
-        if batch is not None:
-            from app.services.internal_use_approval import prelock_reservation_sources
-            prelock_reservation_sources(db, requests)
         stock_request_svc.mark_failed_approval(
             db,
             request,
             approver=approver,
             reason=reason,
         )
-        if batch is not None:
-            lifecycle.advance_command(db, batch, actor=approver, previous_revision=expected_revision,
-                action="settlement_failed", reason=reason)
-            error = lifecycle.persisted_failure(batch, request_id, internal_use=False)
-        else:
-            error = None
-    return error
 
 
 def _record_failed_decision(
@@ -107,17 +90,13 @@ def _record_failed_decision(
     request_id: uuid.UUID,
     approver_id: uuid.UUID,
     reason: str,
-    expected_revision: int | None,
-    expected_status: StockRequestStatusEnum,
-) -> WorkReservationError | None:
+) -> None:
     """일반 단건 승인 실패 결과를 rollback 뒤 별도 트랜잭션에 남긴다."""
-    return _record_failed_approval(
+    _record_failed_approval(
         db,
         request_id=request_id,
         approver_id=approver_id,
         reason=reason,
-        expected_revision=expected_revision,
-        expected_status=expected_status,
     )
 
 
@@ -133,14 +112,9 @@ def _run_decision_with_failure_boundary(
     rejected_target_section: str | None = None,
 ) -> None:
     """internal-use 실패는 잠금을 유지해 기록하고 일반 요청만 기존처럼 재기록한다."""
-    post_commit_error: Exception | None = None
+    post_commit_error: stock_request_svc.FailedApprovalError | None = None
     try:
         with transactional(db):
-            batch, requests, request = lifecycle.lock_request_context(db, request_id)
-            db.refresh(approver)
-            previous_revision = batch.revision if batch is not None else None
-            expected_status = request.status
-            before = lifecycle.decision_snapshot(batch, requests)
             try:
                 command()
             except stock_request_svc.FailedApprovalError as exc:
@@ -162,27 +136,14 @@ def _run_decision_with_failure_boundary(
                         request_id=rejected_request_id,
                         target_section=rejected_target_section,
                     )
-                if batch is not None:
-                    lifecycle.advance_command(db, batch, actor=approver, previous_revision=previous_revision,
-                        action="settlement_failed", reason=str(exc))
-                    post_commit_error = lifecycle.persisted_failure(batch, request_id, internal_use=True)
-                else:
-                    post_commit_error = exc
-            else:
-                if batch is not None and lifecycle.decision_snapshot(batch, requests) != before:
-                    lifecycle.advance_command(db, batch, actor=approver, previous_revision=previous_revision,
-                        action="returned" if batch.status == "draft" else "approval_changed")
+                post_commit_error = exc
     except stock_request_svc.FailedApprovalError as exc:
-        persisted_error = _record_failed_decision(
+        _record_failed_decision(
             db,
             request_id=request_id,
             approver_id=approver.employee_id,
             reason=str(exc),
-            expected_revision=previous_revision,
-            expected_status=expected_status,
         )
-        if persisted_error is not None:
-            raise persisted_error from exc
         raise
     if post_commit_error is not None:
         raise post_commit_error
@@ -481,18 +442,12 @@ def cancel_request(
     with transactional(db):
         from app.services import internal_use_approval
 
-        batch, requests, request = lifecycle.lock_request_context(db, request.request_id)
-        db.refresh(requester)
-        previous_revision = batch.revision if batch is not None else None
-        before = lifecycle.decision_snapshot(batch, requests)
         if internal_use_approval.is_internal_use_request(db, request):
+            batch, requests, request = internal_use_approval.locked_request(db, request)
             if batch.requester_employee_id != requester.employee_id:
                 raise PermissionError("본인 작업 묶음만 취소할 수 있습니다.")
             if not verify_pin(requester.pin_hash, pin):
                 raise PermissionError("PIN이 일치하지 않습니다.")
-            ensure_batch_is_mutable(batch)
-            if batch.status == "cancelled":
-                return request
             if batch.status in {"completed", "partially_completed", "rejected", "failed"}:
                 raise ValueError(f"취소할 수 없는 작업 묶음 상태입니다: {batch.status}")
             internal_use_approval.prelock_reservation_sources(db, requests)
@@ -506,12 +461,9 @@ def cancel_request(
                 for line in linked.lines:
                     line.status = StockRequestStatusEnum.CANCELLED
             batch.status = "cancelled"
-            batch.reservation_status = "inactive"
-            batch.reservation_issue = None
             batch.completed_at = None
             batch.updated_at = now
             db.flush()
-            lifecycle.advance_command(db, batch, actor=requester, previous_revision=previous_revision)
             return request
         stock_request_svc.cancel_request(
             db,
@@ -520,8 +472,6 @@ def cancel_request(
             pin=pin,
             http_request=http_request,
         )
-        if batch is not None and lifecycle.decision_snapshot(batch, requests) != before:
-            lifecycle.advance_command(db, batch, actor=requester, previous_revision=previous_revision)
     return request
 
 
@@ -531,7 +481,6 @@ def revert_to_draft(
     request: StockRequest,
     requester: Employee,
     pin: str,
-    expected_revision: int | None = None,
     http_request: Optional[Request] = None,
 ) -> IoBatch:
     """연결 batch의 미결 요청을 모두 취소하고 하나의 draft로 되돌린다."""
@@ -542,9 +491,26 @@ def revert_to_draft(
 
         from app.services import internal_use_approval
 
-        batch, linked_requests, request = lifecycle.lock_request_context(db, request.request_id)
-        db.refresh(requester)
-        is_internal_use = batch is not None and batch.sub_type == internal_use_approval.INTERNAL_USE_SUB_TYPE
+        is_internal_use = internal_use_approval.is_internal_use_request(db, request)
+        if is_internal_use:
+            batch, linked_requests = internal_use_approval.lock_batch_requests(
+                db,
+                batch_id=batch_id,
+            )
+        else:
+            requests_query = (
+                db.query(StockRequest)
+                .filter(StockRequest.operation_batch_id == batch_id)
+                .order_by(StockRequest.created_at.asc(), StockRequest.request_id.asc())
+                .populate_existing()
+            )
+            batch_query = db.query(IoBatch).filter(IoBatch.batch_id == batch_id)
+            if db.bind is not None and db.bind.dialect.name != "sqlite":
+                requests_query = requests_query.with_for_update()
+            linked_requests = requests_query.all()
+            if db.bind is not None and db.bind.dialect.name != "sqlite":
+                batch_query = batch_query.with_for_update()
+            batch = batch_query.first()
         if batch is None:
             raise ValueError("연결된 입출고 작업 묶음을 찾을 수 없습니다.")
         clicked_request = next(
@@ -559,7 +525,6 @@ def revert_to_draft(
             raise PermissionError("본인 작업 묶음만 수정할 수 있습니다.")
         if not verify_pin(requester.pin_hash, pin):
             raise PermissionError("PIN이 일치하지 않습니다.")
-        io_reservations.check_revision(batch, expected_revision)
         ensure_batch_is_mutable(batch)
         if batch.status in {"completed", "partially_completed"}:
             raise ValueError("완료된 작업 묶음은 수정할 수 없습니다.")
@@ -587,11 +552,6 @@ def revert_to_draft(
         if any(linked.status not in open_statuses | preserved_statuses for linked in linked_requests):
             raise ValueError("수정할 수 없는 연결 요청 상태가 있습니다.")
 
-        from app.services.io_effective_plan import build_effective_plan
-
-        plan = build_effective_plan(db, batch)
-        # Lock old approval sources and newly computed sources before releasing either.
-        internal_use_approval.prelock_reservation_sources(db, linked_requests, extra_plan=plan)
         for linked_request in linked_requests:
             if linked_request.status in open_statuses:
                 stock_request_svc.cancel_request(
@@ -611,7 +571,5 @@ def revert_to_draft(
         batch.status = "draft"
         batch.completed_at = None
         batch.updated_at = datetime.utcnow()
-        io_reservations.replace_reservations(db, batch, plan)
-        lifecycle.advance_command(db, batch, actor=requester, previous_revision=expected_revision, action="returned")
         db.flush()
     return batch

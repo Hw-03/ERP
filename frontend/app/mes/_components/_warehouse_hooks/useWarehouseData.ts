@@ -20,7 +20,7 @@ type Args = {
  * (useItemsQuery/useEmployeesQuery)로 이관 — productModels 가 이미
  * useModelsQuery 로 통합된 전례를 그대로 따른다. 탭 전환으로 이 훅이
  * 리마운트돼도 QueryClient 캐시가 살아있어 재요청 없이 즉시 렌더된다.
- * 작성기 예약 계산에 조회 상태와 QueryClient가 관리하는 재고 갱신을 제공한다.
+ * 반환 시그니처는 이관 전과 동일하게 유지해 호출부는 무변경.
  */
 export function useWarehouseData({ globalSearch, onStatusChange }: Args) {
   const queryClient = useQueryClient();
@@ -52,10 +52,6 @@ export function useWarehouseData({ globalSearch, onStatusChange }: Args) {
     },
     [queryClient, search],
   );
-  const refreshItems = useCallback(() => queryClient.refetchQueries(
-    { queryKey: queryKeys.items.list({ limit: 2000, search }), exact: true, type: "active" },
-    { throwOnError: true },
-  ), [queryClient, search]);
 
   const loadFailureError = itemsQuery.error ?? employeesQuery.error;
   const loadFailure = loadFailureError
@@ -67,14 +63,6 @@ export function useWarehouseData({ globalSearch, onStatusChange }: Args) {
   return {
     employees: employeesQuery.data ?? [],
     items: itemsQuery.data ?? [],
-    inventoryQueryState: {
-      queryKey: JSON.stringify(queryKeys.items.list({ limit: 2000, search })),
-      isInvalidated: queryClient.getQueryState(queryKeys.items.list({ limit: 2000, search }))?.isInvalidated ?? true,
-      isSuccess: itemsQuery.isSuccess,
-      isFetching: itemsQuery.isFetching,
-      dataUpdatedAt: itemsQuery.dataUpdatedAt,
-      dataUpdateCount: queryClient.getQueryState(queryKeys.items.list({ limit: 2000, search }))?.dataUpdateCount ?? 0,
-    },
     productModels: productModels ?? EMPTY_MODELS,
     loadFailure,
     loading: itemsQuery.isLoading || employeesQuery.isLoading,
@@ -83,6 +71,5 @@ export function useWarehouseData({ globalSearch, onStatusChange }: Args) {
     itemsLoadError: itemsQuery.error instanceof Error ? itemsQuery.error.message : itemsQuery.error ? "품목을 불러오지 못했습니다." : null,
     retryItems: () => { void itemsQuery.refetch(); },
     setItems,
-    refreshItems,
   };
 }

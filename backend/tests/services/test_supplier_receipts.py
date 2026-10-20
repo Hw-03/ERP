@@ -11,7 +11,6 @@ from app.schemas import IoSubmitRequest
 from app.services import io_actions, io_draft
 from app.services import io_preview, inventory_operation_cancellation
 from app.schemas.io import IoPreviewTarget
-from app.services.work_reservation_errors import WorkReservationError
 
 
 def _requester(db_session) -> Employee:
@@ -32,7 +31,6 @@ def _requester(db_session) -> Employee:
 def _receive_payload(requester: Employee, item_id: uuid.UUID, item_name: str) -> IoSubmitRequest:
     """공급처 원자재 입고 한 줄을 만든다."""
     return IoSubmitRequest(
-        client_request_id=str(uuid.uuid4()),
         requester_employee_id=requester.employee_id,
         work_type="receive",
         sub_type="receive_supplier",
@@ -168,7 +166,6 @@ def test_hidden_supplier_draft_cannot_be_submitted_until_supplier_is_changed(
             db_session,
             batch_id=draft["batch_id"],
             requester_employee_id=requester.employee_id,
-            expected_revision=draft["revision"],
         )
 
 
@@ -240,19 +237,10 @@ def test_material_outbound_respects_reserved_stock(db_session, make_item):
     _, item, _, payload = _outbound_payload(db_session, make_item, quantity=4)
     inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
     inventory.pending_quantity = 7
-    db_session.commit()
-    with pytest.raises(WorkReservationError) as error:
+    db_session.flush()
+    with pytest.raises(ValueError, match="재고 부족"):
         io_actions.submit(db_session, payload)
-    assert error.value.code == "STOCK_SHORTAGE"
-    assert error.value.status_code == 422
-    shortages = error.value.extra["reservation_shortages"]
-    assert len(shortages) == 1
-    assert shortages[0]["item_id"] == str(item.item_id)
-    assert shortages[0]["required_quantity"] == 4
-    assert shortages[0]["available_quantity"] == 3
-    assert shortages[0]["shortage_quantity"] == 1
     assert inventory.warehouse_qty == 10
-    assert inventory.pending_quantity == 7
 
 
 def test_material_outbound_draft_requires_permission_and_restores(db_session, make_item):
@@ -264,7 +252,6 @@ def test_material_outbound_draft_requires_permission_and_restores(db_session, ma
     requester.warehouse_role = "none"
     db_session.flush()
     payload.batch_id = draft["batch_id"]
-    payload.expected_revision = draft["revision"]
     with pytest.raises(PermissionError):
         io_draft.save_draft(db_session, payload)
 
@@ -275,7 +262,6 @@ def test_material_outbound_draft_allows_empty_reason_without_stock_change(db_ses
     payload.notes = ""
     draft = io_draft.save_draft(db_session, payload)
     payload.batch_id = draft["batch_id"]
-    payload.expected_revision = draft["revision"]
     payload.notes = "  "
     updated = io_draft.save_draft(db_session, payload)
     assert updated["batch_id"] == draft["batch_id"]
@@ -284,12 +270,7 @@ def test_material_outbound_draft_allows_empty_reason_without_stock_change(db_ses
     assert inventory.quantity == inventory.warehouse_qty == 10
     assert db_session.query(TransactionLog).filter_by(item_id=item.item_id).count() == 0
     with pytest.raises(ValueError, match="사유"):
-        io_actions.submit_existing_draft(
-            db_session,
-            batch_id=updated["batch_id"],
-            requester_employee_id=payload.requester_employee_id,
-            expected_revision=updated["revision"],
-        )
+        io_actions.submit(db_session, payload)
 
 
 def test_material_outbound_preview_is_single_item(db_session, make_item, make_bom):
@@ -310,19 +291,10 @@ def test_material_outbound_aggregates_duplicate_items(db_session, make_item):
     second.bundle_id = uuid.uuid4()
     second.lines[0].line_id = uuid.uuid4()
     payload.bundles.append(second)
-    with pytest.raises(WorkReservationError) as error:
+    with pytest.raises(ValueError, match="재고 부족"):
         io_actions.submit(db_session, payload)
-    assert error.value.code == "STOCK_SHORTAGE"
-    assert error.value.status_code == 422
-    shortages = error.value.extra["reservation_shortages"]
-    assert len(shortages) == 1
-    assert shortages[0]["item_id"] == str(item.item_id)
-    assert shortages[0]["required_quantity"] == 12
-    assert shortages[0]["available_quantity"] == 10
-    assert shortages[0]["shortage_quantity"] == 2
     inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
     assert inventory.warehouse_qty == 10
-    assert inventory.pending_quantity == 0
 
 
 def test_material_outbound_cancellation_restores_stock(db_session, make_item):

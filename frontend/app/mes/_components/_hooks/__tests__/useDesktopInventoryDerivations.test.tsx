@@ -1,4 +1,4 @@
-import { render, renderHook, screen, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Item } from "@/lib/api";
 import { matchesKpi } from "../../_inventory_sections/inventoryFilter";
@@ -14,7 +14,7 @@ function item(overrides: Partial<Item>): Item {
     production_total: 0,
     defective_total: 0,
     pending_quantity: 0,
-    available_quantity: overrides.available_quantity ?? overrides.quantity ?? 0,
+    available_quantity: 0,
     last_reserver_name: null,
     location: null,
     locations: [],
@@ -37,40 +37,6 @@ function item(overrides: Partial<Item>): Item {
 }
 
 describe("useDesktopInventoryDerivations", () => {
-  it("예약 이후 KPI·상태 필터·상세 헤더가 가용 재고를 함께 따라간다", async () => {
-    const electrode = item({ item_id: "electrode", quantity: 214, available_quantity: 1, min_stock: 5 });
-    const filler = item({ item_id: "filler", quantity: 20, available_quantity: 20, min_stock: 5 });
-    const onSummaryChange = vi.fn();
-    const { result, rerender } = renderHook(({ selected }: { selected: Item }) => useDesktopInventoryDerivations({
-      items: [selected, filler], scopedItems: [selected, filler], filteredItems: [selected, filler],
-      selectedDepts: [], selectedModels: [], selectedProcessSteps: [], showDisused: false,
-      deferredLocalSearch: "전극", displayItem: selected, onSummaryChange,
-    }), { initialProps: { selected: electrode } });
-    const badge = render(result.current.headerBadge);
-
-    expect(result.current.kpiCards.map(({ key, value }) => [key, value])).toEqual([
-      ["ALL", 2], ["NORMAL", 1], ["LOW", 1], ["ZERO", 0],
-    ]);
-    expect(matchesKpi(electrode, "LOW")).toBe(true);
-    expect(screen.getByText("부족")).toBeInTheDocument();
-    await waitFor(() => expect(onSummaryChange).toHaveBeenLastCalledWith({ low: 1, zero: 0 }));
-
-    rerender({ selected: { ...electrode, available_quantity: 0 } });
-    badge.rerender(result.current.headerBadge);
-    expect(result.current.kpiCards.map(({ key, value }) => [key, value])).toEqual([
-      ["ALL", 2], ["NORMAL", 1], ["LOW", 0], ["ZERO", 1],
-    ]);
-    expect(screen.getByText("품절")).toBeInTheDocument();
-    await waitFor(() => expect(onSummaryChange).toHaveBeenLastCalledWith({ low: 0, zero: 1 }));
-
-    rerender({ selected: { ...electrode, available_quantity: 214 } });
-    badge.rerender(result.current.headerBadge);
-    expect(result.current.kpiCards.map(({ key, value }) => [key, value])).toEqual([
-      ["ALL", 2], ["NORMAL", 2], ["LOW", 0], ["ZERO", 0],
-    ]);
-    expect(screen.getByText("정상")).toBeInTheDocument();
-  });
-
   it("PA/PF 품목은 KPI 숫자에서만 빼고 기존 요약 콜백과 KPI 선택 판별은 유지한다", async () => {
     const normal = item({ item_id: "normal", quantity: 12 });
     const low = item({ item_id: "low", quantity: 5 });
