@@ -58,7 +58,12 @@ describe("InventoryItemRow quantity summary", () => {
   it.each([false, true])("상세가 닫힌 선택 행을 다시 누르면 해당 품목을 연다 (compact=%s)", (compact) => {
     const item = makeItem();
     const onSelect = vi.fn();
-    render(<table><tbody><InventoryItemRow item={item} selected detailOpen={false} compact={compact} onSelect={onSelect} /></tbody></table>);
+    const { rerender } = render(<table><tbody><InventoryItemRow item={item} selected detailOpen compact={compact} onSelect={onSelect} /></tbody></table>);
+    expect(screen.getByRole("button", { name: /테스트 품목/ })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: /테스트 품목/ }));
+    expect(onSelect).toHaveBeenLastCalledWith(null);
+    rerender(<table><tbody><InventoryItemRow item={item} selected detailOpen={false} compact={compact} onSelect={onSelect} /></tbody></table>);
+    expect(screen.getByRole("button", { name: /테스트 품목/ })).toHaveAttribute("aria-pressed", "false");
     fireEvent.click(screen.getByRole("button", { name: /테스트 품목/ }));
     expect(onSelect).toHaveBeenCalledWith(item);
   });

@@ -45,7 +45,7 @@ function InventoryItemRowImpl({ item, selected, detailOpen = true, onSelect, ima
   const handleSelect = () => onSelect(selected && detailOpen ? null : item);
 
   return (
-    <InventoryTableRow selected={selected} onSelect={handleSelect} compact={compact}>
+    <InventoryTableRow selected={selected && detailOpen} onSelect={handleSelect} compact={compact}>
       <td className={compact ? "border-b px-2 py-3 text-center align-middle whitespace-nowrap" : "border-b px-4 py-5 text-center align-middle whitespace-nowrap"} style={{ borderColor: LEGACY_COLORS.border }}>
         <span
           className={compact ? "inline-flex w-fit items-center gap-1 rounded-full px-2 py-1 text-xs font-medium" : "inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-sm font-bold"}
