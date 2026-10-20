@@ -4,7 +4,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { DesktopSidebar, type DesktopTabId } from "../DesktopSidebar";
 
 vi.mock("next/image", () => ({
-  default: ({ alt = "", priority: _priority, ...props }: Record<string, unknown>) => <img alt={String(alt)} {...props} />,
+  default: ({ alt = "", priority: _priority, unoptimized: _unoptimized, ...props }: Record<string, unknown>) => <img alt={String(alt)} {...props} />,
 }));
 
 describe("DesktopSidebar", () => {

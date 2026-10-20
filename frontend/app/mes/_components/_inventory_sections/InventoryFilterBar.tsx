@@ -2,7 +2,7 @@
 
 import { Layers, RotateCcw, Sparkles, TrendingUp } from "lucide-react";
 import type { ProductModel } from "@/lib/api";
-import type { ReactNode, Ref } from "react";
+import { useCallback, useLayoutEffect, useRef, type ReactNode, type Ref } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { FilterChip } from "../common";
 import { SearchInput } from "../common/SearchInput";
@@ -214,9 +214,34 @@ export function InventoryTableStickyHeader({
   headerRef,
   onManageSearch,
 }: StickyHeaderProps) {
+  const localHeaderRef = useRef<HTMLDivElement | null>(null);
+  const setHeaderRef = useCallback((node: HTMLDivElement | null): void => {
+    localHeaderRef.current = node;
+    if (typeof headerRef === "function") headerRef(node);
+    else if (headerRef) headerRef.current = node;
+  }, [headerRef]);
+
+  useLayoutEffect(() => {
+    const header = localHeaderRef.current;
+    const surface = header?.parentElement;
+    if (compact || !header || !surface) return;
+    // The search controls can grow or wrap; keep both sticky layers below them.
+    const updateHeaderTop = (): void => {
+      surface.style.setProperty("--desktop-inventory-header-top", `${header.getBoundingClientRect().height}px`);
+    };
+    updateHeaderTop();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(updateHeaderTop);
+    observer.observe(header);
+    return () => {
+      observer.disconnect();
+      surface.style.removeProperty("--desktop-inventory-header-top");
+    };
+  }, [compact]);
+
   return (
     <div
-      ref={headerRef}
+      ref={setHeaderRef}
       className={compact ? "sticky top-0 z-20 mb-0 rounded-t-[20px]" : "sticky top-0 z-20 -mx-5 -mt-5 mb-0 rounded-t-[24px]"}
       style={{
         background: "var(--c-popup-bg)",

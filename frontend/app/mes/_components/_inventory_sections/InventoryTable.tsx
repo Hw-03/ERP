@@ -21,8 +21,8 @@ export function InventoryTable({ columns, compact, loading, stickyTop, fillAvail
   columns: InventoryTableColumn[]; compact?: boolean; loading?: boolean;
   stickyTop?: string; fillAvailableSpace?: boolean; children: ReactNode;
 }) {
-  const top = stickyTop ?? (compact ? "var(--mobile-inventory-header-top,54px)" : "71px");
-  const topClass = compact ? "top-[var(--mobile-inventory-header-top,54px)]" : "top-[71px]";
+  const top = stickyTop ?? (compact ? "var(--mobile-inventory-header-top,54px)" : "var(--desktop-inventory-header-top,75px)");
+  const topClass = compact ? "top-[var(--mobile-inventory-header-top,54px)]" : "top-[var(--desktop-inventory-header-top,75px)]";
   const firstVisibleColumn = columns.findIndex(column => !column.ariaHidden);
   return <>
     {compact && <div aria-hidden="true" data-testid="inventory-mobile-header-corners" className={`pointer-events-none sticky ${topClass} z-20 -mb-5 flex h-5 justify-between`} style={{ top }}>
