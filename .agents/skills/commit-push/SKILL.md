@@ -7,19 +7,28 @@ description: Stage, commit, and push the current task changes when the user asks
 
 When the user asks to commit and push, treat that as explicit approval to complete the full local commit and remote push workflow for the current task. Do not stop to ask whether to exclude unrelated files when attribution is clear; exclude them, mention them, and keep moving.
 
+## Logical Commit Units (Required)
+
+- Split changes into logical commits before staging. One task or session may require several commits; never use session membership, file count, or speed alone as the reason to bundle independent changes.
+- Each commit must express one coherent purpose that a reviewer can understand and revert independently where practical. Keep the implementation and its directly related tests together; keep inseparable API/type changes and their consumers together.
+- Inspect file and hunk dependencies, order prerequisite commits first, and verify intermediate commits remain buildable and testable. Do not split mechanically by directory or file count, or create a commit that references missing files or symbols.
+- State the proposed commit groups briefly, then execute without another confirmation when committing and pushing is already authorized. Use one commit only when the selected diff genuinely has one inseparable purpose.
+- For each group, stage an explicit allowlist (or selected hunks), inspect the staged diff, run `git diff --cached --check`, and use checks appropriate to that group. Reuse still-applicable final verification; do not repeatedly run the entire suite for every commit.
+- Push the ordered commits together after all groups are ready. If the user explicitly requests splitting an already-pushed commit, preserve the original commit for recovery, confirm the remote tip has not changed, verify the reconstructed final tree is identical except for intended new changes, and use an explicit `--force-with-lease=<ref>:<expected-sha>`; never use an unconditional force push.
+
 ## Fast Path
 
 Use this path by default when the user asks for "this session", "your work", "only what you touched", or the worktree contains obvious unrelated changes.
 
 1. Inspect `git status --short --branch` and the relevant diffs.
-2. Build an explicit allowlist of files attributable to the current task/session.
+2. Build an explicit allowlist of files attributable to the current task/session and divide it into logical commit groups using the required rules above.
 3. Stage only that allowlist with pathspecs. Leave unrelated files unstaged.
 4. Confirm the staged list with `git diff --cached --name-only`.
 5. Run a quick staged sanity check such as `git diff --cached --check`.
 6. Reuse already-run relevant verification when it is fresh and still applies.
    If checks are missing, use `efficient-verification`: preview the staged smart plan, inspect the actual behavior and consumers, then run only the missing checks that cover the risk. Path-based full escalation alone is not a requirement to run every gate.
 7. If full-suite verification fails only in clearly unrelated unstaged areas, record that fact and continue unless the repository instructions absolutely forbid it.
-8. Commit with the repository-required message format.
+8. Commit each logical group with the repository-required message format; repeat staging and checks for the remaining groups.
 9. Verify the commit subject with `git log -1 --format=%s`.
 10. Push to the current branch origin.
 
@@ -36,10 +45,10 @@ Use this path by default when the user asks for "this session", "your work", "on
 ## Workflow
 
 1. Inspect `git status` and the relevant diffs before staging.
-2. Stage only changes attributable to the current task or session.
+2. Divide attributable changes into logical commit groups, then stage only one group at a time.
 3. Leave unrelated user changes unstaged and mention them briefly.
 4. Run the most relevant verification command available for the touched area when practical.
-5. Commit with a concise message that matches the repository existing style.
+5. Commit each group with a concise message that matches the repository existing style. Repeat until all selected groups are committed.
 6. Push to the current branch origin.
 7. If `git push` requires approval because it writes to a remote or needs network access, request that approval immediately and continue after approval.
 
