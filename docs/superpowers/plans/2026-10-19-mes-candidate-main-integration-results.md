@@ -1,6 +1,113 @@
 # 최신 main을 후보에 결합한 검증 기록
 
-**2026-10-20 현재 판정: main62ab7305까지 후보 통합·국소 검증·production 빌드3.273MiB 완료, 후보 푸시·최종 CI 진행. main과 직원 환경은 변경하지 않았다.**
+**2026-10-20 16시대 현재 판정: 후보48ddea95의 production 일반 키 입력→바로 다음→제출→새로고침 후 저장 확인을1회 통과했다. 사용자와 정한 마지막 메모 확인 조건은 충족했고, 해당 검증 후보의 병합을 권고한다. 과거 간헐 실패 원인 확정은 별도 후속으로 남긴다. main·직원 환경은 변경하지 않았다.**
+
+## 최종 production 메모 확인 — 지정 흐름 1회 통과
+
+사용자는 원인 확정을 기다리는 조건을 병합 판단에서 분리하고 production의 일반 입력 경로를 한 번만 확인하도록 승인했다. 아래는 그 신규 실행 결과이며, 앞선 미확정 원인을 해결했다고 표시하지 않는다.
+
+| 단계 | 기대 | 실제 |
+|---|---|---|
+| 입력 | 일반 키 경로로 메모 한 번 입력 | `pressSequentially`로 `QA-PROD-MEMO-20261020-ONCE` 입력. fill·재입력·고정대기 없음 |
+| 바로 다음 | 최종확인 화면에 같은 문구 | 입력 뒤 다른 조회/스냅샷 없이 다음 클릭, 같은 메모 표시. 입력완료→클릭완료230ms |
+| 제출 | 새 QA 요청 한 건과 동일 메모 저장 | 제출1회·POST201 한 번·해당메모 원건1 |
+| 새로고침 | 서버에서 다시 읽은 상세에도 같은 문구 | 새 원건 상세 열기→reload→동일 메모가 표시됨. 로컬 DB 값도 일치 |
+| 무관 자료 | 기존 업무·수량 보존 | 기존 출하요청 전체 행, inventory/inventory_locations/bom/shipping_allocations 전체 행 digest 불변 |
+
+재현 순서: 격리 `http://127.0.0.1:3039` → QA 겸임 로그인 → 출하 → 출하 관리 → 새 요청 → `6-PF-0050` 선택·수량1·기본 BOM 유지 →2·3·4단계 → 메모 키 입력 직후 다음 → 출하 요청 → 방금 만든 원건 상세 → 새로고침. 준비완료·픽업·취소나 응답 유실 주입은 이번 대상이 아니다. 실제 뷰포트는1914×884이며1920×1080 실행으로 표시하지 않는다. 해당1회 이외 업무 재실행은 없다.
+
+환경·근거 위치: Rprod=`C:/Users/user/.codex/worktrees/mes-main-candidate-comparison/ERP/_attic/runtime/production-memo-20261020`, Lprod=`/home/hw/production-memo-20261020`.
+
+- 후보HEAD48ddea95의 제품·설정·lockfile 등1404개 입력이 기존 Linux 최종 source와 일치함을 확인해 빌드ID `hKCIuFnWnUqvs5XfLCsCu`를 재사용했다. 새 빌드·번들 검사·전체검사·CI는 실행하지 않았다. production JS/CSS 등114개 산출물도 원 빌드와 동일하다.
+- 기존 검토DB를 온라인 백업으로 Rprod/qa.db에 만들고 새 Linux 사본에서만 처리했다. backend8021/frontend3039와 새 서명세션을 사용했다. 원 production 빌드의 API 목적지8010은 **새 QA 빌드 사본의 routes-manifest만**8021로 바꿔 원본 서비스 연결을 막았다. 앱 번들은 수정하지 않았다. SQLite QA의 backend설정은development이며 직원 PostgreSQL 배포 검증으로 확대하지 않는다.
+- `preflight.json`, `session.json`: 시작소스·DB·스키마0047·프로세스·빌드 식별값. `browser-actions.json`: 입력·즉시다음·단일제출·reload 시각. `after-reload-ax.txt`, `after-reload.jpg`, `saved-memo-after-reload.jpg`: 새로고침 결과와 메모가 보이는 화면. 원문은 ignored에만 보존한다.
+- `verification.json`: DB동일메모1건·POST201 한 번·기존업무/재고/BOM/예약 불변·산출물동일. `after.db`, `backend.log`, `frontend.log`: 온라인 사본과 원문. `cleanup-first.txt`: Next의 공백 포함 프로세스명 때문에 최초 종료가드가 거부한 도구문제와 수정. 올바른 /proc stat필드 파싱 뒤 같은 PID·시작시각·프로세스그룹 확인을 유지해 소유서버만 종료했다. 업무 실행은 반복하지 않았다.
+- `postflight.json`: 보호검토DB/session 해시 불변·후보HEAD불변·전용포트해제. 사용자3038/8038 PID32400/32304 유지, 기존BOM초안/연구요청 미사용. 검증탭만 닫고 원래 탭을 유지했다. 커밋·푸시·배포·예약 변경 없음.
+
+검증 도중 main/origin main은62ab7305에서 **81b5875d**로 전진했다. 추가1커밋은 전수조사 대기화면의3개 제품파일과 기록이며 출하·백엔드 파일 변경은 없다. 이번 작업은 Git 변이 명령을 실행하지 않았고 이를 후보에 자동 결합하지 않았다. 이번 production·CI 근거는48ddea95에 대한 것이다. 실제 병합 시 새 main 변경을 보존해 정상 결합하고 그 영향만 확인해야 하며, 새 코드 조합의 검증을 이미 끝냈다고 표시하지 않는다.
+
+병합 판단은 **지정 메모 조건 충족·검증 후보 병합 권고**다. 과거 간헐 실패의 제품/자동화 구분과 원인·수정 목표는 미확정으로 유지하되 그것만을 이유로 무기한 병합 보류하지 않는다. 아래15시대 보류·진행불가 기록은 당시 원인조사의 이력으로 보존한다.
+
+## 출하 메모 경계 — 승인한 1회 관측 종료
+
+| 확인 대상 | 과거 실패 기록 | 이번 후보 관측 | 직원 영향·판정 |
+|---|---|---|---|
+| 메모 입력→다음 단계 | fill성공. 후속 원문 분석에서 다음 호출 전의 입력직후 DOM도 빈값 확인. native/React 기록 없음 | 명령→native→React→다음 모두 같은 메모 유지 | 이번1회 정상. 과거 제품/자동화 원인은 **미확정** |
+| 응답 유실→재제출 | 빈메모로 첫201, 그 이후 메모 단언 실패 | 메모·같은키 유지, 제출2회·서버 원건1·저장메모 일치 | 이번 지정 조건 정상. 과거 입력유실 해결을 뜻하지 않음 |
+| 화면 단계와 URL 시간차 | 입력 시 서로 달랐음 | 화면4/URL3에서 입력했어도 정상 보존 | 시간차 하나만으로 원인이라 판정할 수 없음 |
+
+### 무엇을 왜 확인했는지
+
+CI 실패에서는 응답 유실을 주입하기 전에 메모가 이미 빠져 있었다. 자동 입력 명령의 성공 반환과 실제 입력 성공을 구분하기 위해, 빠져 있던 native입력·React반영·초기화writer·단계이동·본문 경계만 새로 관측했다. 기존 `frontend/tests/e2e/shipping-expectations.spec.ts:352`의 입력→즉시 다음→제출·응답 유실→재제출 순서와 단언은 유지했다. 실제 입력은 `frontend/app/mes/_components/DesktopShippingView.tsx:3265`의 textarea→onNotes, 상태는 같은 파일303행이다. 다섯 setNotes 위치(441/1150/1177/1208/1232행)는 진단 사본에서 호출 직전만 기록했다.
+
+### 서버·계정·품목과 확인 순서
+
+- W=`C:/Users/user/.codex/worktrees/mes-main-candidate-comparison/ERP`, 후보=`codex/mes-main-candidate-comparison-20261016`, HEAD=`48ddea951a698d5f50571691b74fad5f777088b3`. main/origin main=`62ab7305bcb98f9304837b45f1112f45347dde9f`는 변경하지 않았다.
+- 새 진단 L=`/home/hw/shipping-memo-boundary-20261020-152043`, Rm=`W/_attic/runtime/shipping-memo-boundary-20261020-152043`. 실행기·Chromium·Next·백엔드는 같은 Linux,3100/8021. `.git`/보호mes.db 없는 별도 source와 합성 `backend/mes_e2e.db`를 사용했다. Node20.20.2/Python3.11.17/Chromium1223·동일lockfile을 재사용했고 과거 GitHub runner의 누적 부하 전체를 재현한 실행은 아니다.
+- 합성 요청자(창고/생산부 결재역할 없음)로 로그인 → 출하 요청 작성 → 합성 PF `3-PF-0001`(이번 생성명 `출하검수-pf-b5749080`) 선택 → 기존 기본구성 그대로2·3·4단계 → 요청메모에 고정 합성 문자열 입력 → 즉시5단계 → 제출. 서버201을 받은 뒤 첫 브라우저 응답만 원 테스트대로 유실시켜 메모·제출버튼 유지 확인 → 재제출 → 저장메모·요청키·서버 목록 확인.
+- 원문 실행 명령은 Rm/run.sh의observe 분기다. 선택자는 `SHIP-RETRY PC`, worker1·retry0·max-failures1·trace on으로 **정확히1회** 실행했다. 입력 전 추가focus·준비대기·반복입력·timeout확대·단언삭제는 넣지 않았다. 정상 종료 뒤 같은 검사를 다시 실행하지 않았다.
+
+### 예상과 실제
+
+| 단계 | 예상 | 이번 실제·정확한 근거 |
+|---|---|---|
+| 입력 전 | 빈 메모 | shipping 문서의초기writer는url:new-draft, seq4 |
+| 입력 명령 | 대상에 한 번 전달 | Input.insertText 송수신 성공, pending0/drop0. memo-boundary.json의network/input-transport |
+| 실제 입력 | native 이벤트→onChange→화면 상태가 같은 값 | TEXTAREA uid8의seq87/89/92, React prop·추적값·DOM 모두 고정메모와 일치 |
+| 다음 단계 | 메모 보존 | seq104(4→5), 입력 후30렌더에 빈메모 없음 |
+| 제출·응답 유실 | 본문과 서버 저장값 일치, 화면 메모 유지 | seq122·POST201 모두 같은메모. 첫응답 유실은 테스트의 의도된route.abort |
+| 재제출 | 같은키·서버원건1 | seq139·두번째201도 같은메모·같은원건. 마지막GET의 해당PF원건1, 원래단언 통과 |
+| 재고·후속사용·취소 | 이번은 요청 작성 경계만 확인 | 준비완료/픽업/후속사용/취소는 미실행. 반환원건transactions0/allocations0은 읽었으나 위치별 전후재고·기본BOM 불변의 새 검증으로 세지 않음 |
+
+**판정:** 이번 지정 조건은 정상이며, 과거 사건은 **구분 근거 부족(미재현)**이다. 자동화 문제라고 확정할 실패 경계와 일반사용자 대조가 없고, 제품이 값을 지웠다고 할 writer 기록도 없다. 일반 입력에서 같은 일이 생기면 출하 전달메모 누락 영향이 있지만 발생 가능성·원인은 이번 정상1회로 해소하지 못했다. 재고·수량 오류가 이 사건에서 발생했다는 증거는 없다. main에서 같은 조건을 새로 실행하지 않아 이번에main/후보 차이를 발견했다고 표시하지 않는다.
+
+### 관측 도구·신규 검사·재사용·미실행
+
+실제 React 소형화면에서 관측off/on의 변경1회·렌더2회·focus2회·제출값이 같았고, wire명령 송수신·누락0을 확인했다. 이 검사는 업무 실패 재현도, 실제 전체화면의 타이밍 무영향 증명도 아니다. 진단복사본의 관련ESLint는 통과했다. 초기fixture의 `use` 이름이 React hook규칙에 걸린 실패를 보존하고 `runTest` 명명만 바꾼 뒤 재검사했다. 관측은메모리버퍼에만 쓰고 setter/updater를 재호출하지 않았다. shipping기록151이벤트·오류/손실/잘린스택/일시정지0이며, 메모첨부를fixture/계정정리·context종료 전에 완료했다.
+
+제품·원래테스트·lockfile·공유진단도구의tracked소스는 모두불변이다. 새 원인이 없으므로 실패회귀/수정/되돌림대조·일반사용자입력대조는 미실행이다. production빌드·번들·전체검사·새CI·과거BOM/AS조사는 반복하지 않았다. 기존CI·실패trace·관련검사·빌드의 근거는 당시 입력 범위대로 보존하며 이번 관측을 전체 기대값 완료로 확장하지 않는다.
+
+### 정확한 자료와 종료 상태
+
+다음은 모두 ignored Rm 안에 보관한다. 실제 직원 정보가 담긴 원자료나 DB는 문서에 복사하지 않는다.
+
+- `preflight.json`, `prior-working-files/`, `prior-working.patch`: 시작 코드·문서3개·보호DB/session·입력 해시.
+- `linux-evidence/observation-preparation.json`, `linux-evidence/source-observation.patch`: 진단 전후 소스해시·writer위치·업무본문 유지. `linux-evidence/observer-probe.json`, `linux-evidence/observer-probe-wire.json`: 도구off/on 검사.
+- `observe-once.log`: 원선택자1pass/재시도0, 정리완료. `diagnostic-eslint.log`/`diagnostic-eslint-02.log`: 초기도구실패와통과.
+- `memo-boundary.json`, `analysis.json`, `analyze.py`, `memo-boundary-screen.png`: 이벤트번호·요청키해시·서버목록·정리전보존 순서·정제분석·화면.
+- `results-once/shipping-expectations-SHIP-fc7f3--06-응답-유실-뒤-초안·키-유지-및-서버-1건-chromium/trace.zip`: 이번원문. 내부 `resources/9b3681a617e2334804f9840cc06edd45818dd1ee.json`(본문), `1bce51663a12feffc207414479327ccf13f78d46.json`(201), `b410e3d673d60cce451fda40b2f93d28010fdb22.json`(마지막목록). route.fetch와브라우저의중복관측을 별도업무요청으로 세지 않았다.
+- `postflight.json`:15:36 KST 후보/main/ref·제품/테스트/lockfile·검토DB/session 불변. 사용자검토3038 PID32400/8038 PID32304 유지. 소유WSL Next667/백엔드717 종료·진단3100/8021 해제. 합성DB는 원global teardown이 삭제했으며 원문trace/관측은 남겼다.
+
+원인·수정 CP3는 미완료다. 승인한 한도에 따라 여기서 멈추며 동일정상검사나키보드대조를 추가하지 않는다. 새 실제실패의 입력/native/React/초기화 기록이 있을 때 최초불일치부터 분석할 수 있다. 자동후속예약·커밋·푸시는 만들지 않았다. 검토용3038/8038·BOM초안·연구요청·main·직원환경은 보존했다.
+
+### 같은 날 후속 원문 분석 — 다음 호출 이전부터 기록상 빈 메모
+
+새 업무 실행 없이 기존 실패trace의 증분 DOM 참조를 해제했다. Playwright의 `snapshotNodes` 후위순회·상대스냅샷/노드번호 계약을 설치된 `frontend/node_modules/playwright-core/lib/coreBundle.js`와 대조하고, `__playwright_value_`가 textarea.value를 직렬화하는 경로도 확인했다. 원문은 수정하지 않았다.
+
+- fill종료: monotonic2956510.492ms.
+- 입력직후 `after@call@34527`:2956518.371ms, 대상 `요청 메모`의 `__playwright_value_=""`. 이 스냅샷은 `[[1,18]]`로 직전 입력전DOM을 참조하고 있었다.
+- 다음API시작:2956520.155ms. 즉 입력완료 약7.879ms 뒤·다음호출 약1.784ms 전부터 **기록상 빈값**이다.
+- `before@call@34529`와 클릭직전 `input@call@34529`도 같은 빈값이다.
+
+이로써 원래의 넓은 입력→다음 구간을 **입력 전달·처리 또는 입력 직후 복원 구간**으로 좁혔다. 다음 클릭 처리에서 최초로 사라졌다는 설명은 이 기록과 맞지 않는다. 단, 짧은 순간 값이 들어왔다가 사라졌는지와 애초 native입력이 전달되지 않았는지는 간헐스냅샷만으로 구분할 수 없다. 제품/자동화 원인 확정이나 새 수정 근거로 쓰지 않는다.
+
+정확한 근거는 Rm/`original-dom-boundary.py`, `original-dom-boundary.json`이다. 원실패trace SHA256과 복원 알고리즘을 확인한 코드 SHA256, 네 스냅샷·타임스탬프를 함께 남겼다. 새업무실행0, 기존정상1회 한도 불변. 다음 분석에 필요한 것은 다음버튼 이후가 아니라 **원실패의 입력명령→native/React/최초값쓰기 기록**이다. 이를 확보한 실행은 현재 없다.
+
+진행 불가 감사(2026-10-20): 같은 원자료 공백과1회정상관측 종료 조건이 세 목표 턴에 걸쳐 유지됐다. 현재 진행중인진단이나 새로운실패자료는 없다. 원인확정·수정 목표는 **blocked(진행 불가), 미완료**로 남긴다. 새 실패에서 빠진 경계를 관측한 자료나 별도로 판별 가능한 실행 범위가 있어야 재개할 수 있다. 정상검사를 반복하거나 추측수정으로 완료 처리하지 않는다. 감사 근거는 Rm/`goal-followup-audit-03.json`이다.
+
+## 2026-10-20 CI 이후 병합 판단 — 출하 메모 입력 경계 확인 전 보류
+
+사용자 요청에 따라 실제 실패 trace를 추가로 읽었다. main62ab7305는 원격에서도 동일하고 후보48ddea95의 조상이며, DB 계보·사전검사·창고/생산부 권한·복귀 위치 보호에서 이번 읽기 검토의 새 차단 사항은 발견하지 못했다. 다만 CI 성공을 직원 영향 없음으로 확대하지 않는다.
+
+`SHIP-RETRY PC`의 실패 시도에서는 메모 fill 명령이 성공 반환했지만, **POST 이전**의 최종 화면부터 `입력된 메모 없음`이었다. 실제 생성 본문의notes=null, 서버201 응답의notes=null/PREPARING도 확인했다. 브라우저의 연결 실패는 테스트가 응답 유실을 재현하려고 의도적으로 만든 것이다. 따라서 메모가 사라진 경계는 응답 유실 이후가 아니라 메모 입력→다음 단계 구간이다. 자동 입력 전달 문제인지 제품 상태 처리 문제인지는 원래 trace에 native/React 입력 이벤트가 없어 구분하지 못했다. 메모가 정상 입력에서도 빠진다면 실제 출하 요청의 전달사항이 누락될 수 있어, 현재는 즉시 병합을 권하지 않는다. 재고·수량 손상이나 중복 요청이 이 실패에서 발생했다는 증거는 없다.
+
+이 판단은 새 전체 검사를 반복한 결과가 아니라 CI artifact12243024446의 실패 시점 기록을 분석한 결과다. 근거: R/readiness-20261020/assessment.json, playwright-report-general/data/a7438a056688a5a82a493ae3e93fb78a371575c7.zip, data/33d64bc908f63744a477a1182bfedf490149bb3b.md, data/f0fbe1d1f06a8b7a2cdb1759529af59e548fbe89.png. trace의call@34527(입력),call@34529(다음),call@34535(제출), resources/83a5283f6e697bfddf57101dd57b04de263701f9.json(본문), resources/4c6a1c7843336db2a0a65ba84c158de0d41e9c08.json(201 응답)을 연결했다.
+
+현재 남은 판단 조건은 메모가 입력된 순간 제품 상태에 반영됐는지, 다음 단계에서 왜 빈 값이었는지의 구분이다. 정상 입력 경로에 한정해 이를 확인하기 전에는 자동화에만 한정된 실패라고 확정하지 않는다. 과거 BOM/AS 원인 미확정도 이번 메모 사건과 같은 원인으로 묶지 않는다. 이번에는 제품·테스트·DB 수정, 서버 조작, 테스트 실행, Git 병합·커밋·푸시를 수행하지 않았으며 판단·인계 문서만 로컬 갱신했다. 실제 직원 DB의 다음 동기화 성공 여부는 이번 읽기 검토의 보장 범위 밖이다.
+
+## CI 성공 확인 이력
+
+예약 후속에서 [최종 CI39371380403](https://github.com/Hw-03/ERP/actions/runs/39371380403)의 브랜치·HEAD가 실제 후보48ddea951a698d5f50571691b74fad5f777088b3와 일치함을 확인했다. 전체8job은14:42:44 KST에 성공 종료했다. 일반 E2E는300건 첫 실행 통과·1건 재시도 통과다. 재시도한 `SHIP-RETRY PC`는 응답 유실 뒤 메모 표시를 첫 실행에서 찾지 못한 사건으로 원인 미확정이다. 이전 `SHELL02 shipping`은 이번 첫 통과했지만 과거 원인 해결로 소급하지 않는다. 실패 원문과 성공 결과를 함께 R의scheduled-ci-20261020-state.json/general.log/frontend.log에 보존했다. CI 성공 확인이므로 새 제품 수정·검사 반복·커밋·푸시는 수행하지 않았고 이 종료 기록만 로컬 갱신했다. 전체 기대값의 현재 실행 상태나 과거 미확정 원인은 승격하지 않았다. 아래 진행·실패 기록은 당시 이력이다.
 
 후보5f5be8fb의 [CI39366613242](https://github.com/Hw-03/ERP/actions/runs/39366613242)는7job성공·일반E2E실패(298통과/2실패/1재시도통과)로 끝났다. 확정2실패는62ab7305의 `selected && detailOpen` 변경에 맞추지 못한 재고 E2E였다. 닫힌 상세의 `aria-pressed=false`와 다시 열 때의 상세/선택 복원을 함께 검증하도록 테스트만 수정했다. Linux 최종 제품 사본에서 해당2건과 같은 파일의 관련 왕복1건이 재시도0으로 통과했다(`followup-ci-inventory-fix.log`). ESLint도 통과했으며 제품 소스/빌드가 동일하므로 기존7job·빌드 근거를 재사용한다. 기대값 원문/과거 바인딩과 실패 원문 `followup-ci-failed.log`를 보존한다. 출하 초안 `SHELL02 shipping`의 인보이스 입력칸 미발견은 첫 실행 실패 후 재시도 통과한 간헐 사건이며 원인 미확정으로 남긴다. 새 수정 HEAD의 CI는 별도 확인한다.
 

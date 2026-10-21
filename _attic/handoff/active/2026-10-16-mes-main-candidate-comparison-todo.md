@@ -1,14 +1,44 @@
 # 개발서버·병합 후보 비교 검증
 
-## 2026-10-19 최신 main → 후보 통합: 완료 4 / 전체 5
+## 2026-10-20 최종 production 메모 확인: 완료 3 / 전체 3
+
+- [x] CP0: 후보48ddea95와 기존 Linux source의제품입력1404개 일치, production빌드·산출물114개 재사용. 원검토DB 온라인백업→새 Lprod DB,3039/8021·API목적지가드 확인. 원본3038/8038·초안 유지.
+- [x] CP1: 인앱브라우저에서 QA겸임·6-PF-0050·수량1·기본BOM으로 일반키 메모입력→바로다음→제출1회→원건상세새로고침. 같은메모 표시, DB동일메모1건·POST201 한 번. `production-memo-20261020/browser-actions.json`, `saved-memo-after-reload.jpg`, `verification.json`.
+- [x] CP2: 기존요청·inventory/inventory_locations/bom/shipping_allocations 전행불변, 보호DB/session해시·검토PID 불변. 소유QA서버/탭 종료·포트해제, 보고서·인계 동시 갱신. `postflight.json`. 전체검사·빌드·새CI·제품수정·커밋·푸시 없음.
+
+현재 판단: 사용자가 정한 production 메모조건 충족으로 검증후보의병합권고. 아래 원인조사 CP3미완료/4-of-5는 그대로 보존하지만 원인확정을병합의무기한조건으로두지 않는다. 실제main반영·직원배포는 아직미승인이고 실행하지 않았다. 작업 중 새main81b5875d(전수조사대기화면1커밋)가전진했으므로 실제반영때보존결합·해당영향만확인한다. 이번신규결합은안했다.
+
+Rprod=`_attic/runtime/production-memo-20261020`, Lprod=`/home/hw/production-memo-20261020`. 상세는 [통합 결과의 production 메모 절](../../../docs/superpowers/plans/2026-10-19-mes-candidate-main-integration-results.md).
+
+## 2026-10-20 출하 메모 입력 경계 조사: 실행·기록 완료 4 / 전체 5, 원인·수정 미완료
+
+- [x] CP0 (2026-10-20): 후보48ddea95·문서3개 변경·검토DB/session 해시 보존. R=`_attic/runtime/shipping-memo-boundary-20261020-152043`, preflight.json/prior-working-files/prior-working.patch. 새 Linux 소스 `/home/hw/shipping-memo-boundary-20261020-152043/source`, .git/보호mes.db 없음,3100/8021 해제 확인.3038/8038 유지.
+- [x] CP1 (2026-10-20): 기존 native 메모 관측기 재사용, 진단 사본에만 onChange/기존5개메모writer/렌더/단계이동/본문 연결. 실제 setter/updater·입력순서 유지. 실제 React 소형 화면의 관측off/on 입력·변경1회·렌더2회·제출값·focus2회 동일, 오류/손실0. Linux evidence/observer-probe.json, observation-preparation.json, source-observation.patch. 업무 재현 성공으로 세지 않는다.
+- [x] CP2 (2026-10-20 15:29): 원래 `SHIP-RETRY PC` 한 건만 새 관측을 붙여 재시도0으로 통과. Input.insertText 성공→native입력(seq87)→onChange(89)→React반영(92)→다음(104)→본문(122/139) 메모 일치. 같은 키로 제출2회·서버 원건1·저장메모 일치. 기록 오류/손실0, 정리 전 첨부 확인. R/observe-once.log, memo-boundary.json, analysis.json, results-once/*/trace.zip. **실패 미재현이며 원인 확정 아님.**
+- [ ] CP3 (미실행): 원실패가 잡히지 않아 제품/자동화 구분·실패 회귀·최소수정·원인 대조는 수행하지 않았다. 제품·원래 테스트 수정 없음. 정상 결과를 원인 해결이나 병합 가능으로 승격하지 않는다.
+- [x] CP4 (2026-10-20 15:36 이후): 상세 결과·첫 비교표·인계에 신규 정상 관측/재사용 근거/미실행을 분리. postflight.json에서 HEAD/main·제품/테스트/lockfile·검토DB/session 불변,3038/8038 동일PID, WSL3100/8021 해제·소유Next/백엔드 종료 확인. 진단 사본 ESLint 통과(`diagnostic-eslint-02.log`), 초기 도구 명명 오류 원문도 보존. 전체검사/빌드/커밋/푸시/새CI 없음.
+
+진행 범위: 조사·최소수정·국소검증·기록. main/직원/실DB/예약/검토서버 변경, 커밋·푸시·새CI 제외. 원래 계획의 모두 정상 시 미확정 유지 원칙을 적용한다.
+
+종료 판단: 이번 수집은 정상이나 **과거 사건의 제품/자동화 구분 근거는 부족**하다. 입력 당시 화면4/URL3 차이는 이번 정상 실행에서도 관찰돼 그 차이만으로 원인이라 할 수 없다. 계획의 한도에 따라 같은 검사·키보드 대조·기존 BOM/AS 조사 반복을 하지 않는다. 다음은 원 실패 순간의 native/React/초기화 기록이 새로 확보될 때 해당 경계만 분석하는 것이며, 자동 실행·예약은 만들지 않는다. 상세는 [통합 결과의 메모 조사 절](../../../docs/superpowers/plans/2026-10-19-mes-candidate-main-integration-results.md).
+
+후속 읽기 분석(새업무0): 원실패trace의증분DOM을해제해 `after@call@34527`에서 메모value가이미빈값임을확인했다. fill끝+7.879ms/다음API시작-1.784ms여서 다음클릭처리보다앞선 입력전달·처리·즉시복원 경계로범위를좁혔다. `R/original-dom-boundary.py`·json에 원문/디코더해시·4스냅샷 보존. native/React기록은여전히없어 CP3미완료·4/5불변. 원인변수대조나추가업무실행은하지않았다.
+
+진행 불가 감사(2026-10-20): 원실패의native/React/최초writer기록 부재와 승인한1회 관측의 정상 종료라는 같은 차단 조건을 세 목표 턴에서 확인했다. 새실패자료·실행중진단 없음, 제품입력 불변. `R/goal-followup-audit-03.json`. 원인확정 목표는 blocked 처리하며 CP3미완료·병합보류는 유지한다. 재개 조건은 해당 실패의 누락 경계를 담은 새 자료 또는 판별 가능한 새 실행 범위다. 정상검사 반복·추측패치는 하지 않는다.
+
+## 2026-10-19 최신 main → 후보 통합: 완료 5 / 전체 5
 
 승인 계획: [후보 통합 실행](../../../docs/superpowers/plans/2026-10-19-mes-candidate-main-integration.md). 기존 미확정 원인의 추가 진단은 중단하고 아래 통합을 진행한다. 과거 미확정 기록은 해결로 승격하지 않는다.
+
+현재 병합 판단(2026-10-20 추가 읽기 검토): CP0~4와 CI 완료 여부는5/5 그대로이나 즉시 main 병합 권고는 보류다. CI실패trace에서 출하 메모는 응답 유실 전에 이미빈값, POST/201도notes=null이었다. 일반 입력에서도 가능한지 자동 입력 전달에 한정되는지는 미확정이며 실제 직원에게 생기면 출하 메모 누락 영향이 있다. 근거 R/readiness-20261020/assessment.json 및 연결trace. 새 테스트/제품수정/서버조작/병합/커밋/푸시는 하지 않았다. 이 추가 판단을 과거 CI 실패나 전체 미완료로 바꾸지 않는다.
 
 - [x] CP0 (2026-10-19) 기존 변경·후보 DB 보존과 선행 커밋76133d5e/b34ae8ac/217c6ce0/e9f98f19, 후보 서버 중지.
 - [x] CP1 (2026-10-19) main9824903e의 충돌 통합·읽기 전용 계약 리뷰. merge commit은 검증 후 작성.
 - [x] CP2 (2026-10-20) 관련 자동 검사·DB 사본·타입·정적·production 빌드·승인3.30MiB 번들 게이트 통과. bundle-approved.log.
 - [x] CP3 (2026-10-19) 격리 production에서 OR 검색·창고 격리/복귀/취소·관리자 BOM 저장/취소 확인. 사용자 원 DB 해시 불변·3038 production 복원.
-- [ ] CP4 후보 브랜치 푸시·최종 CI·결과 기록.
+- [x] CP4 (2026-10-20 14:51 KST 확인) 후보48ddea95 푸시와 [최종 CI39371380403](https://github.com/Hw-03/ERP/actions/runs/39371380403) 8job 성공 확인. 일반 E2E300건 첫 실행 통과·SHIP-RETRY PC1건 재시도 통과. 이 간헐 실패의 원인은 미확정으로 보존하며 전체 첫 실행 무실패로 표시하지 않는다. 종료 기록만 로컬 갱신, 추가 수정·커밋·푸시·검사 재실행 없음.
+
+예약 확인 결과(2026-10-20 14:51 KST): 실제 후보 HEAD와 CI headSha가48ddea951a698d5f50571691b74fad5f777088b3로 일치했다. CI는14:42:44 KST에 전체 성공으로 종료했다. 출하 `SHIP-RETRY PC`의 응답 유실 후 메모 표시1건은 첫 실패 후 재시도 통과했으며 원인 미확정이다. 이전 `SHELL02 shipping`은 이번 실행에서 첫 통과했지만 과거 사건의 원인 해결을 뜻하지 않는다. R의scheduled-ci-20261020-state.json/general.log/frontend.log에 원문을 보존했다. main·직원 환경·사용자 검토 서버는 조작하지 않았고, 전체 기대값 현재 PASS로 승격하지 않았다. 일회성 후속 예약은 종료 처리한다. 아래 진행 문단은 해당 실행 당시의 역사 기록이다.
 
 최신 CI 후속(2026-10-20):5f5be8fb의39366613242는7job성공/general298통과·재고2실패·출하초안1flaky. 재고2건은 main62ab7305의 상세닫힘 선택표시 해제에 테스트를 맞추지 못한 것이며, false와 재열기/true를 함께 확인하도록 수정했다. 해당2+관련왕복1=3건 및 ESLint 통과. 제품/빌드 불변으로 기존7job·빌드 재사용. 새후속commit/push·CI는 진행 중, 출하초안 간헐 실패 원인은 미확정이다.
 
