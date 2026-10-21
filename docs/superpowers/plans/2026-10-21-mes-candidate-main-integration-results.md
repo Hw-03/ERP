@@ -2,7 +2,7 @@
 
 ## 현재 상태
 
-최신 main을 후보에만 결합해 국소 검증을 마쳤다. 사용자 승인 3.35MiB 번들 검사도 통과했다. 최종 기록·커밋·푸시를 진행하며 main 반영·직원 배포·예약 변경은 수행하지 않는다. 과거 BOM·AS·출하 메모의 간헐 사건을 해결로 승격하지 않는다.
+최신 main을 결합한 후보024f6897의 CI는 일반 E2E만 실패했고 다른7job은 성공했다. 아래 CI 후속에서 실패14건의 관련 검사와 최종 빌드를 통과했다. 후보 커밋·푸시를 진행하며 main 반영·직원 배포·예약 변경은 수행하지 않는다. 과거 BOM·AS·출하 메모의 간헐 사건을 해결로 승격하지 않는다.
 
 - 작업본: `C:/Users/user/.codex/worktrees/mes-main-candidate-comparison/ERP`
 - 후보: `codex/mes-main-candidate-comparison-20261016`
@@ -71,3 +71,40 @@
 보호 DB/session 해시·main ref·C:/ERP 변경 목록과 검토 서버 PID(3038:32400,8038:32304)는 시작과 일치한다. 소유 Linux QA 포트 3100/8021은 해제됐다(`R/postflight.json`, `review-ports-final.json`, `qa-ports-final.json`).
 
 이 문서는 push 전 로컬 검증 완료 지점이다. 후보만 정상 push한 뒤 정확한 새 HEAD의 CI 링크와 시작 상태를 보고하고 전체 완료는 기다리지 않는다. 실제 원격 반영·CI 결과는 `R/git-final.json`과 이 대화의 최종 보고에 연결한다.
+
+## 2026-10-21 CI39550477694 후속
+
+[기준 CI](https://github.com/Hw-03/ERP/actions/runs/39550477694)는 후보`024f68978ede672fab2788d87eac1d8e66766d30`에서 종료했다. 일반 E2E는300통과·14실패, 나머지7job은 성공했다. 이후 main을 추가로 결합하지 않았다. 이번 근거는 `C=R/ci-39550477694`, Linux 대응 자료는 `L/ci-39550477694`다.
+
+| 실패와 직원 영향 | 확인한 원인·최소 수정 | 직접 결과와 근거 |
+|---|---|---|
+| 품목·모델8건: 자동 검사가 이전 상세까지 선택 | 상세 전환용 snapshot에도 같은 placeholder·코드가 남아 있었다. 테스트만 live `[data-admin-detail-content]` 안에서 이름·수량·코드를 선택한다. 저장값·미리보기·409·재고 단언은 유지한다. | 관리자 실패13건 중8건. `C/general-failed.log`, `artifact/`, `admin-failed-01.log` |
+| 권한3건: 옛 입력 위젯을 찾음 | 실제 권한 UI는 radiogroup의 정·부·없음/승인이다. 옛 combobox·checkbox 선택을 맞추고 재진입 시 창고·부서·AS 역할을 모두 확인한다. 직접403·회수·예약·1회 승인 단언은 유지한다. 결재 권한 제품 로직 변경은 없다. | 같은13건 중3건. `admin-expectations.spec.ts`, `admin-ui-lifecycle-expectations.spec.ts`, `C/admin-failed-01.log` |
+| 직원 버튼 좌표2건: 비활성 직원을 선택한 상태 | 원 CI snapshot의 첫 직원은 비활성이었다. `직원 활성화`도 정상 버튼인데 옛 테스트는 비활성화 문구만 찾았다. 양쪽 이름을 허용하고 실제 선택 표시 및1px 좌표 단언은 유지한다. | 같은13건 중2건. `C/artifact/data/c7200ddb56b2eba87d8953601ff2e199cf81b9ae.md`, `admin-failed-01.log` |
+| 관리자 로딩1건: 실제 접근성 상태 누락 | `display:contents` 요소의 자식이 모두 aria-hidden이라 Chromium 접근성 트리에서 status가 사라졌다. DOM에는1개인데 role 선택은0개, 실제 flex 요소에 role을 주면1개인 대조를 확인했다. 페이드 ref와 contents 외곽은 유지하고 로딩 role·label·busy만 실제 flex 요소로 이동했다. 화면 읽기 도구의 로딩 안내에 영향을 주던 제품 문제다. | `C/loading-role-probe.log`, `probe-loading-role.cjs`, `scoped-green.log`의admin조건. 조회 API·데이터·권한·재고 변경 없음 |
+| 위 실패 후 테스트 정리의 추가 오류 | 보류한 응답을 풀자마자 route를 제거해 `Route is already handled`가 발생했다. 응답 완료를 기다린 뒤 해당 handler만 제거한다. 오류를 무시하거나 재시도를 추가하지 않았다. | 새 회귀를 기존 helper에서 RED→수정 후 GREEN. `C/cleanup-red.log`, `scoped-green.log` 첫 조건. 이는 테스트 정리 문제이며 과거 AS 연결 사건과 묶지 않는다. |
+
+### 이번 신규 검사와 재사용 범위
+
+코드 위치: snapshot에서 live 표식을 제거하는 경계는 `frontend/app/mes/_components/_admin_sections/_admin_primitives/AdminDetailViewport.tsx:22`, 권한 UI는 `_employee_parts/EmployeeDetailGrid.tsx:117`, 로딩 상태는 `_admin_primitives/AdminReadState.tsx:41`, 응답 정리는 `frontend/tests/e2e/capacity-readstates.spec.ts:41`이다. 뒤의 두 상대 경로는 같은 `_admin_sections` 아래다.
+
+- 관리자 실패13건: Linux worker1·재시도0으로13통과(`C/admin-failed-01.log`). 준비·정리는 별도 합성 DB에서만 수행했다.
+- 응답 정리와6화면 로딩·첫 오류·재시도·빈값·검색0, 일보:8통과(`C/scoped-green.log`). 첫 실행의 실패·정리 원문도 보존했다.
+- 로딩 표시의 두 화면 폭과 품목·직원/부서·BOM 좌표:6통과(`C/loading-green-02.log`). 앞선 준비 시도는 TIME_WAIT 때문에 bind 가드에서 중단됐고 업무 실행이 없었다(`loading-green.log`). Linux listener가 없음을 확인하고 로컬 준비 소켓만 SO_REUSEADDR로 TIME_WAIT를 구분했다. 제품 포트·timeout은 변경하지 않았다.
+- AdminReadBoundary와 직접 직원·부서 소비자:3파일33통과(`C/read-state-tests.log`). 변경파일 ESLint는 `eslint-01.log` 및 helper 후속 `eslint-final.log`에 보존했다.
+- 최종 production 빌드의 TypeScript 검사와 번들 도구3검사 통과. 3,483,615바이트(3.322MiB), 승인3.35MiB 기본 한도 통과(`C/final-build.log`). 사용자 검토 `.next-prod`와3038/8038은 덮어쓰지 않았다. `C/final-product-inputs.json`은 Windows와 Linux 제품 입력 대조다.
+- 변경된9개 E2E 파일의 연결243개만 소스 해시·선언 위치·변경된 단언에 맞췄다. 기존 연결을 historicalBindings에 보존하고 execution·historicalExecutions는 그대로 유지한다. `C/assertions-before.json`, `binding-refresh.json`, `binding-refresh.log`. 새 테스트 연결을 전체 기대값의 현재 PASS로 바꾸지 않았다.
+- 문서 smart 게이트의 공백·유지 링크 검사 통과. 도구 단위14통과·Windows symlink 생성 권한이 필요한1건SKIP이며, 이를 실행 통과로 세지 않는다(`C/docs-verify.log`). 해당 도구 구현은 이번에 변경하지 않았다.
+- 기존 CI의7개 성공 job과 당시300개 일반 E2E 통과는 해당 코드·실행의 근거로 유지한다. 이번에 전체 backend·전체 E2E·커버리지·성능·복구·기대값 업무 실행을 반복하지 않았다. 일부 일반 조건 통과를 새 후보 전체 CI 성공으로 확대하지 않는다.
+
+구현은 관리자 테스트`d84a9a82`, 로딩·정리`7be6e3a4`로 분리했다. 각 staged smart PlanOnly는 연결 JSON을unknown 경로로 전체 승격했으나, 검증 선택/공통 설정·API·DB 변경이 없고 직접 소비자와 입력이 특정돼 국소 검사 근거를 사용했다(`C/smart-admin-aligned.log`, `smart-loading.log`). 관리자 단계의 중간 원장은 그 커밋의 테스트 소스로 별도 검증했다(`intermediate-bindings.log`). 최초 smart 요청은 부분 stage/working 메타데이터 차이를 거부했으며, 해당 두 문서만 중간 값에 맞춰 PlanOnly를 확인한 뒤 최종 작업 내용을 복원했다. 이 과정에서 업무 검사를 다시 실행하지 않았다.
+
+### 보호 확인의 제한
+
+main ref는`57767831` 그대로다. 직원 서비스·DB·배포·예약을 조작하지 않았고, 테스트는 별도 Linux3100/8021의 합성 DB만 사용했다. 사용자 검토 서버3038/8038의 PID32400/32304 및 session.json은 기존 값과 같다.
+
+이전 통합 작업의 오래된 preflight와 비교한 검토용 QA DB 해시 가드는 실패했다. QA DB 최종 수정시각은15:59:23 KST이며 온라인 백업 사본의 최근 감사에는 검토 화면의 로그인·메뉴 이동·관리자 PIN 확인이 있다. 누가 실행했는지나 전체 변경 원인은 이번 근거만으로 확정하지 않는다. 이번 CI 후속 시작 시 새 QA 해시를 기록하지 않았으므로 **이번 내내 QA DB 불변이었다는 판정도 하지 않는다**. 원형을 복원하거나 감사 행을 삭제하지 않았다. 이 대상은 직원 DB가 아니라 기존 검토용 QA DB다. 원형·상세 원문은 ignored `C/protection-audit.json`, `review-qa-readonly.db`에 보존한다. 과거 `R/postflight.json`을 이번 보호 성공 근거로 재사용하지 않는다.
+
+### 최종 반영 범위
+
+관리자 테스트 계약, 로딩 접근성·테스트 응답 정리, 검증 기록을 분리해 후보에만 커밋·정상 push한다. 새 HEAD의 CI 링크·시작 상태는 `C/git-final.json`과 최종 응답에 남긴다. 새 CI 전체 종료는 이번 로컬 통과와 별도로 판단하며 main·직원 환경은 미반영이다.

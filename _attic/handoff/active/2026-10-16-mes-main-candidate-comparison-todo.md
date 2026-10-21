@@ -1,5 +1,16 @@
 # 개발서버·병합 후보 비교 검증
 
+## 2026-10-21 CI39550477694 후속: 로컬 조치 완료 4 / 전체 4
+
+- [x] C0: 후보024f6897의 CI 종료 확인. 일반 E2E300통과·14실패, 다른7job성공. 원문 로그와 Playwright artifact를 R/ci-39550477694에 보존.
+- [x] C1: 관리자13실패의 live 상세 선택자·라디오 권한 UI·활성/비활성 버튼명 계약을 테스트만 수정. 기존 API/재고/권한회수/단일 승인/좌표 단언 유지, Linux worker1·재시도0으로13건 통과(`admin-failed-01.log`).
+- [x] C2: Chromium probe에서 display:contents status 누락을 확인해 로딩 role을 실제 flex로 이동. 직접 Vitest33·최초 로딩/실패/재시도/빈값 및 정리8건·로딩 좌표6건 통과. 보류 응답 정리 regression의 기존 helper RED(`Route is already handled`)→GREEN 확인. `read-state-tests.log`, `scoped-green.log`, `loading-green-02.log`.
+- [x] C3: 최종 빌드의 타입·ESLint·3.322MiB/승인3.35MiB·원장 check 통과, 변경 binding243개와 과거 실행 이력 보존. 유효한 기존7job 및 업무 근거 재사용. 관리자 테스트 `d84a9a82`, 로딩/정리 `7be6e3a4`로 분리 커밋. 기록 커밋 후 후보만 정상 push하며 정확한 HEAD·새 CI 시작 상태는 `R/ci-39550477694/git-final.json`과 최종 보고에 남긴다. 새 CI 전체 성공을 뜻하지 않는다. main/직원/예약/3038·8038 변경 금지.
+
+R=`_attic/runtime/main-integration-20261021`, L=`/home/hw/main-integration-20261021/ci-39550477694`. 전체 backend/E2E/커버리지/기대값 반복 없음.
+
+보호 제한: 과거 통합 preflight와 검토 QA DB 해시가 달라 이전 `postflight.json`은 이번 성공 근거로 쓰지 않는다. 온라인 사본의 최신 감사는15:59:23 관리자 PIN 확인·그 전 메뉴 이동/로그인이며 전체 변경 원인·실행 주체는 미확정이다. 원형 복원/행 삭제 없이 `R/ci-39550477694/protection-audit.json`, `review-qa-readonly.db`에 보존. main ref·검토 session/PID는 동일, 직원 환경 조작 없음.
+
 ## 2026-10-21 최신 main → 후보 추가 결합: 로컬 검증 완료 4 / 전체 4
 
 - [x] CP0: 시작48ddea95·검토 DB/session·미커밋 문서3개 보존. 기존 기록은 e6ff32bc로 먼저 커밋. 원격 main57767831 확인, C:/ERP 변경 제외.

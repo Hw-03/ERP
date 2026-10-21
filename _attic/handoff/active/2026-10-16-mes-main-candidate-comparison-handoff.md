@@ -1,5 +1,16 @@
 # main·후보 비교 — 현재 재개 지점
 
+## 2026-10-21 16시대 CI 실패 후속 — 관련 검증 완료, 후보 커밋·푸시 진행
+
+- 기준 후보024f6897, CI39550477694는 일반 E2E300통과/14실패·나머지7job성공. W branch 유지, 시작 clean. 원문 `_attic/runtime/main-integration-20261021/ci-39550477694/general-failed.log`, artifact/index.html·data, failed-cases.json.
+- 관리자13: 이전 상세 snapshot의 placeholder/코드까지 잡던8개 선택자를 live `[data-admin-detail-content]`로 제한. 옛 권한 combobox/checkbox3개→실제 권한 radiogroup/radio, 버튼명2개는 활성/비활성 모두 측정. 수량/저장/직접403/회수/1승인 단언 유지. 테스트8파일만 수정, Linux admin-failed-01.log의13선택자·worker1·retry0 모두 통과.
+- 나머지1: Chromium 소형 분리 probe에서 display:contents의 status DOM1/접근성0, flex로 바꾸면 접근성1(`loading-role-probe.log`). AdminReadState의 role을 실제 로딩 flex로 이동. 직접unit33·capacity상태/정리8·로딩좌표6 통과. cleanup 회귀는 기존 helper로 `Route is already handled` RED→inflight 완료 후 unroute GREEN. 제품 API/DB/수량/권한은 변경하지 않았다.
+- 최종: 별도 Linux L/source production빌드·TypeScript·도구3검사·3.322MiB/승인3.35MiB 통과. 관련 ESLint 통과. 변경9E2E파일의 binding243개만 갱신, 과거 binding/실행 상태는 보존. 독립 첫 커밋의 중간 원장도 staged 예정 소스 기준으로 검증했다. 전체 검사를 반복하지 않았다.
+- 정확한 다음 행동: 관리자 테스트+그 연결 → 접근성/응답정리+남은 연결 → 기록 순으로 명시 stage·cached diff/check·smart PlanOnly 후 로컬 commit, 후보만 정상 push. 새 정확한HEAD CI 시작 상태를 R/ci-39550477694/git-final.json에 기록하고 전체종료는 기다리지 않는다.
+- 로컬 구현 커밋: `d84a9a82` 관리자 테스트/중간 원장, `7be6e3a4` 로딩 접근성/응답 정리/최종 원장. 각각 cached diff/check와 smart PlanOnly 확인, JSON 연결 경로가unknown으로 전체 승격했으나 실제 제품/검증 설정 영향이 국소적이라 직접13+8+6 E2E·33unit·정적·타입·빌드 근거만 사용했다. 남은 것은 정제한 문서4개 커밋 후 정상push·새 CI 상태 기록이다.
+- 보호: 사용자3038/8038·초안·연구요청 유지. Linux3100/8021 합성 DB만 재생성. 제품 데이터/API/DB 스키마/재고/권한 로직 변경 없음. 과거 AS/BOM/메모 조사·전체 검사는 재개하지 않는다.
+- 보호 가드 제한: 이전 통합 preflight 대비 검토QA DB 해시가 달라 과거 postflight는 이번에 재사용하지 않는다. 최신15:59:23 감사는 검토화면의 관리자PIN 확인·그 전 로그인/메뉴이동이다. 주체/전체 변경 원인은 미확정이며 이번 전체 QA불변 판정은 하지 않는다. 온라인 사본/해시를 `protection-audit.json`, `review-qa-readonly.db`에 보존, DB복원/감사삭제 없음. main ref57767831·검토session해시·PID32400/32304는 동일. 직원 DB와는 별도다.
+
 ## 2026-10-21 최신 main57767831 → 후보 로컬 결합·검증 완료
 
 - W/브랜치는 기존 후보 그대로. 시작48ddea95, 기존 문서3개 기록 e6ff32bc 후 main57767831을 통합한 커밋8fd749fb 작성 완료. 다른 worktree/C:/ERP 변경은 포함하지 않았다.
