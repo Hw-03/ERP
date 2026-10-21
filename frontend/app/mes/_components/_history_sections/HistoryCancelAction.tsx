@@ -252,6 +252,7 @@ export function HistoryCancelAction({
 }) {
   const copy = getHistoryCancelCopy(scope);
   const blockerId = useId();
+  const shippingReservationBlocked = blocker?.startsWith("출하 예약된 재고가 있어 취소할 수 없습니다.");
   const blockerMessage = blocker?.startsWith("현재 재고가 부족하여 취소할 수 없습니다.")
     ? "재고가 부족해 취소할 수 없습니다."
     : blocker?.startsWith("지난 주 내역은 취소할 수 없습니다.")
@@ -374,13 +375,14 @@ export function HistoryCancelAction({
       <div className="hc-idle">
         <button
           type="button"
+          className={shippingReservationBlocked ? "!h-auto" : undefined}
           disabled={Boolean(blocker)}
           aria-label={blocker ? triggerLabel ?? copy.trigger : undefined}
           aria-describedby={blocker ? blockerId : undefined}
           onClick={controller.openConfirmation}
         >
           {blocker ? (
-            <span id={blockerId} className="hc-blocker">{blockerMessage}</span>
+            <span id={blockerId} className={shippingReservationBlocked ? "hc-blocker !line-clamp-none" : "hc-blocker"}>{blockerMessage}</span>
           ) : (
             <><XCircle className="h-4 w-4" />{triggerLabel ?? copy.trigger}</>
           )}
