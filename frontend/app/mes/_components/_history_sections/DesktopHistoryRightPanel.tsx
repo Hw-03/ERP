@@ -14,6 +14,7 @@ import type { HistoryTableFocusTarget } from "./HistoryTable";
 import { getDisplayBundles } from "./historyBatchInterpreter";
 import { HistorySubmissionDetail } from "./HistorySubmissionDetail";
 import { getHistoryGroupSummary, type LogGroup } from "./historyTableHelpers";
+import { useItemNameCopy } from "../common/useItemNameCopy";
 
 const HISTORY_DETAIL_TITLE_ID = "desktop-history-detail-title";
 
@@ -64,6 +65,26 @@ export function DesktopHistoryRightPanel({
   useLayoutEffect(() => {
     setDesktopCancellationOpen(false);
   }, [selectionKey]);
+
+  const batch = displaySelection?.kind === "batch" ? batchCache.get(displaySelection.batchId) ?? null : null;
+  const first = displaySelection?.kind === "batch" ? displaySelection.logs[0] : undefined;
+  // 재작업은 자식 부품 대신 부모 품목명을 헤더와 복사에 사용한다.
+  const disassembleLog = displaySelection?.kind === "batch"
+    ? displaySelection.logs.find((log) => log.transaction_type === "DISASSEMBLE") : undefined;
+  const displayBundles = batch ? getDisplayBundles(batch) : [];
+  const batchTitle = disassembleLog
+    ? `${disassembleLog.item_name} 재작업`
+    : displayBundles.length > 0
+      ? (displayBundles.length > 1
+        ? `${displayBundles[0].title} 외 ${displayBundles.length - 1}건`
+        : displayBundles[0].title)
+      : displaySelection?.kind === "batch" ? `${first?.item_name} 외 ${displaySelection.logs.length - 1}건` : undefined;
+  const batchSubtitle = disassembleLog?.mes_code ?? displayBundles[0]?.source_mes_code ?? first?.mes_code ?? undefined;
+  const nameCopy = useItemNameCopy(
+    displaySelection?.kind === "log" ? displaySelection.log.item_name : batchTitle,
+    selectionKey,
+    !!selection && !desktopCancellationOpen,
+  );
 
   const backButtonNode = canGoBack ? (
     <button
@@ -118,12 +139,15 @@ export function DesktopHistoryRightPanel({
           title={desktopCancellationOpen ? "내역 취소" : displaySelection.log.item_name}
           titleId={HISTORY_DETAIL_TITLE_ID}
           subtitle={desktopCancellationOpen ? displaySelection.log.item_name : displaySelection.log.mes_code ?? undefined}
+          subtitleAction={desktopCancellationOpen ? undefined : nameCopy.button}
+          subtitleFullWidth={!desktopCancellationOpen}
           backButton={desktopCancellationOpen ? undefined : backButtonNode}
           headerAction={desktopCancellationOpen ? cancellationReturnButton : undefined}
           onClose={handleClose}
           fillAvailableWidth
           tone={desktopCancellationOpen ? "danger" : "default"}
         >
+          {nameCopy.error}
           <HistoryDetailPanel
             panelOpen={!!selection}
             selected={displaySelection.log}
@@ -137,35 +161,20 @@ export function DesktopHistoryRightPanel({
         </DesktopRightPanel>
       )}
 
-      {displaySelection?.kind === "batch" && (() => {
-        const batch = batchCache.get(displaySelection.batchId) ?? null;
-        const first = displaySelection.logs[0];
-        // 재작업(DISASSEMBLE 포함) batch 는 헤더 행과 동일하게 부모 품목명으로 표기.
-        // bundles[0].title 은 created_at 정렬에 따라 자식 부품명이 올 수 있어 헷갈림.
-        const disassembleLog = displaySelection.logs.find((l) => l.transaction_type === "DISASSEMBLE");
-        const displayBundles = batch ? getDisplayBundles(batch) : [];
-        const titleText = disassembleLog
-          ? `${disassembleLog.item_name} 재작업`
-          : displayBundles.length > 0
-          ? (displayBundles.length > 1
-              ? `${displayBundles[0].title} 외 ${displayBundles.length - 1}건`
-              : displayBundles[0].title)
-          : `${first.item_name} 외 ${displaySelection.logs.length - 1}건`;
-        const subtitleText = disassembleLog?.mes_code
-          ?? displayBundles[0]?.source_mes_code
-          ?? first.mes_code
-          ?? undefined;
-        return (
+      {displaySelection?.kind === "batch" && (
           <DesktopRightPanel
-            title={desktopCancellationOpen ? "내역 취소" : titleText}
+            title={desktopCancellationOpen ? "내역 취소" : batchTitle ?? ""}
             titleId={HISTORY_DETAIL_TITLE_ID}
-            subtitle={desktopCancellationOpen ? titleText : subtitleText}
+            subtitle={desktopCancellationOpen ? batchTitle : batchSubtitle}
+            subtitleAction={desktopCancellationOpen ? undefined : nameCopy.button}
+            subtitleFullWidth={!desktopCancellationOpen}
             backButton={desktopCancellationOpen ? undefined : backButtonNode}
             headerAction={desktopCancellationOpen ? cancellationReturnButton : undefined}
             onClose={handleClose}
             fillAvailableWidth
             tone={desktopCancellationOpen ? "danger" : "default"}
           >
+            {nameCopy.error}
             <HistoryBatchDetailPanel
               panelOpen={!!selection}
               batchId={displaySelection.batchId}
@@ -180,8 +189,7 @@ export function DesktopHistoryRightPanel({
               onDesktopCancellationOpenChange={setDesktopCancellationOpen}
             />
           </DesktopRightPanel>
-        );
-      })()}
+      )}
     </SlidePanel>
   );
 }

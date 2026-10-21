@@ -52,6 +52,7 @@ export function DesktopRightPanel({
   subtitle,
   subtitleBadge,
   subtitleAction,
+  subtitleFullWidth = false,
   headerBadge,
   backButton,
   headerAction,
@@ -69,6 +70,8 @@ export function DesktopRightPanel({
   subtitle?: string;
   subtitleBadge?: React.ReactNode;
   subtitleAction?: ReactNode;
+  /** 닫기 버튼 아래까지 부제 줄을 펼쳐 본문 오른쪽 끝선에 맞춘다. */
+  subtitleFullWidth?: boolean;
   headerBadge?: React.ReactNode;
   backButton?: React.ReactNode;
   headerAction?: React.ReactNode;
@@ -85,6 +88,20 @@ export function DesktopRightPanel({
 }) {
   const [body, setBody] = useState<HTMLDivElement | null>(null);
   const [footer, setFooter] = useState<HTMLDivElement | null>(null);
+  const subtitleNode = subtitle || subtitleBadge || subtitleAction ? (
+    <div className={`mt-1.5 flex items-center gap-2 text-sm leading-6 ${subtitleFullWidth ? "pr-1.5" : ""}`} style={{ color: LEGACY_COLORS.muted2 }}>
+      {subtitleAction ? <>
+        <div className="min-w-0 flex flex-wrap items-center gap-2 break-all">
+          {subtitle ? <span>{subtitle}</span> : null}
+          {subtitleBadge}
+        </div>
+        <div className="ml-auto shrink-0">{subtitleAction}</div>
+      </> : <>
+        {subtitle ? <span>{subtitle}</span> : null}
+        {subtitleBadge}
+      </>}
+    </div>
+  ) : null;
 
   return (
     <DesktopRightPanelBodyContext.Provider value={body}>
@@ -120,24 +137,12 @@ export function DesktopRightPanel({
                 >
                   {title}
                 </TruncatedText>
-                {subtitle || subtitleBadge || subtitleAction ? (
-                  <div className="mt-1.5 flex items-center gap-2 text-sm leading-6" style={{ color: LEGACY_COLORS.muted2 }}>
-                    {subtitleAction ? <>
-                      <div className="min-w-0 flex flex-wrap items-center gap-2 break-all">
-                        {subtitle ? <span>{subtitle}</span> : null}
-                        {subtitleBadge}
-                      </div>
-                      <div className="ml-auto shrink-0">{subtitleAction}</div>
-                    </> : <>
-                      {subtitle ? <span>{subtitle}</span> : null}
-                      {subtitleBadge}
-                    </>}
-                  </div>
-                ) : null}
+                {!subtitleFullWidth && subtitleNode}
               </div>
               {headerBadge ? <div className="shrink-0 pt-1">{headerBadge}</div> : null}
               {headerAction ?? (onClose && <DesktopPanelCloseButton onClick={onClose} />)}
             </div>
+            {subtitleFullWidth && subtitleNode}
           </div>
           <div ref={setBody} data-testid="desktop-right-panel-body" className={`sg min-h-0 flex-1 overflow-y-auto ${bodyScrollbarOutset ? "-mr-2.5 pr-2.5" : ""}`}>{children}</div>
           <div ref={setFooter} data-testid="desktop-right-panel-footer" className="max-h-[45%] shrink-0 overflow-y-auto empty:hidden pt-4" />
