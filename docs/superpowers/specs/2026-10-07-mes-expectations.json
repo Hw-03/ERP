@@ -146985,15 +146985,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(scenario.loading(page)).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -147099,6 +147099,20 @@
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(scenario.loading(page)).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
             }
           ]
         },
@@ -147116,15 +147130,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(failure).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -147230,6 +147244,20 @@
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(failure).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
             }
           ]
         },
@@ -147247,15 +147275,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(failure.getByRole(\"button\", { name: \"다시 시도\", exact: true })).toBeEnabled();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(failure).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -147361,6 +147389,20 @@
               "assertion": "await expect(failure).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(failure.getByRole(\"button\", { name: \"다시 시도\", exact: true })).toBeEnabled();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(failure).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
             }
           ]
         },
@@ -147378,8 +147420,8 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -147471,6 +147513,13 @@
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
             }
           ]
         },
@@ -147488,22 +147537,22 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.noResultsLabel!, { exact: true })).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -147623,6 +147672,27 @@
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.noResultsLabel!, { exact: true })).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
             }
           ]
         },
@@ -147640,15 +147710,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(scenario.loading(page)).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -147754,6 +147824,20 @@
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(scenario.loading(page)).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
             }
           ]
         },
@@ -147771,15 +147855,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(failure).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -147885,6 +147969,20 @@
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(failure).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
             }
           ]
         },
@@ -147902,15 +148000,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(failure.getByRole(\"button\", { name: \"다시 시도\", exact: true })).toBeEnabled();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(failure).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -148016,6 +148114,20 @@
               "assertion": "await expect(failure).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(failure.getByRole(\"button\", { name: \"다시 시도\", exact: true })).toBeEnabled();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(failure).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
             }
           ]
         },
@@ -148033,8 +148145,8 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -148126,6 +148238,13 @@
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
             }
           ]
         },
@@ -148143,22 +148262,22 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 warehouse 실제 품목선택 검색0은 빈 요청 목록과 별도 안내",
               "assertion": "await expect(page.getByText(\"필터에 맞는 품목 없음\", { exact: true })).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 104
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 131
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 warehouse 실제 품목선택 검색0은 빈 요청 목록과 별도 안내",
               "assertion": "await expect(search).toHaveValue(\"\");",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 104
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 131
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 warehouse 실제 품목선택 검색0은 빈 요청 목록과 별도 안내",
               "assertion": "await expect(page.getByText(\"필터에 맞는 품목 없음\", { exact: true })).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 104
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 131
             }
           ],
           "execution": {
@@ -148278,6 +148397,27 @@
               "assertion": "await expect(page.getByText(\"필터에 맞는 품목 없음\", { exact: true })).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 104
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 warehouse 실제 품목선택 검색0은 빈 요청 목록과 별도 안내",
+              "assertion": "await expect(page.getByText(\"필터에 맞는 품목 없음\", { exact: true })).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 104
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 warehouse 실제 품목선택 검색0은 빈 요청 목록과 별도 안내",
+              "assertion": "await expect(search).toHaveValue(\"\");",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 104
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 warehouse 실제 품목선택 검색0은 빈 요청 목록과 별도 안내",
+              "assertion": "await expect(page.getByText(\"필터에 맞는 품목 없음\", { exact: true })).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 104
             }
           ]
         },
@@ -148295,15 +148435,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(scenario.loading(page)).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -148408,6 +148548,20 @@
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(scenario.loading(page)).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
               "line": 72
             }
           ]
@@ -148426,15 +148580,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(failure).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -148539,6 +148693,20 @@
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(failure).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
               "line": 72
             }
           ]
@@ -148557,15 +148725,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(failure.getByRole(\"button\", { name: \"다시 시도\", exact: true })).toBeEnabled();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(failure).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -148670,6 +148838,20 @@
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(failure).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(failure.getByRole(\"button\", { name: \"다시 시도\", exact: true })).toBeEnabled();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(failure).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
               "line": 72
             }
           ]
@@ -148688,8 +148870,8 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -148780,6 +148962,13 @@
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
               "line": 72
             }
           ]
@@ -148798,22 +148987,22 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.noResultsLabel!, { exact: true })).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -148932,6 +149121,27 @@
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.noResultsLabel!, { exact: true })).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
               "line": 72
             }
           ]
@@ -148950,15 +149160,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(scenario.loading(page)).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -149063,6 +149273,20 @@
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(scenario.loading(page)).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
               "line": 72
             }
           ]
@@ -149081,15 +149305,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(failure).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -149194,6 +149418,20 @@
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(failure).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
               "line": 72
             }
           ]
@@ -149212,15 +149450,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(failure.getByRole(\"button\", { name: \"다시 시도\", exact: true })).toBeEnabled();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(failure).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -149325,6 +149563,20 @@
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(failure).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(failure.getByRole(\"button\", { name: \"다시 시도\", exact: true })).toBeEnabled();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(failure).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
               "line": 72
             }
           ]
@@ -149343,8 +149595,8 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -149435,6 +149687,13 @@
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
               "line": 72
             }
           ]
@@ -149453,22 +149712,22 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.noResultsLabel!, { exact: true })).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -149587,6 +149846,27 @@
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.noResultsLabel!, { exact: true })).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
               "line": 72
             }
           ]
@@ -149605,15 +149885,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(scenario.loading(page)).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -149718,6 +149998,20 @@
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(scenario.loading(page)).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
               "line": 72
             }
           ]
@@ -149736,15 +150030,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(failure).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -149850,6 +150144,20 @@
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(failure).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
             }
           ]
         },
@@ -149867,15 +150175,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(failure.getByRole(\"button\", { name: \"다시 시도\", exact: true })).toBeEnabled();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(failure).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -149981,6 +150289,20 @@
               "assertion": "await expect(failure).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(failure.getByRole(\"button\", { name: \"다시 시도\", exact: true })).toBeEnabled();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(failure).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
             }
           ]
         },
@@ -149998,8 +150320,8 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -150091,6 +150413,13 @@
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
             }
           ]
         },
@@ -150108,22 +150437,22 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.noResultsLabel!, { exact: true })).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -150243,6 +150572,27 @@
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.noResultsLabel!, { exact: true })).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
             }
           ]
         },
@@ -150260,15 +150610,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(scenario.loading(page)).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -150374,6 +150724,20 @@
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(scenario.loading(page)).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
             }
           ]
         },
@@ -150391,15 +150755,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(failure).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -150505,6 +150869,20 @@
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(failure).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
             }
           ]
         },
@@ -150522,15 +150900,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(failure.getByRole(\"button\", { name: \"다시 시도\", exact: true })).toBeEnabled();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(failure).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -150636,6 +151014,20 @@
               "assertion": "await expect(failure).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(failure.getByRole(\"button\", { name: \"다시 시도\", exact: true })).toBeEnabled();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(failure).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
             }
           ]
         },
@@ -150653,8 +151045,8 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -150746,6 +151138,13 @@
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
             }
           ]
         },
@@ -150763,22 +151162,22 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.noResultsLabel!, { exact: true })).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 72
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 99
             }
           ],
           "execution": {
@@ -150898,6 +151297,27 @@
               "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.noResultsLabel!, { exact: true })).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별",
+              "assertion": "await expect(page.getByText(scenario.emptyLabel, { exact: true })).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 72
             }
           ]
         },
@@ -150915,15 +151335,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 reports 실제 빈 작성자와 최초 로딩·실패·PC 재시도를 구별",
               "assertion": "await expect(scenario.loading(page)).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 120
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 147
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 reports 실제 빈 작성자와 최초 로딩·실패·PC 재시도를 구별",
               "assertion": "await expect(page.getByText(\"작성된 일보가 없습니다.\", { exact: true })).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 120
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 147
             }
           ],
           "execution": {
@@ -151029,6 +151449,20 @@
               "assertion": "await expect(page.getByText(\"작성된 일보가 없습니다.\", { exact: true })).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 120
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 reports 실제 빈 작성자와 최초 로딩·실패·PC 재시도를 구별",
+              "assertion": "await expect(scenario.loading(page)).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 120
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 reports 실제 빈 작성자와 최초 로딩·실패·PC 재시도를 구별",
+              "assertion": "await expect(page.getByText(\"작성된 일보가 없습니다.\", { exact: true })).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 120
             }
           ]
         },
@@ -151046,15 +151480,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 reports 실제 빈 작성자와 최초 로딩·실패·PC 재시도를 구별",
               "assertion": "await expect(failure).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 120
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 147
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 reports 실제 빈 작성자와 최초 로딩·실패·PC 재시도를 구별",
               "assertion": "await expect(page.getByText(\"0명\", { exact: true })).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 120
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 147
             }
           ],
           "execution": {
@@ -151160,6 +151594,20 @@
               "assertion": "await expect(page.getByText(\"0명\", { exact: true })).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 120
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 reports 실제 빈 작성자와 최초 로딩·실패·PC 재시도를 구별",
+              "assertion": "await expect(failure).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 120
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 reports 실제 빈 작성자와 최초 로딩·실패·PC 재시도를 구별",
+              "assertion": "await expect(page.getByText(\"0명\", { exact: true })).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 120
             }
           ]
         },
@@ -151177,15 +151625,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 reports 실제 빈 작성자와 최초 로딩·실패·PC 재시도를 구별",
               "assertion": "await expect(page.getByText(\"작성된 일보가 없습니다.\", { exact: true })).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 120
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 147
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 reports 실제 빈 작성자와 최초 로딩·실패·PC 재시도를 구별",
               "assertion": "await expect(failure).toHaveCount(0);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 120
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 147
             }
           ],
           "execution": {
@@ -151291,6 +151739,20 @@
               "assertion": "await expect(failure).toHaveCount(0);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 120
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 reports 실제 빈 작성자와 최초 로딩·실패·PC 재시도를 구별",
+              "assertion": "await expect(page.getByText(\"작성된 일보가 없습니다.\", { exact: true })).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 120
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 reports 실제 빈 작성자와 최초 로딩·실패·PC 재시도를 구별",
+              "assertion": "await expect(failure).toHaveCount(0);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 120
             }
           ]
         },
@@ -151308,15 +151770,15 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 reports 실제 빈 작성자와 최초 로딩·실패·PC 재시도를 구별",
               "assertion": "expect(await response.json()).toBeNull();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 120
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 147
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "STATE01 reports 실제 빈 작성자와 최초 로딩·실패·PC 재시도를 구별",
               "assertion": "await expect(page.getByRole(\"textbox\", { name: \"작업 내역\", exact: true })).toHaveValue(\"\");",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 120
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 147
             }
           ],
           "execution": {
@@ -151421,6 +151883,20 @@
               "selector": "STATE01 reports 실제 빈 작성자와 최초 로딩·실패·PC 재시도를 구별",
               "assertion": "await expect(page.getByRole(\"textbox\", { name: \"작업 내역\", exact: true })).toHaveValue(\"\");",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
+              "line": 120
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 reports 실제 빈 작성자와 최초 로딩·실패·PC 재시도를 구별",
+              "assertion": "expect(await response.json()).toBeNull();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 120
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "STATE01 reports 실제 빈 작성자와 최초 로딩·실패·PC 재시도를 구별",
+              "assertion": "await expect(page.getByRole(\"textbox\", { name: \"작업 내역\", exact: true })).toHaveValue(\"\");",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
               "line": 120
             }
           ]
@@ -154527,36 +155003,36 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
               "assertion": "await expect(chip).toContainText(`${formatQty(representative.ship_ready)}/${formatQty(representative.fast_production)}/${formatQty(representative.total_production)}`);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 148
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 175
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
               "assertion": "await expect(modelRow.locator(\":scope > span\").nth(4)).toHaveText(formatQty(representative.ship_ready));",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 148
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 175
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
               "assertion": "await expect(modelRow.locator(\":scope > span\").nth(5)).toHaveText(formatQty(representative.fast_production));",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 148
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 175
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
               "assertion": "await expect(modelRow.locator(\":scope > span\").nth(6)).toHaveText(formatQty(representative.total_production));",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 148
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 175
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
               "assertion": "await expect(workspace.getByText(label, { exact: true }).locator(\"..\")).toContainText(formatQty(quantity));",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 148
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 175
             }
           ],
           "execution": {
@@ -154704,6 +155180,41 @@
               "assertion": "await expect(workspace.getByText(label, { exact: true }).locator(\"..\")).toContainText(formatQty(quantity));",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 148
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
+              "assertion": "await expect(chip).toContainText(`${formatQty(representative.ship_ready)}/${formatQty(representative.fast_production)}/${formatQty(representative.total_production)}`);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 148
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
+              "assertion": "await expect(modelRow.locator(\":scope > span\").nth(4)).toHaveText(formatQty(representative.ship_ready));",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 148
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
+              "assertion": "await expect(modelRow.locator(\":scope > span\").nth(5)).toHaveText(formatQty(representative.fast_production));",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 148
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
+              "assertion": "await expect(modelRow.locator(\":scope > span\").nth(6)).toHaveText(formatQty(representative.total_production));",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 148
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
+              "assertion": "await expect(workspace.getByText(label, { exact: true }).locator(\"..\")).toContainText(formatQty(quantity));",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 148
             }
           ]
         },
@@ -154721,29 +155232,29 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
               "assertion": "await expect(afRow).toContainText(assembly.af_name);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 148
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 175
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
               "assertion": "await expect(bom).toBeEnabled();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 148
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 175
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
               "assertion": "await expect(workspace).toContainText(representative.pf_name);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 148
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 175
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
               "assertion": "await expect(models).toBeVisible();",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 148
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 175
             }
           ],
           "execution": {
@@ -154877,6 +155388,34 @@
               "assertion": "await expect(models).toBeVisible();",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
               "line": 148
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
+              "assertion": "await expect(afRow).toContainText(assembly.af_name);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 148
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
+              "assertion": "await expect(bom).toBeEnabled();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 148
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
+              "assertion": "await expect(workspace).toContainText(representative.pf_name);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 148
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
+              "assertion": "await expect(models).toBeVisible();",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 148
             }
           ]
         },
@@ -154894,29 +155433,29 @@
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
               "assertion": "await expect(columns.nth(3)).toHaveText(`${formatQty(child.required_quantity, { maximumFractionDigits: 2, trimTrailingZeros: true })} ${child.unit}`);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 148
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 175
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
               "assertion": "await expect(columns.nth(4)).toHaveText(child.warehouse_stock == null ? \"—\" : `${formatQty(child.warehouse_stock)} ${child.unit}`);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 148
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 175
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
               "assertion": "await expect(columns.nth(5)).toHaveText(child.department_stock == null ? \"—\" : `${formatQty(child.department_stock)} ${child.unit}`);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 148
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 175
             },
             {
               "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
               "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
               "assertion": "await expect(columns.nth(6)).toHaveText(`${formatQty(child.current_stock)} ${child.unit}`);",
-              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
-              "line": 148
+              "sourceHash": "ed7baee36a634101e5be1f817d182d35eaef74d946c038155557b1a0375dbd89",
+              "line": 175
             }
           ],
           "execution": {
@@ -155049,6 +155588,34 @@
               "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
               "assertion": "await expect(columns.nth(6)).toHaveText(`${formatQty(child.current_stock)} ${child.unit}`);",
               "sourceHash": "6f85dd323d67306f58751e59c9f556ce2d9f36612871eca271065f620cc6a143",
+              "line": 148
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
+              "assertion": "await expect(columns.nth(3)).toHaveText(`${formatQty(child.required_quantity, { maximumFractionDigits: 2, trimTrailingZeros: true })} ${child.unit}`);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 148
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
+              "assertion": "await expect(columns.nth(4)).toHaveText(child.warehouse_stock == null ? \"—\" : `${formatQty(child.warehouse_stock)} ${child.unit}`);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 148
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
+              "assertion": "await expect(columns.nth(5)).toHaveText(child.department_stock == null ? \"—\" : `${formatQty(child.department_stock)} ${child.unit}`);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
+              "line": 148
+            },
+            {
+              "file": "frontend/tests/e2e/capacity-readstates.spec.ts",
+              "selector": "DASHBOARD04 실제 API·요약·모델·AF·PF·BOM의 수량과 구성품 소요량 일치",
+              "assertion": "await expect(columns.nth(6)).toHaveText(`${formatQty(child.current_stock)} ${child.unit}`);",
+              "sourceHash": "822a8b5c8728dc20ee41da9b98f6d2e2518f6e835f42f6596af2fba46237ce91",
               "line": 148
             }
           ]

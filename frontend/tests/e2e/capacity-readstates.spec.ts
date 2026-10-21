@@ -21,17 +21,28 @@ async function scriptedRead(page: Page, scenario: ReadScenario) {
   let phase: ReadPhase = "hold";
   let release!: () => void;
   const gate = new Promise<void>((resolve) => { release = resolve; });
-  const handler = async (route: Route): Promise<void> => {
+  const pending = new Set<Promise<void>>();
+  const respond = async (route: Route): Promise<void> => {
     const url = new URL(route.request().url());
     if (route.request().method() !== "GET" || !scenario.matches(url)) { await route.continue(); return; }
     if (phase === "hold") await gate;
     if (phase === "error") await route.fulfill({ status: 503, json: { detail: "검수용 첫 조회 실패" } });
     else await route.fulfill({ status: 200, json: scenario.empty(url) });
   };
+  const handler = (route: Route): Promise<void> => {
+    const response = respond(route);
+    pending.add(response);
+    void response.then(() => pending.delete(response), () => pending.delete(response));
+    return response;
+  };
   await page.route("**/api/**", handler);
   return {
     setPhase(next: ReadPhase): void { phase = next; release(); },
-    async dispose(): Promise<void> { release(); await page.unroute("**/api/**", handler); },
+    async dispose(): Promise<void> {
+      release();
+      await Promise.all([...pending]);
+      await page.unroute("**/api/**", handler);
+    },
   };
 }
 
@@ -67,6 +78,22 @@ const scenarios: ReadScenario[] = [
     loading: (page) => page.getByRole("status", { name: "직원 목록 불러오는 중", exact: true }),
     emptyLabel: "직원이 없습니다.", searchLabel: "이름·부서·직급 검색", noResultsLabel: "검색 결과가 없습니다." },
 ];
+
+test("STATE01 보류한 응답은 정리 전에 완료하고 중복 처리하지 않는다", async ({ page }) => {
+  await page.goto("/");
+  const scenario = scenarios.find(value => value.tab === "admin")!;
+  let started!: () => void;
+  const pending = new Promise<void>(resolve => { started = resolve; });
+  const read = await scriptedRead(page, { ...scenario, matches: url => {
+    if (!scenario.matches(url)) return false;
+    started();
+    return true;
+  } });
+  const response = page.evaluate(() => fetch("/api/employees?active_only=false").then(result => result.json()));
+  await pending;
+  await read.dispose();
+  expect(await response).toEqual([]);
+});
 
 for (const scenario of scenarios) {
   test(`STATE01 ${scenario.tab} 실제 탭의 최초 로딩·첫 오류·재시도·빈 성공과 검색0을 구별`, async ({ page, actors }, info) => {
