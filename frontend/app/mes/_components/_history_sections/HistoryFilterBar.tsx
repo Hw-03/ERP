@@ -61,7 +61,7 @@ export function HistoryFilterBar({
           disabled={disabled}
           leading={<Search className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
           inputProps={{ className: mobile ? "!text-base focus-visible:ring-2 focus-visible:ring-[var(--c-blue)]" : "lg:!h-auto !font-normal" }}
-          className={mobile ? "flex min-h-11 w-full items-center gap-2 !rounded-[12px] border pl-3 !pr-1" : "flex min-h-[44px] flex-1 items-center gap-2 !rounded-[12px] border px-3 py-2 lg:min-h-0"}
+          className={mobile ? "flex min-h-11 w-full items-center gap-2 !rounded-[12px] border pl-3 !pr-1" : "flex min-h-[44px] flex-1 items-center gap-2 !rounded-[12px] border px-3 py-2 lg:min-h-0 lg:[&>button]:min-h-0 lg:[&>button]:h-5"}
           style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
         />
   );
