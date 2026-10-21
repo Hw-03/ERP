@@ -59,6 +59,10 @@ INSUFFICIENT_STOCK_MESSAGE = (
     "현재 재고가 부족하여 취소할 수 없습니다. "
     "현재 재고를 확인한 뒤 다시 시도해 주세요."
 )
+SHIPPING_RESERVED_MESSAGE = (
+    "출하 예약된 재고가 있어 취소할 수 없습니다. "
+    "연결된 출하의 준비 완료를 먼저 취소해 주세요."
+)
 
 
 class CancellationError(ValueError):
@@ -233,7 +237,8 @@ def _cell_key(item_id: uuid.UUID, cell: dict) -> tuple[str, str, str, str, str]:
 def _current_cell(
     db: Session,
     key: tuple[str, str, str, str, str],
-) -> tuple[int, int]:
+) -> tuple[int, int, int]:
+    """현재 수량·전체 예약·출하 예약을 반환해 차단 사유를 구분한다."""
     item_id, scope, department, status, box_id = key
     if scope == "warehouse":
         inventory = db.query(Inventory).filter(Inventory.item_id == item_id).one_or_none()
@@ -245,7 +250,7 @@ def _current_cell(
         )
         return int(inventory.warehouse_qty or 0), int(
             figure.stock_request_pending + figure.active_shipping_reserved
-        )
+        ), int(figure.active_shipping_reserved)
     if scope == "warehouse_box":
         box_item = (
             db.query(WarehouseBoxItem)
@@ -257,7 +262,7 @@ def _current_cell(
         )
         if box_item is None:
             raise CancellationNotAllowed("취소 원복할 박스 항목을 찾을 수 없습니다.")
-        return int(box_item.quantity or 0), 0
+        return int(box_item.quantity or 0), 0, 0
     location = (
         db.query(InventoryLocation)
         .filter(
@@ -278,10 +283,10 @@ def _current_cell(
         )
         return int(location.quantity if location is not None else 0), int(
             figure.stock_request_pending + figure.active_shipping_reserved
-        )
+        ), int(figure.active_shipping_reserved)
     if location is None:
-        return 0, 0
-    return int(location.quantity or 0), int(location.pending_quantity or 0)
+        return 0, 0, 0
+    return int(location.quantity or 0), int(location.pending_quantity or 0), 0
 
 
 def _plan_payload(
@@ -418,7 +423,7 @@ def _shipping_reservations(
         # Adopted legacy pickups retain their original warehouse movement.
         if cell not in changes and warehouse_cell in changes:
             cell = warehouse_cell
-        stock, pending = _current_cell(db, cell)
+        stock, pending, _ = _current_cell(db, cell)
         reserved = sum(int(row.quantity) for row in db.query(ShippingAllocation).filter(
             ShippingAllocation.item_id == item_id,
             ShippingAllocation.department == department,
@@ -546,10 +551,15 @@ def preview_cancellation(
 
     cell_plans: list[CancellationCell] = []
     for key, quantity_change in sorted(changes.items()):
-        current, reserved = _current_cell(db, key)
+        current, reserved, shipping_reserved = _current_cell(db, key)
         after = current + quantity_change
-        if after < reserved + reservation_increases.get(key, 0):
-            blockers.append(INSUFFICIENT_STOCK_MESSAGE)
+        required_reserved = reserved + reservation_increases.get(key, 0)
+        if after < required_reserved:
+            blockers.append(
+                SHIPPING_RESERVED_MESSAGE
+                if shipping_reserved > 0 and after >= required_reserved - shipping_reserved
+                else INSUFFICIENT_STOCK_MESSAGE
+            )
         item_id, scope, department, status, box_id = key
         cell_plans.append(
             CancellationCell(
@@ -970,7 +980,7 @@ def _assert_plan_applied(
             cell.status or "",
             cell.box_id or "",
         )
-        current, reserved = _current_cell(
+        current, reserved, _ = _current_cell(
             db,
             key,
         )

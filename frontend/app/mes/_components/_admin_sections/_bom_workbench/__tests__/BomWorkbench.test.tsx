@@ -1,17 +1,28 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render as renderTesting, screen, waitFor, within, type RenderOptions } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useLayoutEffect, type ReactElement } from "react";
+import { catalogApi } from "@/lib/api/catalog";
+import { queryKeys } from "@/lib/queries/keys";
+import { BomChildAddBox } from "../BomChildAddBox";
 import { api, type BOMEntry, type Item } from "@/lib/api";
 import { itemsApi } from "@/lib/api/items";
 import { type ComponentProps } from "react";
 import { BomWorkbench as Workbench } from "../BomWorkbench";
 import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
 
-function BomWorkbench(props: ComponentProps<typeof Workbench>) {
-  return <DirtyGuardProvider><Workbench {...props} /></DirtyGuardProvider>;
+type WorkbenchProps = Omit<ComponentProps<typeof Workbench>, "setItems"> & Partial<Pick<ComponentProps<typeof Workbench>, "setItems">>;
+function BomWorkbench(props: WorkbenchProps) {
+  return <DirtyGuardProvider><Workbench setItems={vi.fn()} {...props} /></DirtyGuardProvider>;
 }
 import { AdminReadProvider, INITIAL_ADMIN_READ_STATES } from "../../_admin_primitives/AdminReadState";
 
 const realtime = vi.hoisted(() => ({ revision: null as number | null }));
+let queryClient: QueryClient;
+function render(ui: ReactElement, options?: RenderOptions) {
+  return renderTesting(ui, { ...options, wrapper: ({ children }) =>
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider> });
+}
 
 vi.mock("@/lib/queries/realtime", () => ({
   useRealtimeRevision: () => realtime.revision,
@@ -43,9 +54,80 @@ function deferred<T>() {
 }
 
 describe("BomWorkbench", () => {
+  afterEach(() => {
+    queryClient.clear();
+    Reflect.deleteProperty(Element.prototype, "animate");
+    vi.unstubAllGlobals();
+  });
+  it("reads only the active mode and reuses a previously selected parent's cached rows", async () => {
+    const getBom = vi.spyOn(catalogApi, "getBOM").mockResolvedValue([]);
+    const getUsage = vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
+    const other = { ...selectedParent, item_id: "parent-2", item_name: "Second parent" };
+    render(<BomWorkbench items={[selectedParent, other]} setItems={vi.fn()} allBomRows={[]}
+      refreshAllBom={vi.fn()} refreshItems={async () => undefined} onStatusChange={vi.fn()} onError={vi.fn()} />);
+    await screen.findByText("등록된 BOM 이 없습니다");
+    expect(getUsage).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Second parent/, pressed: false }));
+    await waitFor(() => expect(getBom).toHaveBeenCalledTimes(2));
+    await screen.findByText("등록된 BOM 이 없습니다");
+    fireEvent.click(screen.getByRole("button", { name: /Selected parent summary/, pressed: false }));
+    expect(screen.queryByRole("status", { name: "현재 구성 불러오는 중" })).not.toBeInTheDocument();
+    expect(getBom).toHaveBeenCalledTimes(2);
+  });
+  it("does not fade the workbench when expanding unmatched materials", async () => {
+    vi.spyOn(catalogApi, "getBOM").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
+    const animate = vi.fn(() => ({ cancel: vi.fn() }));
+    Object.defineProperty(Element.prototype, "animate", { configurable: true, value: animate });
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
+    render(<BomWorkbench items={[selectedParent]} setItems={vi.fn()} allBomRows={[]}
+      refreshAllBom={vi.fn()} refreshItems={async () => undefined} onStatusChange={vi.fn()} onError={vi.fn()} />);
+    await screen.findByText("등록된 BOM 이 없습니다");
+    animate.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: /미배치 원자재/ }));
+    expect(animate).not.toHaveBeenCalled();
+  });
+  it("잠금 안내 문구 자리는 유지하고 잠금 상태에서만 표시한다", () => {
+    const props = { parent: selectedParent, bomRows: [], items: [], onAdd: vi.fn() };
+    const { rerender } = render(<BomChildAddBox {...props} isLocked={false} />);
+    const hint = screen.getByText("완료 해제 후 수정 가능");
+    expect(hint).toHaveAttribute("aria-hidden", "true");
+    rerender(<BomChildAddBox {...props} isLocked />);
+    expect(screen.getByText("완료 해제 후 수정 가능")).toBe(hint);
+    expect(hint).not.toHaveAttribute("aria-hidden");
+  });
+  it("첫 레이아웃부터 저장된 사용처 모드를 복원한다", async () => {
+    window.history.replaceState({ bomWorkbench: { dept: "ALL", mode: "whereused", parentId: "parent-1" } }, "");
+    vi.spyOn(catalogApi, "getBOM").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
+    let firstMode: string | null | undefined;
+    function FirstLayoutObserver() {
+      useLayoutEffect(() => { firstMode = document.querySelector("[data-mode]")?.getAttribute("data-mode"); }, []);
+      return null;
+    }
+    render(<><BomWorkbench items={[selectedParent]} setItems={vi.fn()} allBomRows={[]} refreshAllBom={vi.fn()}
+      refreshItems={async () => undefined} onStatusChange={vi.fn()} onError={vi.fn()} /><FirstLayoutObserver /></>);
+    expect(firstMode).toBe("whereused");
+    await screen.findByText("사용처 BOM이 없습니다");
+  });
   beforeEach(() => {
+    queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000, gcTime: Infinity } } });
     realtime.revision = null;
     window.history.replaceState({}, "", "/mes?tab=admin");
+  });
+
+  it("상위 품목이 없거나 완료돼도 편집 화면의 구성 저장 공간을 유지한다", async () => {
+    vi.spyOn(catalogApi, "getBOM").mockResolvedValue([]);
+    const props = { allBomRows: [], refreshAllBom: vi.fn(), refreshItems: async () => undefined,
+      onStatusChange: vi.fn(), onError: vi.fn() };
+    const { rerender } = render(<BomWorkbench {...props} items={[]} />);
+    const actions = screen.getByLabelText("BOM 구성 저장");
+    expect(actions).toHaveClass("h-9", "shrink-0");
+    expect(within(actions).queryByRole("button")).not.toBeInTheDocument();
+    rerender(<BomWorkbench {...props} items={[{ ...selectedParent, bom_completed_at: "2026-10-21T00:00:00Z" }]} />);
+    await screen.findByText("등록된 BOM 이 없습니다");
+    expect(screen.getByLabelText("BOM 구성 저장")).toBe(actions);
+    expect(within(actions).queryByRole("button")).not.toBeInTheDocument();
   });
 
   it("saves all changed rows once and preserves the original baseline and draft after a conflict", async () => {
@@ -53,13 +135,13 @@ describe("BomWorkbench", () => {
     const second = { ...child, item_id: "second", item_name: "Second draft child" };
     const rows = [child, second].map((item, index) => ({ bom_id: `row-${index}`, parent_item_id: selectedParent.item_id,
       child_item_id: item.item_id, quantity: 2, unit: "EA", notes: null } as BOMEntry));
-    const load = vi.spyOn(api, "getBOM").mockResolvedValue(rows);
-    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    const load = vi.spyOn(catalogApi, "getBOM").mockResolvedValue(rows);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
     const legacy = vi.spyOn(api, "updateBOM");
     const save = vi.spyOn(api, "replaceBOM").mockRejectedValueOnce(new Error("다른 작업에서 BOM을 변경했습니다."));
     const props = { items: [selectedParent, child, second], allBomRows: rows, refreshAllBom: () => undefined,
       refreshItems: async () => undefined, onStatusChange: vi.fn(), onError: vi.fn() };
-    const { rerender } = render(<BomWorkbench {...props} />);
+    render(<BomWorkbench {...props} />);
     await waitFor(() => expect(screen.getAllByTitle("클릭하여 수량 수정")).toHaveLength(2));
     fireEvent.click(screen.getAllByTitle("클릭하여 수량 수정")[0]);
     fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "3" } });
@@ -70,8 +152,7 @@ describe("BomWorkbench", () => {
     expect(legacy).not.toHaveBeenCalled();
     expect(save).not.toHaveBeenCalled();
     load.mockResolvedValue(rows.map(row => ({ ...row, quantity: 5 })));
-    realtime.revision = 2;
-    rerender(<BomWorkbench {...props} />);
+    await act(async () => { await queryClient.invalidateQueries({ queryKey: queryKeys.bom.all }); });
     await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
     fireEvent.click(screen.getByRole("button", { name: "구성 저장", exact: true }));
     await screen.findByText("다른 작업에서 BOM을 변경했습니다.");
@@ -86,8 +167,8 @@ describe("BomWorkbench", () => {
   it("shows every invalid draft row and submits corrected rows only once during a pending save", async () => {
     const children = ["First", "Second"].map((name, index) => ({ item_id: `child-${index}`, item_name: name, process_type_code: "AR", unit: "EA" } as Item));
     const rows = children.map(child => ({ bom_id: child.item_id, child_item_id: child.item_id, parent_item_id: selectedParent.item_id, quantity: 2, unit: "EA", notes: null } as BOMEntry));
-    vi.spyOn(api, "getBOM").mockResolvedValue(rows);
-    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOM").mockResolvedValue(rows);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
     const pending = deferred<BOMEntry[]>();
     const save = vi.spyOn(api, "replaceBOM").mockReturnValue(pending.promise);
     render(<BomWorkbench items={[selectedParent, ...children]} allBomRows={rows} refreshAllBom={() => undefined}
@@ -120,8 +201,8 @@ describe("BomWorkbench", () => {
   it("keeps completion review open after failure and allows the same composition to retry", async () => {
     const child = { item_id: "child", item_name: "Review child", process_type_code: "AR", unit: "EA" } as Item;
     const row = { bom_id: "row", parent_item_id: selectedParent.item_id, child_item_id: child.item_id, quantity: 2, unit: "EA" } as BOMEntry;
-    vi.spyOn(api, "getBOM").mockResolvedValue([row]);
-    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOM").mockResolvedValue([row]);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
     const save = vi.spyOn(api, "updateBomCompletion").mockRejectedValueOnce(new Error("완료 저장 실패"))
       .mockResolvedValueOnce({ ...selectedParent, bom_completed_at: "2026-10-07T00:00:00Z" });
     const onError = vi.fn();
@@ -142,8 +223,8 @@ describe("BomWorkbench", () => {
   it("closes a stale draft when another tab completes the BOM and shows the locked server composition", async () => {
     const child = { item_id: "child", item_name: "Completed elsewhere child", process_type_code: "AR", unit: "EA" } as Item;
     const row = { bom_id: "row", parent_item_id: selectedParent.item_id, child_item_id: child.item_id, quantity: 2, unit: "EA" } as BOMEntry;
-    const load = vi.spyOn(api, "getBOM").mockResolvedValue([row]);
-    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    const load = vi.spyOn(catalogApi, "getBOM").mockResolvedValue([row]);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
     const save = vi.spyOn(api, "replaceBOM");
     const props = { allBomRows: [row], refreshAllBom: () => undefined, refreshItems: async () => undefined,
       onStatusChange: vi.fn(), onError: vi.fn() };
@@ -157,6 +238,8 @@ describe("BomWorkbench", () => {
     load.mockResolvedValue([{ ...row, quantity: 4 }]);
     rerender(<BomWorkbench {...props} items={[{ ...selectedParent, bom_completed_at: "2026-10-07T12:00:00Z" }, child]} />);
     await waitFor(() => expect(screen.getByTitle("클릭하여 수량 수정")).toHaveTextContent("4EA"));
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(queryClient.getQueryData(queryKeys.bom.detail(selectedParent.item_id))).toEqual([{ ...row, quantity: 4 }]);
     expect(screen.getByTitle("클릭하여 수량 수정")).toBeDisabled();
     expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
     expect(save).not.toHaveBeenCalled();
@@ -168,8 +251,8 @@ describe("BomWorkbench", () => {
     const rows = children.map((child, index) => ({ bom_id: `row-${index}`, parent_item_id: index ? otherParent.item_id : selectedParent.item_id,
       child_item_id: child.item_id, quantity: index ? 4 : 2, unit: "EA", notes: null } as BOMEntry));
     const pending = deferred<BOMEntry[]>();
-    const load = vi.spyOn(api, "getBOM").mockImplementation(async (id) => rows.filter(row => row.parent_item_id === id));
-    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    const load = vi.spyOn(catalogApi, "getBOM").mockImplementation(async (id) => rows.filter(row => row.parent_item_id === id));
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
     render(<BomWorkbench items={[selectedParent, otherParent, ...children]} allBomRows={rows} refreshAllBom={() => undefined}
       refreshItems={async () => undefined} onStatusChange={() => undefined} onError={() => undefined} />);
     await waitFor(() => expect(screen.getAllByTitle("클릭하여 수량 수정")).toHaveLength(1));
@@ -197,16 +280,15 @@ describe("BomWorkbench", () => {
     const child = { item_id: "race-child", item_name: "Race child", process_type_code: "AR", unit: "EA" } as Item;
     const row = { bom_id: "race-row", parent_item_id: selectedParent.item_id, child_item_id: child.item_id, quantity: 2, unit: "EA" } as BOMEntry;
     const stale = deferred<BOMEntry[]>();
-    const load = vi.spyOn(api, "getBOM").mockResolvedValue([row]);
-    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    const load = vi.spyOn(catalogApi, "getBOM").mockResolvedValue([row]);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
     vi.spyOn(api, "replaceBOM").mockResolvedValue([{ ...row, quantity: 3 }]);
     const props = { items: [selectedParent, child], setItems: vi.fn(), allBomRows: [row],
       refreshAllBom: vi.fn(), refreshItems: async () => undefined, onStatusChange: vi.fn(), onError: vi.fn() };
-    const { rerender } = render(<BomWorkbench {...props} />);
+    render(<BomWorkbench {...props} />);
     await screen.findByTitle("클릭하여 수량 수정");
     load.mockReturnValueOnce(stale.promise);
-    realtime.revision = 41;
-    rerender(<BomWorkbench {...props} />);
+    act(() => { void queryClient.invalidateQueries({ queryKey: queryKeys.bom.all }); });
     await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
     fireEvent.click(screen.getByTitle("클릭하여 수량 수정"));
     fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "3" } });
@@ -216,8 +298,10 @@ describe("BomWorkbench", () => {
     const expected = action === "save" ? "3EA" : "4EA";
     await waitFor(() => expect(screen.getByRole("button", { name: "변경 취소", exact: true })).toBeDisabled());
     expect(screen.getByTitle("클릭하여 수량 수정")).toHaveTextContent(expected);
+    expect((load.mock.calls[1][1] as AbortSignal).aborted).toBe(true);
     await act(async () => { stale.resolve([row]); await stale.promise; });
     expect(screen.getByTitle("클릭하여 수량 수정")).toHaveTextContent(expected);
+    expect(queryClient.getQueryData(queryKeys.bom.detail(selectedParent.item_id))).toEqual([{ ...row, quantity: action === "save" ? 3 : 4 }]);
   });
 
   it("reserves all three panels and hides zero counts and selection hints during initial bootstrap", () => {
@@ -230,12 +314,13 @@ describe("BomWorkbench", () => {
     expect(screen.queryByText("0")).not.toBeInTheDocument();
     expect(screen.queryByText(/좌측에서 상위 품목을 선택|등록된 BOM 이 없습니다/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /미배치 원자재/ })).not.toBeInTheDocument();
+    expect(screen.getByText("미배치 원자재")).toBeInTheDocument();
   });
 
   it("keeps BOM rows as skeletons until a selected parent's first response and supports retry", async () => {
     const pending = deferred<BOMEntry[]>();
-    vi.spyOn(api, "getBOM").mockReturnValueOnce(pending.promise).mockResolvedValueOnce([]);
-    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOM").mockReturnValueOnce(pending.promise).mockResolvedValueOnce([]);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
     render(<BomWorkbench items={[selectedParent]} setItems={vi.fn()} allBomRows={[]}
       refreshAllBom={vi.fn()} refreshItems={async () => undefined} onStatusChange={vi.fn()} onError={vi.fn()} />);
     expect(screen.getByRole("status", { name: "현재 구성 불러오는 중" })).toBeInTheDocument();
@@ -250,8 +335,8 @@ describe("BomWorkbench", () => {
   it("ignores an earlier parent's late response while the newly selected parent is loading", async () => {
     const first = deferred<BOMEntry[]>();
     const second = deferred<BOMEntry[]>();
-    vi.spyOn(api, "getBOM").mockImplementation((id) => id === "parent-1" ? first.promise : second.promise);
-    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOM").mockImplementation((id) => id === "parent-1" ? first.promise : second.promise);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
     const other = { ...selectedParent, item_id: "parent-2", item_name: "Second parent" };
     render(<BomWorkbench items={[selectedParent, other]} setItems={vi.fn()} allBomRows={[]}
       refreshAllBom={vi.fn()} refreshItems={async () => undefined} onStatusChange={vi.fn()} onError={vi.fn()} />);
@@ -267,14 +352,14 @@ describe("BomWorkbench", () => {
   it("does not replace the new selection with a late refresh after saving the previous BOM", async () => {
     const savedRefresh = deferred<BOMEntry[]>();
     const row = { bom_id: "bom-1", parent_item_id: "parent-1", child_item_id: "child-1", quantity: 2, unit: "EA" } as BOMEntry;
-    const getBom = vi.spyOn(api, "getBOM").mockResolvedValueOnce([row]).mockReturnValueOnce(savedRefresh.promise).mockResolvedValue([]);
-    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    const getBom = vi.spyOn(catalogApi, "getBOM").mockResolvedValueOnce([row]).mockReturnValueOnce(savedRefresh.promise).mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
     const save = vi.spyOn(api, "replaceBOM").mockResolvedValue([{ ...row, quantity: 3 }]);
     const other = { ...selectedParent, item_id: "parent-2", item_name: "Second parent" };
     const child = { item_id: "child-1", item_name: "Previous child", process_type_code: "AR", unit: "EA" } as Item;
     const props = { items: [selectedParent, other, child], setItems: vi.fn(), allBomRows: [],
       refreshAllBom: vi.fn(), refreshItems: async () => undefined, onStatusChange: vi.fn(), onError: vi.fn() };
-    const { container, rerender } = render(<BomWorkbench {...props} />);
+    const { container } = render(<BomWorkbench {...props} />);
     await waitFor(() => expect(container.querySelector("div[data-bom-row-surface]")).not.toBeNull());
     const currentRow = container.querySelector("div[data-bom-row-surface]")!;
     fireEvent.click(currentRow.querySelector("button")!);
@@ -284,8 +369,7 @@ describe("BomWorkbench", () => {
     fireEvent.click(screen.getByRole("button", { name: "구성 저장", exact: true }));
     await waitFor(() => expect(screen.getByRole("button", { name: "변경 취소", exact: true })).toBeDisabled());
     expect(save).toHaveBeenCalledTimes(1);
-    realtime.revision = 41;
-    rerender(<BomWorkbench {...props} />);
+    act(() => { void queryClient.invalidateQueries({ queryKey: queryKeys.bom.all }); });
     await waitFor(() => expect(getBom).toHaveBeenCalledTimes(2));
     const list = screen.getByText("상위 품목 선택").closest("[data-scrollbar-rail-shell]") as HTMLElement;
     fireEvent.click(within(list).getByText("Second parent"));
@@ -299,8 +383,8 @@ describe("BomWorkbench", () => {
   });
 
   it("starts with all departments and filters parents from the parent-list controls", async () => {
-    vi.spyOn(api, "getBOM").mockResolvedValue([]);
-    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOM").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
     const highParent = { ...selectedParent, item_id: "high-parent", item_name: "High parent", process_type_code: "HA" } as Item;
     render(<BomWorkbench items={[selectedParent, highParent]} setItems={vi.fn()} allBomRows={[]}
       refreshAllBom={vi.fn()} refreshItems={async () => undefined} onStatusChange={vi.fn()} onError={vi.fn()} />);
@@ -348,8 +432,8 @@ describe("BomWorkbench", () => {
   });
 
   it("saves an unmatched raw disposition, disables only its three controls, then refreshes items", async () => {
-    vi.spyOn(api, "getBOM").mockResolvedValue([]);
-    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOM").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
     const raw = {
       item_id: "raw-1",
       item_name: "Unmatched raw",
@@ -412,8 +496,8 @@ describe("BomWorkbench", () => {
   });
 
   it("keeps the PATCH response visible and reports refresh failure separately", async () => {
-    vi.spyOn(api, "getBOM").mockResolvedValue([]);
-    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOM").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
     const raw = {
       item_id: "raw-1",
       item_name: "Unmatched raw",
@@ -462,8 +546,8 @@ describe("BomWorkbench", () => {
   });
 
   it("renders later parent item replacements and removals without local status state", async () => {
-    vi.spyOn(api, "getBOM").mockResolvedValue([]);
-    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOM").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
     const heldRaw = {
       item_id: "raw-1",
       item_name: "Unmatched raw",
@@ -497,8 +581,8 @@ describe("BomWorkbench", () => {
   });
 
   it("excludes deleted raw items from the unmatched count and expanded list", async () => {
-    vi.spyOn(api, "getBOM").mockResolvedValue([]);
-    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOM").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
     const activeRaw = {
       item_id: "raw-active",
       item_name: "Active unmatched raw",
@@ -536,8 +620,8 @@ describe("BomWorkbench", () => {
   });
 
   it("keeps the visible status unchanged and reports an error when unmatched raw saving fails", async () => {
-    vi.spyOn(api, "getBOM").mockResolvedValue([]);
-    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOM").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
     const raw = {
       item_id: "raw-1",
       item_name: "Unmatched raw",
@@ -568,8 +652,8 @@ describe("BomWorkbench", () => {
   });
 
   it("keeps each BOM list's scroll owner in a stable external desktop rail without shifting table columns", async () => {
-    vi.spyOn(api, "getBOM").mockResolvedValue([]);
-    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOM").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
     const child = {
       item_id: "child-1",
       item_name: "Candidate child",
@@ -656,8 +740,8 @@ describe("BomWorkbench", () => {
       quantity: 2,
       unit: "EA",
     } as BOMEntry;
-    const getBom = vi.spyOn(api, "getBOM").mockResolvedValue([row]);
-    const getWhereUsed = vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    const getBom = vi.spyOn(catalogApi, "getBOM").mockResolvedValue([row]);
+    const getWhereUsed = vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
     const child = {
       item_id: "child-1",
       item_name: "Draft child",
@@ -677,7 +761,7 @@ describe("BomWorkbench", () => {
 
     await waitFor(() => {
       expect(getBom).toHaveBeenCalledTimes(1);
-      expect(getWhereUsed).toHaveBeenCalledTimes(1);
+      expect(getWhereUsed).not.toHaveBeenCalled();
       expect(container.querySelector("div[data-bom-row-surface]")).not.toBeNull();
     });
     const currentRow = container.querySelector("div[data-bom-row-surface]")!;
@@ -693,12 +777,13 @@ describe("BomWorkbench", () => {
     expect(quantity).toBeVisible();
     expect(quantity).toHaveValue(7);
 
+    await act(async () => { await queryClient.invalidateQueries({ queryKey: queryKeys.bom.all }); });
     realtime.revision = 1;
     rerender(<BomWorkbench {...props} />);
 
     await waitFor(() => {
       expect(getBom).toHaveBeenCalledTimes(2);
-      expect(getWhereUsed).toHaveBeenCalledTimes(2);
+      expect(getWhereUsed).not.toHaveBeenCalled();
       expect(
         container.querySelector("div[data-bom-row-surface] input[type=number]"),
       ).toHaveValue(7);
@@ -713,8 +798,8 @@ describe("BomWorkbench", () => {
       mes_code: "HIGH-001",
       process_type_code: "HA",
     } as Item;
-    vi.spyOn(api, "getBOM").mockResolvedValue([]);
-    vi.spyOn(api, "getBOMWhereUsed").mockImplementation(async (itemId) => itemId === "high-parent" ? [{
+    vi.spyOn(catalogApi, "getBOM").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockImplementation(async (itemId) => itemId === "high-parent" ? [{
       bom_id: "where-used-1",
       parent_item_id: "high-parent",
       parent_item_name: "High parent",
@@ -776,8 +861,8 @@ describe("BomWorkbench", () => {
       mes_code: "DELETED-001",
       deleted_at: "2026-08-05T00:00:00Z",
     } as Item;
-    vi.spyOn(api, "getBOM").mockResolvedValue([]);
-    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([{
+    vi.spyOn(catalogApi, "getBOM").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([{
       bom_id: "where-used-deleted",
       parent_item_id: "deleted-parent",
       parent_item_name: "Deleted parent",
@@ -835,8 +920,8 @@ describe("BomWorkbench", () => {
       item_name: "Second parent",
       mes_code: "PARENT-002",
     } as Item;
-    vi.spyOn(api, "getBOM").mockResolvedValue([]);
-    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOM").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
     window.history.replaceState({ shell: "kept" }, "", "/mes?tab=admin");
     const pushState = vi.spyOn(window.history, "pushState");
     const replaceState = vi.spyOn(window.history, "replaceState");
@@ -894,8 +979,8 @@ describe("BomWorkbench", () => {
       mes_code: "DELETED-001",
       deleted_at: "2026-08-05T00:00:00Z",
     } as Item;
-    vi.spyOn(api, "getBOM").mockResolvedValue([]);
-    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOM").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
     window.history.replaceState({ shell: "kept" }, "", "/mes?tab=admin");
     const pushState = vi.spyOn(window.history, "pushState");
     const replaceState = vi.spyOn(window.history, "replaceState");
@@ -946,8 +1031,8 @@ describe("BomWorkbench", () => {
       shell: "kept",
       bomWorkbench: { dept: "H", mode: "whereused", parentId: "high-parent" },
     };
-    vi.spyOn(api, "getBOM").mockResolvedValue([]);
-    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOM").mockResolvedValue([]);
+    vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
     window.history.replaceState(restoredState, "", "/mes?tab=admin");
     const pushState = vi.spyOn(window.history, "pushState");
     const replaceState = vi.spyOn(window.history, "replaceState");

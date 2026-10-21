@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useRef, type AriaRole, type ReactNode } from "react";
+import { List } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState } from "../../common/EmptyState";
 import { SearchInput } from "../../common/SearchInput";
 import { SkeletonBlock } from "../../common/LoadingSkeleton";
 import { AdminReadBoundary, type useAdminReadState } from "./AdminReadState";
+import { AdminVirtualRows, type AdminVirtualOptions } from "./AdminVirtualRows";
+import { useAdminScrollRestoration } from "../../_admin_hooks/useAdminSessionState";
 
 export interface AdminListPanelProps<T> {
   title?: string;
@@ -17,7 +20,7 @@ export interface AdminListPanelProps<T> {
   filters?: ReactNode;
   action?: ReactNode;
   items: T[];
-  renderItem: (item: T) => ReactNode;
+  renderItem: (item: T, index: number) => ReactNode;
   emptyState?: ReactNode;
   footer?: ReactNode;
   width?: number | string;
@@ -28,6 +31,7 @@ export interface AdminListPanelProps<T> {
   externalScrollbar?: boolean;
   read?: ReturnType<typeof useAdminReadState>;
   skeleton?: ReactNode;
+  virtual?: AdminVirtualOptions<T>;
 }
 
 export function AdminListPanel<T>({
@@ -51,8 +55,10 @@ export function AdminListPanel<T>({
   externalScrollbar = false,
   read,
   skeleton,
+  virtual,
 }: AdminListPanelProps<T>) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  useAdminScrollRestoration(`list.scroll:${listAriaLabel ?? title}`, scrollRef, !read?.loading);
 
   // 드래그 중 마우스 휠로 스크롤 — HTML5 drag가 기본 스크롤을 막으므로 non-passive 리스너로 수동 처리.
   useEffect(() => {
@@ -71,13 +77,15 @@ export function AdminListPanel<T>({
     <AdminReadBoundary read={read ?? { loading: false, error: undefined, retry: () => {} }} skeleton={skeleton} label={listAriaLabel ?? title ?? "목록"}>
     {items.length === 0
       ? emptyState ?? <EmptyState variant="no-data" compact />
-      : items.map((item) => renderItem(item))}
+      : virtual ? <AdminVirtualRows {...virtual} items={items} renderItem={renderItem} scrollRef={scrollRef} />
+      : items.map((item, index) => renderItem(item, index))}
     </AdminReadBoundary>
   </>;
   const viewport = <div
     ref={scrollRef}
     data-scrollbar-rail-viewport={externalScrollbar ? "" : undefined}
     role={listRole}
+    aria-rowcount={listRole === "grid" ? items.length + (listHeader ? 1 : 0) : undefined}
     aria-label={listAriaLabel}
     className={externalScrollbar
       ? `absolute inset-y-0 left-0 right-0 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable] ${listClassName ?? ""}`
@@ -98,15 +106,23 @@ export function AdminListPanel<T>({
       }}
     >
       {(title || action) && (
-        <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 px-1 pt-1">
-          <div className="flex items-baseline gap-2">
+        <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 rounded-[14px] border px-2"
+          style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             {title && (
-              <div className="whitespace-nowrap text-base font-black leading-6" style={{ color: LEGACY_COLORS.text }}>
+              <>
+              <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]"
+                style={{ color: LEGACY_COLORS.blue, background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 12%, transparent)` }}>
+                <List className="h-[18px] w-[18px]" />
+              </span>
+              <div className="min-w-0 truncate text-base font-bold leading-6" style={{ color: LEGACY_COLORS.text }}>
                 {title}
               </div>
+              </>
             )}
             {countLabel && (
-              <div className="whitespace-nowrap text-sm font-semibold leading-5 tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="ml-auto flex min-h-7 shrink-0 items-center justify-center whitespace-nowrap rounded-full border px-2 text-sm font-bold leading-5 tabular-nums"
+                style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
                 {read?.loading ? <SkeletonBlock className="h-4 w-10" /> : read?.error ? "—" : countLabel}
               </div>
             )}

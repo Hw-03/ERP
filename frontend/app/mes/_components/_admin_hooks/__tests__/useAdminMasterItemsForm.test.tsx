@@ -52,6 +52,23 @@ const baseArgs = (over: Partial<Parameters<typeof useAdminMasterItemsForm>[0]> =
 });
 
 describe("useAdminMasterItemsForm", () => {
+  it("becomes clean when edits are reverted, regardless of model selection order", () => {
+    const { result } = renderFormHook(baseArgs({ selectedItem: I({ model_slots: [1, 2] }) }));
+    act(() => result.current.setForm((form) => ({ ...form, item_name: "draft" })));
+    expect(result.current.dirty).toBe(true);
+    act(() => result.current.setForm((form) => ({ ...form, item_name: "프로브", model_slots: [2, 1] })));
+    expect(result.current.dirty).toBe(false);
+  });
+  it("rejects a failed save so a navigation guard cannot discard the draft", async () => {
+    const args = baseArgs({ selectedItem: I() });
+    const { result } = renderFormHook(args);
+    act(() => result.current.setForm((form) => ({ ...form, item_name: "draft" })));
+    updateItemMock.mockRejectedValueOnce(new Error("offline"));
+    await act(async () => { await expect(result.current.save()).rejects.toThrow("offline"); });
+    expect(result.current.form.item_name).toBe("draft");
+    expect(result.current.dirty).toBe(true);
+    expect(args.setSelectedItem).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     updateItemMock.mockReset();
   });
@@ -157,7 +174,7 @@ describe("useAdminMasterItemsForm", () => {
       result.current.setForm((form) => ({ ...form, minimum_order_quantity: "0" }));
     });
 
-    await act(async () => { await result.current.save(); });
+    await act(async () => { await expect(result.current.save()).rejects.toThrow(); });
 
     expect(args.onError).toHaveBeenCalledWith("최소 발주수량(MOQ)은 1 이상 입력하세요.");
     expect(updateItemMock).not.toHaveBeenCalled();
@@ -174,7 +191,7 @@ describe("useAdminMasterItemsForm", () => {
       result.current.setForm((form) => ({ ...form, [field]: value }));
     });
 
-    await act(async () => { await result.current.save(); });
+    await act(async () => { await expect(result.current.save()).rejects.toThrow(); });
 
     expect(args.onError).toHaveBeenCalledWith(errorMessage);
     expect(updateItemMock).not.toHaveBeenCalled();
@@ -196,7 +213,7 @@ describe("useAdminMasterItemsForm", () => {
       result.current.setForm((form) => ({ ...form, [field]: value }));
     });
 
-    await act(async () => { await result.current.save(); });
+    await act(async () => { await expect(result.current.save()).rejects.toThrow(); });
 
     expect(args.onError).toHaveBeenCalledWith(errorMessage);
     expect(updateItemMock).not.toHaveBeenCalled();
@@ -209,7 +226,7 @@ describe("useAdminMasterItemsForm", () => {
       result.current.setForm((form) => ({ ...form, standard_purchase_price: standardPurchasePrice }));
     });
 
-    await act(async () => { await result.current.save(); });
+    await act(async () => { await expect(result.current.save()).rejects.toThrow(); });
 
     expect(args.onError).toHaveBeenCalledWith("기준 매입단가는 0 이상, 소수점 둘째 자리까지 입력하세요.");
     expect(updateItemMock).not.toHaveBeenCalled();

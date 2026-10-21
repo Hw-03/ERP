@@ -27,7 +27,8 @@ export type AdminDepartmentsState = {
   setAddName: (v: string) => void;
   selectedDept: DepartmentMaster | null;
   setSelectedDept: (d: DepartmentMaster | null) => void;
-  addDepartmentMaster: () => void;
+  addDepartmentMaster: () => Promise<void>;
+  adding: boolean;
   deactivateDepartmentMaster: (id: number) => void;
   reactivateDepartmentMaster: (id: number) => void;
   hardDeleteDepartment: (id: number) => void;
@@ -74,6 +75,7 @@ export function useAdminDepartments({
     selectedDept,
     setSelectedDept,
     addDepartmentMaster: commands.add,
+    adding: commands.adding,
     deactivateDepartmentMaster: commands.deactivate,
     reactivateDepartmentMaster: commands.reactivate,
     hardDeleteDepartment: commands.hardDelete,

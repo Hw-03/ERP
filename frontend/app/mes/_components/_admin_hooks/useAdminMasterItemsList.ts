@@ -3,7 +3,8 @@
 // W5: MasterItems 도메인 List sub-hook.
 // 책임: 품목 목록 + 검색 키워드 + 필터링된 visibleItems.
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useAdminSessionState } from "./useAdminSessionState";
 import type { Item } from "@/lib/api";
 import { useItemSearch } from "@/lib/queries/useItemSearch";
 
@@ -32,7 +33,7 @@ export function useAdminMasterItemsList({
   globalSearch,
 }: UseAdminMasterItemsListArgs): UseAdminMasterItemsListState {
   const { matchesItem } = useItemSearch();
-  const [itemSearch, setItemSearch] = useState("");
+  const [itemSearch, setItemSearch] = useAdminSessionState<string>("items.search", "");
   const hasSearch = Boolean(`${globalSearch} ${itemSearch}`.trim());
 
   const visibleItems = useMemo(() => {

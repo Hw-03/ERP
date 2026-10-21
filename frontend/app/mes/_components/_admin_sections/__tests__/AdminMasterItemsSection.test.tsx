@@ -9,6 +9,7 @@ vi.mock("@/lib/api/items", () => ({ itemsApi: {
 } }));
 import styles from "../_admin_primitives/AdminMasterData.module.css";
 import { AdminReadProvider, INITIAL_ADMIN_READ_STATES } from "../_admin_primitives/AdminReadState";
+import { AdminSessionProvider } from "../../_admin_hooks/useAdminSessionState";
 
 const item = {
   item_id: "item-1",
@@ -73,6 +74,8 @@ function findByClasses(container: HTMLElement, ...classes: string[]) {
 }
 
 afterEach(() => {
+  Reflect.deleteProperty(Element.prototype, "animate");
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   context.visibleItems = [item];
   context.selectedItem = null;
@@ -107,6 +110,18 @@ describe("AdminMasterItemsSection", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "삭제 확인", exact: true })).toBeEnabled());
   });
 
+  it("restores the detail tab when returning to the same item within the admin session", () => {
+    context.selectedItem = item;
+    const view = (visible: boolean) => <AdminSessionProvider><DirtyGuardProvider>
+      {visible && <AdminMasterItemsSection allBomRows={[]} />}
+    </DirtyGuardProvider></AdminSessionProvider>;
+    const { rerender } = render(view(true));
+    fireEvent.click(screen.getByRole("tab", { name: "재고·구매" }));
+    rerender(view(false));
+    rerender(view(true));
+    expect(screen.getByRole("tab", { name: "재고·구매" })).toHaveAttribute("aria-selected", "true");
+  });
+
   it("다른 품목을 선택하면 기본 탭으로 바로 복귀하고 본문 페이드는 한 번만 재생한다", () => {
     vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
     context.selectedItem = item;
@@ -115,7 +130,8 @@ describe("AdminMasterItemsSection", () => {
     const panel = screen.getByRole("tabpanel");
     panel.style.setProperty("--admin-fade-duration", "350ms");
     const animate = vi.fn(() => ({ cancel: vi.fn() }));
-    Object.defineProperty(panel, "animate", { value: animate });
+    Object.defineProperty(Element.prototype, "animate", { configurable: true, value: animate });
+    vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({ width: 400, height: 300, left: 100, top: 200 } as DOMRect);
     fireEvent.click(screen.getByRole("tab", { name: "재고·구매" }));
     expect(animate).toHaveBeenCalledOnce();
     animate.mockClear();
@@ -150,8 +166,11 @@ describe("AdminMasterItemsSection", () => {
     expect(screen.getByTestId("admin-detail-skeleton")).toBeInTheDocument();
     expect(screen.queryByText(/품목을 선택하거나 추가/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "품목 추가" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "삭제", exact: true })).toBeDisabled();
   });
-  it("[8.19-04] 1050개 visibleItems의 KPI·상태 합·목록·끝행이 같은 모집단을 사용한다", () => {
+  it("[8.19-04] 1050개 visibleItems의 KPI와 가상 목록이 같은 모집단을 사용한다", async () => {
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(600);
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
     context.visibleItems = Array.from({ length: 1050 }, (_, index) => ({
       ...item,
       item_id: `item-${index + 1}`,
@@ -173,8 +192,12 @@ describe("AdminMasterItemsSection", () => {
     expect(screen.getAllByText("정상")[0]?.parentElement).toHaveTextContent("432");
     expect(screen.getAllByText("부족")[0]?.parentElement).toHaveTextContent("252");
     expect(screen.getAllByText("품절")[0]?.parentElement).toHaveTextContent("366");
-    expect(within(grid).getAllByRole("row")).toHaveLength(1051);
-    expect(within(grid).getByRole("row", { name: /품목 1050/ })).toBeInTheDocument();
+    expect(grid).toHaveAttribute("aria-rowcount", "1051");
+    expect(within(grid).getAllByRole("row").length).toBeLessThan(80);
+    fireEvent.keyDown(within(grid).getByRole("row", { name: /품목 0001/ }), { key: "End" });
+    await waitFor(() => {
+      expect(within(grid).getByRole("row", { name: /품목 1050/ })).toBeInTheDocument();
+    });
   });
 
   it("locks item reordering while the list is filtered", () => {
@@ -346,7 +369,8 @@ describe("AdminMasterItemsSection", () => {
     expect(within(tabActionsRow!).getByRole("button", { name: "삭제" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "저장" })).toBeInTheDocument();
     expect(screen.getByText("구매 기준")).toBeInTheDocument();
-    expect(screen.getByRole("tabpanel").firstElementChild).toHaveClass("h-full");
+    expect(screen.getByRole("tabpanel").firstElementChild).toHaveStyle({ display: "contents" });
+    expect(screen.getByRole("tabpanel").querySelector("fieldset")?.firstElementChild).toHaveClass("h-full");
     expect(screen.queryByText("현재 재고")).not.toBeInTheDocument();
     expect(screen.queryByText("창고 보관")).not.toBeInTheDocument();
 
@@ -395,6 +419,7 @@ describe("AdminMasterItemsSection", () => {
     await waitFor(() => expect(within(tabActionsRow!).getByRole("button", { name: "삭제 확인" })).toBeEnabled());
     fireEvent.click(within(tabActionsRow!).getByRole("button", { name: "삭제 확인" }));
     expect(context.deleteItem).toHaveBeenCalledWith(item.item_id);
+    await waitFor(() => expect(within(tabActionsRow!).queryByRole("button", { name: "삭제 확인" })).not.toBeInTheDocument());
   });
 
   it("초기 렌더와 확인 중 품목 전환에서는 삭제 버튼을 강제 포커스하지 않는다", async () => {

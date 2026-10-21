@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { ioDirectionTone } from "./ioVisualTheme";
 import { Button } from "@/lib/ui/Button";
 import { tint } from "@/lib/mes/colorUtils";
 import { api, type IoBundle, type IoInternalUseBomMode, type IoLine, type IoSourceKind, type IoSourceLocation, type IoSubType, type IoWorkType, type Item } from "@/lib/api";
@@ -919,8 +920,11 @@ export function IoComposeView({
   const lineCount = state.bundles.reduce((acc, b) => acc + b.lines.length, 0);
   const itemMap = useMemo(() => new Map(items.map((item) => [item.item_id, item])), [items]);
   const materialOutbound = isMaterialWorkType(state.workType) && state.materialDirectionSelected && (state.subType === "outbound_supplier" || state.subType === "tube_outbound_supplier");
-  const directionOutbound = materialOutbound || state.workType === "internal_use" || (["process", "warehouse_io", "warehouse_adjust"].includes(state.workType) && state.deptIoDirection === "out");
-  const accent = isExitWorkType(state.workType) || directionOutbound ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
+  const directionSelected = isMaterialWorkType(state.workType)
+    ? state.materialDirectionSelected
+    : isExitWorkType(state.workType) || state.deptIoDirection !== null;
+  const accent = directionSelected ? ioDirectionTone(state.subType) : LEGACY_COLORS.blue;
+  const surfaceTone = step > 1 && directionSelected ? accent : undefined;
   const stepWrapperClass = (n: IoStep) => `flex min-h-0 flex-1 flex-col${step > n ? " pt-[9px]" : ""}`;
   const workTypeInfo = IO_WORK_TYPES.find((row) => row.id === state.workType);
   const currentWorkTitle = workTypeInfo?.label ?? workTypeLabel(state.workType);
@@ -1026,11 +1030,11 @@ export function IoComposeView({
                 type="button"
                 onClick={stepId === 1 ? returnToWorkTypeStep : () => state.goTo(stepId)}
                 className="iwpb done"
-                style={directionOutbound ? { background: tint(accent, 10), borderColor: tint(accent, 36), color: accent } : undefined}
+                style={directionSelected ? { background: tint(accent, 8), borderColor: tint(accent, 36), color: accent } : undefined}
                 data-testid="io-step-nav-item"
               >
                 <span className="iwpl">{stepTitle(stepId)}</span>
-                {summaryText && <span className="iwps" style={directionOutbound ? { color: accent } : undefined}>{summaryText}</span>}
+                {summaryText && <span className="iwps" style={directionSelected ? { color: accent } : undefined}>{summaryText}</span>}
               </button>
             );
           }
@@ -1040,7 +1044,7 @@ export function IoComposeView({
               type="button"
               disabled
               className={active ? "iwpb a" : "iwpb locked"}
-              style={active && directionOutbound ? { background: tint(accent, 12), borderColor: accent, color: accent } : undefined}
+              style={active && directionSelected ? { background: tint(accent, 8), borderColor: accent, color: accent } : undefined}
               data-testid="io-step-nav-item"
             >
               <span className="iwpl">{stepTitle(stepId)}</span>
@@ -1267,7 +1271,7 @@ export function IoComposeView({
 
       {step === 6 && (
         <div ref={(el) => { stepRefs.current[6] = el; }} className="flex min-h-0 flex-1 flex-col">
-          <WizardStepCard n={2} title={stepTitle(6)} state="active" accent={accent} chrome={workChrome} chromeOnly fill>
+          <WizardStepCard n={2} title={stepTitle(6)} state="active" accent={accent} surfaceTone={surfaceTone} chrome={workChrome} chromeOnly fill>
             <div className="flex h-full min-h-0 flex-col gap-5">
               <div className="min-h-0 flex-1">
                 <MaterialDirectionStep tube={state.workType === "tube_material"} selected={state.materialDirectionSelected ? state.subType : null} onSelect={handleSubTypeChange} />
@@ -1292,6 +1296,7 @@ export function IoComposeView({
               summary={stepTwoSummary}
               onChange={() => state.goTo(2)}
               accent={accent}
+              surfaceTone={surfaceTone}
               chrome={workChrome}
               chromeOnly
               fill
@@ -1364,6 +1369,7 @@ export function IoComposeView({
             summary={stepSummary(3)}
             onChange={() => state.goTo(3)}
             accent={accent}
+            surfaceTone={surfaceTone}
             chrome={workChrome}
             chromeOnly
             fill
@@ -1426,6 +1432,7 @@ export function IoComposeView({
             summary={stepSummary(4)}
             onChange={() => state.goTo(4)}
             accent={accent}
+            surfaceTone={surfaceTone}
             chrome={workChrome}
             chromeOnly
             fill
@@ -1520,6 +1527,7 @@ export function IoComposeView({
             state="active"
             summary="제출 준비 완료"
             accent={accent}
+            surfaceTone={surfaceTone}
             chrome={workChrome}
             chromeOnly
             fill

@@ -7,6 +7,7 @@ import { EmptyState } from "../common";
 import type { IoBundle, IoInternalUseBomMode, IoLine, IoSubType, Item } from "./types";
 import { IoBundleCard } from "./IoBundleCard";
 import { hasUnselectedInternalUseBomMode } from "./internalUseBom";
+import { ioDirectionTone } from "./ioVisualTheme";
 import scrollStyles from "../mobile/primitives/MobileScrollFrame.module.css";
 
 interface Props {
@@ -190,7 +191,7 @@ export function IoBundleCart({
                 onClick={onAdvance}
                 disabled={!canAdvance || internalUseBomBusy}
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
-                style={{ background: (subType === "outbound_supplier" || subType === "tube_outbound_supplier") ? LEGACY_COLORS.red : LEGACY_COLORS.blueSolid }}
+                style={{ background: ioDirectionTone(subType) === LEGACY_COLORS.red ? LEGACY_COLORS.redSolid : LEGACY_COLORS.blueSolid }}
               >
                 <ClipboardCheck className="h-4 w-4" />
                 제출확인 →
@@ -202,7 +203,7 @@ export function IoBundleCart({
               onClick={onAdvance}
               disabled={!canAdvance || internalUseBomBusy}
               className="flex w-full items-center justify-center gap-1.5 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
-              style={{ background: (subType === "outbound_supplier" || subType === "tube_outbound_supplier") ? LEGACY_COLORS.red : LEGACY_COLORS.blueSolid }}
+              style={{ background: ioDirectionTone(subType) === LEGACY_COLORS.red ? LEGACY_COLORS.redSolid : LEGACY_COLORS.blueSolid }}
             >
               <ClipboardCheck className="h-4 w-4" />
               제출확인 →

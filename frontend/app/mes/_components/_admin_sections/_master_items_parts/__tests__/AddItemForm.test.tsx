@@ -8,7 +8,7 @@ vi.mock("../../AdminMasterItemsContext", () => ({
   useAdminMasterItemsContext: () => ({
     setAddMode: vi.fn(),
     addForm: {
-      item_name: "",
+      item_name: "새 품목",
       process_type_code: "TF",
       unit: "EA",
       model_slots: [],

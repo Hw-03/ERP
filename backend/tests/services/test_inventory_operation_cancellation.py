@@ -242,8 +242,10 @@ def test_cancel_blocks_when_reversal_would_intrude_on_reserved_stock(
     assert cancellation_svc.INSUFFICIENT_STOCK_MESSAGE in preview.blockers
 
 
+@pytest.mark.parametrize("department", [None, DepartmentEnum.SHIPPING])
+@pytest.mark.parametrize("consumed, pending", [(0, 0), (1, 0), (0, 1)])
 def test_cancel_blocks_when_reversal_would_intrude_on_shipping_reservation(
-    db_session, make_item
+    db_session, make_item, make_location, department, consumed: int, pending: int
 ) -> None:
     """입고 취소가 활성 출하 예약의 물리 재고를 없애면 차단한다."""
 
@@ -257,6 +259,16 @@ def test_cancel_blocks_when_reversal_would_intrude_on_shipping_reservation(
     )
     db_session.commit()
     original = _receive_operation(db_session, item, actor, 7)
+    inventory = inventory_svc.get_or_create_inventory(db_session, item.item_id)
+    if department is None:
+        inventory.warehouse_qty -= consumed
+        inventory.pending_quantity = pending
+    else:
+        inventory.warehouse_qty = 0
+        location = make_location(item.item_id, department=department, quantity=7 - consumed)
+        location.pending_quantity = pending
+        log = db_session.query(TransactionLog).filter_by(operation_id=original.operation_id).one()
+        log.inventory_effect = [{"scope": "location", "department": department.value, "status": "PRODUCTION", "delta": 7}]
     request = ShippingRequest(
         base_pf_item_id=item.item_id,
         final_pf_item_id=item.item_id,
@@ -270,7 +282,7 @@ def test_cancel_blocks_when_reversal_would_intrude_on_shipping_reservation(
             request_id=request.request_id,
             item_id=item.item_id,
             quantity=1,
-            department=None,
+            department=department,
             status="RESERVED",
         )
     )
@@ -283,9 +295,13 @@ def test_cancel_blocks_when_reversal_would_intrude_on_shipping_reservation(
     )
 
     assert preview.can_cancel is False
-    assert preview.cells[0].current_quantity == 7
-    assert preview.cells[0].reserved_quantity == 1
-    assert cancellation_svc.INSUFFICIENT_STOCK_MESSAGE in preview.blockers
+    assert preview.cells[0].current_quantity == 7 - consumed
+    assert preview.cells[0].reserved_quantity == 1 + pending
+    expected = (
+        "출하 예약된 재고가 있어 취소할 수 없습니다. 연결된 출하의 준비 완료를 먼저 취소해 주세요."
+        if not consumed and not pending else cancellation_svc.INSUFFICIENT_STOCK_MESSAGE
+    )
+    assert expected in preview.blockers
 
 
 def test_cancel_rolls_back_every_change_when_reversal_fails_midway(

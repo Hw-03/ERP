@@ -4,6 +4,7 @@ import { startTransition, useEffect, useState, type ReactElement } from "react";
 import type { AdminSection } from "../_admin_hooks/useAdminViewState";
 import { AdminSectionContent, type AdminSectionContentProps } from "./AdminSectionContent";
 import { AdminSectionEntrySkeleton } from "./AdminSectionEntrySkeleton";
+import { useAdminReadState, type AdminReadDomain } from "./_admin_primitives/AdminReadState";
 import styles from "./AdminTransitions.module.css";
 
 function needsEntry(section: AdminSection | null): section is "items" | "bom" {
@@ -15,14 +16,19 @@ export function AdminSectionTransition({ section, contentProps }: {
   section: AdminSection;
   contentProps: Omit<AdminSectionContentProps, "section">;
 }): ReactElement {
-  const [preparedSection, setPreparedSection] = useState<AdminSection | null>(() => needsEntry(section) ? null : section);
-  const [coverSection, setCoverSection] = useState<AdminSection | null>(() => needsEntry(section) ? section : null);
-  const contentSection = needsEntry(section) ? preparedSection : section;
+  const domains: AdminReadDomain[] = section === "items" ? ["items", "models"] : section === "bom" ? ["items", "bom"] : [];
+  const entryRead = useAdminReadState(...domains);
+  const ready = !!entryRead.managed && !entryRead.loading && !entryRead.error;
+  const [preparedSection, setPreparedSection] = useState<AdminSection | null>(() => needsEntry(section) && !ready ? null : section);
+  const [coverSection, setCoverSection] = useState<AdminSection | null>(() => needsEntry(section) && !ready ? section : null);
+  const warmEntry = ready && coverSection !== section;
+  const contentSection = needsEntry(section) && !warmEntry ? preparedSection : section;
   const pending = contentSection !== section;
+  const waiting = pending || (coverSection === section && entryRead.loading);
   const covered = needsEntry(section) && (pending || coverSection === section);
 
   useEffect(() => {
-    if (!needsEntry(section)) {
+    if (!needsEntry(section) || warmEntry) {
       setPreparedSection(section);
       setCoverSection(null);
       return;
@@ -42,10 +48,10 @@ export function AdminSectionTransition({ section, contentProps }: {
       cancelAnimationFrame(firstFrame);
       cancelAnimationFrame(secondFrame);
     };
-  }, [section, preparedSection]);
+  }, [section, preparedSection, warmEntry]);
 
   useEffect(() => {
-    if (pending || coverSection !== section) return;
+    if (waiting || coverSection !== section) return;
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const finish = (): void => {
       if (motion.matches) setCoverSection((current) => current === section ? null : current);
@@ -53,29 +59,30 @@ export function AdminSectionTransition({ section, contentProps }: {
     finish();
     motion.addEventListener?.("change", finish);
     return () => motion.removeEventListener?.("change", finish);
-  }, [pending, coverSection, section]);
+  }, [waiting, coverSection, section]);
 
-  return <div className="relative flex min-h-0 flex-1 flex-col" aria-busy={pending} data-admin-entry-covered={covered || undefined}>
+  return <div className="relative flex min-h-0 flex-1 flex-col" aria-busy={waiting} data-admin-entry-covered={covered || undefined}>
     {contentSection !== null && <div
       key={`content-${contentSection}`}
+      data-admin-section-reveal={needsEntry(contentSection) ? undefined : ""}
       className={`flex min-h-0 flex-1 flex-col overflow-hidden ${needsEntry(contentSection) ? "" : styles.fade}`}
       style={{ display: pending ? "none" : undefined }}
-      inert={pending || undefined}
-      aria-hidden={pending || undefined}
+      inert={waiting || undefined}
+      aria-hidden={waiting || undefined}
     >
       <AdminSectionContent {...contentProps} section={contentSection} />
     </div>}
     {covered && <div
       key={`entry-${section}`}
       data-testid="admin-section-entry-cover"
-      className={`absolute inset-0 z-30 flex min-h-0 flex-col ${styles.entryCover} ${pending ? "" : styles.entryExit}`}
-      aria-hidden={!pending || undefined}
-      inert={!pending || undefined}
-      role={pending ? "status" : undefined}
-      aria-label={pending ? `${section === "items" ? "품목 관리" : "BOM 관리"} 불러오는 중` : undefined}
-      aria-busy={pending}
+      className={`absolute inset-0 z-30 flex min-h-0 flex-col ${styles.entryCover} ${waiting ? "" : styles.entryExit}`}
+      aria-hidden={!waiting || undefined}
+      inert={!waiting || undefined}
+      role={waiting ? "status" : undefined}
+      aria-label={waiting ? `${section === "items" ? "품목 관리" : "BOM 관리"} 불러오는 중` : undefined}
+      aria-busy={waiting}
       onAnimationEnd={(event) => {
-        if (event.target === event.currentTarget && !pending) setCoverSection((current) => current === section ? null : current);
+        if (event.target === event.currentTarget && !waiting) setCoverSection((current) => current === section ? null : current);
       }}
     >
       <AdminSectionEntrySkeleton section={section} />

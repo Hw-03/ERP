@@ -155,8 +155,8 @@ function MesCodeSection({
 export function ItemFormFields({ form, setForm, showInitialQuantity, showInitialLocations, showMesCode, enableAfSalesReviewDefault, productModels = [], codePreview }: Props) {
   const departments = useDepartments();
   const bomStockExempt = Boolean(form.bom_stock_exempt);
-  const deptOptions = departments.map((d) => ({ value: d.name, label: d.name }));
-  const locationOptions = [{ value: WAREHOUSE_LOCATION, label: WAREHOUSE_LOCATION }, ...deptOptions];
+  const locationOptions = [...new Set([WAREHOUSE_LOCATION, ...departments.map((d) => d.name)])]
+    .map((value) => ({ value, label: value }));
   const materialOptions = [
     ...(form.legacy_item_type && !MATERIAL_TYPE_OPTIONS.includes(form.legacy_item_type as (typeof MATERIAL_TYPE_OPTIONS)[number])
       ? [{ value: form.legacy_item_type, label: "현재값: " + form.legacy_item_type }]

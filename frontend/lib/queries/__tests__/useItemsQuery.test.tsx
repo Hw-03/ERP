@@ -54,6 +54,19 @@ afterEach(() => {
 });
 
 describe("useItemsQuery", () => {
+  it("waits for admin unlock before requesting the list", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = makeClient();
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useItemsQuery({ limit: 2000 }, { enabled }),
+      { initialProps: { enabled: false }, wrapper: makeWrapper(client) },
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+    rerender({ enabled: true });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
   it("마운트 시 GET /api/items 호출 + process_type_code 쿼리 전달", async () => {
     const sample = [{ item_id: "1", item_name: "샘플", process_type_code: "PA" }];
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse(sample)));

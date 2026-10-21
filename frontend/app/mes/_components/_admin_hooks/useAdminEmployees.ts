@@ -5,6 +5,7 @@
 // — Form/Confirm sub-hook 은 Round-15 부터 존재 — Commands 추출 + List 추출로 표준화.
 
 import type { DepartmentMaster, Employee } from "@/lib/api";
+import { useEffect, useRef } from "react";
 import { api } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/queries/keys";
@@ -13,6 +14,7 @@ import { useAdminEmployeesForm, type EmployeeEditForm } from "./useAdminEmployee
 import { useAdminEmployeesConfirm } from "./useAdminEmployeesConfirm";
 import { useAdminEmployeesCommands } from "./useAdminEmployeesCommands";
 import type { EmployeeAddForm } from "../_admin_sections/adminShared";
+import { useAdminSave } from "./useAdminSave";
 
 export type { EmployeeEditForm } from "./useAdminEmployeesForm";
 
@@ -33,7 +35,7 @@ export type AdminEmployeesState = {
   setEmpAddMode: (v: boolean) => void;
   empAddForm: EmployeeAddForm;
   setEmpAddForm: (updater: (f: EmployeeAddForm) => EmployeeAddForm) => void;
-  addEmployee: () => void;
+  addEmployee: () => Promise<void>;
   toggleEmployee: (employee: Employee) => void;
   confirmTarget: Employee | null;
   confirmToggle: () => void;
@@ -44,6 +46,11 @@ export type AdminEmployeesState = {
   saveEmployee: () => Promise<void>;
   /** 저장 안 한 편집 여부 (PR-2 2-3 unsaved guard) */
   dirty: boolean;
+  saving: boolean;
+  adding: boolean;
+  toggling: boolean;
+  deleting: boolean;
+  resettingPin: boolean;
   pinResetTarget: Employee | null;
   pinResetAdminPin: string;
   setPinResetAdminPin: (v: string) => void;
@@ -66,25 +73,31 @@ export function useAdminEmployees({
   onError,
 }: UseAdminEmployeesArgs): AdminEmployeesState {
   const queryClient = useQueryClient();
+  const saveTask = useAdminSave();
   const form = useAdminEmployeesForm(employees);
+  const selectedId = useRef(form.selectedEmployee?.employee_id);
+  useEffect(() => {
+    selectedId.current = form.selectedEmployee?.employee_id;
+    return () => { selectedId.current = undefined; };
+  }, [form.selectedEmployee?.employee_id]);
   const confirm = useAdminEmployeesConfirm();
   const commands = useAdminEmployeesCommands({ setEmployees, onStatusChange, onError });
 
-  function addEmployee() {
-    void commands.add(form.empAddForm).then((created) => {
-      if (created) {
-        form.resetAddForm();
-        form.setSelectedEmployee(created);
-      }
-    });
+  async function addEmployee(): Promise<void> {
+    const created = await commands.add(form.empAddForm);
+    if (!created) throw new Error("직원을 추가하지 못했습니다. 입력 내용을 확인하고 다시 시도하세요.");
+    form.resetAddForm();
+    form.setSelectedEmployee(created);
   }
 
   function confirmToggle() {
     const target = confirm.confirmTarget;
     if (!target) return;
     void commands.toggleActive(target).then((updated) => {
-      confirm.setConfirmTarget(null);
-      if (updated) form.setSelectedEmployee(updated);
+      if (updated) {
+        confirm.setConfirmTarget(null);
+        form.setSelectedEmployee(updated);
+      }
     });
   }
 
@@ -92,7 +105,7 @@ export function useAdminEmployees({
     if (!form.selectedEmployee) return;
     if (!form.editForm.name.trim()) {
       onError("이름은 필수입니다.");
-      return;
+      throw new Error("이름은 필수입니다.");
     }
     const isAssembly = form.editForm.department === "조립";
     const savingOperator = getOperatorAccessContext();
@@ -121,10 +134,11 @@ export function useAdminEmployees({
       setEmployees((current) =>
         current.map((e) => (e.employee_id === updated.employee_id ? updated : e)),
       );
-      form.setSelectedEmployee(updated);
+      if (selectedId.current === updated.employee_id) form.setSelectedEmployee(updated);
       onStatusChange(`'${updated.name}' 정보를 저장했습니다.`);
     } catch (error) {
       onError(error instanceof Error ? error.message : "직원 정보 저장 실패");
+      throw error;
     }
   }
 
@@ -132,8 +146,8 @@ export function useAdminEmployees({
     const target = confirm.deleteTarget;
     if (!target) return;
     void commands.delete(target).then((result) => {
-      confirm.setDeleteTarget(null);
       if (!result) return;
+      confirm.setDeleteTarget(null);
       if (result.deleted) {
         form.setSelectedEmployee(null);
       } else if (result.updated) {
@@ -176,7 +190,12 @@ export function useAdminEmployees({
     cancelConfirm: () => confirm.setConfirmTarget(null),
     editForm: form.editForm,
     setEditForm: form.setEditForm,
-    saveEmployee,
+    saveEmployee: () => saveTask.run(saveEmployee),
+    saving: saveTask.saving,
+    adding: commands.adding,
+    toggling: commands.toggling,
+    deleting: commands.deleting,
+    resettingPin: commands.resettingPin,
     dirty: form.dirty,
     pinResetTarget: confirm.pinResetTarget,
     pinResetAdminPin: confirm.pinResetAdminPin,

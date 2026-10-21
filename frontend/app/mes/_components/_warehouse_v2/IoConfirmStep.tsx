@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
+import { ioDirectionTone } from "./ioVisualTheme";
 import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
 import {
   automaticLineRouteLabel,
@@ -124,24 +125,6 @@ const AUTO_APPROVAL_META = {
 };
 
 const MEMO_REQUIRED_MESSAGE = "메모를 입력해야 작업을 진행할 수 있습니다.";
-
-function directionAccent(subType: IoSubType): string {
-  if (
-    subType === "defect_quarantine" ||
-    subType === "supplier_return" ||
-    subType === "defect_restore" ||
-    subType === "defect_process" ||
-    subType === "warehouse_to_dept" ||
-    (subType === "outbound_supplier" || subType === "tube_outbound_supplier") ||
-    subType === "internal_use_out" ||
-    subType === "disassemble" ||
-    subType === "adjust_out"
-    || subType === "warehouse_adjust_out"
-  ) {
-    return LEGACY_COLORS.red;
-  }
-  return LEGACY_COLORS.blue;
-}
 
 function confirmCopy(
   subType: IoSubType,
@@ -324,7 +307,7 @@ export function IoConfirmStep({
     (effectIncludedLines.length === 0 && !allowsNoEffectCustomBomApproval) ||
     hasShortage || hasInvalidQuantity || missingInternalUseBomMode || (materialOutbound && memoMissing) || defectReasonMissing;
   const saveDisabled = submitting || saving || bundles.length === 0;
-  const accent = directionAccent(subType);
+  const accent = ioDirectionTone(subType);
   const blockerText = hasShortage
     ? "재고 부족 라인이 있어 제출할 수 없습니다. Step 4에서 라인을 다시 확인하세요."
     : hasInvalidQuantity
@@ -341,7 +324,7 @@ export function IoConfirmStep({
       <div
         className="flex flex-wrap items-center justify-between gap-2 lg:gap-4 rounded-[18px] border px-5 py-3 lg:py-4"
         style={{
-          background: tint(accent, 6),
+          background: tint(accent, 3, LEGACY_COLORS.s1),
           borderColor: tint(accent, 24),
         }}
       >
@@ -543,7 +526,7 @@ function ConfirmBundleCard({
     return (
       <div
         className="flex min-h-[60px] items-center justify-between gap-4 rounded-[18px] px-5 py-3"
-        style={{ background: tint((subType === "outbound_supplier" || subType === "tube_outbound_supplier") ? LEGACY_COLORS.red : LEGACY_COLORS.blue, 6) }}
+        style={{ background: tint(ioDirectionTone(subType), 3, LEGACY_COLORS.s1) }}
       >
         <div className="min-w-0 flex-1">
           <div className="truncate text-base font-black" style={{ color: LEGACY_COLORS.text }}>
@@ -596,7 +579,7 @@ function ConfirmBundleCard({
   const isSingle = bundle.source_kind === "direct_item";
   const isCollapsible = !isSingle && visibleLines.length > 0;
 
-  const tone = (subType === "outbound_supplier" || subType === "tube_outbound_supplier") ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
+  const tone = ioDirectionTone(subType);
   const childrenOnlyBom =
     showDeductionSource &&
     bundle.source_kind === "bom_parent" &&
@@ -643,13 +626,13 @@ function ConfirmBundleCard({
       }}
       className="standard-hover rounded-[18px] px-5 py-4 outline-none transition-[filter] focus-visible:ring-2 focus-visible:ring-[var(--c-blue)]"
       style={{
-        background: tint(tone, 6),
+        background: tint(tone, 3, LEGACY_COLORS.s1),
         cursor: isCollapsible ? "pointer" : "default",
       }}
     >
       <div className="flex w-full items-start justify-between gap-3 text-left">
         <span className="flex min-w-0 items-start gap-2">
-          <Layers className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
+          <Layers className="h-5 w-5 shrink-0" style={{ color: tone }} />
           <span className="min-w-0 flex-1">
             <span
               className="line-clamp-2 text-base font-black leading-tight lg:truncate lg:line-clamp-none"
@@ -707,8 +690,8 @@ function ConfirmBundleCard({
             <span
               className="rounded-full px-2.5 py-1 text-xs font-black"
               style={{
-                background: tint(LEGACY_COLORS.blue, 14),
-                color: LEGACY_COLORS.blue,
+                background: tint(tone, 8),
+                color: tone,
               }}
             >
               {INTERNAL_USE_BOM_MODE_LABEL[bundle.internal_use_bom_mode]}

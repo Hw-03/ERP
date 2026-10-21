@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
+import { useAdminSessionState } from "../_admin_hooks/useAdminSessionState";
 import { Plus, Save, Users, X } from "lucide-react";
 import { type Employee, type ProductModel } from "@/lib/api";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
@@ -28,6 +29,7 @@ import { toChosung } from "@/lib/hangul";
 import styles from "./_admin_primitives/AdminMasterData.module.css";
 import { AdminReadBoundary, useAdminReadState } from "./_admin_primitives/AdminReadState";
 import { AdminDetailSkeleton, AdminTableSkeleton } from "./_admin_primitives/AdminSkeleton";
+import { EMPTY_EMPLOYEE_FORM } from "./adminShared";
 
 export function AdminEmployeesSection() {
   const read = useAdminReadState("employees", "departments");
@@ -62,15 +64,22 @@ export function AdminEmployeesSection() {
     confirmDelete,
     cancelDelete,
     dirty,
+    saving,
+    adding,
+    toggling,
+    deleting,
+    resettingPin,
   } = ctx;
 
   // 활성 섹션 dirty/save 를 상위 registry 에 등록 (탭/사이드바 가드).
-  useRegisterDirty("employees", dirty, saveEmployee);
+  const hasDraft = empAddMode ? JSON.stringify(empAddForm) !== JSON.stringify({ ...EMPTY_EMPLOYEE_FORM, role: "사원" }) : dirty;
+  const saveDraft = empAddMode ? addEmployee : saveEmployee;
+  useRegisterDirty("employees", hasDraft, saveDraft);
   // 항목 변경(트리거 a) 가드 — 같은 페이지에서 다른 직원 선택.
-  const { confirmNavigation } = useLocalDirtyGuard(dirty, saveEmployee);
+  const { confirmNavigation } = useLocalDirtyGuard(hasDraft, saveDraft);
 
-  const [search, setSearch] = useState("");
-  const [deptFilter, setDeptFilter] = useState<string>("ALL");
+  const [search, setSearch] = useAdminSessionState<string>("employees.search", "");
+  const [deptFilter, setDeptFilter] = useAdminSessionState<string>("employees.department", "ALL");
   const { data: allModels } = useModelsQuery();
   const productModels = useMemo<ProductModel[]>(
     () => (allModels ?? []).filter((m) => !m.is_reserved && (m.model_name || m.symbol)),
@@ -94,6 +103,7 @@ export function AdminEmployeesSection() {
       })
       .sort((a, b) => a.name.localeCompare(b.name, "ko"));
   }, [employees, search, deptFilter]);
+  const detailLoading = detailRead.loading || (!!detailRead.managed && !detailRead.error && !selectedEmployee && !empAddMode && filteredEmployees.length > 0);
 
   // KPI 4개
   const stats = useMemo(() => {
@@ -125,6 +135,7 @@ export function AdminEmployeesSection() {
   }
 
   function handleSelectEmployee(employee: Employee) {
+    if (selectedEmployee?.employee_id === employee.employee_id && !empAddMode) return;
     confirmNavigation(() => {
       setSelectedEmployee(employee);
       setEmpAddMode(false);
@@ -157,6 +168,8 @@ export function AdminEmployeesSection() {
 
         <div className="flex min-h-0 flex-1 gap-4">
           <AdminListPanel
+            footer={selectedEmployee && !filteredEmployees.some((employee) => employee.employee_id === selectedEmployee.employee_id)
+              ? <p role="status" className="text-xs text-[var(--c-muted2)]">선택한 직원이 검색 결과 밖에 있습니다. 상세 편집은 유지됩니다.</p> : undefined}
             read={read} skeleton={<AdminTableSkeleton columns="minmax(0,0.9fr) minmax(0,1fr) 76px" count={3} />}
             title="직원 목록"
             countLabel={`${filteredEmployees.length}명`}
@@ -261,7 +274,8 @@ export function AdminEmployeesSection() {
           />
 
           <AdminDetailCard
-            selectionKey={detailRead.loading ? undefined : empAddMode ? "add" : selectedEmployee?.employee_id}
+            externalScrollbar
+            selectionKey={detailRead.error ? undefined : detailLoading ? "loading" : empAddMode ? "add" : selectedEmployee?.employee_id}
             title={
               empAddMode
                 ? "직원 추가"
@@ -277,19 +291,21 @@ export function AdminEmployeesSection() {
               ) : null
             }
           >
-            <AdminReadBoundary read={{ ...detailRead, loading: detailRead.loading || (!!detailRead.managed && !detailRead.error && !selectedEmployee && !empAddMode && filteredEmployees.length > 0) }} skeleton={<AdminDetailSkeleton variant="employees" />} label="직원 상세">
+            <AdminReadBoundary reveal={false} read={{ ...detailRead, loading: detailLoading }} skeleton={<AdminDetailSkeleton variant="employees" />} label="직원 상세">
             {empAddMode ? (
               <EmployeeAddInline
                 form={empAddForm}
                 setForm={setEmpAddForm}
                 departments={departments}
                 productModels={productModels}
-                onSubmit={addEmployee}
+                onSubmit={() => void addEmployee().catch(() => {})}
+                busy={adding}
               />
             ) : selectedEmployee ? (
+              <fieldset className="contents" disabled={saving} aria-busy={saving}>
               <EmployeeDetailGrid
                 employee={selectedEmployee}
-                headerActions={<Button variant="primary" size="md" className="h-11 min-w-[88px]" iconLeft={<Save className="h-4 w-4" />} onClick={saveEmployee}>저장</Button>}
+                headerActions={<Button variant="primary" size="md" className="h-11 min-w-[88px]" iconLeft={<Save className="h-4 w-4" />} disabled={!dirty || saving} loading={saving} onClick={() => void saveEmployee().catch(() => {})}>저장</Button>}
                 form={editForm}
                 setForm={setEditForm}
                 departments={departments}
@@ -298,6 +314,7 @@ export function AdminEmployeesSection() {
                 onToggle={toggleEmployee}
                 onRequestDelete={requestDelete}
               />
+              </fieldset>
             ) : (
               <div className="flex min-h-full flex-col">
                 <EmptyState
@@ -320,6 +337,7 @@ export function AdminEmployeesSection() {
         confirmLabel={confirmTarget?.is_active ? "비활성화" : "활성화"}
         onClose={cancelConfirm}
         onConfirm={confirmToggle}
+        busy={toggling}
       />
 
       <ConfirmModal
@@ -330,6 +348,7 @@ export function AdminEmployeesSection() {
         confirmLabel="삭제"
         onClose={cancelDelete}
         onConfirm={confirmDelete}
+        busy={deleting}
       />
 
       <ConfirmModal
@@ -341,6 +360,7 @@ export function AdminEmployeesSection() {
         confirmDisabled={pinResetAdminPin.length !== PIN_LENGTH}
         onClose={cancelPinReset}
         onConfirm={confirmPinReset}
+        busy={resettingPin}
       >
         <div className="mt-2">
           <div

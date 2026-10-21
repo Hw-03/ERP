@@ -30,11 +30,14 @@ describe("실제 코드 미리보기 제출", () => {
       result.current.setAddMode(true);
       result.current.setAddForm((form) => ({ ...form, item_name: "new", model_slots: [1], initial_locations: [{ department: "창고", quantity: "5" }] }));
     });
-    act(() => result.current.addItem());
+    await act(async () => {
+      await expect(result.current.addItem()).rejects.toThrow("품목 코드 미리보기를 확인한 뒤 추가하세요.");
+    });
     expect(mocks.createItem).not.toHaveBeenCalled();
     await waitFor(() => expect(mocks.getItemCodePreview).toHaveBeenCalled());
     await act(async () => finish({ mes_code: "3-TR-0020" }));
-    act(() => result.current.addItem());
+    await waitFor(() => expect(result.current.addCodePreview.status).toBe("ready"));
+    await act(async () => { await result.current.addItem(); });
     await waitFor(() => expect(mocks.createItem).toHaveBeenCalledWith(expect.objectContaining({ expected_mes_code: "3-TR-0020", initial_quantity: 5 })));
   });
 
@@ -49,14 +52,16 @@ describe("실제 코드 미리보기 제출", () => {
     });
     await waitFor(() => expect(mocks.getItemCodePreview).toHaveBeenCalled());
     await waitFor(() => expect(result.current.addCodePreview.code).toBe("3-TR-0020"));
-    await act(async () => { result.current.addItem(); });
+    await act(async () => {
+      await expect(result.current.addItem()).rejects.toThrow("품목 코드가 변경됐습니다.");
+    });
     await waitFor(() => expect(args.onError).toHaveBeenCalled());
     expect(result.current.addMode).toBe(true);
     expect(result.current.addForm.item_name).toBe("draft");
     expect(result.current.addForm.initial_locations).toEqual([{ department: "창고", quantity: "5" }]);
     await waitFor(() => expect(mocks.getItemCodePreview).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(result.current.addCodePreview.code).toBe("3-TR-0021"));
-    await act(async () => { result.current.addItem(); });
+    await act(async () => { await result.current.addItem(); });
     await waitFor(() => expect(mocks.createItem).toHaveBeenLastCalledWith(expect.objectContaining({ expected_mes_code: "3-TR-0021" })));
   });
 });

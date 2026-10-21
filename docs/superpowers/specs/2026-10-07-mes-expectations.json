@@ -80922,8 +80922,8 @@
               "file": "frontend/app/mes/_components/_admin_sections/__tests__/AdminModelsSection.test.tsx",
               "selector": "API 모델 슬롯으로 여러 글자 기호의 연결 품목과 BOM 수를 집계한다",
               "assertion": "expect(screen.getByText(\"연결 품목 수\").parentElement).toHaveTextContent(\"1\");",
-              "sourceHash": "0767010380b2764377c86f43e8ad348ea9c48e8e8e966412214919d1838bcd8f",
-              "line": 49
+              "sourceHash": "012d82c9d56522e958232ccc6f4fd782b987f23bdb85920642445dda1d7c1507",
+              "line": 67
             },
             {
               "file": "frontend/tests/e2e/admin-expectations.spec.ts",
@@ -81190,6 +81190,13 @@
               "assertion": "expect((await saved).status()).toBe(200);",
               "sourceHash": "c1fcc61c52979b69f967c55cce170b03af46d2c5dbf0be00243fbae8c270c007",
               "line": 212
+            },
+            {
+              "file": "frontend/app/mes/_components/_admin_sections/__tests__/AdminModelsSection.test.tsx",
+              "selector": "API 모델 슬롯으로 여러 글자 기호의 연결 품목과 BOM 수를 집계한다",
+              "assertion": "expect(screen.getByText(\"연결 품목 수\").parentElement).toHaveTextContent(\"1\");",
+              "sourceHash": "0767010380b2764377c86f43e8ad348ea9c48e8e8e966412214919d1838bcd8f",
+              "line": 49
             }
           ]
         }
@@ -82227,24 +82234,24 @@
           "bindings": [
             {
               "file": "frontend/app/mes/_components/_admin_sections/__tests__/AdminMasterItemsSection.test.tsx",
-              "selector": "[8.19-04] 1050개 visibleItems의 KPI·상태 합·목록·끝행이 같은 모집단을 사용한다",
+              "selector": "[8.19-04] 1050개 visibleItems의 KPI와 가상 목록이 같은 모집단을 사용한다",
               "assertion": "expect(screen.getByText(\"전체 품목\").parentElement).toHaveTextContent(\"1050\");",
-              "sourceHash": "27fd7950a492a4e6d2744efd4aae3826dba98fce7b2bc811ada9a8884826275d",
-              "line": 154
+              "sourceHash": "529d8e44f0a0ea2266dbfa233f078b2611b13bf3b58d9d7f3678e3f64a4f4342",
+              "line": 171
             },
             {
               "file": "frontend/app/mes/_components/_admin_sections/__tests__/AdminMasterItemsSection.test.tsx",
-              "selector": "[8.19-04] 1050개 visibleItems의 KPI·상태 합·목록·끝행이 같은 모집단을 사용한다",
-              "assertion": "expect(within(grid).getAllByRole(\"row\")).toHaveLength(1051);",
-              "sourceHash": "27fd7950a492a4e6d2744efd4aae3826dba98fce7b2bc811ada9a8884826275d",
-              "line": 154
+              "selector": "[8.19-04] 1050개 visibleItems의 KPI와 가상 목록이 같은 모집단을 사용한다",
+              "assertion": "expect(grid).toHaveAttribute(\"aria-rowcount\", \"1051\");",
+              "sourceHash": "529d8e44f0a0ea2266dbfa233f078b2611b13bf3b58d9d7f3678e3f64a4f4342",
+              "line": 171
             },
             {
               "file": "frontend/app/mes/_components/_admin_sections/__tests__/AdminMasterItemsSection.test.tsx",
-              "selector": "[8.19-04] 1050개 visibleItems의 KPI·상태 합·목록·끝행이 같은 모집단을 사용한다",
+              "selector": "[8.19-04] 1050개 visibleItems의 KPI와 가상 목록이 같은 모집단을 사용한다",
               "assertion": "expect(within(grid).getByRole(\"row\", { name: /품목 1050/ })).toBeInTheDocument();",
-              "sourceHash": "27fd7950a492a4e6d2744efd4aae3826dba98fce7b2bc811ada9a8884826275d",
-              "line": 154
+              "sourceHash": "529d8e44f0a0ea2266dbfa233f078b2611b13bf3b58d9d7f3678e3f64a4f4342",
+              "line": 171
             }
           ],
           "execution": {
@@ -82341,6 +82348,27 @@
               "assertion": "expect(within(grid).getByRole(\"row\", { name: /품목 1050/ })).toBeInTheDocument();",
               "sourceHash": "037ac1b0671dfd7e96d51cb2e72fe57167bd1299280b9e29a948897da009e807",
               "line": 106
+            },
+            {
+              "file": "frontend/app/mes/_components/_admin_sections/__tests__/AdminMasterItemsSection.test.tsx",
+              "selector": "[8.19-04] 1050개 visibleItems의 KPI·상태 합·목록·끝행이 같은 모집단을 사용한다",
+              "assertion": "expect(screen.getByText(\"전체 품목\").parentElement).toHaveTextContent(\"1050\");",
+              "sourceHash": "27fd7950a492a4e6d2744efd4aae3826dba98fce7b2bc811ada9a8884826275d",
+              "line": 154
+            },
+            {
+              "file": "frontend/app/mes/_components/_admin_sections/__tests__/AdminMasterItemsSection.test.tsx",
+              "selector": "[8.19-04] 1050개 visibleItems의 KPI·상태 합·목록·끝행이 같은 모집단을 사용한다",
+              "assertion": "expect(within(grid).getAllByRole(\"row\")).toHaveLength(1051);",
+              "sourceHash": "27fd7950a492a4e6d2744efd4aae3826dba98fce7b2bc811ada9a8884826275d",
+              "line": 154
+            },
+            {
+              "file": "frontend/app/mes/_components/_admin_sections/__tests__/AdminMasterItemsSection.test.tsx",
+              "selector": "[8.19-04] 1050개 visibleItems의 KPI·상태 합·목록·끝행이 같은 모집단을 사용한다",
+              "assertion": "expect(within(grid).getByRole(\"row\", { name: /품목 1050/ })).toBeInTheDocument();",
+              "sourceHash": "27fd7950a492a4e6d2744efd4aae3826dba98fce7b2bc811ada9a8884826275d",
+              "line": 154
             }
           ]
         },
@@ -88467,8 +88495,8 @@
               "file": "frontend/app/mes/_components/_admin_hooks/__tests__/useAdminEmployeesForm.test.tsx",
               "selector": "직원 재조회 결과에서 삭제 모델을 제거하고 남은 담당 모델 순서로 선택 폼을 갱신한다",
               "assertion": "expect(result.current.editForm.assigned_model_slots).toEqual([3, 1]);",
-              "sourceHash": "6b269a14b9a9c6f47aaaca77b0223755eac3326696d304ef802eb8d1aa1101f8",
-              "line": 43
+              "sourceHash": "1914f0b9fbb1e414504a6cc92f2a54cd515ffdd88a047e6288ff9e8e9694a7c6",
+              "line": 57
             }
           ],
           "execution": {
@@ -88553,7 +88581,14 @@
                 "sourceHash": "dd9b07e9e041f3326a2fd16a960228d243308d9f778325f396fd3fa3cb1bbec8",
                 "line": 43
               }
-            ]
+            ],
+            {
+              "file": "frontend/app/mes/_components/_admin_hooks/__tests__/useAdminEmployeesForm.test.tsx",
+              "selector": "직원 재조회 결과에서 삭제 모델을 제거하고 남은 담당 모델 순서로 선택 폼을 갱신한다",
+              "assertion": "expect(result.current.editForm.assigned_model_slots).toEqual([3, 1]);",
+              "sourceHash": "6b269a14b9a9c6f47aaaca77b0223755eac3326696d304ef802eb8d1aa1101f8",
+              "line": 43
+            }
           ]
         },
         {
@@ -91797,8 +91832,8 @@
               "file": "frontend/app/mes/_components/_admin_sections/_bom_workbench/__tests__/BomWorkbench.test.tsx",
               "selector": "closes a stale draft when another tab completes the BOM and shows the locked server composition",
               "assertion": "expect(save).not.toHaveBeenCalled();",
-              "sourceHash": "4131516937f1e1cd7492942f8aeef9cb90aa52749da000956753f57625b60039",
-              "line": 142
+              "sourceHash": "be2b4a4c1b656c206787444c6b9828186efcac6647311a7e03d0e9afaeb148b6",
+              "line": 223
             }
           ],
           "execution": {
@@ -91979,6 +92014,13 @@
               "assertion": "await expect(childRow(other, children[0].item_name).getByRole(\"spinbutton\")).toHaveCount(0);",
               "sourceHash": "ce69fec0098dbe4792da584f596c77c1f22d06411aefd9cdd163c6c1a2a19622",
               "line": 88
+            },
+            {
+              "file": "frontend/app/mes/_components/_admin_sections/_bom_workbench/__tests__/BomWorkbench.test.tsx",
+              "selector": "closes a stale draft when another tab completes the BOM and shows the locked server composition",
+              "assertion": "expect(save).not.toHaveBeenCalled();",
+              "sourceHash": "4131516937f1e1cd7492942f8aeef9cb90aa52749da000956753f57625b60039",
+              "line": 142
             },
             {
               "file": "frontend/app/mes/_components/_admin_sections/_bom_workbench/__tests__/BomWorkbench.test.tsx",
@@ -171833,8 +171875,8 @@
               "file": "frontend/app/mes/_components/_history_sections/__tests__/HistoryDetailPanels.test.tsx",
               "selector": "aborts a prior edit request and ignores its late response after the selected log changes",
               "assertion": "expect(screen.queryByText(\"First editor\")).not.toBeInTheDocument();",
-              "sourceHash": "cc618accd1ac7c31440f1cf378ad0de86caf90799cd2cfbbc56b822dc40359d2",
-              "line": 767
+              "sourceHash": "dfead143f16fe7e50a9f8dbaf03bcd4c4fede5c8524e7d8be7a562562fd71e8d",
+              "line": 780
             }
           ],
           "execution": {
@@ -171926,6 +171968,13 @@
               "assertion": "expect(screen.queryByText(\"First editor\")).not.toBeInTheDocument();",
               "sourceHash": "aba25aee42ab87626547145186c48c3d3c8d9cd2dc12a64469c9fdfa04a0532c",
               "line": 736
+            },
+            {
+              "file": "frontend/app/mes/_components/_history_sections/__tests__/HistoryDetailPanels.test.tsx",
+              "selector": "aborts a prior edit request and ignores its late response after the selected log changes",
+              "assertion": "expect(screen.queryByText(\"First editor\")).not.toBeInTheDocument();",
+              "sourceHash": "cc618accd1ac7c31440f1cf378ad0de86caf90799cd2cfbbc56b822dc40359d2",
+              "line": 767
             }
           ]
         }
@@ -187328,8 +187377,8 @@
               "file": "frontend/app/mes/_components/_admin_sections/_bom_workbench/__tests__/BomWorkbench.test.tsx",
               "selector": "saves an unmatched raw disposition, disables only its three controls, then refreshes items",
               "assertion": "expect(screen.getByRole(\"checkbox\", { name: \"Unmatched raw (RAW-001) 보류\" })).toBeChecked();",
-              "sourceHash": "4131516937f1e1cd7492942f8aeef9cb90aa52749da000956753f57625b60039",
-              "line": 350
+              "sourceHash": "be2b4a4c1b656c206787444c6b9828186efcac6647311a7e03d0e9afaeb148b6",
+              "line": 434
             },
             {
               "file": "frontend/tests/e2e/admin-bom-status.spec.ts",
@@ -187636,6 +187685,13 @@
               "assertion": "await expect(status(\"중복\")).toBeChecked();",
               "sourceHash": "82ad67e9ac90315811d9f45e8df0ba3a6ae0a1637f5edf87acf7bd58d5968e84",
               "line": 26
+            },
+            {
+              "file": "frontend/app/mes/_components/_admin_sections/_bom_workbench/__tests__/BomWorkbench.test.tsx",
+              "selector": "saves an unmatched raw disposition, disables only its three controls, then refreshes items",
+              "assertion": "expect(screen.getByRole(\"checkbox\", { name: \"Unmatched raw (RAW-001) 보류\" })).toBeChecked();",
+              "sourceHash": "4131516937f1e1cd7492942f8aeef9cb90aa52749da000956753f57625b60039",
+              "line": 350
             }
           ]
         }

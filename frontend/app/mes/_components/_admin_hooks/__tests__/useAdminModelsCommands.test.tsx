@@ -31,6 +31,13 @@ const baseArgs = (over: Partial<Parameters<typeof useAdminModelsCommands>[0]> = 
 });
 
 describe("useAdminModelsCommands", () => {
+  it("keeps the add draft and rejects when creation fails", async () => {
+    const { result } = renderHook(() => useAdminModelsCommands(baseArgs()), { wrapper });
+    act(() => result.current.setModelAddName("draft"));
+    createMutate.mockImplementation((_payload, options) => options.onError(new Error("offline")));
+    await act(async () => { await expect(result.current.add()).rejects.toThrow("offline"); });
+    expect(result.current.modelAddName).toBe("draft");
+  });
   beforeEach(() => {
     createMutate.mockReset();
     deleteMutate.mockReset();
@@ -43,10 +50,10 @@ describe("useAdminModelsCommands", () => {
     expect(result.current.modelAddSymbol).toBe("");
   });
 
-  it("add — 이름 비어있으면 mutate 호출 안 함", () => {
+  it("add — 이름 비어있으면 mutate 호출 안 함", async () => {
     const { result } = renderHook(() => useAdminModelsCommands(baseArgs()), { wrapper });
-    act(() => {
-      result.current.add();
+    await act(async () => {
+      await result.current.add();
     });
     expect(createMutate).not.toHaveBeenCalled();
   });
@@ -90,7 +97,7 @@ describe("useAdminModelsCommands", () => {
     const { result } = renderHook(() => useAdminModelsCommands(args), { wrapper });
     vi.spyOn(window, "confirm").mockReturnValueOnce(true);
 
-    act(() => result.current.delete(7));
+    act(() => { void result.current.delete(7); });
     expect(deleteMutate).toHaveBeenCalledTimes(1);
     await act(async () => { await deleteMutate.mock.calls[0]![1].onSuccess(); });
 
@@ -107,20 +114,24 @@ describe("useAdminModelsCommands", () => {
     const { result } = renderHook(() => useAdminModelsCommands(args), { wrapper });
     vi.spyOn(window, "confirm").mockReturnValueOnce(true);
 
-    act(() => result.current.delete(7));
+    act(() => { void result.current.delete(7); });
     await act(async () => { await deleteMutate.mock.calls[0]![1].onSuccess(); });
 
     expect(args.onStatusChange).toHaveBeenCalledWith("'QA' 모델을 삭제했습니다.");
     expect(args.onError).toHaveBeenCalledWith(expect.stringContaining("직원 API 오류"));
   });
 
-  it("모델 삭제 실패 시 직원 목록을 재조회하지 않는다", () => {
+  it("모델 삭제 실패 시 직원 목록을 재조회하지 않는다", async () => {
     const args = baseArgs({ productModels: [{ slot: 7, model_name: "QA", symbol: "QA" } as any] });
     const { result } = renderHook(() => useAdminModelsCommands(args), { wrapper });
     vi.spyOn(window, "confirm").mockReturnValueOnce(true);
 
-    act(() => result.current.delete(7));
-    act(() => deleteMutate.mock.calls[0]![1].onError(new Error("409")));
+    let task!: Promise<void>;
+    act(() => { task = result.current.delete(7); });
+    await act(async () => {
+      deleteMutate.mock.calls[0]![1].onError(new Error("409"));
+      await expect(task).rejects.toThrow("409");
+    });
 
     expect(args.refreshEmployees).not.toHaveBeenCalled();
     expect(args.setProductModels).not.toHaveBeenCalled();

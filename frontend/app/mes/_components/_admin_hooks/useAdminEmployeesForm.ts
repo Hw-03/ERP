@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DepartmentRole, Employee, WarehouseRole } from "@/lib/api";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "../_admin_sections/adminShared";
 import { normalizeEmployeePosition } from "../_admin_sections/_employee_parts/employeeRoleLabels";
+import { useAdminSessionState } from "./useAdminSessionState";
 
 /**
  * Round-15 (#2) 추출 — useAdminEmployees 의 form/selection 부분.
@@ -54,16 +55,25 @@ function toEditForm(emp: Employee): EmployeeEditForm {
 }
 
 export function useAdminEmployeesForm(employees: Employee[]) {
-  const [selectedEmployee, setSelection] = useState<Employee | null>(null);
+  const [selectedId, setSelectedId] = useAdminSessionState<string | null>("employees.selection", null);
+  const [selectedEmployee, setSelection] = useState<Employee | null>(() => employees.find((employee) => employee.employee_id === selectedId) ?? null);
   const [empAddMode, setEmpAddMode] = useState(false);
   const [empAddForm, setEmpAddForm] = useState<EmployeeAddForm>(EMPTY_EMPLOYEE_FORM);
-  const [editForm, setEditForm] = useState<EmployeeEditForm>(EMPTY_EDIT_FORM);
+  const [editForm, setEditForm] = useState<EmployeeEditForm>(() => selectedEmployee ? toEditForm(selectedEmployee) : EMPTY_EDIT_FORM);
 
   // 명시적 선택과 저장 응답은 새 편집 기준으로 사용한다.
   const setSelectedEmployee = useCallback((employee: Employee | null) => {
+    setSelectedId(employee?.employee_id ?? null);
     setSelection(employee);
     setEditForm(employee ? toEditForm(employee) : EMPTY_EDIT_FORM);
-  }, []);
+  }, [setSelectedId]);
+
+  useEffect(() => {
+    if (!selectedEmployee && selectedId) {
+      const restored = employees.find((employee) => employee.employee_id === selectedId);
+      if (restored) setSelectedEmployee(restored);
+    }
+  }, [employees, selectedId, selectedEmployee, setSelectedEmployee]);
 
   // 외부 employees 변경 시 selectedEmployee 동기화
   useEffect(() => {
@@ -108,12 +118,10 @@ export function useAdminEmployeesForm(employees: Employee[]) {
     if (orig.warehouse_role !== editForm.warehouse_role) return true;
     if (orig.department_role !== editForm.department_role) return true;
     if (orig.as_research_approver !== editForm.as_research_approver) return true;
-    const hiddenA = orig.hidden_sidebar_tabs;
-    const hiddenB = editForm.hidden_sidebar_tabs;
-    if (hiddenA.length !== hiddenB.length) return true;
-    for (let i = 0; i < hiddenA.length; i += 1) {
-      if (hiddenA[i] !== hiddenB[i]) return true;
-    }
+    const hiddenA = new Set(orig.hidden_sidebar_tabs);
+    const hiddenB = new Set(editForm.hidden_sidebar_tabs);
+    if (hiddenA.size !== hiddenB.size) return true;
+    if ([...hiddenA].some((tab) => !hiddenB.has(tab))) return true;
     const a = orig.assigned_model_slots;
     const b = editForm.assigned_model_slots;
     if (a.length !== b.length) return true;

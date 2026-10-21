@@ -14,6 +14,7 @@ import {
 import { queryKeys } from "@/lib/queries/keys";
 import { itemsApi } from "@/lib/api/items";
 import { EMPTY_ADD_FORM, type AddForm } from "../_admin_sections/adminShared";
+import { useAdminSave } from "./useAdminSave";
 import {
   normalizeStandardPurchasePrice,
   validateStockPurchaseValues,
@@ -33,7 +34,8 @@ export type UseAdminMasterItemsCommandsState = {
   setAddMode: (v: boolean) => void;
   addForm: AddForm;
   setAddForm: (updater: (f: AddForm) => AddForm) => void;
-  add: (expectedCode?: string, onConflict?: () => void) => void;
+  add: (expectedCode?: string, onConflict?: () => void) => Promise<void>;
+  adding: boolean;
   reorder: (ordered: Item[]) => void;
   deleteItem: (itemId: string) => Promise<void>;
   restoreItem: (itemId: string) => Promise<void>;
@@ -48,6 +50,9 @@ export function useAdminMasterItemsCommands({
   adminPin,
 }: UseAdminMasterItemsCommandsArgs): UseAdminMasterItemsCommandsState {
   const queryClient = useQueryClient();
+  const addTask = useAdminSave();
+  const deleteTask = useAdminSave();
+  const restoreTask = useAdminSave();
   const [addMode, setAddMode] = useState(false);
   const [addForm, setAddForm] = useState<AddForm>(EMPTY_ADD_FORM);
   const createMutation = useCreateItemMutation();
@@ -56,21 +61,21 @@ export function useAdminMasterItemsCommands({
   async function _add(expectedCode?: string, onConflict?: () => void): Promise<void> {
     if (!addForm.item_name.trim()) {
       onError("품목명을 입력하세요.");
-      return;
+      throw new Error("품목명을 입력하세요.");
     }
     if (addForm.model_slots.length === 0) {
       onError("사용 제품을 하나 이상 선택하세요.");
-      return;
+      throw new Error("사용 제품을 하나 이상 선택하세요.");
     }
     const allLocs = addForm.initial_locations ?? [];
     if (!allLocs.some((row) => row.department && row.quantity.trim() !== "")) {
       onError("초기 재고 위치와 수량을 입력하세요.");
-      return;
+      throw new Error("초기 재고 위치와 수량을 입력하세요.");
     }
     const stockPurchaseError = validateStockPurchaseValues(addForm);
     if (stockPurchaseError) {
       onError(stockPurchaseError);
-      return;
+      throw new Error(stockPurchaseError);
     }
     const standardPurchasePrice = normalizeStandardPurchasePrice(addForm.standard_purchase_price);
     try {
@@ -107,6 +112,7 @@ export function useAdminMasterItemsCommands({
     } catch (error) {
       onError(error instanceof Error ? error.message : "품목 추가에 실패했습니다.");
       if (error && typeof error === "object" && "status" in error && error.status === 409) onConflict?.();
+      throw error;
     }
   }
 
@@ -135,6 +141,7 @@ export function useAdminMasterItemsCommands({
       void queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
     } catch (err) {
       onError(err instanceof Error ? err.message : "품목 삭제에 실패했습니다.");
+      throw err;
     }
   }
 
@@ -147,6 +154,7 @@ export function useAdminMasterItemsCommands({
       void queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
     } catch (err) {
       onError(err instanceof Error ? err.message : "품목 복구에 실패했습니다.");
+      throw err;
     }
   }
 
@@ -155,9 +163,10 @@ export function useAdminMasterItemsCommands({
     setAddMode,
     addForm,
     setAddForm,
-    add: (expectedCode, onConflict) => void _add(expectedCode, onConflict),
+    add: (expectedCode, onConflict) => addTask.run(() => _add(expectedCode, onConflict)),
+    adding: addTask.saving,
     reorder,
-    deleteItem,
-    restoreItem,
+    deleteItem: (id) => deleteTask.run(() => deleteItem(id)),
+    restoreItem: (id) => restoreTask.run(() => restoreItem(id)),
   };
 }

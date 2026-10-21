@@ -25,8 +25,10 @@ export type AdminModelsState = {
   setModelAddName: (v: string) => void;
   modelAddSymbol: string;
   setModelAddSymbol: (v: string) => void;
-  addModel: () => void;
-  deleteModel: (slot: number) => void;
+  addModel: () => Promise<void>;
+  adding: boolean;
+  deleteModel: (slot: number) => Promise<void>;
+  deleting: boolean;
   // 인라인 편집
   editForm: import("./useAdminModelsForm").ModelEditForm;
   setEditForm: (
@@ -35,7 +37,7 @@ export type AdminModelsState = {
   editDirty: boolean;
   editSaving: boolean;
   initEditForm: (model: ProductModel) => void;
-  saveModel: (slot: number) => void;
+  saveModel: (slot: number) => Promise<void>;
   reorderModels: (ordered: ProductModel[]) => void;
 };
 
@@ -65,7 +67,9 @@ export function useAdminModels({
     modelAddSymbol: commands.modelAddSymbol,
     setModelAddSymbol: commands.setModelAddSymbol,
     addModel: commands.add,
+    adding: commands.adding,
     deleteModel: commands.delete,
+    deleting: commands.deleting,
     editForm: form.form,
     setEditForm: form.setForm,
     editDirty: form.dirty,

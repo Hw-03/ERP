@@ -2,7 +2,7 @@ import Image from "next/image";
 import { DirectionCard } from "./IoWorkTypeStep";
 import type { IoSubType } from "./types";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { tint } from "@/lib/mes/colorUtils";
+import { ioSelectionStyle } from "./ioVisualTheme";
 import presentation from "../mobile/mobilePresentation.module.css";
 
 export function MaterialDirectionStep({ selected, onSelect, mobilePresentation = false, tube = false }: {
@@ -29,12 +29,7 @@ export function MaterialDirectionStep({ selected, onSelect, mobilePresentation =
               aria-pressed={active}
               onClick={() => onSelect(subType)}
               className={`${presentation.directionChoice} ${presentation.illustratedChoice}`}
-              style={{
-                background: tint(color, active ? 16 : 7),
-                borderColor: active ? color : tint(color, 25),
-                borderWidth: active ? 2 : 1,
-                color: active ? color : LEGACY_COLORS.text,
-              }}
+              style={ioSelectionStyle(color, active)}
             >
               <span>{label}</span>
               <Image

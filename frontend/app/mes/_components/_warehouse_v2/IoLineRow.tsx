@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Check, ChevronDown, ChevronRight, MapPin, MinusCircle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
+import { ioDirectionTone } from "./ioVisualTheme";
 import { getStockState } from "@/lib/mes/inventory";
 import type { IoLine, IoSubType, Item } from "./types";
 import { isWarehouseAdjustSubType } from "./ioWorkType";
@@ -83,7 +84,7 @@ export function IoLineRow({
 }: Props) {
   const [showChildren, setShowChildren] = useState(false);
   const isInternalUse = subType === "internal_use_out";
-  const selectionColor = (subType === "outbound_supplier" || subType === "tube_outbound_supplier") ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
+  const selectionColor = ioDirectionTone(subType);
   const hasInventoryEffectOverride = inventoryEffect !== undefined;
   const effectLine = inventoryEffect ?? line;
   const noInventoryEffect = hasInventoryEffectOverride && inventoryEffect === null;

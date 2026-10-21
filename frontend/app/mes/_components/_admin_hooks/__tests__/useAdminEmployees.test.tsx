@@ -41,7 +41,10 @@ describe("직원 편집 저장 계약", () => {
     }, { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
     act(() => result.current.setSelectedEmployee(employee));
     act(() => result.current.setEditForm((current) => ({ ...current, department_role: "primary" })));
-    await act(async () => result.current.saveEmployee());
+    await act(async () => {
+      if (mode === "failure") await expect(result.current.saveEmployee()).rejects.toThrow("저장 실패");
+      else await result.current.saveEmployee();
+    });
     expect(readCurrentOperator()?.department_role).toBe(mode === "self" ? "primary" : "none");
     if (mode === "failure") expect(invalidate).not.toHaveBeenCalled();
     else expect(invalidate).toHaveBeenCalledWith({ queryKey: ["employees"] });

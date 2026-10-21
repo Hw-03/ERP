@@ -1,8 +1,21 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ConfirmModal } from "../ConfirmModal";
 
 describe("확인 팝업 키보드 동작", () => {
+  it("moves focus inside a newly mounted open dialog and restores it on unmount", async () => {
+    const trigger = document.createElement("button");
+    document.body.append(trigger);
+    trigger.focus();
+    const { unmount } = render(
+      <ConfirmModal open viewer title="처리 확인" onClose={vi.fn()} />,
+    );
+    await waitFor(() => expect(screen.getByRole("dialog").contains(document.activeElement)).toBe(true));
+    unmount();
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
+
   it("취소 버튼의 Enter는 전역 확인을 실행하지 않는다", () => {
     const confirm = vi.fn();
     const close = vi.fn();

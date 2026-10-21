@@ -12,6 +12,7 @@ import { useRefreshDepartments } from "../../DepartmentsContext";
 import { deptColor, TAILWIND_PALETTE } from "./departmentColors";
 import { DetailCardSlot, MetaCell } from "./departmentDetailPrimitives";
 import styles from "../AdminDepartmentsSection.module.css";
+import { useAdminSave } from "../../_admin_hooks/useAdminSave";
 
 interface DeptDetailViewProps {
   dept: DepartmentMaster;
@@ -24,10 +25,12 @@ interface DeptDetailViewProps {
   setSelectedDept: (d: DepartmentMaster | null) => void;
   onStatusChange: (msg: string) => void;
   onError: (msg: string) => void;
-  onToggleActive: () => void;
+  onToggleActive: () => Promise<void>;
+  toggling?: boolean;
   onRequestDelete: () => void;
-  onSaveRef?: (fn: (() => void) | null) => void;
+  onSaveRef?: (fn: (() => Promise<void>) | null) => void;
   onDirtyChange?: (dirty: boolean) => void;
+  onSavingChange?: (saving: boolean) => void;
 }
 
 export function DeptDetailView({
@@ -42,9 +45,11 @@ export function DeptDetailView({
   onStatusChange,
   onError,
   onToggleActive,
+  toggling = false,
   onRequestDelete,
   onSaveRef,
   onDirtyChange,
+  onSavingChange,
 }: DeptDetailViewProps) {
   const savedColor = deptColor(dept);
   const [editForm, setEditForm] = useState({
@@ -55,6 +60,8 @@ export function DeptDetailView({
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [toggleConfirmOpen, setToggleConfirmOpen] = useState(false);
   const refreshDepartments = useRefreshDepartments();
+  const saveTask = useAdminSave();
+  useEffect(() => { onSavingChange?.(saveTask.saving); }, [onSavingChange, saveTask.saving]);
   const normalizedDepartment = normalizeDepartment(dept.name);
   const isProcessMappedDepartment = Object.values(PROCESS_TO_DEPT).some(
     (name) => name === normalizedDepartment,
@@ -80,8 +87,15 @@ export function DeptDetailView({
     onDirtyChange?.(dirty);
   }, [dirty, onDirtyChange]);
 
-  function save() {
-    void api
+  function save(): Promise<void> {
+    return saveTask.run(async () => {
+      const error = !editForm.name.trim() ? "부서명을 입력하세요."
+        : !/^#[0-9a-fA-F]{6}$/.test(editForm.color_hex) ? "올바른 색상 코드를 입력하세요." : null;
+      if (error) {
+        onError(error);
+        throw new Error(error);
+      }
+      await api
       .updateDepartment(dept.id, {
         display_name: editForm.name.trim() || dept.display_name || dept.name,
         color_hex: editForm.color_hex,
@@ -93,9 +107,11 @@ export function DeptDetailView({
         onStatusChange(`'${updated.display_name ?? updated.name}' 부서 정보를 저장했습니다.`);
         void refreshDepartments();
       })
-      .catch((err: unknown) =>
-        onError(err instanceof Error ? err.message : "저장 실패"),
-      );
+      .catch((err: unknown) => {
+        onError(err instanceof Error ? err.message : "저장 실패");
+        throw err;
+      });
+    });
   }
 
   // 저장 함수 ref 노출 (부모가 헤더 버튼에서 호출)
@@ -111,7 +127,7 @@ export function DeptDetailView({
   const colorChanged = isValidHex && previewColor.toLowerCase() !== savedColor.toLowerCase();
 
   return (
-    <div className="flex min-h-full flex-col gap-3">
+    <fieldset disabled={saveTask.saving} className={`flex min-h-full min-w-0 flex-col gap-3 ${styles.detailLayout}`}>
       {/* 메타 그리드 */}
       <div className={styles.detailHeader}>
         <div className={styles.metaGrid}>
@@ -142,15 +158,46 @@ export function DeptDetailView({
         품목 코드 공정 기준{!isProcessMappedDepartment ? " · 공정 코드 매핑 없음" : ""}
       </p>
 
-      {/* 색상 변경 */}
+      {/* 소속 직원과 색상 설정 */}
+      <div className={styles.detailCards}>
+      <DetailCardSlot
+        title={`소속 직원 (${deptEmployees.length}명)`}
+        icon={<Users />}
+        className="min-h-0 flex-1"
+      >
+        {deptEmployees.length === 0 ? (
+          <div className="text-[14px]" style={{ color: LEGACY_COLORS.muted2 }}>
+            소속된 직원이 없습니다.
+          </div>
+        ) : (
+          <div className={styles.employees}>
+            {deptEmployees.map((e) => (
+              <div key={e.employee_id} className={`flex items-center gap-2 text-[14px] ${styles.employee}`}>
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ background: e.is_active ? LEGACY_COLORS.green : LEGACY_COLORS.muted2 }}
+                />
+                <span className="font-bold" style={{ color: LEGACY_COLORS.text }}>
+                  {e.name}
+                </span>
+                {e.role && (
+                  <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                    {e.role}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </DetailCardSlot>
       <DetailCardSlot
         title="색상"
         icon={<Palette />}
         className="min-h-0 flex-1"
       >
-        <div className="flex flex-col gap-3">
+        <div className={styles.colorBody}>
           {/* 미리보기 + 텍스트 입력 */}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex shrink-0 flex-wrap items-center gap-3">
             <div
               className="h-9 w-9 shrink-0 rounded-full border-2"
               style={{ background: savedColor, borderColor: LEGACY_COLORS.border }}
@@ -206,13 +253,13 @@ export function DeptDetailView({
               />
             </div>
           </div>
-          <div>
+          <div className={styles.colorPalette}>
             <button
               type="button"
               aria-expanded={isPaletteOpen}
               aria-controls="department-color-palette"
               onClick={() => setIsPaletteOpen((open) => !open)}
-              className="standard-hover flex h-11 w-full items-center justify-between rounded-[12px] border px-3 text-[14px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30"
+              className="standard-hover flex h-11 w-full shrink-0 items-center justify-between rounded-[12px] border px-3 text-[14px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30"
               style={{
                 background: isPaletteOpen
                   ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`
@@ -256,43 +303,7 @@ export function DeptDetailView({
           </div>
         </div>
       </DetailCardSlot>
-
-      {/* 소속 직원 미리보기 */}
-      <DetailCardSlot
-        title={`소속 직원 (${deptEmployees.length}명)`}
-        icon={<Users />}
-        className="min-h-0 flex-1"
-      >
-        {deptEmployees.length === 0 ? (
-          <div className="text-[14px]" style={{ color: LEGACY_COLORS.muted2 }}>
-            소속된 직원이 없습니다.
-          </div>
-        ) : (
-          <div className={styles.employees}>
-            {deptEmployees.slice(0, 5).map((e) => (
-              <div key={e.employee_id} className={`flex items-center gap-2 text-[14px] ${styles.employee}`}>
-                <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ background: e.is_active ? LEGACY_COLORS.green : LEGACY_COLORS.muted2 }}
-                />
-                <span className="font-bold" style={{ color: LEGACY_COLORS.text }}>
-                  {e.name}
-                </span>
-                {e.role && (
-                  <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                    {e.role}
-                  </span>
-                )}
-              </div>
-            ))}
-            {deptEmployees.length > 5 && (
-              <div className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                외 {deptEmployees.length - 5}명 더보기
-              </div>
-            )}
-          </div>
-        )}
-      </DetailCardSlot>
+      </div>
 
       {/* 액션 */}
       <div className={`mt-auto flex gap-2 ${styles.dangerActions}`}>
@@ -302,9 +313,10 @@ export function DeptDetailView({
             if (dept.is_active) {
               setToggleConfirmOpen(true);
             } else {
-              onToggleActive();
+              void onToggleActive().catch(() => {});
             }
           }}
+          disabled={toggling}
           className="standard-hover flex-1 rounded-[10px] border px-3 py-2 text-[12px] font-bold transition-colors"
           style={{
             background: dept.is_active
@@ -339,8 +351,9 @@ export function DeptDetailView({
         tone="caution"
         confirmLabel="비활성화"
         onClose={() => setToggleConfirmOpen(false)}
-        onConfirm={() => { setToggleConfirmOpen(false); onToggleActive(); }}
+        busy={toggling}
+        onConfirm={() => onToggleActive().then(() => setToggleConfirmOpen(false)).catch(() => {})}
       />
-    </div>
+    </fieldset>
   );
 }

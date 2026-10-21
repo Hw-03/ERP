@@ -99,6 +99,7 @@ export function DesktopSidebar({
               style={{ width: 54, height: "auto" }}
               className="object-contain"
               priority
+              unoptimized
             />
           </div>
           {/* 확장 상태: 큰 로고 */}
@@ -119,6 +120,7 @@ export function DesktopSidebar({
               style={{ width: 168, height: "auto" }}
               className="object-contain"
               priority
+              unoptimized
             />
           </div>
         </div>

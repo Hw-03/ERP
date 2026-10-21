@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { ArrowLeft, ScanLine } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { ioDirectionTone, ioSurfaceStyle } from "../../_warehouse_v2/ioVisualTheme";
 import { tint } from "@/lib/mes/colorUtils";
 import { WORK_TYPE_LABEL } from "@/lib/io/glossary";
 import {
@@ -156,7 +157,12 @@ export function MobileIoComposeWizard({
   const state = useIoWorkState(defaultWorkType, operator?.department, getAvailable);
   const itemAddBlocked = state.workType !== "tube_material" && (bomListQuery.isPending || bomListQuery.isError);
   const materialOutbound = isMaterialWorkType(state.workType) && state.materialDirectionSelected && (state.subType === "outbound_supplier" || state.subType === "tube_outbound_supplier");
-  const directionOutbound = materialOutbound || (["process", "warehouse_io", "warehouse_adjust"].includes(state.workType) && state.deptIoDirection === "out");
+  const directionSelected = isMaterialWorkType(state.workType)
+    ? state.materialDirectionSelected
+    : isExitWorkType(state.workType) || state.deptIoDirection !== null;
+  const accent = directionSelected ? ioDirectionTone(state.subType) : LEGACY_COLORS.blue;
+  const directionOutbound = accent === LEGACY_COLORS.red;
+  const surfaceTone = state.step > 1 && directionSelected ? accent : undefined;
   const authorizedEntryIntent = entryIntent
     && IO_WORK_TYPES.some((row) => row.id === entryIntent.workType)
     && canSeeWorkType(entryIntent.workType, operator)
@@ -693,12 +699,12 @@ export function MobileIoComposeWizard({
       : "최종 확인";
 
   return (
-    <div className={`flex h-full min-h-0 flex-1 flex-col ${panelStyles.touchScope} ${panelStyles.composeScope}`} style={{ background: LEGACY_COLORS.bg }}>
+    <div className={`flex h-full min-h-0 flex-1 flex-col ${panelStyles.touchScope} ${panelStyles.composeScope}`} style={{ background: surfaceTone ? tint(surfaceTone, 3, LEGACY_COLORS.s1) : LEGACY_COLORS.bg }}>
       {/* 진행 안내는 본문 밖에 두어 스크롤 중에도 현재 단계를 유지한다. */}
       {step > 1 && (
         <div
           className="z-10 mx-3 flex min-h-10 shrink-0 items-center gap-2 rounded-[12px] border px-3 py-2 [@media(max-height:500px)]:py-1"
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+          style={ioSurfaceStyle(surfaceTone)}
         >
           <IconButton icon={ArrowLeft} label="이전 단계" size="md" onClick={state.goPrev} />
           <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -714,7 +720,7 @@ export function MobileIoComposeWizard({
               steps={isMaterialWorkType(state.workType) ? [{ key: "1", label: "작업 유형" }, { key: "6", label: "입고·출고" }, { key: "2", label: "공급업체" }, ...STEP_META.slice(2)] : STEP_META}
               current={state.steps.indexOf(step)}
               variant="inline"
-              accent={directionOutbound ? LEGACY_COLORS.red : undefined}
+              accent={surfaceTone}
               className="flex-1"
             />
           </div>

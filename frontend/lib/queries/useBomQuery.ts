@@ -81,21 +81,22 @@ function shouldRetryBomList(error: unknown): boolean {
 }
 
 /** parentId 없음: getAllBOM (BOMDetailEntry[]) */
-export function useBomListQuery() {
+export function useBomListQuery(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.bom.list(),
     queryFn: ({ signal }) => fetchBomList(signal),
+    enabled: options?.enabled,
     retry: (failureCount, error) => failureCount < 1 && shouldRetryBomList(error),
     retryDelay: () => BOM_LIST_RETRY_DELAY_MS,
   });
 }
 
 /** parentId 지정: getBOM (BOMEntry[]) */
-export function useBomQuery(parentId: string) {
+export function useBomQuery(parentId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.bom.detail(parentId),
-    queryFn: () => catalogApi.getBOM(parentId),
-    enabled: Boolean(parentId),
+    queryFn: ({ signal }) => catalogApi.getBOM(parentId, signal),
+    enabled: Boolean(parentId) && options?.enabled !== false,
   });
 }
 
@@ -107,11 +108,11 @@ export function useBomTreeQuery(parentId: string) {
   });
 }
 
-export function useBomWhereUsedQuery(itemId: string) {
+export function useBomWhereUsedQuery(itemId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.bom.whereUsed(itemId),
-    queryFn: () => catalogApi.getBOMWhereUsed(itemId),
-    enabled: Boolean(itemId),
+    queryFn: ({ signal }) => catalogApi.getBOMWhereUsed(itemId, signal),
+    enabled: Boolean(itemId) && options?.enabled !== false,
   });
 }
 

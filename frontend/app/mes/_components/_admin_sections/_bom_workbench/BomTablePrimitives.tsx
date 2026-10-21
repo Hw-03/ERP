@@ -6,6 +6,7 @@ import {
   type CSSProperties,
   type DOMAttributes,
   type ReactNode,
+  type ReactElement,
   type RefObject,
 } from "react";
 import type { Item } from "@/lib/api";
@@ -13,6 +14,7 @@ import { Tooltip } from "@/lib/ui";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { BomBadge } from "./BomBadge";
 import listPerformance from "../AdminListPerformance.module.css";
+import type { StageLetter } from "./bomDept";
 
 export const BOM_EDIT_LIST_GRID_TEMPLATE = "40px minmax(0, 1fr) clamp(78px, 5.75vw, 110px) 64px";
 export const BOM_CURRENT_ROW_GRID_TEMPLATE = "40px minmax(0, 1fr) clamp(78px, 5.75vw, 110px) 72px 28px";
@@ -20,6 +22,44 @@ export const BOM_WHERE_USED_ROW_GRID_TEMPLATE = "40px minmax(0, 1fr) clamp(78px,
 export const BOM_SEARCH_BAR_CLASS_NAME = "flex h-12 shrink-0 items-center gap-3 px-4";
 export const BOM_FILTER_BAR_CLASS_NAME = "flex h-10 shrink-0 items-center border-b border-[var(--c-border)] px-4";
 export const BOM_ROW_SURFACE_CLASS_NAME = "grid h-[37px] items-center gap-2 border-b px-3 transition-colors duration-150 hover:bg-[var(--c-s4)]";
+
+/** 검색·필터 영역은 로딩 중에도 실제 버튼과 같은 폭을 예약한다. */
+export function BomStageFilters({ value, onChange, includeRaw = false, disabled = false, label = "단계 필터" }: {
+  value: "ALL" | StageLetter;
+  onChange: (value: "ALL" | StageLetter) => void;
+  includeRaw?: boolean;
+  disabled?: boolean;
+  label?: string;
+}): ReactElement {
+  const filters: { id: "ALL" | StageLetter; label: string }[] = [
+    { id: "ALL", label: "전체" }, ...(includeRaw ? [{ id: "R" as const, label: "원자재" }] : []),
+    { id: "A", label: "중간공정" }, { id: "F", label: "공정완료" },
+  ];
+  return <div role="group" aria-label={label} className="flex shrink-0 gap-1.5">
+    {filters.map(filter => <button key={filter.id} type="button" disabled={disabled} onClick={() => onChange(filter.id)}
+      aria-pressed={value === filter.id} className="whitespace-nowrap rounded-md border px-2 py-1 text-xs font-semibold transition-colors"
+      style={{ background: value === filter.id ? LEGACY_COLORS.blue : LEGACY_COLORS.s1,
+        color: value === filter.id ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
+        borderColor: value === filter.id ? LEGACY_COLORS.blue : LEGACY_COLORS.border }}>{filter.label}</button>)}
+  </div>;
+}
+
+/** 고정 프레임과 모서리 마스크는 스크롤 영역 크기에 영향을 주지 않는다. */
+export function BomPanelFrame(): ReactElement {
+  return <>
+    <div data-scrollbar-rail-frame aria-hidden className="pointer-events-none absolute inset-0 z-20 rounded-2xl border" style={{ borderColor: LEGACY_COLORS.border }} />
+    <div data-scrollbar-rail-masks aria-hidden className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between">
+      <div className="flex justify-between">
+        <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 15px, var(--c-bg) 16px)" }} />
+        <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 100%, transparent 0 15px, var(--c-bg) 16px)" }} />
+      </div>
+      <div className="flex justify-between">
+        <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 0, transparent 0 15px, var(--c-bg) 16px)" }} />
+        <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 0, transparent 0 15px, var(--c-bg) 16px)" }} />
+      </div>
+    </div>
+  </>;
+}
 
 export function bomRowSurfaceStyle({
   gridTemplateColumns,

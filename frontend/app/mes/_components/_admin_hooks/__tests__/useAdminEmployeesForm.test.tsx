@@ -40,6 +40,20 @@ describe("useAdminEmployeesForm", () => {
     expect(result.current.dirty).toBe(true);
   });
 
+  it("treats restored menu visibility as clean but keeps model priority significant", () => {
+    const original = employee({ assigned_model_slots: [3, 7] });
+    const { result } = renderHook(() => useAdminEmployeesForm([original]));
+    act(() => result.current.setSelectedEmployee(original));
+    act(() => result.current.setEditForm((form) => ({
+      ...form, hidden_sidebar_tabs: ["admin", "weekly"],
+    })));
+    expect(result.current.dirty).toBe(false);
+    act(() => result.current.setEditForm((form) => ({
+      ...form, assigned_model_slots: [7, 3],
+    })));
+    expect(result.current.dirty).toBe(true);
+  });
+
   it("직원 재조회 결과에서 삭제 모델을 제거하고 남은 담당 모델 순서로 선택 폼을 갱신한다", async () => {
     const original = employee({ assigned_model_slots: [3, 7, 1] });
     const refreshed = employee({ assigned_model_slots: [3, 1] });

@@ -1,7 +1,8 @@
 .fade,
 .selection,
 .entryCover {
-  --admin-fade-duration: 350ms;
+  --admin-fade-duration: 220ms;
+  --admin-selection-duration: 180ms;
 }
 
 .entryCover { background: var(--c-bg); }

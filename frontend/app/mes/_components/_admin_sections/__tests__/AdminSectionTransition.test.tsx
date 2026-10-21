@@ -3,6 +3,7 @@ import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminSectionTransition } from "../AdminSectionTransition";
 import { AdminSectionTabs } from "../AdminSectionTabs";
+import { AdminReadProvider, INITIAL_ADMIN_READ_STATES } from "../_admin_primitives/AdminReadState";
 import type { AdminSection } from "../../_admin_hooks/useAdminViewState";
 import type { AdminSectionContentProps } from "../AdminSectionContent";
 
@@ -45,6 +46,36 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("AdminSectionTransition", () => {
+  it("renders cached items immediately on first mount and return without a skeleton or deferred frame", () => {
+    render(<AdminReadProvider value={{
+      states: { ...INITIAL_ADMIN_READ_STATES, items: { status: "ready" }, models: { status: "ready" } }, retry: vi.fn(),
+    }}><Harness initial="items" /></AdminReadProvider>);
+    expect(screen.queryByTestId("admin-section-entry-cover")).not.toBeInTheDocument();
+    expect(screen.getByTestId("actual-section")).toHaveTextContent("본문 items");
+    expect(frames.size).toBe(0);
+    fireEvent.click(screen.getByRole("button", { name: "모델 관리", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "품목 관리", exact: true }));
+    expect(screen.queryByTestId("admin-section-entry-cover")).not.toBeInTheDocument();
+    expect(screen.getByTestId("actual-section")).toHaveTextContent("본문 items");
+    expect(frames.size).toBe(0);
+  });
+  it("keeps the entry cover until data is ready, even after the body has mounted", () => {
+    const view = (ready: boolean) => <AdminReadProvider value={{
+      states: { ...INITIAL_ADMIN_READ_STATES, items: { status: ready ? "ready" : "pending" }, models: { status: "ready" } }, retry: vi.fn(),
+    }}><Harness initial="items" /></AdminReadProvider>;
+    const { rerender } = render(view(false));
+    nextFrame();
+    nextFrame();
+    expect(contentRender).toHaveBeenCalledWith("items");
+    expect(screen.getByTestId("admin-section-entry-cover")).toHaveAttribute("aria-busy", "true");
+    fireEvent.animationEnd(screen.getByTestId("admin-section-entry-cover"));
+    expect(screen.getByTestId("admin-section-entry-cover")).toBeInTheDocument();
+    rerender(view(true));
+    expect(screen.getByTestId("admin-section-entry-cover")).toHaveAttribute("aria-hidden", "true");
+    fireEvent.animationEnd(screen.getByTestId("admin-section-entry-cover"));
+    expect(screen.queryByTestId("admin-section-entry-cover")).not.toBeInTheDocument();
+  });
+
   it.each(["items", "bom"] as const)("paints the %s entry before mounting its heavy body, without rendering the old section again", (section) => {
     render(<Harness />);
     const label = section === "items" ? "품목 관리" : "BOM 관리";

@@ -12,6 +12,7 @@ import {
   useUpdateDepartmentMutation,
 } from "@/lib/queries/useDepartmentsQuery";
 import { useRefreshDepartments } from "../DepartmentsContext";
+import { useAdminSave } from "./useAdminSave";
 
 export const COLOR_PALETTE = [
   "#2f805d", "#85630d", "#7052a8", "#5c5c5c",
@@ -72,7 +73,8 @@ export type UseAdminDepartmentsCommandsArgs = {
 };
 
 export type UseAdminDepartmentsCommandsState = {
-  add: () => void;
+  add: () => Promise<void>;
+  adding: boolean;
   deactivate: (id: number) => void;
   reactivate: (id: number) => void;
   hardDelete: (id: number) => void;
@@ -92,16 +94,17 @@ export function useAdminDepartmentsCommands({
   getAddName,
 }: UseAdminDepartmentsCommandsArgs): UseAdminDepartmentsCommandsState {
   const refreshDepartments = useRefreshDepartments();
+  const addTask = useAdminSave();
   const createMutation = useCreateDepartmentMutation();
   const updateMutation = useUpdateDepartmentMutation();
   const deleteMutation = useDeleteDepartmentMutation();
   const reorderMutation = useReorderDepartmentsMutation();
 
-  function add() {
+  function add(): Promise<void> {
     const name = getAddName().trim();
-    if (!name) return;
+    if (!name) return Promise.resolve();
     const color_hex = pickAutoColor(departments);
-    createMutation.mutate(
+    return new Promise<void>((resolve, reject) => createMutation.mutate(
       { name, display_order: departments.length, pin: adminPin, color_hex },
       {
         onSuccess: (created) => {
@@ -109,10 +112,14 @@ export function useAdminDepartmentsCommands({
           onAfterAdd?.();
           onStatusChange(`'${created.name}' 부서를 추가했습니다.`);
           void refreshDepartments();
+          resolve();
         },
-        onError: (err) => onError(err instanceof Error ? err.message : "부서 추가 실패"),
+        onError: (err) => {
+          onError(err instanceof Error ? err.message : "부서 추가 실패");
+          reject(err);
+        },
       },
-    );
+    ));
   }
 
   function deactivate(id: number) {
@@ -205,5 +212,5 @@ export function useAdminDepartmentsCommands({
     );
   }
 
-  return { add, deactivate, reactivate, hardDelete, reorder, updateColor };
+  return { add: () => addTask.run(add), adding: addTask.saving, deactivate, reactivate, hardDelete, reorder, updateColor };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import type { BOMDetailEntry, Item } from "@/lib/api";
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatBomQuantity } from "@/lib/mes/bomFormat";
 import { EmptyState } from "../../common/EmptyState";
@@ -9,7 +9,9 @@ import { BOM_WHERE_USED_ROW_GRID_TEMPLATE, BomTableHeader, BomTableItemRow } fro
 import { AdminReadBoundary, type useAdminReadState } from "../_admin_primitives/AdminReadState";
 import { AdminTableSkeleton } from "../_admin_primitives/AdminSkeleton";
 import { SkeletonBlock } from "../../common/LoadingSkeleton";
-import { useAdminSelectionFade } from "../useAdminSelectionFade";
+import { AdminDetailViewport } from "../_admin_primitives/AdminDetailViewport";
+import { AdminVirtualRows } from "../_admin_primitives/AdminVirtualRows";
+import { useAdminScrollRestoration } from "../../_admin_hooks/useAdminSessionState";
 import transitions from "../AdminTransitions.module.css";
 
 /**
@@ -27,7 +29,8 @@ interface Props {
 }
 
 export function BomWhereUsedPanel({ selected, rows, items, onSelectParent, read, parentHeader }: Props) {
-  const fadeRef = useAdminSelectionFade(read?.loading ? undefined : selected?.item_id);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useAdminScrollRestoration(`bom.usage.scroll:${selected?.item_id}`, scrollRef, !!selected && !read?.loading && !read?.error);
   if (!selected && !read?.loading && !read?.error) {
     return (
       <div
@@ -47,7 +50,7 @@ export function BomWhereUsedPanel({ selected, rows, items, onSelectParent, read,
   const itemMap = new Map(items.map((i) => [i.item_id, i]));
 
   return (
-    <div ref={fadeRef} className={`flex min-h-0 flex-1 flex-col [&_[data-bom-row-code]]:text-center ${transitions.selection}`}>
+    <div className={`flex min-h-0 flex-1 flex-col [&_[data-bom-row-code]]:text-center ${transitions.selection}`}>
       {/* 역참조 결과 */}
       <div
         className="flex min-h-0 flex-1 flex-col rounded-2xl border"
@@ -59,9 +62,11 @@ export function BomWhereUsedPanel({ selected, rows, items, onSelectParent, read,
         >
           {parentHeader ?? <>사용처 {read?.loading ? <SkeletonBlock className="inline-block h-3 w-12" /> : read?.error ? "—" : `(${rows.length}건)`}</>}
         </div>
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <AdminDetailViewport selectionKey={`${selected?.item_id}:${read?.loading ? "loading" : read?.error ? "error" : "ready"}`}
+          loading={read?.loading} className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <BomTableHeader variant="usage" gridTemplateColumns={BOM_WHERE_USED_ROW_GRID_TEMPLATE} />
-          <AdminReadBoundary read={read ?? { loading: false, error: undefined, retry: () => {} }} label="BOM 사용처" skeleton={<AdminTableSkeleton columns={BOM_WHERE_USED_ROW_GRID_TEMPLATE} count={5} rowClassName="h-[37px]" />}>
+          <AdminReadBoundary reveal={false} read={read ?? { loading: false, error: undefined, retry: () => {} }} label="BOM 사용처" skeleton={<AdminTableSkeleton columns={BOM_WHERE_USED_ROW_GRID_TEMPLATE} count={4} rowClassName="h-[37px]" />}>
           {rows.length === 0 ? (
             <EmptyState
               variant="no-data"
@@ -70,7 +75,7 @@ export function BomWhereUsedPanel({ selected, rows, items, onSelectParent, read,
               description="이 품목을 자식으로 사용하는 BOM이 없습니다."
             />
           ) : (
-            rows.map((r) => {
+            <AdminVirtualRows items={rows} getKey={(row) => row.bom_id} estimateSize={37} scrollRef={scrollRef} renderItem={(r) => {
               const parent = itemMap.get(r.parent_item_id);
               return (
                 <BomTableItemRow
@@ -88,10 +93,11 @@ export function BomWhereUsedPanel({ selected, rows, items, onSelectParent, read,
                   </div>}
                 />
               );
-            })
+            }} />
           )}
           </AdminReadBoundary>
         </div>
+        </AdminDetailViewport>
       </div>
     </div>
   );

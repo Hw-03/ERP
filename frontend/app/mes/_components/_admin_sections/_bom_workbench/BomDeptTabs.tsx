@@ -10,9 +10,10 @@ import { DEPT_LETTERS, DEPT_LETTER_TO_NAME, deptColor, type BomDeptFilter } from
 interface Props {
   value: BomDeptFilter;
   onChange: (v: BomDeptFilter) => void;
+  disabled?: boolean;
 }
 
-export function BomDeptTabs({ value, onChange }: Props) {
+export function BomDeptTabs({ value, onChange, disabled = false }: Props) {
   const chips: Array<{ letter: BomDeptFilter; name: string }> = [
     { letter: "ALL", name: "전체" },
     ...DEPT_LETTERS.map((l) => ({ letter: l, name: DEPT_LETTER_TO_NAME[l] })),
@@ -28,6 +29,7 @@ export function BomDeptTabs({ value, onChange }: Props) {
           <button
             key={chip.letter}
             type="button"
+            disabled={disabled}
             onClick={() => onChange(chip.letter)}
             aria-pressed={active}
             className="whitespace-nowrap rounded-md border px-2 py-1 text-xs font-semibold transition-colors"

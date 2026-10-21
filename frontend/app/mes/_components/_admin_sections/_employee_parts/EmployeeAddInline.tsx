@@ -18,17 +18,19 @@ interface EmployeeAddInlineProps {
   departments: DepartmentMaster[];
   productModels: ProductModel[];
   onSubmit: () => void;
+  busy?: boolean;
 }
 
-export function EmployeeAddInline({ form, setForm, departments, productModels, onSubmit }: EmployeeAddInlineProps) {
+export function EmployeeAddInline({ form, setForm, departments, productModels, onSubmit, busy = false }: EmployeeAddInlineProps) {
   return (
     <form
       className="flex max-w-[520px] flex-col gap-4"
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit();
+        if (!busy && form.name.trim()) onSubmit();
       }}
     >
+      <fieldset className="contents" disabled={busy} aria-busy={busy}>
       <div className="grid grid-cols-2 gap-3">
         <FieldRow label="이름" htmlFor="emp-add-name" required>
           <TextInput
@@ -63,7 +65,7 @@ export function EmployeeAddInline({ form, setForm, departments, productModels, o
               .map((d) => ({ value: d.name, label: d.display_name ?? d.name }))}
           />
         </FieldRow>
-        <FieldRow label="창고 결재 역할">
+        <FieldRow label="창고 결재 권한">
           <SelectInput
             value={form.warehouse_role}
             onChange={(v) => setForm((f) => ({ ...f, warehouse_role: v as WarehouseRole }))}
@@ -73,7 +75,7 @@ export function EmployeeAddInline({ form, setForm, departments, productModels, o
             }))}
           />
         </FieldRow>
-        <FieldRow label="부서 결재 역할">
+        <FieldRow label="부서 결재 권한">
           <SelectInput
             value={form.department_role}
             onChange={(v) => setForm((f) => ({ ...f, department_role: v as DepartmentRole }))}
@@ -124,11 +126,13 @@ export function EmployeeAddInline({ form, setForm, departments, productModels, o
       </div>
       <button
         type="submit"
+        disabled={busy || !form.name.trim()}
         className="standard-hover rounded-[12px] py-2.5 text-[14px] font-bold text-white transition-colors"
         style={{ background: LEGACY_COLORS.blueSolid }}
       >
         직원 추가
       </button>
+      </fieldset>
     </form>
   );
 }

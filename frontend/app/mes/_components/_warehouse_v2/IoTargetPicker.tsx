@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Check, GripVertical, Maximize2, Minimize2, Plus, RotateCcw, Save, Settings2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
+import { ioDirectionTone } from "./ioVisualTheme";
 import { formatQty } from "@/lib/mes/format";
 import { findInventoryLocation, locationAvailable, locationPending, warehouseAvailable, warehousePending } from "@/lib/mes/inventory";
 import { Tooltip } from "@/lib/ui";
@@ -323,7 +324,7 @@ export function IoTargetPicker({
   }, [fullscreen, onFullscreenChange]);
 
   const actionMode = getItemActionMode(subType);
-  const outbound = subType === "outbound_supplier" || subType === "tube_outbound_supplier" || subType === "warehouse_adjust_out" || subType === "internal_use_out";
+  const outbound = ioDirectionTone(subType) === LEGACY_COLORS.red;
   const activeFilters = filters ?? localFilters;
   const { department: dept, model, stage } = activeFilters;
   const keyword = search.trim().toLowerCase();
@@ -775,7 +776,7 @@ function InternalUseSourceControl({
   }
   return (
     <ChoiceButtons
-      outbound={variant === "desktop"}
+      outbound
       bomSelected={selectedMode === "bom"}
       singleSelected={selectedMode === "single"}
       hasBom={hasBom}
@@ -1035,7 +1036,7 @@ function ItemTable({
                 key={item.item_id}
                 isHighlight={isHighlight}
                 isSelected={isSelected}
-                outbound={outbound}
+                outbound={subType === "outbound_supplier" || subType === "tube_outbound_supplier" || subType === "warehouse_adjust_out" || subType === "internal_use_out"}
                 onClick={rowClickEnabled ? toggleSingleItem : undefined}
               >
                 <td className="max-w-0 w-full px-3 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>

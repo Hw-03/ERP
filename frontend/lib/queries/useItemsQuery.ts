@@ -14,10 +14,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { itemsApi } from "@/lib/api/items";
 import { queryKeys } from "./keys";
 
-export function useItemsQuery(params?: Parameters<typeof itemsApi.getItems>[0]) {
+export function useItemsQuery(params?: Parameters<typeof itemsApi.getItems>[0], options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.items.list(params),
     queryFn: ({ signal }) => itemsApi.getItems(params, { signal }),
+    enabled: options?.enabled,
   });
 }
 
@@ -68,6 +69,6 @@ export function useReorderItemsMutation() {
   return useMutation({
     mutationFn: (payload: Parameters<typeof itemsApi.reorderItems>[0]) =>
       itemsApi.reorderItems(payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.items.all }),
+    onSettled: () => qc.invalidateQueries({ queryKey: queryKeys.items.all }),
   });
 }

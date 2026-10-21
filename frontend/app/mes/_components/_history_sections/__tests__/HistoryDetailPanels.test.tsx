@@ -453,6 +453,19 @@ describe("desktop history detail panels", () => {
     expect(api.cancelTransaction).not.toHaveBeenCalled();
   });
 
+  it.each(["desktop", "default"] as const)("shows the shipping reservation reason and next action in %s", (variant) => {
+    const blocker = "출하 예약된 재고가 있어 취소할 수 없습니다. 연결된 출하의 준비 완료를 먼저 취소해 주세요.";
+    render(<HistoryCancelAction panelOpen identity="shipping-reserved" scope="single" effects={[]} cancelled={false} blocker={blocker} onSubmit={vi.fn()} variant={variant} />);
+    const button = screen.getByRole("button");
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription(blocker);
+    expect(screen.getByText(blocker)).toBeVisible();
+    if (variant === "desktop") {
+      expect(button).toHaveClass("!h-auto");
+      expect(screen.getByText(blocker)).toHaveClass("!line-clamp-none");
+    }
+  });
+
   it("updates blocked cancellation after realtime refresh and uses the fallback reason", async () => {
     const selected = makeLog({ operation_id: "operation-1" });
     vi.mocked(productionApi.getTransactions).mockResolvedValue([selected]);

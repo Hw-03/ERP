@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useAdminSessionState } from "../_admin_hooks/useAdminSessionState";
+import { useAdminSave } from "../_admin_hooks/useAdminSave";
 import { Building2, Plus, Save, Users, X } from "lucide-react";
 import {
   api,
@@ -58,26 +60,29 @@ export function AdminDepartmentsSection({
     addName,
     setAddName,
     addDepartmentMaster,
+    adding,
     selectedDept,
     setSelectedDept,
+    dirty: deptDirty,
     setDirty,
   } = useAdminDepartmentsContext();
   const refreshDepartments = useRefreshDepartments();
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [search, setSearch] = useAdminSessionState<string>("departments.search", "");
+  const [statusFilter, setStatusFilter] = useAdminSessionState<"all" | "active" | "inactive">("departments.status", "all");
   const [addMode, setAddMode] = useState(false);
+  const [deptSaving, setDeptSaving] = useState(false);
+  const toggleTask = useAdminSave();
+  const deleteTask = useAdminSave();
   const [deleteTarget, setDeleteTarget] = useState<DepartmentMaster | null>(null);
-  const deptSaveRef = useRef<(() => void) | null>(null);
-
-  // PR-2 2-3: 부서명 편집 기능(A3)이 아직 worktree 에 없으므로 dirty 는 placeholder(false).
-  // 인프라(가드/모달/registry)는 준비해 두어 A3 머지 후 dirty 노출만 연결하면 바로 동작.
-  const deptDirty = false;
-  const deptSave = async () => {
-    /* placeholder: A3 가 saveDepartment 노출 시 교체 */
+  const deptSaveRef = useRef<(() => Promise<void>) | null>(null);
+  const deptSave = async (): Promise<void> => {
+    if (addMode) await addDepartmentMaster();
+    else await deptSaveRef.current?.();
   };
-  useRegisterDirty("departments", deptDirty, deptSave);
-  const { confirmNavigation } = useLocalDirtyGuard(deptDirty, deptSave);
+  const dirty = addMode ? Boolean(addName) : deptDirty;
+  useRegisterDirty("departments", dirty, deptSave);
+  const { confirmNavigation } = useLocalDirtyGuard(dirty, deptSave);
 
   const empCountByDept = useMemo(() => {
     const map = new Map<string, number>();
@@ -137,14 +142,14 @@ export function AdminDepartmentsSection({
 
   function handleSubmitAdd() {
     if (!addName.trim()) return;
-    addDepartmentMaster();
-    setAddMode(false);
+    void addDepartmentMaster().then(() => setAddMode(false)).catch(() => {});
   }
 
   function handleSelect(dept: DepartmentMaster) {
+    if (selectedDept?.id === dept.id && !addMode) return;
     confirmNavigation(() => {
       setAddMode(false);
-      setSelectedDept(selectedDept?.id === dept.id ? null : dept);
+      setSelectedDept(dept);
     });
   }
 
@@ -160,6 +165,7 @@ export function AdminDepartmentsSection({
       void refreshDepartments();
     } catch (err) {
       onError(err instanceof Error ? err.message : "상태 변경 실패");
+      throw err;
     }
   }
 
@@ -170,11 +176,10 @@ export function AdminDepartmentsSection({
       setDepartments((prev) => prev.filter((d) => d.id !== deleteTarget.id));
       setSelectedDept(null);
       onStatusChange(`'${deleteTarget.display_name ?? deleteTarget.name}' 부서를 삭제했습니다.`);
+      setDeleteTarget(null);
       void refreshDepartments();
     } catch (err) {
       onError(err instanceof Error ? err.message : "삭제 실패");
-    } finally {
-      setDeleteTarget(null);
     }
   }
 
@@ -204,6 +209,8 @@ export function AdminDepartmentsSection({
 
         <div className={`flex min-h-0 flex-1 gap-4 ${styles.workspace}`}>
           <AdminListPanel
+            footer={selectedDept && !filteredDepartments.some((department) => department.id === selectedDept.id)
+              ? <p role="status" className="text-xs text-[var(--c-muted2)]">선택한 부서가 검색 결과 밖에 있습니다. 상세 편집은 유지됩니다.</p> : undefined}
             read={read} skeleton={<AdminTableSkeleton columns="minmax(0,0.9fr) minmax(0,1fr) 88px" count={3} />}
             title="부서 목록"
             countLabel={`${filteredDepartments.length}개`}
@@ -305,13 +312,13 @@ export function AdminDepartmentsSection({
           >
             <AdminReadBoundary read={{ ...detailRead, loading: detailRead.loading || (!!detailRead.managed && !detailRead.error && !selectedDept && !addMode && filteredDepartments.length > 0) }} skeleton={<AdminDetailSkeleton variant="departments" />} label="부서 상세">
             {addMode ? (
-              <DeptAddForm value={addName} onChange={setAddName} onSubmit={handleSubmitAdd} />
+              <DeptAddForm value={addName} onChange={setAddName} onSubmit={handleSubmitAdd} busy={adding} />
             ) : selectedDept ? (
               <DeptDetailView
                 key={selectedDept.id}
                 dept={selectedDept}
                 headerActions={
-                  <Button variant="primary" size="md" className="h-11 min-w-[88px]" iconLeft={<Save className="h-4 w-4" />} onClick={() => deptSaveRef.current?.()}>
+                  <Button variant="primary" size="md" className="h-11 min-w-[88px]" iconLeft={<Save className="h-4 w-4" />} disabled={!deptDirty || deptSaving} loading={deptSaving} onClick={() => { void deptSave().catch(() => undefined); }}>
                     저장
                   </Button>
                 }
@@ -325,10 +332,12 @@ export function AdminDepartmentsSection({
                 setSelectedDept={setSelectedDept}
                 onStatusChange={onStatusChange}
                 onError={onError}
-                onToggleActive={() => handleToggleActive(selectedDept)}
+                onToggleActive={() => toggleTask.run(() => handleToggleActive(selectedDept))}
+                toggling={toggleTask.saving}
                 onRequestDelete={() => setDeleteTarget(selectedDept)}
                 onSaveRef={(fn) => { deptSaveRef.current = fn; }}
                 onDirtyChange={setDirty}
+                onSavingChange={setDeptSaving}
               />
             ) : (
               <div className="flex min-h-full flex-col">
@@ -352,7 +361,8 @@ export function AdminDepartmentsSection({
         cautionMessage="이 작업은 되돌릴 수 없습니다. 부서에 속한 직원과 품목 매핑은 유지되지만, 부서명 참조가 사라집니다."
         confirmLabel="삭제"
         onClose={() => setDeleteTarget(null)}
-        onConfirm={handleConfirmDelete}
+        onConfirm={() => deleteTask.run(handleConfirmDelete)}
+        busy={deleteTask.saving}
       />
     </>
   );

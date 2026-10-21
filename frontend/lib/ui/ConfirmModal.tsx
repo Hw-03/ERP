@@ -110,10 +110,10 @@ export function ConfirmModal({
 
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useFocusTrap<HTMLDivElement>(open, {
+  const [mounted, setMounted] = useState(false);
+  const panelRef = useFocusTrap<HTMLDivElement>(open && mounted, {
     initialFocusRef: viewer ? closeRef : undefined,
   });
-  const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
   }, []);
