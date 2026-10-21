@@ -1,5 +1,14 @@
 # 개발서버·병합 후보 비교 검증
 
+## 2026-10-21 최신 main → 후보 추가 결합: 로컬 검증 완료 4 / 전체 4
+
+- [x] CP0: 시작48ddea95·검토 DB/session·미커밋 문서3개 보존. 기존 기록은 e6ff32bc로 먼저 커밋. 원격 main57767831 확인, C:/ERP 변경 제외.
+- [x] CP1: main57767831을 후보에만 merge. 충돌17개에서 캐시·가상화와 코드 미리보기·BOM 일괄 저장·두 탭/완료 보호 결합. 예약 추가/revert 순변경0, migration 변경 없음.
+- [x] CP2: backend26·관리자 실패 재검사6·직접 소비자213·최종 타입/ESLint 통과. BOM 툴바 결합 회귀 최소 수정 후 직접35·브라우저6 통과. 가상 목록 끝행 포함19 통과. 최종 빌드3.322MiB, 사용자 승인3.35MiB 기본 게이트/도구3검사 통과. 연결8개와 과거 이력 보존, 실행 상태 변경0.
+- [x] CP3: 보호 확인·최종 연결 check·cached diff/check 통과 후 통합 커밋8fd749fb 작성, 결과·재개 기록 정리. main/직원/예약 변경 없음. 이 문서 커밋 후 후보만 정상 push하고 새 HEAD CI 시작 상태를 R/git-final.json과 최종 응답에 기록한다.
+
+상세: [추가 결합 결과](../../../docs/superpowers/plans/2026-10-21-mes-candidate-main-integration-results.md). R=`_attic/runtime/main-integration-20261021`, L=`/home/hw/main-integration-20261021`. 과거 미확정 원인은 별도 이력으로 유지한다.
+
 ## 2026-10-20 최종 production 메모 확인: 완료 3 / 전체 3
 
 - [x] CP0: 후보48ddea95와 기존 Linux source의제품입력1404개 일치, production빌드·산출물114개 재사용. 원검토DB 온라인백업→새 Lprod DB,3039/8021·API목적지가드 확인. 원본3038/8038·초안 유지.
