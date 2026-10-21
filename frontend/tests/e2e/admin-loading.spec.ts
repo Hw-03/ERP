@@ -40,8 +40,8 @@ for (const width of [1914, 1280]) {
     for (let index = 0; index < 4; index += 1) await zero.click();
     const nav = page.getByRole("navigation", { name: "관리자 섹션" });
     for (const [tab, table, action] of [
-      ["직원 관리", "직원 목록", "직원 비활성화"],
-      ["부서 관리", "부서 목록", "부서 비활성화"],
+      ["직원 관리", "직원 목록", /^직원 (?:비활성화|활성화)$/],
+      ["부서 관리", "부서 목록", /^부서 (?:비활성화|활성화)$/],
     ]) {
       await nav.getByRole("button", { name: tab, exact: true }).click();
       const rows = page.getByRole("grid", { name: table, exact: true }).getByRole("row");
@@ -50,6 +50,7 @@ for (const width of [1914, 1280]) {
       const before = await button.boundingBox();
       for (const index of [2, 3, 1]) {
         await rows.nth(index).click();
+        await expect(rows.nth(index)).toHaveAttribute("aria-selected", "true");
         await expect(page.locator("[data-admin-detail-snapshot]")).toHaveCount(0);
         const after = await button.boundingBox();
         expect(Math.abs(before!.x - after!.x)).toBeLessThanOrEqual(1);

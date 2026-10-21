@@ -21,11 +21,6 @@ async function openAdmin(page: Page, actors: CommonActors, section: string) {
   await expect(navigation).toBeVisible();
   await navigation.getByRole("button", { name: section, exact: true }).click();
 }
-async function chooseOption(page: Page, field: string, label: string) {
-  const container = page.getByText(field, { exact: true }).filter({ visible: true }).locator("..");
-  await container.getByRole("combobox").click();
-  await page.getByRole("option", { name: label, exact: true }).click();
-}
 async function physical(request: APIRequestContext, itemId: string) {
   const item = await json(request, `/api/items/${itemId}`);
   return { quantity: item.quantity, warehouse_qty: item.warehouse_qty,
@@ -107,9 +102,9 @@ test.describe("관리자 원자 기대의 실제 화면 회귀", () => {
     await expect(page.getByRole("combobox", { name: /등급|ADMIN|MANAGER|STAFF/ })).toHaveCount(0);
     const newName = `역할 검수 ${randomUUID().slice(0, 6)}`;
     await page.getByRole("textbox", { name: "이름", exact: true }).fill(newName);
-    await chooseOption(page, "창고 결재 역할", "부 · 보조 결재 가능");
-    await chooseOption(page, "부서 결재 역할", "정 · 부서 주담당 결재");
-    await page.getByRole("checkbox", { name: "AS·연구 승인 권한", exact: true }).check();
+    await page.getByRole("radiogroup", { name: "창고 결재 권한", exact: true }).getByRole("radio", { name: "부", exact: true }).click();
+    await page.getByRole("radiogroup", { name: "부서 결재 권한", exact: true }).getByRole("radio", { name: "정", exact: true }).click();
+    await page.getByRole("radiogroup", { name: "AS·연구 승인 권한", exact: true }).getByRole("radio", { name: "승인", exact: true }).click();
     const saved = page.waitForResponse((response) => response.url().endsWith(`/api/employees/${actors.requester.employee_id}`) && response.request().method() === "PUT");
     await page.getByRole("button", { name: "저장", exact: true }).click();
     expect((await saved).status()).toBe(200);
@@ -120,7 +115,9 @@ test.describe("관리자 원자 기대의 실제 화면 회귀", () => {
     await page.getByRole("navigation", { name: "관리자 섹션" }).getByRole("button", { name: "직원 관리", exact: true }).click();
     await row.click();
     await expect(page.getByRole("textbox", { name: "이름", exact: true })).toHaveValue(newName);
-    await expect(page.getByRole("checkbox", { name: "AS·연구 승인 권한", exact: true })).toBeChecked();
+    await expect(page.getByRole("radiogroup", { name: "창고 결재 권한", exact: true }).getByRole("radio", { name: "부", exact: true })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("radiogroup", { name: "부서 결재 권한", exact: true }).getByRole("radio", { name: "정", exact: true })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("radiogroup", { name: "AS·연구 승인 권한", exact: true }).getByRole("radio", { name: "승인", exact: true })).toHaveAttribute("aria-checked", "true");
     const login = await request.post(`/api/employees/${actors.requester.employee_id}/verify-pin`, { data: { pin: "0000" } });
     expect(login.ok()).toBeTruthy();
     expect((await login.json()).name).toBe(newName);

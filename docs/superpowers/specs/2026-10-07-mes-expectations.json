@@ -4361,7 +4361,7 @@
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "G01 실제 PIN 로그인 세션과 직원 CSV에는 등급이 없다",
               "assertion": "expect(current.operator).not.toHaveProperty(\"level\");",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 35
             },
             {
@@ -4641,6 +4641,13 @@
               "selector": "test_valid_pin_via_header",
               "assertion": "assert resp.status_code == 200, resp.text",
               "sourceHash": "3debd4cbf1e73729ae192757faf1ebaf82f9f63bd4ef82a842548a34dc580cec"
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "G01 실제 PIN 로그인 세션과 직원 CSV에는 등급이 없다",
+              "assertion": "expect(current.operator).not.toHaveProperty(\"level\");",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "line": 35
             }
           ]
         },
@@ -4670,35 +4677,35 @@
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "G01 실제 PIN 로그인 세션과 직원 CSV에는 등급이 없다",
               "assertion": "expect(current.operator).not.toHaveProperty(\"level\");",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 35
             },
             {
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "G01 실제 PIN 로그인 세션과 직원 CSV에는 등급이 없다",
               "assertion": "expect(current.operator).not.toHaveProperty(\"grade\");",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 35
             },
             {
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "G01 실제 PIN 로그인 세션과 직원 CSV에는 등급이 없다",
               "assertion": "await expect(page.getByRole(\"combobox\", { name: /등급|ADMIN|MANAGER|STAFF/ })).toHaveCount(0);",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 35
             },
             {
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "G01 실제 PIN 로그인 세션과 직원 CSV에는 등급이 없다",
               "assertion": "expect(file.rows[0]).toEqual([\"이름\", \"부서\", \"직급\", \"창고 역할\", \"활성\"]);",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 35
             },
             {
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "G01 실제 PIN 로그인 세션과 직원 CSV에는 등급이 없다",
               "assertion": "expect(file.rows[0]).not.toContain(\"등급\");",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 35
             }
           ],
@@ -4898,6 +4905,41 @@
               "selector": "G01 실제 PIN 로그인 세션과 직원 CSV에는 등급이 없다",
               "assertion": "expect(file.rows[0]).not.toContain(\"등급\");",
               "sourceHash": "6396e36a10053c85e5314657d16170a331f0ac04540dea6fbb9b121f8bdbae4e",
+              "line": 35
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "G01 실제 PIN 로그인 세션과 직원 CSV에는 등급이 없다",
+              "assertion": "expect(current.operator).not.toHaveProperty(\"level\");",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "line": 35
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "G01 실제 PIN 로그인 세션과 직원 CSV에는 등급이 없다",
+              "assertion": "expect(current.operator).not.toHaveProperty(\"grade\");",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "line": 35
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "G01 실제 PIN 로그인 세션과 직원 CSV에는 등급이 없다",
+              "assertion": "await expect(page.getByRole(\"combobox\", { name: /등급|ADMIN|MANAGER|STAFF/ })).toHaveCount(0);",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "line": 35
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "G01 실제 PIN 로그인 세션과 직원 CSV에는 등급이 없다",
+              "assertion": "expect(file.rows[0]).toEqual([\"이름\", \"부서\", \"직급\", \"창고 역할\", \"활성\"]);",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "line": 35
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "G01 실제 PIN 로그인 세션과 직원 CSV에는 등급이 없다",
+              "assertion": "expect(file.rows[0]).not.toContain(\"등급\");",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
               "line": 35
             }
           ]
@@ -80929,36 +80971,36 @@
               "file": "frontend/tests/e2e/admin-expectations.spec.ts",
               "selector": "8.19-02 8.19-03 PC-DELTA-CACHE02 다른 탭 모델명 변경과 통신 차단 후 온라인 복귀",
               "assertion": "expect(invalidWrites).toEqual([]);",
-              "sourceHash": "2a99ae6bb57d56e6dce2cfc744defa0c49c1ba8967e985902401bf7563095d14",
-              "line": 212
+              "sourceHash": "8368b2f805897c07ace06e782044571a965b4d8bd3593f3429d10bbdf375bc7f",
+              "line": 209
             },
             {
               "file": "frontend/tests/e2e/admin-expectations.spec.ts",
               "selector": "8.19-02 8.19-03 PC-DELTA-CACHE02 다른 탭 모델명 변경과 통신 차단 후 온라인 복귀",
               "assertion": "expect((await rejected).status()).toBe(409);",
-              "sourceHash": "2a99ae6bb57d56e6dce2cfc744defa0c49c1ba8967e985902401bf7563095d14",
-              "line": 212
+              "sourceHash": "8368b2f805897c07ace06e782044571a965b4d8bd3593f3429d10bbdf375bc7f",
+              "line": 209
             },
             {
               "file": "frontend/tests/e2e/admin-expectations.spec.ts",
               "selector": "8.19-02 8.19-03 PC-DELTA-CACHE02 다른 탭 모델명 변경과 통신 차단 후 온라인 복귀",
               "assertion": "await expect(symbol).toHaveValue(\"ABCDE\");",
-              "sourceHash": "2a99ae6bb57d56e6dce2cfc744defa0c49c1ba8967e985902401bf7563095d14",
-              "line": 212
+              "sourceHash": "8368b2f805897c07ace06e782044571a965b4d8bd3593f3429d10bbdf375bc7f",
+              "line": 209
             },
             {
               "file": "frontend/tests/e2e/admin-expectations.spec.ts",
               "selector": "8.19-02 8.19-03 PC-DELTA-CACHE02 다른 탭 모델명 변경과 통신 차단 후 온라인 복귀",
               "assertion": "await expect(page.getByText(\"연결 품목 수\", { exact: true }).locator(\"..\")).toContainText(String(linkedCount));",
-              "sourceHash": "2a99ae6bb57d56e6dce2cfc744defa0c49c1ba8967e985902401bf7563095d14",
-              "line": 212
+              "sourceHash": "8368b2f805897c07ace06e782044571a965b4d8bd3593f3429d10bbdf375bc7f",
+              "line": 209
             },
             {
               "file": "frontend/tests/e2e/admin-expectations.spec.ts",
               "selector": "8.19-02 8.19-03 PC-DELTA-CACHE02 다른 탭 모델명 변경과 통신 차단 후 온라인 복귀",
               "assertion": "expect((await saved).status()).toBe(200);",
-              "sourceHash": "2a99ae6bb57d56e6dce2cfc744defa0c49c1ba8967e985902401bf7563095d14",
-              "line": 212
+              "sourceHash": "8368b2f805897c07ace06e782044571a965b4d8bd3593f3429d10bbdf375bc7f",
+              "line": 209
             }
           ],
           "execution": {
@@ -81197,6 +81239,41 @@
               "assertion": "expect(screen.getByText(\"연결 품목 수\").parentElement).toHaveTextContent(\"1\");",
               "sourceHash": "0767010380b2764377c86f43e8ad348ea9c48e8e8e966412214919d1838bcd8f",
               "line": 49
+            },
+            {
+              "file": "frontend/tests/e2e/admin-expectations.spec.ts",
+              "selector": "8.19-02 8.19-03 PC-DELTA-CACHE02 다른 탭 모델명 변경과 통신 차단 후 온라인 복귀",
+              "assertion": "expect(invalidWrites).toEqual([]);",
+              "sourceHash": "2a99ae6bb57d56e6dce2cfc744defa0c49c1ba8967e985902401bf7563095d14",
+              "line": 212
+            },
+            {
+              "file": "frontend/tests/e2e/admin-expectations.spec.ts",
+              "selector": "8.19-02 8.19-03 PC-DELTA-CACHE02 다른 탭 모델명 변경과 통신 차단 후 온라인 복귀",
+              "assertion": "expect((await rejected).status()).toBe(409);",
+              "sourceHash": "2a99ae6bb57d56e6dce2cfc744defa0c49c1ba8967e985902401bf7563095d14",
+              "line": 212
+            },
+            {
+              "file": "frontend/tests/e2e/admin-expectations.spec.ts",
+              "selector": "8.19-02 8.19-03 PC-DELTA-CACHE02 다른 탭 모델명 변경과 통신 차단 후 온라인 복귀",
+              "assertion": "await expect(symbol).toHaveValue(\"ABCDE\");",
+              "sourceHash": "2a99ae6bb57d56e6dce2cfc744defa0c49c1ba8967e985902401bf7563095d14",
+              "line": 212
+            },
+            {
+              "file": "frontend/tests/e2e/admin-expectations.spec.ts",
+              "selector": "8.19-02 8.19-03 PC-DELTA-CACHE02 다른 탭 모델명 변경과 통신 차단 후 온라인 복귀",
+              "assertion": "await expect(page.getByText(\"연결 품목 수\", { exact: true }).locator(\"..\")).toContainText(String(linkedCount));",
+              "sourceHash": "2a99ae6bb57d56e6dce2cfc744defa0c49c1ba8967e985902401bf7563095d14",
+              "line": 212
+            },
+            {
+              "file": "frontend/tests/e2e/admin-expectations.spec.ts",
+              "selector": "8.19-02 8.19-03 PC-DELTA-CACHE02 다른 탭 모델명 변경과 통신 차단 후 온라인 복귀",
+              "assertion": "expect((await saved).status()).toBe(200);",
+              "sourceHash": "2a99ae6bb57d56e6dce2cfc744defa0c49c1ba8967e985902401bf7563095d14",
+              "line": 212
             }
           ]
         }
@@ -81685,42 +81762,42 @@
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코드·모델 연결 수에 같은 기준",
               "assertion": "expect(current.model_slots).toEqual([second.slot]);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 30
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코드·모델 연결 수에 같은 기준",
               "assertion": "expect(current.warehouse_qty).toBe(item.warehouse_qty);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 30
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코드·모델 연결 수에 같은 기준",
               "assertion": "expect(current.mes_code).toBe(`${second.symbol}-TR-${String(item.serial_no).padStart(4, \"0\")}`);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 30
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코드·모델 연결 수에 같은 기준",
               "assertion": "await expect(inventoryRow).toContainText(current.mes_code!);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 30
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코드·모델 연결 수에 같은 기준",
               "assertion": "await expect(inventoryRow).toHaveCount(0);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 30
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코드·모델 연결 수에 같은 기준",
               "assertion": "await expect(page.getByText(\"연결 품목 수\", { exact: true }).locator(\"..\").locator(\"div\").nth(1)).toHaveText(String(beforeCount + 1));",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 30
             }
           ],
@@ -81841,7 +81918,49 @@
                 "sourceHash": "7bf60e25ff22f291ed247699be60e5acff2824be1c6b96a60b4a1cf3709aa919",
                 "line": 30
               }
-            ]
+            ],
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코드·모델 연결 수에 같은 기준",
+              "assertion": "expect(current.model_slots).toEqual([second.slot]);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 30
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코드·모델 연결 수에 같은 기준",
+              "assertion": "expect(current.warehouse_qty).toBe(item.warehouse_qty);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 30
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코드·모델 연결 수에 같은 기준",
+              "assertion": "expect(current.mes_code).toBe(`${second.symbol}-TR-${String(item.serial_no).padStart(4, \"0\")}`);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 30
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코드·모델 연결 수에 같은 기준",
+              "assertion": "await expect(inventoryRow).toContainText(current.mes_code!);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 30
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코드·모델 연결 수에 같은 기준",
+              "assertion": "await expect(inventoryRow).toHaveCount(0);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 30
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코드·모델 연결 수에 같은 기준",
+              "assertion": "await expect(page.getByText(\"연결 품목 수\", { exact: true }).locator(\"..\").locator(\"div\").nth(1)).toHaveText(String(beforeCount + 1));",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 30
+            }
           ]
         }
       ],
@@ -82055,7 +82174,7 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
               "assertion": "expect(new Set(population.map((item) => item.item_id)).size).toBe(population.length);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 97
             }
           ],
@@ -82218,6 +82337,13 @@
               "selector": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
               "assertion": "expect(new Set(population.map((item) => item.item_id)).size).toBe(population.length);",
               "sourceHash": "1606c979040024d1b4ee534d45615bc5dc3095145338d40b7859bc58a75c7ddf",
+              "line": 97
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
+              "assertion": "expect(new Set(population.map((item) => item.item_id)).size).toBe(population.length);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
               "line": 97
             }
           ]
@@ -82386,35 +82512,35 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
               "assertion": "await expect(rows).toHaveCount(population.length);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 97
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
               "assertion": "expect([...displayedIds].sort()).toEqual(population.map((item) => item.item_id).sort());",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 97
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
               "assertion": "await expect(total).toHaveText(`전체 품목${population.length}`);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 97
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
-              "assertion": "await expect(page.getByPlaceholder(\"예: 텅스텐 필라멘트\")).toHaveValue(item.item_name);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "assertion": "await expect(page.locator(\"[data-admin-detail-content]\").getByPlaceholder(\"예: 텅스텐 필라멘트\")).toHaveValue(item.item_name);",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 97
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
-              "assertion": "await expect(page.locator(\"[aria-readonly]\")).toHaveText(item.mes_code!);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "assertion": "await expect(page.locator(\"[data-admin-detail-content] [aria-readonly]\")).toHaveText(item.mes_code!);",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 97
             }
           ],
@@ -82598,6 +82724,41 @@
               "assertion": "await expect(page.locator(\"[aria-readonly]\")).toHaveText(item.mes_code!);",
               "sourceHash": "1606c979040024d1b4ee534d45615bc5dc3095145338d40b7859bc58a75c7ddf",
               "line": 97
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
+              "assertion": "await expect(rows).toHaveCount(population.length);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 97
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
+              "assertion": "expect([...displayedIds].sort()).toEqual(population.map((item) => item.item_id).sort());",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 97
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
+              "assertion": "await expect(total).toHaveText(`전체 품목${population.length}`);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 97
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
+              "assertion": "await expect(page.getByPlaceholder(\"예: 텅스텐 필라멘트\")).toHaveValue(item.item_name);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 97
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지막 상세가 일치",
+              "assertion": "await expect(page.locator(\"[aria-readonly]\")).toHaveText(item.mes_code!);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 97
             }
           ]
         }
@@ -82703,28 +82864,28 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
               "assertion": "expect(item.mes_code).toBe(previewCodes[index]);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 199
             },
             {
               "file": "frontend/tests/e2e/admin-item-code-preview.spec.ts",
               "selector": "8.19-05 실제 모델·카테고리 변경의 정확한 미리보기와 저장 코드가 같다",
               "assertion": "expect((await modelResult.json()).mes_code).toBe(modelPreview);",
-              "sourceHash": "e4e9f53aee6d9bc120d45738096f96557dfb8da92f9812a0644f0edaa64e9294",
+              "sourceHash": "83b4a225a5c3ee6bdadd06e0b0301a0170c53f6e019e9de54ac451b4493a7031",
               "line": 17
             },
             {
               "file": "frontend/tests/e2e/admin-item-code-preview.spec.ts",
               "selector": "8.19-05 실제 모델·카테고리 변경의 정확한 미리보기와 저장 코드가 같다",
               "assertion": "expect((await categoryResult.json()).mes_code).toBe(categoryPreview);",
-              "sourceHash": "e4e9f53aee6d9bc120d45738096f96557dfb8da92f9812a0644f0edaa64e9294",
+              "sourceHash": "83b4a225a5c3ee6bdadd06e0b0301a0170c53f6e019e9de54ac451b4493a7031",
               "line": 17
             },
             {
               "file": "frontend/tests/e2e/admin-item-code-preview.spec.ts",
               "selector": "8.19-05 미리보기 조회 실패는 생성하지 않고 입력을 보존해 재조회 뒤 정확히 저장",
               "assertion": "expect(created.mes_code).toBe(reviewed);",
-              "sourceHash": "e4e9f53aee6d9bc120d45738096f96557dfb8da92f9812a0644f0edaa64e9294",
+              "sourceHash": "83b4a225a5c3ee6bdadd06e0b0301a0170c53f6e019e9de54ac451b4493a7031",
               "line": 59
             }
           ],
@@ -82866,6 +83027,34 @@
               "assertion": "expect(created.mes_code).toBe(reviewed);",
               "sourceHash": "634499d8a9619841cd668d482de8a517021e48a8017c42ad81decfdb00e6960b",
               "line": 58
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
+              "assertion": "expect(item.mes_code).toBe(previewCodes[index]);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 199
+            },
+            {
+              "file": "frontend/tests/e2e/admin-item-code-preview.spec.ts",
+              "selector": "8.19-05 실제 모델·카테고리 변경의 정확한 미리보기와 저장 코드가 같다",
+              "assertion": "expect((await modelResult.json()).mes_code).toBe(modelPreview);",
+              "sourceHash": "e4e9f53aee6d9bc120d45738096f96557dfb8da92f9812a0644f0edaa64e9294",
+              "line": 17
+            },
+            {
+              "file": "frontend/tests/e2e/admin-item-code-preview.spec.ts",
+              "selector": "8.19-05 실제 모델·카테고리 변경의 정확한 미리보기와 저장 코드가 같다",
+              "assertion": "expect((await categoryResult.json()).mes_code).toBe(categoryPreview);",
+              "sourceHash": "e4e9f53aee6d9bc120d45738096f96557dfb8da92f9812a0644f0edaa64e9294",
+              "line": 17
+            },
+            {
+              "file": "frontend/tests/e2e/admin-item-code-preview.spec.ts",
+              "selector": "8.19-05 미리보기 조회 실패는 생성하지 않고 입력을 보존해 재조회 뒤 정확히 저장",
+              "assertion": "expect(created.mes_code).toBe(reviewed);",
+              "sourceHash": "e4e9f53aee6d9bc120d45738096f96557dfb8da92f9812a0644f0edaa64e9294",
+              "line": 59
             }
           ]
         },
@@ -82980,7 +83169,7 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
               "assertion": "expect(new Set(created.map((item) => item.mes_code)).size).toBe(2);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 199
             }
           ],
@@ -83079,6 +83268,13 @@
               "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
               "assertion": "expect(new Set(created.map((item) => item.mes_code)).size).toBe(2);",
               "sourceHash": "1606c979040024d1b4ee534d45615bc5dc3095145338d40b7859bc58a75c7ddf",
+              "line": 199
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
+              "assertion": "expect(new Set(created.map((item) => item.mes_code)).size).toBe(2);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
               "line": 199
             }
           ]
@@ -83388,49 +83584,49 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
               "assertion": "expect(previewCodes[0]).toBe(previewCodes[1]);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 199
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
               "assertion": "expect(responses.map((response) => response.status()).sort()).toEqual([201, 409]);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 199
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
-              "assertion": "await expect(conflictPage.getByPlaceholder(\"예: 텅스텐 필라멘트\")).toHaveValue(names[conflicted]);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "assertion": "await expect(conflictPage.locator(\"[data-admin-detail-content]\").getByPlaceholder(\"예: 텅스텐 필라멘트\")).toHaveValue(names[conflicted]);",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 199
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
-              "assertion": "await expect(conflictPage.getByPlaceholder(\"수량\", { exact: true })).toHaveValue(\"20\");",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "assertion": "await expect(conflictPage.locator(\"[data-admin-detail-content]\").getByPlaceholder(\"수량\", { exact: true })).toHaveValue(\"20\");",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 199
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
-              "assertion": "await expect(conflictPage.locator(\"[aria-readonly]\")).not.toHaveText(previewCodes[conflicted]);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "assertion": "await expect(conflictPage.locator(\"[data-admin-detail-content] [aria-readonly]\")).not.toHaveText(previewCodes[conflicted]);",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 199
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
               "assertion": "expect(retried.status()).toBe(201);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 199
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
               "assertion": "expect(item.mes_code).toBe(previewCodes[index]);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 199
             }
           ],
@@ -83655,6 +83851,55 @@
               "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
               "assertion": "expect(item.mes_code).toBe(previewCodes[index]);",
               "sourceHash": "1606c979040024d1b4ee534d45615bc5dc3095145338d40b7859bc58a75c7ddf",
+              "line": 199
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
+              "assertion": "expect(previewCodes[0]).toBe(previewCodes[1]);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 199
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
+              "assertion": "expect(responses.map((response) => response.status()).sort()).toEqual([201, 409]);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 199
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
+              "assertion": "await expect(conflictPage.getByPlaceholder(\"예: 텅스텐 필라멘트\")).toHaveValue(names[conflicted]);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 199
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
+              "assertion": "await expect(conflictPage.getByPlaceholder(\"수량\", { exact: true })).toHaveValue(\"20\");",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 199
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
+              "assertion": "await expect(conflictPage.locator(\"[aria-readonly]\")).not.toHaveText(previewCodes[conflicted]);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 199
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
+              "assertion": "expect(retried.status()).toBe(201);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 199
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기재고를 만들고 실패 폼을 보존",
+              "assertion": "expect(item.mes_code).toBe(previewCodes[index]);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
               "line": 199
             }
           ]
@@ -83959,7 +84204,7 @@
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
               "assertion": "expect(after.warehouse_qty).toBe(5);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 137
             }
           ],
@@ -84059,7 +84304,14 @@
                 "sourceHash": "7bf60e25ff22f291ed247699be60e5acff2824be1c6b96a60b4a1cf3709aa919",
                 "line": 137
               }
-            ]
+            ],
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
+              "assertion": "expect(after.warehouse_qty).toBe(5);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 137
+            }
           ]
         },
         {
@@ -84132,7 +84384,7 @@
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
               "assertion": "expect(after.warehouse_qty).toBe(5);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 137
             }
           ],
@@ -84274,7 +84526,14 @@
                 "sourceHash": "7bf60e25ff22f291ed247699be60e5acff2824be1c6b96a60b4a1cf3709aa919",
                 "line": 137
               }
-            ]
+            ],
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
+              "assertion": "expect(after.warehouse_qty).toBe(5);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 137
+            }
           ]
         }
       ],
@@ -84621,28 +84880,28 @@
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "8.19-07 실제 이름·분류 변경은 당시 품목·현재 연결과 삭제 전체 의존 안내를 보존",
               "assertion": "await expect(page.locator('[role=\"alert\"]:not(#__next-route-announcer__)')).toContainText(`${entry.label} ${entry.count}건`);",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 54
             },
             {
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "8.19-07 실제 이름·분류 변경은 당시 품목·현재 연결과 삭제 전체 의존 안내를 보존",
               "assertion": "await expect(page.getByRole(\"button\", { name: \"삭제 확인\", exact: true })).toBeDisabled();",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 54
             },
             {
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "8.19-07 실제 이름·분류 변경은 당시 품목·현재 연결과 삭제 전체 의존 안내를 보존",
               "assertion": "await expect(detail.getByTestId(\"history-item-identity\")).toContainText(`거래 당시 품목: ${name} (${item.mes_code})`);",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 54
             },
             {
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "8.19-07 실제 이름·분류 변경은 당시 품목·현재 연결과 삭제 전체 의존 안내를 보존",
               "assertion": "await expect(detail.getByTestId(\"history-item-identity\")).toContainText(`현재 품목: ${changedName} (${currentCode})`);",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 54
             }
           ],
@@ -84776,6 +85035,34 @@
               "selector": "8.19-07 실제 이름·분류 변경은 당시 품목·현재 연결과 삭제 전체 의존 안내를 보존",
               "assertion": "await expect(detail.getByTestId(\"history-item-identity\")).toContainText(`현재 품목: ${changedName} (${currentCode})`);",
               "sourceHash": "6396e36a10053c85e5314657d16170a331f0ac04540dea6fbb9b121f8bdbae4e",
+              "line": 54
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "8.19-07 실제 이름·분류 변경은 당시 품목·현재 연결과 삭제 전체 의존 안내를 보존",
+              "assertion": "await expect(page.locator('[role=\"alert\"]:not(#__next-route-announcer__)')).toContainText(`${entry.label} ${entry.count}건`);",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "line": 54
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "8.19-07 실제 이름·분류 변경은 당시 품목·현재 연결과 삭제 전체 의존 안내를 보존",
+              "assertion": "await expect(page.getByRole(\"button\", { name: \"삭제 확인\", exact: true })).toBeDisabled();",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "line": 54
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "8.19-07 실제 이름·분류 변경은 당시 품목·현재 연결과 삭제 전체 의존 안내를 보존",
+              "assertion": "await expect(detail.getByTestId(\"history-item-identity\")).toContainText(`거래 당시 품목: ${name} (${item.mes_code})`);",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "line": 54
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "8.19-07 실제 이름·분류 변경은 당시 품목·현재 연결과 삭제 전체 의존 안내를 보존",
+              "assertion": "await expect(detail.getByTestId(\"history-item-identity\")).toContainText(`현재 품목: ${changedName} (${currentCode})`);",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
               "line": 54
             }
           ]
@@ -85166,43 +85453,43 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-08 이미 열린 로그인 후보는 실제 직원 이름 변경·비활성화를 갱신",
               "assertion": "await expect(page.locator(`[data-admin-employee-row=\"${actors.requester.employee_id}\"]`)).toContainText(name);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 168
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-08 이미 열린 로그인 후보는 실제 직원 이름 변경·비활성화를 갱신",
               "assertion": "await expect(login.getByRole(\"option\", { name: new RegExp(name) })).toBeVisible({ timeout: 30_000 });",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 168
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-08 이미 열린 로그인 후보는 실제 직원 이름 변경·비활성화를 갱신",
               "assertion": "await expect(login.getByRole(\"option\", { name: new RegExp(name) })).toHaveCount(0, { timeout: 30_000 });",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 168
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-08 실제 직원 추가는 이미 열린 로그인 후보·목록에 새 식별정보를 반영",
               "assertion": "await expect(page.locator(`[data-admin-employee-row=\"${employee!.employee_id}\"]`)).toContainText(name);",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 112
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 110
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-08 실제 직원 추가는 이미 열린 로그인 후보·목록에 새 식별정보를 반영",
               "assertion": "await expect(login.getByRole(\"option\", { name: new RegExp(name) })).toBeVisible({ timeout: 30_000 });",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 112
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 110
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-08 실제 직원 추가는 이미 열린 로그인 후보·목록에 새 식별정보를 반영",
               "assertion": "await expect(login.getByRole(\"button\", { name: new RegExp(name) }).filter({ visible: true }).first()).toBeVisible();",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 112
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 110
             }
           ],
           "execution": {
@@ -85385,6 +85672,48 @@
               "assertion": "await expect(login.getByRole(\"button\", { name: new RegExp(name) }).filter({ visible: true }).first()).toBeVisible();",
               "sourceHash": "2fec3cfdd9db586701b48584db305717a8d4202676fba01544fbf8ad1d4ed1fa",
               "line": 111
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-08 이미 열린 로그인 후보는 실제 직원 이름 변경·비활성화를 갱신",
+              "assertion": "await expect(page.locator(`[data-admin-employee-row=\"${actors.requester.employee_id}\"]`)).toContainText(name);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 168
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-08 이미 열린 로그인 후보는 실제 직원 이름 변경·비활성화를 갱신",
+              "assertion": "await expect(login.getByRole(\"option\", { name: new RegExp(name) })).toBeVisible({ timeout: 30_000 });",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 168
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-08 이미 열린 로그인 후보는 실제 직원 이름 변경·비활성화를 갱신",
+              "assertion": "await expect(login.getByRole(\"option\", { name: new RegExp(name) })).toHaveCount(0, { timeout: 30_000 });",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 168
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-08 실제 직원 추가는 이미 열린 로그인 후보·목록에 새 식별정보를 반영",
+              "assertion": "await expect(page.locator(`[data-admin-employee-row=\"${employee!.employee_id}\"]`)).toContainText(name);",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 112
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-08 실제 직원 추가는 이미 열린 로그인 후보·목록에 새 식별정보를 반영",
+              "assertion": "await expect(login.getByRole(\"option\", { name: new RegExp(name) })).toBeVisible({ timeout: 30_000 });",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 112
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-08 실제 직원 추가는 이미 열린 로그인 후보·목록에 새 식별정보를 반영",
+              "assertion": "await expect(login.getByRole(\"button\", { name: new RegExp(name) }).filter({ visible: true }).first()).toBeVisible();",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 112
             }
           ]
         }
@@ -86053,57 +86382,57 @@
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
               "assertion": "await expect(targetPage.getByRole(\"tab\", { name: /창고 승인함/ })).toBeVisible();",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 45
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 43
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
               "assertion": "await expect(targetPage.getByRole(\"tab\", { name: /창고 승인함/ })).toHaveCount(0);",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 45
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 43
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
               "assertion": "await expect(targetPage.getByRole(\"button\", { name: \"승인 확정\", exact: true })).toHaveCount(0);",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 45
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 43
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
               "assertion": "await expect(fresh.getByRole(\"tab\", { name: /창고 승인함/ })).toBeVisible();",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 45
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 43
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
               "assertion": "expect(await read(request, `/api/stock-requests/${pending.requestId}`)).toEqual(pendingBefore);",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 45
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 43
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
               "assertion": "expect(forbidden.status()).toBe(403);",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 45
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 43
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
               "assertion": "expect(current.warehouse_qty).toBe(19);",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 45
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 43
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
               "assertion": "expect(logs.filter((log) => log.transaction_type === \"TRANSFER_TO_PROD\")).toHaveLength(1);",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 45
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 43
             }
           ],
           "execution": {
@@ -86321,6 +86650,62 @@
               "assertion": "expect(logs.filter((log) => log.transaction_type === \"TRANSFER_TO_PROD\")).toHaveLength(1);",
               "sourceHash": "2fec3cfdd9db586701b48584db305717a8d4202676fba01544fbf8ad1d4ed1fa",
               "line": 44
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
+              "assertion": "await expect(targetPage.getByRole(\"tab\", { name: /창고 승인함/ })).toBeVisible();",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 45
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
+              "assertion": "await expect(targetPage.getByRole(\"tab\", { name: /창고 승인함/ })).toHaveCount(0);",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 45
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
+              "assertion": "await expect(targetPage.getByRole(\"button\", { name: \"승인 확정\", exact: true })).toHaveCount(0);",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 45
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
+              "assertion": "await expect(fresh.getByRole(\"tab\", { name: /창고 승인함/ })).toBeVisible();",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 45
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
+              "assertion": "expect(await read(request, `/api/stock-requests/${pending.requestId}`)).toEqual(pendingBefore);",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 45
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
+              "assertion": "expect(forbidden.status()).toBe(403);",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 45
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
+              "assertion": "expect(current.warehouse_qty).toBe(19);",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 45
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
+              "assertion": "expect(logs.filter((log) => log.transaction_type === \"TRANSFER_TO_PROD\")).toHaveLength(1);",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 45
             }
           ]
         }
@@ -86623,28 +87008,28 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-10 관리자 표시탭 저장 뒤 새 로그인 메뉴와 직접 URL 접근이 일치",
               "assertion": "await expect(employeePage.getByRole(\"button\", { name: \"출하\", exact: true }).filter({ visible: true })).toHaveCount(0);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 145
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-10 관리자 표시탭 저장 뒤 새 로그인 메뉴와 직접 URL 접근이 일치",
               "assertion": "await expect(employeePage.getByRole(\"button\", { name: \"창고 지도\", exact: true }).filter({ visible: true })).toHaveCount(0);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 145
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-10 관리자 표시탭 저장 뒤 새 로그인 메뉴와 직접 URL 접근이 일치",
               "assertion": "await expect(employeePage).toHaveURL(/tab=dashboard/);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 145
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-10 관리자 표시탭 저장 뒤 새 로그인 메뉴와 직접 URL 접근이 일치",
               "assertion": "await expect(employeePage.getByRole(\"textbox\", { name: \"자재 검색\", exact: true })).toBeVisible();",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 145
             }
           ],
@@ -86806,6 +87191,34 @@
               "selector": "8.19-10 관리자 표시탭 저장 뒤 새 로그인 메뉴와 직접 URL 접근이 일치",
               "assertion": "await expect(employeePage.getByRole(\"textbox\", { name: \"자재 검색\", exact: true })).toBeVisible();",
               "sourceHash": "1606c979040024d1b4ee534d45615bc5dc3095145338d40b7859bc58a75c7ddf",
+              "line": 145
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-10 관리자 표시탭 저장 뒤 새 로그인 메뉴와 직접 URL 접근이 일치",
+              "assertion": "await expect(employeePage.getByRole(\"button\", { name: \"출하\", exact: true }).filter({ visible: true })).toHaveCount(0);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 145
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-10 관리자 표시탭 저장 뒤 새 로그인 메뉴와 직접 URL 접근이 일치",
+              "assertion": "await expect(employeePage.getByRole(\"button\", { name: \"창고 지도\", exact: true }).filter({ visible: true })).toHaveCount(0);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 145
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-10 관리자 표시탭 저장 뒤 새 로그인 메뉴와 직접 URL 접근이 일치",
+              "assertion": "await expect(employeePage).toHaveURL(/tab=dashboard/);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 145
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-10 관리자 표시탭 저장 뒤 새 로그인 메뉴와 직접 URL 접근이 일치",
+              "assertion": "await expect(employeePage.getByRole(\"textbox\", { name: \"자재 검색\", exact: true })).toBeVisible();",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
               "line": 145
             }
           ]
@@ -87280,42 +87693,42 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-11 지정 직원 PIN 초기화 상세·시각·감사 변경자·이전PIN 거부를 실제 확인",
               "assertion": "await expect(page.getByText(\"기본 PIN (0000)\", { exact: true })).toBeVisible();",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 423
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-11 지정 직원 PIN 초기화 상세·시각·감사 변경자·이전PIN 거부를 실제 확인",
               "assertion": "await expect(page.getByText(/마지막 변경:/)).toContainText(new Date(employee.pin_last_changed!).toLocaleDateString(\"ko-KR\", { timeZone: \"Asia/Seoul\" }));",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 423
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-11 지정 직원 PIN 초기화 상세·시각·감사 변경자·이전PIN 거부를 실제 확인",
               "assertion": "expect(audit[0][1]).toBe(actors.approver.name);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 423
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-11 지정 직원 PIN 초기화 상세·시각·감사 변경자·이전PIN 거부를 실제 확인",
               "assertion": "expect(audit[0][2]).toBe(actors.approver.employee_code);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 423
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-11 지정 직원 PIN 초기화 상세·시각·감사 변경자·이전PIN 거부를 실제 확인",
               "assertion": "expect(audit[0][11]).toBe(actors.requester.employee_id);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 423
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-11 지정 직원 PIN 초기화 상세·시각·감사 변경자·이전PIN 거부를 실제 확인",
               "assertion": "expect(audit[0][0]).toMatch(/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 423
             }
           ],
@@ -87520,6 +87933,48 @@
               "assertion": "expect(audit[0][0]).toMatch(/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/);",
               "sourceHash": "1606c979040024d1b4ee534d45615bc5dc3095145338d40b7859bc58a75c7ddf",
               "line": 419
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-11 지정 직원 PIN 초기화 상세·시각·감사 변경자·이전PIN 거부를 실제 확인",
+              "assertion": "await expect(page.getByText(\"기본 PIN (0000)\", { exact: true })).toBeVisible();",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 423
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-11 지정 직원 PIN 초기화 상세·시각·감사 변경자·이전PIN 거부를 실제 확인",
+              "assertion": "await expect(page.getByText(/마지막 변경:/)).toContainText(new Date(employee.pin_last_changed!).toLocaleDateString(\"ko-KR\", { timeZone: \"Asia/Seoul\" }));",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 423
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-11 지정 직원 PIN 초기화 상세·시각·감사 변경자·이전PIN 거부를 실제 확인",
+              "assertion": "expect(audit[0][1]).toBe(actors.approver.name);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 423
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-11 지정 직원 PIN 초기화 상세·시각·감사 변경자·이전PIN 거부를 실제 확인",
+              "assertion": "expect(audit[0][2]).toBe(actors.approver.employee_code);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 423
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-11 지정 직원 PIN 초기화 상세·시각·감사 변경자·이전PIN 거부를 실제 확인",
+              "assertion": "expect(audit[0][11]).toBe(actors.requester.employee_id);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 423
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-11 지정 직원 PIN 초기화 상세·시각·감사 변경자·이전PIN 거부를 실제 확인",
+              "assertion": "expect(audit[0][0]).toMatch(/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 423
             }
           ]
         }
@@ -87638,21 +88093,21 @@
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "8.19-12 퇴직 직원의 실제 완료 요청과 내역 처리자는 삭제 뒤에도 남는다",
               "assertion": "expect(employees.find((entry: { employee_id: string }) => entry.employee_id === actors.requester.employee_id).is_active).toBe(false);",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 98
             },
             {
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "8.19-12 퇴직 직원의 실제 완료 요청과 내역 처리자는 삭제 뒤에도 남는다",
               "assertion": "expect(await read(request, `/api/stock-requests/${work.request_id}`)).toEqual(before);",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 98
             },
             {
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "8.19-12 퇴직 직원의 실제 완료 요청과 내역 처리자는 삭제 뒤에도 남는다",
               "assertion": "expect(await read(request, `/api/inventory/transactions?item_id=${item.item_id}`)).toEqual(logs);",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 98
             }
           ],
@@ -87837,6 +88292,27 @@
               "assertion": "expect(await read(request, `/api/inventory/transactions?item_id=${item.item_id}`)).toEqual(logs);",
               "sourceHash": "6396e36a10053c85e5314657d16170a331f0ac04540dea6fbb9b121f8bdbae4e",
               "line": 97
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "8.19-12 퇴직 직원의 실제 완료 요청과 내역 처리자는 삭제 뒤에도 남는다",
+              "assertion": "expect(employees.find((entry: { employee_id: string }) => entry.employee_id === actors.requester.employee_id).is_active).toBe(false);",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "line": 98
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "8.19-12 퇴직 직원의 실제 완료 요청과 내역 처리자는 삭제 뒤에도 남는다",
+              "assertion": "expect(await read(request, `/api/stock-requests/${work.request_id}`)).toEqual(before);",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "line": 98
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "8.19-12 퇴직 직원의 실제 완료 요청과 내역 처리자는 삭제 뒤에도 남는다",
+              "assertion": "expect(await read(request, `/api/inventory/transactions?item_id=${item.item_id}`)).toEqual(logs);",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "line": 98
             }
           ]
         },
@@ -88084,36 +88560,36 @@
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "8.19-12 퇴직 직원의 실제 완료 요청과 내역 처리자는 삭제 뒤에도 남는다",
               "assertion": "await expect(page.getByTestId(\"history-participant-row\").filter({ hasText: \"요청자\" })).toContainText(actors.requester.name);",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 98
             },
             {
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "8.19-12 퇴직 직원의 실제 완료 요청과 내역 처리자는 삭제 뒤에도 남는다",
               "assertion": "await expect(page.getByTestId(\"history-participant-row\").filter({ hasText: \"승인자\" })).toContainText(actors.approver.name);",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 98
             },
             {
               "file": "frontend/tests/e2e/admin-expectations.spec.ts",
               "selector": "8.19-12 직원 삭제는 대기 업무 안내와 함께 차단하고 요청·예약·현재직원을 보존",
               "assertion": "expect((await deleted).status()).toBe(409);",
-              "sourceHash": "2a99ae6bb57d56e6dce2cfc744defa0c49c1ba8967e985902401bf7563095d14",
-              "line": 129
+              "sourceHash": "8368b2f805897c07ace06e782044571a965b4d8bd3593f3429d10bbdf375bc7f",
+              "line": 126
             },
             {
               "file": "frontend/tests/e2e/admin-expectations.spec.ts",
               "selector": "8.19-12 직원 삭제는 대기 업무 안내와 함께 차단하고 요청·예약·현재직원을 보존",
               "assertion": "await expect(page.getByRole(\"alert\").filter({ hasText: \"진행 중인 업무\" })).toBeVisible();",
-              "sourceHash": "2a99ae6bb57d56e6dce2cfc744defa0c49c1ba8967e985902401bf7563095d14",
-              "line": 129
+              "sourceHash": "8368b2f805897c07ace06e782044571a965b4d8bd3593f3429d10bbdf375bc7f",
+              "line": 126
             },
             {
               "file": "frontend/tests/e2e/admin-expectations.spec.ts",
               "selector": "8.19-12 직원 삭제는 대기 업무 안내와 함께 차단하고 요청·예약·현재직원을 보존",
               "assertion": "expect(await physical(request, itemId)).toEqual(before);",
-              "sourceHash": "2a99ae6bb57d56e6dce2cfc744defa0c49c1ba8967e985902401bf7563095d14",
-              "line": 129
+              "sourceHash": "8368b2f805897c07ace06e782044571a965b4d8bd3593f3429d10bbdf375bc7f",
+              "line": 126
             }
           ],
           "execution": {
@@ -88297,6 +88773,41 @@
               "selector": "8.19-12 직원 삭제는 대기 업무 안내와 함께 차단하고 요청·예약·현재직원을 보존",
               "assertion": "expect(await physical(request, itemId)).toEqual(before);",
               "sourceHash": "c1fcc61c52979b69f967c55cce170b03af46d2c5dbf0be00243fbae8c270c007",
+              "line": 129
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "8.19-12 퇴직 직원의 실제 완료 요청과 내역 처리자는 삭제 뒤에도 남는다",
+              "assertion": "await expect(page.getByTestId(\"history-participant-row\").filter({ hasText: \"요청자\" })).toContainText(actors.requester.name);",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "line": 98
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "8.19-12 퇴직 직원의 실제 완료 요청과 내역 처리자는 삭제 뒤에도 남는다",
+              "assertion": "await expect(page.getByTestId(\"history-participant-row\").filter({ hasText: \"승인자\" })).toContainText(actors.approver.name);",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "line": 98
+            },
+            {
+              "file": "frontend/tests/e2e/admin-expectations.spec.ts",
+              "selector": "8.19-12 직원 삭제는 대기 업무 안내와 함께 차단하고 요청·예약·현재직원을 보존",
+              "assertion": "expect((await deleted).status()).toBe(409);",
+              "sourceHash": "2a99ae6bb57d56e6dce2cfc744defa0c49c1ba8967e985902401bf7563095d14",
+              "line": 129
+            },
+            {
+              "file": "frontend/tests/e2e/admin-expectations.spec.ts",
+              "selector": "8.19-12 직원 삭제는 대기 업무 안내와 함께 차단하고 요청·예약·현재직원을 보존",
+              "assertion": "await expect(page.getByRole(\"alert\").filter({ hasText: \"진행 중인 업무\" })).toBeVisible();",
+              "sourceHash": "2a99ae6bb57d56e6dce2cfc744defa0c49c1ba8967e985902401bf7563095d14",
+              "line": 129
+            },
+            {
+              "file": "frontend/tests/e2e/admin-expectations.spec.ts",
+              "selector": "8.19-12 직원 삭제는 대기 업무 안내와 함께 차단하고 요청·예약·현재직원을 보존",
+              "assertion": "expect(await physical(request, itemId)).toEqual(before);",
+              "sourceHash": "2a99ae6bb57d56e6dce2cfc744defa0c49c1ba8967e985902401bf7563095d14",
               "line": 129
             }
           ]
@@ -88605,36 +89116,36 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-13 실제 담당 모델 순서 저장·재진입·새 로그인은 조립 업무 후보에 같은 우선순위",
               "assertion": "expect(persisted.assigned_model_slots).toEqual([2, 1]);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 277
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-13 실제 담당 모델 순서 저장·재진입·새 로그인은 조립 업무 후보에 같은 우선순위",
               "assertion": "expect(order.indexOf(items[1].item_id)).toBeLessThan(order.indexOf(items[0].item_id));",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 277
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-13 저장된 담당 모델 순서는 실제 불량 격리 후보에서도 유지",
               "assertion": "expect(ordered.indexOf(items[0].item_id)).toBeGreaterThanOrEqual(0);",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 165
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 163
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-13 저장된 담당 모델 순서는 실제 불량 격리 후보에서도 유지",
               "assertion": "expect(ordered.indexOf(items[1].item_id)).toBeGreaterThanOrEqual(0);",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 165
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 163
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-13 저장된 담당 모델 순서는 실제 불량 격리 후보에서도 유지",
               "assertion": "expect(ordered.indexOf(items[1].item_id)).toBeLessThan(ordered.indexOf(items[0].item_id));",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 165
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 163
             }
           ],
           "execution": {
@@ -88796,6 +89307,41 @@
               "assertion": "expect(ordered.indexOf(items[1].item_id)).toBeLessThan(ordered.indexOf(items[0].item_id));",
               "sourceHash": "2fec3cfdd9db586701b48584db305717a8d4202676fba01544fbf8ad1d4ed1fa",
               "line": 164
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-13 실제 담당 모델 순서 저장·재진입·새 로그인은 조립 업무 후보에 같은 우선순위",
+              "assertion": "expect(persisted.assigned_model_slots).toEqual([2, 1]);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 277
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-13 실제 담당 모델 순서 저장·재진입·새 로그인은 조립 업무 후보에 같은 우선순위",
+              "assertion": "expect(order.indexOf(items[1].item_id)).toBeLessThan(order.indexOf(items[0].item_id));",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 277
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-13 저장된 담당 모델 순서는 실제 불량 격리 후보에서도 유지",
+              "assertion": "expect(ordered.indexOf(items[0].item_id)).toBeGreaterThanOrEqual(0);",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 165
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-13 저장된 담당 모델 순서는 실제 불량 격리 후보에서도 유지",
+              "assertion": "expect(ordered.indexOf(items[1].item_id)).toBeGreaterThanOrEqual(0);",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 165
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-13 저장된 담당 모델 순서는 실제 불량 격리 후보에서도 유지",
+              "assertion": "expect(ordered.indexOf(items[1].item_id)).toBeLessThan(ordered.indexOf(items[0].item_id));",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 165
             }
           ]
         }
@@ -89107,28 +89653,28 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-14 상태 필터의 실제 빈 결과는 정상 안내이며 해제하면 전체 부서 복원",
               "assertion": "await expect(rows).toHaveCount(0);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 126
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-14 상태 필터의 실제 빈 결과는 정상 안내이며 해제하면 전체 부서 복원",
               "assertion": "await expect(page.getByText(\"검색 결과가 없습니다.\", { exact: true })).toBeVisible();",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 126
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-14 상태 필터의 실제 빈 결과는 정상 안내이며 해제하면 전체 부서 복원",
               "assertion": "await expect(page.locator('[role=\"alert\"]:not(#__next-route-announcer__)')).toHaveCount(0);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 126
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-14 상태 필터의 실제 빈 결과는 정상 안내이며 해제하면 전체 부서 복원",
               "assertion": "await expect(rows).toHaveCount(population.length);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 126
             }
           ],
@@ -89290,6 +89836,34 @@
               "selector": "8.19-14 상태 필터의 실제 빈 결과는 정상 안내이며 해제하면 전체 부서 복원",
               "assertion": "await expect(rows).toHaveCount(population.length);",
               "sourceHash": "1606c979040024d1b4ee534d45615bc5dc3095145338d40b7859bc58a75c7ddf",
+              "line": 126
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-14 상태 필터의 실제 빈 결과는 정상 안내이며 해제하면 전체 부서 복원",
+              "assertion": "await expect(rows).toHaveCount(0);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 126
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-14 상태 필터의 실제 빈 결과는 정상 안내이며 해제하면 전체 부서 복원",
+              "assertion": "await expect(page.getByText(\"검색 결과가 없습니다.\", { exact: true })).toBeVisible();",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 126
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-14 상태 필터의 실제 빈 결과는 정상 안내이며 해제하면 전체 부서 복원",
+              "assertion": "await expect(page.locator('[role=\"alert\"]:not(#__next-route-announcer__)')).toHaveCount(0);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 126
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-14 상태 필터의 실제 빈 결과는 정상 안내이며 해제하면 전체 부서 복원",
+              "assertion": "await expect(rows).toHaveCount(population.length);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
               "line": 126
             }
           ]
@@ -89590,57 +90164,57 @@
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-15 표시명 변경 후 같은 부서ID의 직원·공정품목 연결수와 재고 위치를 보존",
               "assertion": "expect((await response.json()).name).toBe(\"튜브\");",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 190
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 188
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-15 표시명 변경 후 같은 부서ID의 직원·공정품목 연결수와 재고 위치를 보존",
               "assertion": "await expect(row).toContainText(name);",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 190
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 188
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-15 표시명 변경 후 같은 부서ID의 직원·공정품목 연결수와 재고 위치를 보존",
               "assertion": "await expect(employeeCount).toHaveText(employeeBefore!);",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 190
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 188
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-15 표시명 변경 후 같은 부서ID의 직원·공정품목 연결수와 재고 위치를 보존",
               "assertion": "await expect(itemCount).toHaveText(itemsBefore!);",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 190
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 188
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-15 표시명 변경 후 같은 부서ID의 직원·공정품목 연결수와 재고 위치를 보존",
               "assertion": "await expect(page.getByText(/공정 코드 매핑 없음/)).toHaveCount(0);",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 190
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 188
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-15 표시명 변경 후 같은 부서ID의 직원·공정품목 연결수와 재고 위치를 보존",
               "assertion": "expect(await read(request, \"/api/employees\")).toEqual(employees);",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 190
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 188
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-15 표시명 변경 후 같은 부서ID의 직원·공정품목 연결수와 재고 위치를 보존",
               "assertion": "expect(await read(request, \"/api/items?limit=2000\")).toEqual(items);",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 190
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 188
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-15 표시명 변경 후 같은 부서ID의 직원·공정품목 연결수와 재고 위치를 보존",
               "assertion": "await expect(page.getByRole(\"textbox\", { name: \"부서명\", exact: true })).toHaveValue(name);",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 190
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 188
             }
           ],
           "execution": {
@@ -89772,6 +90346,62 @@
               "assertion": "await expect(page.getByRole(\"textbox\", { name: \"부서명\", exact: true })).toHaveValue(name);",
               "sourceHash": "2fec3cfdd9db586701b48584db305717a8d4202676fba01544fbf8ad1d4ed1fa",
               "line": 189
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-15 표시명 변경 후 같은 부서ID의 직원·공정품목 연결수와 재고 위치를 보존",
+              "assertion": "expect((await response.json()).name).toBe(\"튜브\");",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 190
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-15 표시명 변경 후 같은 부서ID의 직원·공정품목 연결수와 재고 위치를 보존",
+              "assertion": "await expect(row).toContainText(name);",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 190
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-15 표시명 변경 후 같은 부서ID의 직원·공정품목 연결수와 재고 위치를 보존",
+              "assertion": "await expect(employeeCount).toHaveText(employeeBefore!);",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 190
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-15 표시명 변경 후 같은 부서ID의 직원·공정품목 연결수와 재고 위치를 보존",
+              "assertion": "await expect(itemCount).toHaveText(itemsBefore!);",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 190
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-15 표시명 변경 후 같은 부서ID의 직원·공정품목 연결수와 재고 위치를 보존",
+              "assertion": "await expect(page.getByText(/공정 코드 매핑 없음/)).toHaveCount(0);",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 190
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-15 표시명 변경 후 같은 부서ID의 직원·공정품목 연결수와 재고 위치를 보존",
+              "assertion": "expect(await read(request, \"/api/employees\")).toEqual(employees);",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 190
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-15 표시명 변경 후 같은 부서ID의 직원·공정품목 연결수와 재고 위치를 보존",
+              "assertion": "expect(await read(request, \"/api/items?limit=2000\")).toEqual(items);",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 190
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-15 표시명 변경 후 같은 부서ID의 직원·공정품목 연결수와 재고 위치를 보존",
+              "assertion": "await expect(page.getByRole(\"textbox\", { name: \"부서명\", exact: true })).toHaveValue(name);",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 190
             }
           ]
         }
@@ -90474,42 +91104,42 @@
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "8.19-16 부서 영구 삭제 차단은 서버의 모든 의존 사유를 화면에 표시하고 기록을 보존",
               "assertion": "expect(response.status()).toBe(409);",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 129
             },
             {
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "8.19-16 부서 영구 삭제 차단은 서버의 모든 의존 사유를 화면에 표시하고 기록을 보존",
               "assertion": "await expect(page.locator('[role=\"alert\"]:not(#__next-route-announcer__)')).toContainText(`${entry.label} ${entry.count}건`);",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 129
             },
             {
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "8.19-16 부서 영구 삭제 차단은 서버의 모든 의존 사유를 화면에 표시하고 기록을 보존",
               "assertion": "expect(await read(request, \"/api/departments\")).toEqual(departments);",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 129
             },
             {
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "8.19-16 부서 영구 삭제 차단은 서버의 모든 의존 사유를 화면에 표시하고 기록을 보존",
               "assertion": "expect(await read(request, `/api/items/${item.item_id}`)).toEqual(beforeItem);",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 129
             },
             {
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "8.19-16 부서 영구 삭제 차단은 서버의 모든 의존 사유를 화면에 표시하고 기록을 보존",
               "assertion": "expect(await read(request, `/api/inventory/transactions?item_id=${item.item_id}`)).toEqual(beforeLogs);",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 129
             },
             {
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "8.19-16 부서 영구 삭제 차단은 서버의 모든 의존 사유를 화면에 표시하고 기록을 보존",
               "assertion": "expect(await read(request, `/api/stock-requests/${work.request_id}`)).toEqual(beforeWork);",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 129
             }
           ],
@@ -90672,6 +91302,48 @@
               "assertion": "expect(await read(request, `/api/stock-requests/${work.request_id}`)).toEqual(beforeWork);",
               "sourceHash": "6396e36a10053c85e5314657d16170a331f0ac04540dea6fbb9b121f8bdbae4e",
               "line": 128
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "8.19-16 부서 영구 삭제 차단은 서버의 모든 의존 사유를 화면에 표시하고 기록을 보존",
+              "assertion": "expect(response.status()).toBe(409);",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "line": 129
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "8.19-16 부서 영구 삭제 차단은 서버의 모든 의존 사유를 화면에 표시하고 기록을 보존",
+              "assertion": "await expect(page.locator('[role=\"alert\"]:not(#__next-route-announcer__)')).toContainText(`${entry.label} ${entry.count}건`);",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "line": 129
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "8.19-16 부서 영구 삭제 차단은 서버의 모든 의존 사유를 화면에 표시하고 기록을 보존",
+              "assertion": "expect(await read(request, \"/api/departments\")).toEqual(departments);",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "line": 129
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "8.19-16 부서 영구 삭제 차단은 서버의 모든 의존 사유를 화면에 표시하고 기록을 보존",
+              "assertion": "expect(await read(request, `/api/items/${item.item_id}`)).toEqual(beforeItem);",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "line": 129
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "8.19-16 부서 영구 삭제 차단은 서버의 모든 의존 사유를 화면에 표시하고 기록을 보존",
+              "assertion": "expect(await read(request, `/api/inventory/transactions?item_id=${item.item_id}`)).toEqual(beforeLogs);",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "line": 129
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "8.19-16 부서 영구 삭제 차단은 서버의 모든 의존 사유를 화면에 표시하고 기록을 보존",
+              "assertion": "expect(await read(request, `/api/stock-requests/${work.request_id}`)).toEqual(beforeWork);",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "line": 129
             }
           ]
         }
@@ -102676,35 +103348,35 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-26 관리자 PIN 길이·확인 불일치 차단과 실제 저장 중 중복 제출 방지",
               "assertion": "await expect(save).toBeDisabled();",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 58
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-26 관리자 PIN 길이·확인 불일치 차단과 실제 저장 중 중복 제출 방지",
               "assertion": "expect(writes).toEqual([]);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 58
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-26 관리자 PIN 길이·확인 불일치 차단과 실제 저장 중 중복 제출 방지",
               "assertion": "await expect(page.getByText(\"새 PIN과 일치하지 않습니다.\", { exact: true })).toBeVisible();",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 58
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-26 관리자 PIN 길이·확인 불일치 차단과 실제 저장 중 중복 제출 방지",
               "assertion": "expect(writes).toHaveLength(1);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 58
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "8.19-26 관리자 PIN 길이·확인 불일치 차단과 실제 저장 중 중복 제출 방지",
               "assertion": "await expect(current).toHaveValue(\"\"); await expect(next).toHaveValue(\"\"); await expect(confirm).toHaveValue(\"\");",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 58
             }
           ],
@@ -102957,6 +103629,41 @@
               "selector": "8.19-26 관리자 PIN 길이·확인 불일치 차단과 실제 저장 중 중복 제출 방지",
               "assertion": "await expect(current).toHaveValue(\"\"); await expect(next).toHaveValue(\"\"); await expect(confirm).toHaveValue(\"\");",
               "sourceHash": "1606c979040024d1b4ee534d45615bc5dc3095145338d40b7859bc58a75c7ddf",
+              "line": 58
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-26 관리자 PIN 길이·확인 불일치 차단과 실제 저장 중 중복 제출 방지",
+              "assertion": "await expect(save).toBeDisabled();",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 58
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-26 관리자 PIN 길이·확인 불일치 차단과 실제 저장 중 중복 제출 방지",
+              "assertion": "expect(writes).toEqual([]);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 58
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-26 관리자 PIN 길이·확인 불일치 차단과 실제 저장 중 중복 제출 방지",
+              "assertion": "await expect(page.getByText(\"새 PIN과 일치하지 않습니다.\", { exact: true })).toBeVisible();",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 58
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-26 관리자 PIN 길이·확인 불일치 차단과 실제 저장 중 중복 제출 방지",
+              "assertion": "expect(writes).toHaveLength(1);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 58
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "8.19-26 관리자 PIN 길이·확인 불일치 차단과 실제 저장 중 중복 제출 방지",
+              "assertion": "await expect(current).toHaveValue(\"\"); await expect(next).toHaveValue(\"\"); await expect(confirm).toHaveValue(\"\");",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
               "line": 58
             }
           ]
@@ -151575,8 +152282,8 @@
               "file": "frontend/tests/e2e/admin-expectations.spec.ts",
               "selector": "8.19-02 8.19-03 PC-DELTA-CACHE02 다른 탭 모델명 변경과 통신 차단 후 온라인 복귀",
               "assertion": "await expect(second.getByRole(\"grid\", { name: \"모델 목록\" }).getByRole(\"row\").filter({ hasText: label })).toBeVisible({ timeout: 30_000 });",
-              "sourceHash": "2a99ae6bb57d56e6dce2cfc744defa0c49c1ba8967e985902401bf7563095d14",
-              "line": 212
+              "sourceHash": "8368b2f805897c07ace06e782044571a965b4d8bd3593f3429d10bbdf375bc7f",
+              "line": 209
             }
           ],
           "execution": {
@@ -151667,6 +152374,13 @@
               "selector": "8.19-02 8.19-03 PC-DELTA-CACHE02 다른 탭 모델명 변경과 통신 차단 후 온라인 복귀",
               "assertion": "await expect(second.getByRole(\"grid\", { name: \"모델 목록\" }).getByRole(\"row\").filter({ hasText: label })).toBeVisible({ timeout: 30_000 });",
               "sourceHash": "c1fcc61c52979b69f967c55cce170b03af46d2c5dbf0be00243fbae8c270c007",
+              "line": 212
+            },
+            {
+              "file": "frontend/tests/e2e/admin-expectations.spec.ts",
+              "selector": "8.19-02 8.19-03 PC-DELTA-CACHE02 다른 탭 모델명 변경과 통신 차단 후 온라인 복귀",
+              "assertion": "await expect(second.getByRole(\"grid\", { name: \"모델 목록\" }).getByRole(\"row\").filter({ hasText: label })).toBeVisible({ timeout: 30_000 });",
+              "sourceHash": "2a99ae6bb57d56e6dce2cfc744defa0c49c1ba8967e985902401bf7563095d14",
               "line": 212
             }
           ]
@@ -158331,28 +159045,28 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "PC-DELTA-IOORDER-01 실제 드래그 저장·재진입·새로고침·초기화는 다른 직원 탭 순서를 보존",
               "assertion": "expect(await ids(page)).toEqual(expected);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 316
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "PC-DELTA-IOORDER-01 실제 드래그 저장·재진입·새로고침·초기화는 다른 직원 탭 순서를 보존",
               "assertion": "expect([...persisted].sort((left, right) => left.display_order - right.display_order).map((row) => row.item_id)).toEqual(expected);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 316
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "PC-DELTA-IOORDER-01 실제 드래그 저장·재진입·새로고침·초기화는 다른 직원 탭 순서를 보존",
               "assertion": "expect(await ids(other)).toEqual(otherBaseline);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 316
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "PC-DELTA-IOORDER-01 실제 드래그 저장·재진입·새로고침·초기화는 다른 직원 탭 순서를 보존",
               "assertion": "await expect.poll(() => ids(page)).toEqual(baseline);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 316
             }
           ],
@@ -158514,6 +159228,34 @@
               "selector": "PC-DELTA-IOORDER-01 실제 드래그 저장·재진입·새로고침·초기화는 다른 직원 탭 순서를 보존",
               "assertion": "await expect.poll(() => ids(page)).toEqual(baseline);",
               "sourceHash": "1606c979040024d1b4ee534d45615bc5dc3095145338d40b7859bc58a75c7ddf",
+              "line": 316
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-IOORDER-01 실제 드래그 저장·재진입·새로고침·초기화는 다른 직원 탭 순서를 보존",
+              "assertion": "expect(await ids(page)).toEqual(expected);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 316
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-IOORDER-01 실제 드래그 저장·재진입·새로고침·초기화는 다른 직원 탭 순서를 보존",
+              "assertion": "expect([...persisted].sort((left, right) => left.display_order - right.display_order).map((row) => row.item_id)).toEqual(expected);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 316
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-IOORDER-01 실제 드래그 저장·재진입·새로고침·초기화는 다른 직원 탭 순서를 보존",
+              "assertion": "expect(await ids(other)).toEqual(otherBaseline);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 316
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-IOORDER-01 실제 드래그 저장·재진입·새로고침·초기화는 다른 직원 탭 순서를 보존",
+              "assertion": "await expect.poll(() => ids(page)).toEqual(baseline);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
               "line": 316
             }
           ]
@@ -176114,63 +176856,63 @@
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코드·모델 연결 수에 같은 기준",
               "assertion": "await expect(inventoryRow).toContainText(current.mes_code!);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 30
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코드·모델 연결 수에 같은 기준",
               "assertion": "await expect(inventoryRow).toHaveCount(0);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 30
             },
             {
               "file": "frontend/tests/e2e/admin-master-live.spec.ts",
               "selector": "PC-DELTA-ADMIN-01 품목 수정은 다른 직원의 열린 입출고 후보에 새 이름·코드를 반영한다",
               "assertion": "await expect(candidate).toContainText(name, { timeout: 30_000 });",
-              "sourceHash": "68147bf04079a93633dc4f19b0126d02ebb39990df0f5b6895dfc2225971c986",
+              "sourceHash": "561d6f7e2353eec4ef4c3e429100bb3c4368a62b09b8850533f3643d1ade2f3e",
               "line": 24
             },
             {
               "file": "frontend/tests/e2e/admin-master-live.spec.ts",
               "selector": "PC-DELTA-ADMIN-01 품목 수정은 다른 직원의 열린 입출고 후보에 새 이름·코드를 반영한다",
               "assertion": "await expect(candidate).toContainText(code.replaceAll(\"-\", \"\\u2011\"));",
-              "sourceHash": "68147bf04079a93633dc4f19b0126d02ebb39990df0f5b6895dfc2225971c986",
+              "sourceHash": "561d6f7e2353eec4ef4c3e429100bb3c4368a62b09b8850533f3643d1ade2f3e",
               "line": 24
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-08 실제 직원 추가는 이미 열린 로그인 후보·목록에 새 식별정보를 반영",
               "assertion": "await expect(login.getByRole(\"option\", { name: new RegExp(name) })).toBeVisible({ timeout: 30_000 });",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 112
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 110
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
               "assertion": "await expect(targetPage.getByRole(\"tab\", { name: /창고 승인함/ })).toHaveCount(0);",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 45
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 43
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
               "assertion": "await expect(fresh.getByRole(\"tab\", { name: /창고 승인함/ })).toBeVisible();",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 45
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 43
             },
             {
               "file": "frontend/tests/e2e/admin-master-live.spec.ts",
               "selector": "PC-DELTA-ADMIN-01 부서 표시명 수정은 다른 열린 직원 후보를 갱신하고 미저장 이름을 보존한다",
               "assertion": "await expect(observer.getByRole(\"option\", { name, exact: true })).toBeVisible({ timeout: 30_000 });",
-              "sourceHash": "68147bf04079a93633dc4f19b0126d02ebb39990df0f5b6895dfc2225971c986",
+              "sourceHash": "561d6f7e2353eec4ef4c3e429100bb3c4368a62b09b8850533f3643d1ade2f3e",
               "line": 71
             },
             {
               "file": "frontend/tests/e2e/admin-master-live.spec.ts",
               "selector": "PC-DELTA-ADMIN-01 부서 표시명 수정은 다른 열린 직원 후보를 갱신하고 미저장 이름을 보존한다",
               "assertion": "await expect(observer.locator(\"#emp-edit-name\")).toHaveValue(draftName);",
-              "sourceHash": "68147bf04079a93633dc4f19b0126d02ebb39990df0f5b6895dfc2225971c986",
+              "sourceHash": "561d6f7e2353eec4ef4c3e429100bb3c4368a62b09b8850533f3643d1ade2f3e",
               "line": 71
             },
             {
@@ -176417,6 +177159,69 @@
               "assertion": "await expect(childRow(other, children[0].item_name).getByTitle(\"클릭하여 수량 수정\")).toBeDisabled();",
               "sourceHash": "ce69fec0098dbe4792da584f596c77c1f22d06411aefd9cdd163c6c1a2a19622",
               "line": 88
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코드·모델 연결 수에 같은 기준",
+              "assertion": "await expect(inventoryRow).toContainText(current.mes_code!);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 30
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코드·모델 연결 수에 같은 기준",
+              "assertion": "await expect(inventoryRow).toHaveCount(0);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 30
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-live.spec.ts",
+              "selector": "PC-DELTA-ADMIN-01 품목 수정은 다른 직원의 열린 입출고 후보에 새 이름·코드를 반영한다",
+              "assertion": "await expect(candidate).toContainText(name, { timeout: 30_000 });",
+              "sourceHash": "68147bf04079a93633dc4f19b0126d02ebb39990df0f5b6895dfc2225971c986",
+              "line": 24
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-live.spec.ts",
+              "selector": "PC-DELTA-ADMIN-01 품목 수정은 다른 직원의 열린 입출고 후보에 새 이름·코드를 반영한다",
+              "assertion": "await expect(candidate).toContainText(code.replaceAll(\"-\", \"\\u2011\"));",
+              "sourceHash": "68147bf04079a93633dc4f19b0126d02ebb39990df0f5b6895dfc2225971c986",
+              "line": 24
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-08 실제 직원 추가는 이미 열린 로그인 후보·목록에 새 식별정보를 반영",
+              "assertion": "await expect(login.getByRole(\"option\", { name: new RegExp(name) })).toBeVisible({ timeout: 30_000 });",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 112
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
+              "assertion": "await expect(targetPage.getByRole(\"tab\", { name: /창고 승인함/ })).toHaveCount(0);",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 45
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
+              "assertion": "await expect(fresh.getByRole(\"tab\", { name: /창고 승인함/ })).toBeVisible();",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 45
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-live.spec.ts",
+              "selector": "PC-DELTA-ADMIN-01 부서 표시명 수정은 다른 열린 직원 후보를 갱신하고 미저장 이름을 보존한다",
+              "assertion": "await expect(observer.getByRole(\"option\", { name, exact: true })).toBeVisible({ timeout: 30_000 });",
+              "sourceHash": "68147bf04079a93633dc4f19b0126d02ebb39990df0f5b6895dfc2225971c986",
+              "line": 71
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-live.spec.ts",
+              "selector": "PC-DELTA-ADMIN-01 부서 표시명 수정은 다른 열린 직원 후보를 갱신하고 미저장 이름을 보존한다",
+              "assertion": "await expect(observer.locator(\"#emp-edit-name\")).toHaveValue(draftName);",
+              "sourceHash": "68147bf04079a93633dc4f19b0126d02ebb39990df0f5b6895dfc2225971c986",
+              "line": 71
             }
           ]
         },
@@ -176458,14 +177263,14 @@
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "8.19-12 퇴직 직원의 실제 완료 요청과 내역 처리자는 삭제 뒤에도 남는다",
               "assertion": "expect(await read(request, `/api/stock-requests/${work.request_id}`)).toEqual(before);",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 98
             },
             {
               "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
               "selector": "8.19-12 퇴직 직원의 실제 완료 요청과 내역 처리자는 삭제 뒤에도 남는다",
               "assertion": "expect(await read(request, `/api/inventory/transactions?item_id=${item.item_id}`)).toEqual(logs);",
-              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "sourceHash": "b448ea351518fc7c74c45e220db8000b1c8e6d122649229047e92f32e6165a2a",
               "line": 98
             },
             {
@@ -176702,6 +177507,20 @@
               "selector": "test_bom_admin_edit_keeps_old_shipping_snapshot_and_new_request_uses_latest",
               "assertion": "assert _rows(db_session, TransactionLog, shipping_request_id=old_id) == old_logs",
               "sourceHash": "00edb3bf801c24404132d2ba9b463195b00aa07f21ab9f75b87363444f86ab45"
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "8.19-12 퇴직 직원의 실제 완료 요청과 내역 처리자는 삭제 뒤에도 남는다",
+              "assertion": "expect(await read(request, `/api/stock-requests/${work.request_id}`)).toEqual(before);",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "line": 98
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-expectations.spec.ts",
+              "selector": "8.19-12 퇴직 직원의 실제 완료 요청과 내역 처리자는 삭제 뒤에도 남는다",
+              "assertion": "expect(await read(request, `/api/inventory/transactions?item_id=${item.item_id}`)).toEqual(logs);",
+              "sourceHash": "a06c9ef7a44553df7bad8fa2a8118c8c4860045c1872e68c18708d13c8071da6",
+              "line": 98
             }
           ]
         },
@@ -176810,63 +177629,63 @@
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코드·모델 연결 수에 같은 기준",
               "assertion": "await expect(inventoryRow).toContainText(current.mes_code!);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 30
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코드·모델 연결 수에 같은 기준",
               "assertion": "await expect(inventoryRow).toHaveCount(0);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 30
             },
             {
               "file": "frontend/tests/e2e/admin-master-live.spec.ts",
               "selector": "PC-DELTA-ADMIN-01 품목 수정은 다른 직원의 열린 입출고 후보에 새 이름·코드를 반영한다",
               "assertion": "await expect(candidate).toContainText(name, { timeout: 30_000 });",
-              "sourceHash": "68147bf04079a93633dc4f19b0126d02ebb39990df0f5b6895dfc2225971c986",
+              "sourceHash": "561d6f7e2353eec4ef4c3e429100bb3c4368a62b09b8850533f3643d1ade2f3e",
               "line": 24
             },
             {
               "file": "frontend/tests/e2e/admin-master-live.spec.ts",
               "selector": "PC-DELTA-ADMIN-01 품목 수정은 다른 직원의 열린 입출고 후보에 새 이름·코드를 반영한다",
               "assertion": "await expect(candidate).toContainText(code.replaceAll(\"-\", \"\\u2011\"));",
-              "sourceHash": "68147bf04079a93633dc4f19b0126d02ebb39990df0f5b6895dfc2225971c986",
+              "sourceHash": "561d6f7e2353eec4ef4c3e429100bb3c4368a62b09b8850533f3643d1ade2f3e",
               "line": 24
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-08 실제 직원 추가는 이미 열린 로그인 후보·목록에 새 식별정보를 반영",
               "assertion": "await expect(login.getByRole(\"option\", { name: new RegExp(name) })).toBeVisible({ timeout: 30_000 });",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 112
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 110
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
               "assertion": "await expect(targetPage.getByRole(\"tab\", { name: /창고 승인함/ })).toHaveCount(0);",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 45
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 43
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
               "assertion": "await expect(fresh.getByRole(\"tab\", { name: /창고 승인함/ })).toBeVisible();",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 45
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 43
             },
             {
               "file": "frontend/tests/e2e/admin-master-live.spec.ts",
               "selector": "PC-DELTA-ADMIN-01 부서 표시명 수정은 다른 열린 직원 후보를 갱신하고 미저장 이름을 보존한다",
               "assertion": "await expect(observer.getByRole(\"option\", { name, exact: true })).toBeVisible({ timeout: 30_000 });",
-              "sourceHash": "68147bf04079a93633dc4f19b0126d02ebb39990df0f5b6895dfc2225971c986",
+              "sourceHash": "561d6f7e2353eec4ef4c3e429100bb3c4368a62b09b8850533f3643d1ade2f3e",
               "line": 71
             },
             {
               "file": "frontend/tests/e2e/admin-master-live.spec.ts",
               "selector": "PC-DELTA-ADMIN-01 부서 표시명 수정은 다른 열린 직원 후보를 갱신하고 미저장 이름을 보존한다",
               "assertion": "await expect(observer.locator(\"#emp-edit-name\")).toHaveValue(draftName);",
-              "sourceHash": "68147bf04079a93633dc4f19b0126d02ebb39990df0f5b6895dfc2225971c986",
+              "sourceHash": "561d6f7e2353eec4ef4c3e429100bb3c4368a62b09b8850533f3643d1ade2f3e",
               "line": 71
             },
             {
@@ -177113,6 +177932,69 @@
               "assertion": "await expect(childRow(other, children[0].item_name).getByTitle(\"클릭하여 수량 수정\")).toBeDisabled();",
               "sourceHash": "ce69fec0098dbe4792da584f596c77c1f22d06411aefd9cdd163c6c1a2a19622",
               "line": 88
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코드·모델 연결 수에 같은 기준",
+              "assertion": "await expect(inventoryRow).toContainText(current.mes_code!);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 30
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코드·모델 연결 수에 같은 기준",
+              "assertion": "await expect(inventoryRow).toHaveCount(0);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 30
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-live.spec.ts",
+              "selector": "PC-DELTA-ADMIN-01 품목 수정은 다른 직원의 열린 입출고 후보에 새 이름·코드를 반영한다",
+              "assertion": "await expect(candidate).toContainText(name, { timeout: 30_000 });",
+              "sourceHash": "68147bf04079a93633dc4f19b0126d02ebb39990df0f5b6895dfc2225971c986",
+              "line": 24
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-live.spec.ts",
+              "selector": "PC-DELTA-ADMIN-01 품목 수정은 다른 직원의 열린 입출고 후보에 새 이름·코드를 반영한다",
+              "assertion": "await expect(candidate).toContainText(code.replaceAll(\"-\", \"\\u2011\"));",
+              "sourceHash": "68147bf04079a93633dc4f19b0126d02ebb39990df0f5b6895dfc2225971c986",
+              "line": 24
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-08 실제 직원 추가는 이미 열린 로그인 후보·목록에 새 식별정보를 반영",
+              "assertion": "await expect(login.getByRole(\"option\", { name: new RegExp(name) })).toBeVisible({ timeout: 30_000 });",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 112
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
+              "assertion": "await expect(targetPage.getByRole(\"tab\", { name: /창고 승인함/ })).toHaveCount(0);",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 45
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-09 실제 창고 ${role} 부여·열린승인폼 회수·재부여·새로그인·정확한 한번 승인",
+              "assertion": "await expect(fresh.getByRole(\"tab\", { name: /창고 승인함/ })).toBeVisible();",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 45
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-live.spec.ts",
+              "selector": "PC-DELTA-ADMIN-01 부서 표시명 수정은 다른 열린 직원 후보를 갱신하고 미저장 이름을 보존한다",
+              "assertion": "await expect(observer.getByRole(\"option\", { name, exact: true })).toBeVisible({ timeout: 30_000 });",
+              "sourceHash": "68147bf04079a93633dc4f19b0126d02ebb39990df0f5b6895dfc2225971c986",
+              "line": 71
+            },
+            {
+              "file": "frontend/tests/e2e/admin-master-live.spec.ts",
+              "selector": "PC-DELTA-ADMIN-01 부서 표시명 수정은 다른 열린 직원 후보를 갱신하고 미저장 이름을 보존한다",
+              "assertion": "await expect(observer.locator(\"#emp-edit-name\")).toHaveValue(draftName);",
+              "sourceHash": "68147bf04079a93633dc4f19b0126d02ebb39990df0f5b6895dfc2225971c986",
+              "line": 71
             }
           ]
         }
@@ -177345,29 +178227,29 @@
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-08 실제 직원 추가는 이미 열린 로그인 후보·목록에 새 식별정보를 반영",
               "assertion": "expect(employee!.hidden_sidebar_tabs).toEqual([\"admin\"]);",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 112
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 110
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-08 실제 직원 추가는 이미 열린 로그인 후보·목록에 새 식별정보를 반영",
               "assertion": "await expect(page.getByRole(\"checkbox\", { name: \"관리자\", exact: true })).not.toBeChecked();",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 112
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 110
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-08 실제 직원 추가는 이미 열린 로그인 후보·목록에 새 식별정보를 반영",
               "assertion": "await expect(login.getByRole(\"navigation\", { name: \"관리자 섹션\" })).toHaveCount(0);",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 112
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 110
             },
             {
               "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
               "selector": "8.19-08 실제 직원 추가는 이미 열린 로그인 후보·목록에 새 식별정보를 반영",
               "assertion": "expect(enabled.hidden_sidebar_tabs).toEqual([]);",
-              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
-              "line": 112
+              "sourceHash": "debe7cbca8c13e0a0b2ebb75ee47fde65b7f845668271a4a817cea302b0597e9",
+              "line": 110
             }
           ],
           "execution": {
@@ -177471,6 +178353,34 @@
               "assertion": "expect(enabled.hidden_sidebar_tabs).toEqual([]);",
               "sourceHash": "2fec3cfdd9db586701b48584db305717a8d4202676fba01544fbf8ad1d4ed1fa",
               "line": 111
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-08 실제 직원 추가는 이미 열린 로그인 후보·목록에 새 식별정보를 반영",
+              "assertion": "expect(employee!.hidden_sidebar_tabs).toEqual([\"admin\"]);",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 112
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-08 실제 직원 추가는 이미 열린 로그인 후보·목록에 새 식별정보를 반영",
+              "assertion": "await expect(page.getByRole(\"checkbox\", { name: \"관리자\", exact: true })).not.toBeChecked();",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 112
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-08 실제 직원 추가는 이미 열린 로그인 후보·목록에 새 식별정보를 반영",
+              "assertion": "await expect(login.getByRole(\"navigation\", { name: \"관리자 섹션\" })).toHaveCount(0);",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 112
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-lifecycle-expectations.spec.ts",
+              "selector": "8.19-08 실제 직원 추가는 이미 열린 로그인 후보·목록에 새 식별정보를 반영",
+              "assertion": "expect(enabled.hidden_sidebar_tabs).toEqual([]);",
+              "sourceHash": "f8b3d5330201c2acfee590d7bd2d06a47a8dace4c23e1d96f5267852021ca8b9",
+              "line": 112
             }
           ]
         }
@@ -177897,8 +178807,8 @@
               "file": "frontend/tests/e2e/admin-expectations.spec.ts",
               "selector": "PC-DELTA-ADMIN-03 구매 기준 실패 보존·재시도·재진입과 다른 품목/재고 무변경",
               "assertion": "await expect(field).toHaveValue(value);",
-              "sourceHash": "2a99ae6bb57d56e6dce2cfc744defa0c49c1ba8967e985902401bf7563095d14",
-              "line": 159
+              "sourceHash": "8368b2f805897c07ace06e782044571a965b4d8bd3593f3429d10bbdf375bc7f",
+              "line": 156
             }
           ],
           "execution": {
@@ -177989,6 +178899,13 @@
               "selector": "PC-DELTA-ADMIN-03 구매 기준 실패 보존·재시도·재진입과 다른 품목/재고 무변경",
               "assertion": "await expect(field).toHaveValue(value);",
               "sourceHash": "c1fcc61c52979b69f967c55cce170b03af46d2c5dbf0be00243fbae8c270c007",
+              "line": 159
+            },
+            {
+              "file": "frontend/tests/e2e/admin-expectations.spec.ts",
+              "selector": "PC-DELTA-ADMIN-03 구매 기준 실패 보존·재시도·재진입과 다른 품목/재고 무변경",
+              "assertion": "await expect(field).toHaveValue(value);",
+              "sourceHash": "2a99ae6bb57d56e6dce2cfc744defa0c49c1ba8967e985902401bf7563095d14",
               "line": 159
             }
           ]
@@ -178270,28 +179187,28 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
               "assertion": "expect(actions.map((records) => records.length)).toEqual([1, 1]);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 373
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
               "assertion": "expect(records[0][1]).toBe(actors.approver.name);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 373
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
               "assertion": "expect(records[0][2]).toBe(actors.approver.employee_code);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 373
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
               "assertion": "expect(actions.map((records) => records[0][6])).toEqual([\"POST /api/items\", \"PUT /api/items/:id\"]);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 373
             }
           ],
@@ -178453,6 +179370,34 @@
               "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
               "assertion": "expect(actions.map((records) => records[0][6])).toEqual([\"POST /api/items\", \"PUT /api/items/:id\"]);",
               "sourceHash": "1606c979040024d1b4ee534d45615bc5dc3095145338d40b7859bc58a75c7ddf",
+              "line": 373
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
+              "assertion": "expect(actions.map((records) => records.length)).toEqual([1, 1]);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 373
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
+              "assertion": "expect(records[0][1]).toBe(actors.approver.name);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 373
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
+              "assertion": "expect(records[0][2]).toBe(actors.approver.employee_code);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 373
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
+              "assertion": "expect(actions.map((records) => records[0][6])).toEqual([\"POST /api/items\", \"PUT /api/items/:id\"]);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
               "line": 373
             }
           ]
@@ -178856,21 +179801,21 @@
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
               "assertion": "await expect(detail.getByLabel(\"창고 재고 0 +20→20 EA\", { exact: true })).toBeVisible();",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 373
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
               "assertion": "await expect(detail.getByTestId(\"history-participant-row\")).toContainText(actors.approver.name);",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 373
             },
             {
               "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
               "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
               "assertion": "await expect(detail.getByTestId(\"history-participant-row\")).toContainText(formatHistoryDateTimeLong(logs[0].created_at));",
-              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "sourceHash": "fbca1f7228f734a3fc1413fd5a3c8c3328bfbd922cf4d4d4e733682a075e3958",
               "line": 373
             }
           ],
@@ -179011,6 +179956,27 @@
               "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
               "assertion": "await expect(detail.getByTestId(\"history-participant-row\")).toContainText(formatHistoryDateTimeLong(logs[0].created_at));",
               "sourceHash": "1606c979040024d1b4ee534d45615bc5dc3095145338d40b7859bc58a75c7ddf",
+              "line": 373
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
+              "assertion": "await expect(detail.getByLabel(\"창고 재고 0 +20→20 EA\", { exact: true })).toBeVisible();",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 373
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
+              "assertion": "await expect(detail.getByTestId(\"history-participant-row\")).toContainText(actors.approver.name);",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
+              "line": 373
+            },
+            {
+              "file": "frontend/tests/e2e/admin-ui-extra-expectations.spec.ts",
+              "selector": "PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 사번과 초기20개 거래 상세",
+              "assertion": "await expect(detail.getByTestId(\"history-participant-row\")).toContainText(formatHistoryDateTimeLong(logs[0].created_at));",
+              "sourceHash": "62f5c103cd8ecca82c6a0fe9915aa8e26a078de6a77db527b7a00c98fead1ff1",
               "line": 373
             }
           ]
@@ -187979,14 +188945,14 @@
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-SUPPLIER-01 실제 업체 생성·정렬·이름수정·숨김·복원은 후보와 당시 내역을 구분",
               "assertion": "await expect(listed).toHaveCount(4);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 81
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-SUPPLIER-01 실제 업체 생성·정렬·이름수정·숨김·복원은 후보와 당시 내역을 구분",
               "assertion": "expect(await listed.locator(\"button:first-child\").allTextContents()).toEqual([names[1], names[0], names[3], names[2]]);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 81
             }
           ],
@@ -188079,7 +189045,21 @@
                 "sourceHash": "7bf60e25ff22f291ed247699be60e5acff2824be1c6b96a60b4a1cf3709aa919",
                 "line": 81
               }
-            ]
+            ],
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-SUPPLIER-01 실제 업체 생성·정렬·이름수정·숨김·복원은 후보와 당시 내역을 구분",
+              "assertion": "await expect(listed).toHaveCount(4);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 81
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-SUPPLIER-01 실제 업체 생성·정렬·이름수정·숨김·복원은 후보와 당시 내역을 구분",
+              "assertion": "expect(await listed.locator(\"button:first-child\").allTextContents()).toEqual([names[1], names[0], names[3], names[2]]);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 81
+            }
           ]
         },
         {
@@ -188193,14 +189173,14 @@
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-SUPPLIER-01 실제 업체 생성·정렬·이름수정·숨김·복원은 후보와 당시 내역을 구분",
               "assertion": "await expect(picker.getByRole(\"button\", { name: changedName, exact: true })).toBeEnabled();",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 81
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-SUPPLIER-01 실제 업체 생성·정렬·이름수정·숨김·복원은 후보와 당시 내역을 구분",
               "assertion": "await expect(picker.getByRole(\"button\", { name: `${changedName} 선택됨`, exact: true })).toBeVisible();",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 81
             }
           ],
@@ -188293,7 +189273,21 @@
                 "sourceHash": "7bf60e25ff22f291ed247699be60e5acff2824be1c6b96a60b4a1cf3709aa919",
                 "line": 81
               }
-            ]
+            ],
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-SUPPLIER-01 실제 업체 생성·정렬·이름수정·숨김·복원은 후보와 당시 내역을 구분",
+              "assertion": "await expect(picker.getByRole(\"button\", { name: changedName, exact: true })).toBeEnabled();",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 81
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-SUPPLIER-01 실제 업체 생성·정렬·이름수정·숨김·복원은 후보와 당시 내역을 구분",
+              "assertion": "await expect(picker.getByRole(\"button\", { name: `${changedName} 선택됨`, exact: true })).toBeVisible();",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 81
+            }
           ]
         },
         {
@@ -188310,35 +189304,35 @@
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-SUPPLIER-01 실제 업체 생성·정렬·이름수정·숨김·복원은 후보와 당시 내역을 구분",
               "assertion": "await expect(picker.getByRole(\"button\", { name: `${originalName} 선택됨`, exact: true })).toBeVisible();",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 81
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-SUPPLIER-01 실제 업체 생성·정렬·이름수정·숨김·복원은 후보와 당시 내역을 구분",
               "assertion": "await expect(picker.getByRole(\"button\", { name: `${changedName} 선택됨`, exact: true })).toBeVisible();",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 81
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-SUPPLIER-01 실제 업체 생성·정렬·이름수정·숨김·복원은 후보와 당시 내역을 구분",
               "assertion": "await expect(picker.getByRole(\"button\", { name: changedName, exact: true })).toHaveCount(0);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 81
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-SUPPLIER-01 실제 업체 생성·정렬·이름수정·숨김·복원은 후보와 당시 내역을 구분",
               "assertion": "expect(await read(request, `/api/inventory/transactions?item_id=${item.item_id}`)).toEqual(logs);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 81
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-SUPPLIER-01 실제 업체 생성·정렬·이름수정·숨김·복원은 후보와 당시 내역을 구분",
               "assertion": "await expect(page.locator(`[data-history-detail-log-id=\"${logs[0].log_id}\"]`).filter({ visible: true })).toContainText(originalName);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 81
             }
           ],
@@ -188452,7 +189446,42 @@
                 "sourceHash": "7bf60e25ff22f291ed247699be60e5acff2824be1c6b96a60b4a1cf3709aa919",
                 "line": 81
               }
-            ]
+            ],
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-SUPPLIER-01 실제 업체 생성·정렬·이름수정·숨김·복원은 후보와 당시 내역을 구분",
+              "assertion": "await expect(picker.getByRole(\"button\", { name: `${originalName} 선택됨`, exact: true })).toBeVisible();",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 81
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-SUPPLIER-01 실제 업체 생성·정렬·이름수정·숨김·복원은 후보와 당시 내역을 구분",
+              "assertion": "await expect(picker.getByRole(\"button\", { name: `${changedName} 선택됨`, exact: true })).toBeVisible();",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 81
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-SUPPLIER-01 실제 업체 생성·정렬·이름수정·숨김·복원은 후보와 당시 내역을 구분",
+              "assertion": "await expect(picker.getByRole(\"button\", { name: changedName, exact: true })).toHaveCount(0);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 81
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-SUPPLIER-01 실제 업체 생성·정렬·이름수정·숨김·복원은 후보와 당시 내역을 구분",
+              "assertion": "expect(await read(request, `/api/inventory/transactions?item_id=${item.item_id}`)).toEqual(logs);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 81
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-SUPPLIER-01 실제 업체 생성·정렬·이름수정·숨김·복원은 후보와 당시 내역을 구분",
+              "assertion": "await expect(page.locator(`[data-history-detail-log-id=\"${logs[0].log_id}\"]`).filter({ visible: true })).toContainText(originalName);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 81
+            }
           ]
         }
       ],
@@ -189150,42 +190179,42 @@
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
               "assertion": "await expect(page.locator('[role=\"alert\"]:not(#__next-route-announcer__)')).toContainText(\"PIN\");",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 137
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
               "assertion": "expect(await read(request, `/api/inventory/transactions?item_id=${item.item_id}`)).toEqual(logs);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 137
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
               "assertion": "expect(repeated.status()).toBe(422);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 137
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
               "assertion": "expect(await repeated.text()).toContain(\"이미 취소된 작업입니다.\");",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 137
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
               "assertion": "expect((await read<Item>(request, `/api/items/${item.item_id}`)).warehouse_qty).toBe(7);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 137
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
               "assertion": "expect(await read(request, `/api/inventory/transactions?item_id=${item.item_id}`)).toEqual(cancelled);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 137
             }
           ],
@@ -189306,7 +190335,49 @@
                 "sourceHash": "7bf60e25ff22f291ed247699be60e5acff2824be1c6b96a60b4a1cf3709aa919",
                 "line": 137
               }
-            ]
+            ],
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
+              "assertion": "await expect(page.locator('[role=\"alert\"]:not(#__next-route-announcer__)')).toContainText(\"PIN\");",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 137
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
+              "assertion": "expect(await read(request, `/api/inventory/transactions?item_id=${item.item_id}`)).toEqual(logs);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 137
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
+              "assertion": "expect(repeated.status()).toBe(422);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 137
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
+              "assertion": "expect(await repeated.text()).toContain(\"이미 취소된 작업입니다.\");",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 137
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
+              "assertion": "expect((await read<Item>(request, `/api/items/${item.item_id}`)).warehouse_qty).toBe(7);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 137
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
+              "assertion": "expect(await read(request, `/api/inventory/transactions?item_id=${item.item_id}`)).toEqual(cancelled);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 137
+            }
           ]
         },
         {
@@ -189323,63 +190394,63 @@
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
               "assertion": "await expect(confirmation).toContainText(item.item_name);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 137
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
               "assertion": "await expect(confirmation).toContainText(item.mes_code!);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 137
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
               "assertion": "await expect(commitDialog).toContainText(supplier.name);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 137
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
               "assertion": "expect(await read(request, `/api/items/${item.item_id}`)).toEqual(before);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 137
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
               "assertion": "expect(await read(request, `/api/inventory/transactions?item_id=${item.item_id}`)).toEqual(originalLogs);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 137
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
               "assertion": "await expect(cart.getByRole(\"spinbutton\").first()).toHaveValue(\"2\");",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 137
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
               "assertion": "expect(after.warehouse_qty).toBe(5);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 137
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
               "assertion": "expect(outbound).toHaveLength(1);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 137
             },
             {
               "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
               "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
               "assertion": "expect(cancelled.filter((log) => log.reverses_log_id === outbound[0].log_id)).toHaveLength(1);",
-              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "sourceHash": "6c6f9e3a1d2b7d3d60a0609eac9cbf3be0eddf858d113361dfe9f4dae3fabe35",
               "line": 137
             }
           ],
@@ -189521,7 +190592,70 @@
                 "sourceHash": "7bf60e25ff22f291ed247699be60e5acff2824be1c6b96a60b4a1cf3709aa919",
                 "line": 137
               }
-            ]
+            ],
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
+              "assertion": "await expect(confirmation).toContainText(item.item_name);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 137
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
+              "assertion": "await expect(confirmation).toContainText(item.mes_code!);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 137
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
+              "assertion": "await expect(commitDialog).toContainText(supplier.name);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 137
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
+              "assertion": "expect(await read(request, `/api/items/${item.item_id}`)).toEqual(before);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 137
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
+              "assertion": "expect(await read(request, `/api/inventory/transactions?item_id=${item.item_id}`)).toEqual(originalLogs);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 137
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
+              "assertion": "await expect(cart.getByRole(\"spinbutton\").first()).toHaveValue(\"2\");",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 137
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
+              "assertion": "expect(after.warehouse_qty).toBe(5);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 137
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
+              "assertion": "expect(outbound).toHaveLength(1);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 137
+            },
+            {
+              "file": "frontend/tests/e2e/admin-consumer-chain.spec.ts",
+              "selector": "PC-DELTA-MATERIAL-01 실제 출고 초안·확인·제출과 잘못된 PIN 거부·한번 취소는 같은 재고",
+              "assertion": "expect(cancelled.filter((log) => log.reverses_log_id === outbound[0].log_id)).toHaveLength(1);",
+              "sourceHash": "c34a95b298044dc913c4196011c6ee3d85cdb3920ad5d57f87e26375d5e535ef",
+              "line": 137
+            }
           ]
         }
       ],

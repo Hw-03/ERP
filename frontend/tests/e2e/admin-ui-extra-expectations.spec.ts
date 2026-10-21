@@ -26,10 +26,10 @@ async function openAdmin(page: Page, actors: CommonActors, section: string): Pro
 
 async function fillNewItem(page: Page, name: string): Promise<void> {
   await page.getByRole("button", { name: "품목 추가", exact: true }).click();
-  await page.getByPlaceholder("예: 텅스텐 필라멘트").fill(name);
+  await page.locator("[data-admin-detail-content]").getByPlaceholder("예: 텅스텐 필라멘트").fill(name);
   await page.getByRole("button", { name: /DX3000 \(3\)/ }).click();
   await page.getByRole("button", { name: "+ 위치 추가", exact: true }).click();
-  await page.getByPlaceholder("수량", { exact: true }).fill("20");
+  await page.locator("[data-admin-detail-content]").getByPlaceholder("수량", { exact: true }).fill("20");
 }
 
 async function openPicker(page: Page): Promise<void> {
@@ -116,8 +116,8 @@ test("8.19-04 전체 페이지의 고유 품목과 화면 총수·처음·마지
     const row = page.locator(`[data-item-id="${item.item_id}"]`);
     await expect(row).toBeVisible();
     if (await row.getAttribute("aria-selected") !== "true") await row.click();
-    await expect(page.getByPlaceholder("예: 텅스텐 필라멘트")).toHaveValue(item.item_name);
-    await expect(page.locator("[aria-readonly]")).toHaveText(item.mes_code!);
+    await expect(page.locator("[data-admin-detail-content]").getByPlaceholder("예: 텅스텐 필라멘트")).toHaveValue(item.item_name);
+    await expect(page.locator("[data-admin-detail-content] [aria-readonly]")).toHaveText(item.mes_code!);
   }
   await page.getByRole("textbox", { name: "품목명, 코드 검색", exact: true }).fill("");
   await expect(rows).toHaveCount(population.length);
@@ -208,16 +208,16 @@ test("8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기
     await fillNewItem(second, names[1]);
     const previewCodes = [];
     for (const tab of [page, second]) {
-      await expect(tab.locator("[aria-readonly]")).toHaveText(/^\d+-TR-\d{4}$/);
-      previewCodes.push(await tab.locator("[aria-readonly]").innerText());
+      await expect(tab.locator("[data-admin-detail-content] [aria-readonly]")).toHaveText(/^\d+-TR-\d{4}$/);
+      previewCodes.push(await tab.locator("[data-admin-detail-content] [aria-readonly]").innerText());
     }
     expect(previewCodes[0]).toBe(previewCodes[1]);
     await page.route("**/api/items", (route) => route.request().method() === "POST"
       ? route.fulfill({ status: 503, json: { detail: "품목 생성 검수 실패" } }) : route.continue());
     await page.getByRole("button", { name: "추가", exact: true }).last().click();
     await expect(page.locator('[role="alert"]:not(#__next-route-announcer__)')).toContainText("품목 생성 검수 실패");
-    await expect(page.getByPlaceholder("예: 텅스텐 필라멘트")).toHaveValue(names[0]);
-    await expect(page.getByPlaceholder("수량", { exact: true })).toHaveValue("20");
+    await expect(page.locator("[data-admin-detail-content]").getByPlaceholder("예: 텅스텐 필라멘트")).toHaveValue(names[0]);
+    await expect(page.locator("[data-admin-detail-content]").getByPlaceholder("수량", { exact: true })).toHaveValue("20");
     expect(await read<Item[]>(request, "/api/items?limit=2000")).toEqual(original);
     await page.unroute("**/api/items");
     const writes = [page, second].map((tab) => tab.waitForResponse((response) => response.url().endsWith("/api/items") && response.request().method() === "POST"));
@@ -227,11 +227,11 @@ test("8.19-05 두 직원 탭의 동시 생성은 고유 코드·정확한 초기
     const conflicted = responses.findIndex((response) => response.status() === 409);
     const conflictPage = [page, second][conflicted];
     await expect(conflictPage.locator('[role="alert"]:not(#__next-route-announcer__)')).toContainText("품목 코드가 변경됐습니다.");
-    await expect(conflictPage.getByPlaceholder("예: 텅스텐 필라멘트")).toHaveValue(names[conflicted]);
-    await expect(conflictPage.getByPlaceholder("수량", { exact: true })).toHaveValue("20");
-    await expect(conflictPage.locator("[aria-readonly]")).toHaveText(/^\d+-TR-\d{4}$/);
-    await expect(conflictPage.locator("[aria-readonly]")).not.toHaveText(previewCodes[conflicted]);
-    previewCodes[conflicted] = await conflictPage.locator("[aria-readonly]").innerText();
+    await expect(conflictPage.locator("[data-admin-detail-content]").getByPlaceholder("예: 텅스텐 필라멘트")).toHaveValue(names[conflicted]);
+    await expect(conflictPage.locator("[data-admin-detail-content]").getByPlaceholder("수량", { exact: true })).toHaveValue("20");
+    await expect(conflictPage.locator("[data-admin-detail-content] [aria-readonly]")).toHaveText(/^\d+-TR-\d{4}$/);
+    await expect(conflictPage.locator("[data-admin-detail-content] [aria-readonly]")).not.toHaveText(previewCodes[conflicted]);
+    previewCodes[conflicted] = await conflictPage.locator("[data-admin-detail-content] [aria-readonly]").innerText();
     const retryWrite = conflictPage.waitForResponse((response) => response.url().endsWith("/api/items") && response.request().method() === "POST");
     await conflictPage.getByRole("button", { name: "추가", exact: true }).last().click();
     const retried = await retryWrite;
@@ -384,7 +384,7 @@ test("PC-DELTA-ADMIN-04 PC-DELTA-ADMIN-05 실제 품목 생성·수정 감사 �
   const row = page.locator(`[data-item-id="${item.item_id}"]`);
   await expect(row).toBeVisible();
   if (await row.getAttribute("aria-selected") !== "true") await row.click();
-  await page.getByPlaceholder("예: 텅스텐 필라멘트").fill(`${name}-수정`);
+  await page.locator("[data-admin-detail-content]").getByPlaceholder("예: 텅스텐 필라멘트").fill(`${name}-수정`);
   const updated = page.waitForResponse((response) => response.url().endsWith(`/api/items/${item.item_id}`) && response.request().method() === "PUT");
   await page.getByRole("button", { name: "저장", exact: true }).click();
   const updateResponse = await updated;

@@ -54,7 +54,7 @@ test("8.19-03 관리자 모델 연결 변경은 열린 재고 필터·품목 코
     if (await row.getAttribute("aria-selected") !== "true") await row.click();
     await page.getByRole("button", { name: `${first.model_name} (${first.symbol})`, exact: true }).click();
     await page.getByRole("button", { name: `${second.model_name} (${second.symbol})`, exact: true }).click();
-    await expect(page.locator("[aria-readonly]")).toHaveText(`${second.symbol}-TR-${String(item.serial_no).padStart(4, "0")}`);
+    await expect(page.locator("[data-admin-detail-content] [aria-readonly]")).toHaveText(`${second.symbol}-TR-${String(item.serial_no).padStart(4, "0")}`);
     const write = page.waitForResponse((response) => response.url().endsWith(`/api/items/${item.item_id}`) && response.request().method() === "PUT");
     await page.getByRole("button", { name: "저장", exact: true }).click();
     expect((await write).status()).toBe(200);
