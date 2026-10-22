@@ -1,6 +1,9 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { DailyWorkReportEditor } from "../DailyWorkReportEditor";
+
+beforeAll(() => vi.stubGlobal("ResizeObserver", class { observe = vi.fn(); disconnect = vi.fn(); }));
+afterAll(() => vi.unstubAllGlobals());
 
 function deferred<T>() {
   let resolve!: (value: T) => void;

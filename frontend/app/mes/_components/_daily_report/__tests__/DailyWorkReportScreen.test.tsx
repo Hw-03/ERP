@@ -1,9 +1,12 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { DailyWorkReportScreen } from "../DailyWorkReportScreen";
 import { formatWorkDateLabel, toKstDateKey } from "../dailyReportDate";
 
 const { registerDirtyMock } = vi.hoisted(() => ({ registerDirtyMock: vi.fn() }));
+
+beforeAll(() => vi.stubGlobal("ResizeObserver", class { observe = vi.fn(); disconnect = vi.fn(); }));
+afterAll(() => vi.unstubAllGlobals());
 
 function deferred<T>() {
   let resolve!: (value: T) => void;

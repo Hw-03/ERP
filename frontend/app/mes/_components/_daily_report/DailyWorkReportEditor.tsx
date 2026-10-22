@@ -2,7 +2,7 @@
 
 import { CheckCircle2, PencilLine } from "lucide-react";
 import Image from "next/image";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import layoutStyles from "./dailyMobileLayout.module.css";
 
@@ -28,6 +28,7 @@ export function DailyWorkReportEditor({
   saveRef,
   mobile = false,
   fillAvailableHeight = false,
+  preserveHeight = false,
   loading = false,
 }: {
   initialContent: string;
@@ -42,6 +43,7 @@ export function DailyWorkReportEditor({
   saveRef?: React.MutableRefObject<(() => Promise<void>) | null>;
   mobile?: boolean;
   fillAvailableHeight?: boolean;
+  preserveHeight?: boolean;
   loading?: boolean;
 }) {
   const [content, setContent] = useState(initialContent);
@@ -62,6 +64,21 @@ export function DailyWorkReportEditor({
   const saveLatestRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const dirty = content !== savedContent;
   const mobileFill = mobile && fillAvailableHeight;
+  const sectionRef = useRef<HTMLElement>(null);
+  const desktopSize = preserveHeight ? "lg:h-[var(--daily-editor-height)] lg:flex-none" : "lg:flex-1";
+
+  useLayoutEffect(() => {
+    const section = sectionRef.current;
+    if (!section || mobile || !fillAvailableHeight || preserveHeight) return;
+    // 상세를 펼치기 전의 실제 높이를 유지하고, 접힌 동안에는 화면 크기를 따라간다.
+    const measure = (): void => {
+      section.style.setProperty("--daily-editor-height", `${section.getBoundingClientRect().height}px`);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, [mobile, fillAvailableHeight, preserveHeight]);
 
   useEffect(() => {
     if (appliedResetKeyRef.current !== resetKey) {
@@ -174,7 +191,7 @@ export function DailyWorkReportEditor({
 
   if (!editable) {
     return (
-      <section className={`${mobile ? "flex flex-col rounded-[20px] border p-3" : "rounded-[20px] border p-4 lg:p-5"} ${fillAvailableHeight ? mobile ? "min-h-0 flex-1" : "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col" : ""}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+      <section ref={sectionRef} className={`${mobile ? "flex flex-col rounded-[20px] border p-3" : "rounded-[20px] border p-4 lg:p-5"} ${fillAvailableHeight ? mobile ? "min-h-0 flex-1" : `lg:flex lg:min-h-0 ${desktopSize} lg:flex-col` : ""}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
         <div className="flex items-center gap-3">
           <span className={mobile ? "hidden" : "flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]"} style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>
             <PencilLine className="h-5 w-5" />
@@ -201,7 +218,7 @@ export function DailyWorkReportEditor({
           : null;
 
   return (
-    <section aria-busy={loading || undefined} className={`${mobile ? "flex flex-col rounded-[20px] border p-3" : "rounded-[20px] border p-4 lg:p-5"} ${fillAvailableHeight ? mobile ? "min-h-0 flex-1" : "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col" : ""}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+    <section ref={sectionRef} aria-busy={loading || undefined} className={`${mobile ? "flex flex-col rounded-[20px] border p-3" : "rounded-[20px] border p-4 lg:p-5"} ${fillAvailableHeight ? mobile ? "min-h-0 flex-1" : `lg:flex lg:min-h-0 ${desktopSize} lg:flex-col` : ""}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
       <div className="flex shrink-0 items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className={mobile ? "hidden" : "flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]"} style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>
