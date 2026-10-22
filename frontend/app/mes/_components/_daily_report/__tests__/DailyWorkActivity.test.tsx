@@ -6,6 +6,36 @@ import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
 import { DesktopTabHomeProvider, useDesktopTabHomeController } from "../../DesktopTabHome";
 
 describe("DailyWorkActivity", () => {
+  it.each([
+    { mobile: false, transactionType: "RECEIVE" },
+    { mobile: false, transactionType: "DISASSEMBLE" },
+    { mobile: true, transactionType: "RECEIVE" },
+    { mobile: true, transactionType: "DISASSEMBLE" },
+  ])("불량 재작업은 첫 거래가 $transactionType 이어도 불량 상세에 표시한다 (mobile=$mobile)", ({ mobile, transactionType }) => {
+    render(<DailyWorkActivity mobile={mobile} activity={{
+      work_date: "2026-10-21", employee_id: "employee-1", cancelled_count: 0,
+      summary: [{ operation_key: "defect", operation_label: "불량", work_count: 1, quantity_by_unit: { EA: 230 } }],
+      details: [{ type: "batch", key: "rework-1", logs: [{
+        log_id: "rework-1", item_id: "item-1", mes_code: "3-VF-0003", item_name: "재작업 품목",
+        item_process_type_code: null, item_unit: "EA", transaction_type: transactionType,
+        quantity_change: 115, quantity_before: 0, quantity_after: 115,
+        warehouse_qty_before: null, warehouse_qty_after: null, transfer_qty: null,
+        reference_no: "defect-disassemble:rework-1", operation_batch_id: null,
+        produced_by: "작업자", requester_name: "작업자", approver_name: null,
+        requested_at: "2026-10-21T05:00:00Z", approved_at: null, created_at: "2026-10-21T05:00:00Z",
+        department: "튜닝", notes: null, reason_category: null, reason_memo: null, shipping_phase: null,
+        edit_count: 0, cancelled: false, cancel_reason: null, cancelled_by: null, cancelled_at: null,
+        inventory_effect: [],
+      }] }],
+    } as never} />);
+
+    if (mobile) fireEvent.click(screen.getByRole("button", { name: "MES 작업 기록 1건 펼치기" }));
+    fireEvent.click(screen.getByRole("button", { name: "불량 거래 상세 펼치기" }));
+    expect(screen.getByTestId("daily-work-activity-card")).toHaveTextContent("재작업 품목");
+    fireEvent.click(screen.getByRole("button", { name: "불량 거래 상세 접기" }));
+    expect(screen.queryByTestId("daily-work-activity-card")).not.toBeInTheDocument();
+  });
+
   it("모바일은 MES 건수를 먼저 보여 주고 펼칠 때 작업별 버튼과 상세를 열 수 있다", () => {
     const onDetailOpenChange = vi.fn();
     render(<DailyWorkActivity mobile activity={{
