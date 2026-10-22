@@ -72,8 +72,8 @@ function BomEntryList({ title, variant, columns, dept = "ALL" }: {
   return <div data-scrollbar-rail-shell className="relative flex min-h-0 min-w-0 flex-col rounded-2xl" style={{ background: LEGACY_COLORS.s2 }}>
     <div className={BOM_SEARCH_BAR_CLASS_NAME} style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
       <span className="shrink-0 text-xs font-bold uppercase tracking-widest" style={{ color: LEGACY_COLORS.muted2 }}>{title}</span>
-      {variant === "candidate" && <span className="shrink-0 whitespace-nowrap text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>완료 해제 후 수정 가능</span>}
       <div className="min-w-0 flex-1"><BomSearchInput disabled value="" onChange={noop} bg={LEGACY_COLORS.s1} /></div>
+      {variant === "candidate" && <span className="shrink-0 whitespace-nowrap text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>완료 해제 후 수정 가능</span>}
     </div>
     <div className={BOM_FILTER_BAR_CLASS_NAME}>
       <div className="overflow-x-auto"><div className="flex min-w-full w-max items-center gap-1">

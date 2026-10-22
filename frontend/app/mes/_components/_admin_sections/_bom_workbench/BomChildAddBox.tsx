@@ -122,12 +122,12 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
         <div className="shrink-0 text-xs font-bold uppercase tracking-widest" style={{ color: LEGACY_COLORS.muted2 }}>
           하위 품목 추가
         </div>
-          <span aria-hidden={!isLocked || undefined} className={`shrink-0 whitespace-nowrap text-xs font-semibold ${isLocked ? "" : "invisible"}`} style={{ color: LEGACY_COLORS.muted2 }}>
-            완료 해제 후 수정 가능
-          </span>
         <div className="min-w-0 flex-1">
           <BomSearchInput value={search} onChange={setSearch} bg={LEGACY_COLORS.s1 as string} />
         </div>
+        <span aria-hidden={!isLocked || undefined} className={`shrink-0 whitespace-nowrap text-xs font-semibold ${isLocked ? "" : "invisible"}`} style={{ color: LEGACY_COLORS.muted2 }}>
+          완료 해제 후 수정 가능
+        </span>
       </div>
 
       <div className={BOM_FILTER_BAR_CLASS_NAME}>
