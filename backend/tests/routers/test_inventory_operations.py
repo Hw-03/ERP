@@ -245,6 +245,43 @@ def test_operation_lines_embed_the_same_history_log_as_legacy_history(
     }
 
 
+def test_cancel_permission_preserves_actor_fallback_and_rejects_mixed_requesters(
+    db_session, make_item,
+) -> None:
+    """일반 작업은 본인을 허용하되 여러 요청의 전체 취소 권한은 합치지 않는다."""
+    from fastapi import HTTPException
+    from app.routers.inventory.operations import _verified_canceller
+
+    _item, actor, operation, _log = _seed_operation(db_session, make_item)
+    actor.warehouse_role = "none"
+    other = _seed_legacy_actor(db_session, code="MIXED-REQUESTER")
+    other.warehouse_role = "none"
+    other.department_role = "none"
+    assert _verified_canceller(db_session, operation=operation, employee_code=actor.employee_code, pin="0000") is actor
+    for requester in (actor, other):
+        request = StockRequest(
+            requester_employee_id=requester.employee_id, requester_name=requester.name,
+            requester_department=DepartmentEnum.WAREHOUSE.value,
+            request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT,
+            status=StockRequestStatusEnum.COMPLETED,
+        )
+        db_session.add(request)
+        db_session.flush()
+        operation_svc.record_effect(
+            db_session, operation=operation,
+            effect_kind=InventoryOperationEffectKindEnum.WORKFLOW,
+            subject_type="StockRequest", subject_id=request.request_id, role="EXECUTION_STATUS",
+            before_state={"status": "reserved"}, after_state={"status": "completed"},
+        )
+    db_session.flush()
+    for requester in (actor, other):
+        with pytest.raises(HTTPException) as denied:
+            _verified_canceller(db_session, operation=operation, employee_code=requester.employee_code, pin="0000")
+        assert denied.value.status_code == 403
+    actor.warehouse_role = "primary"
+    assert _verified_canceller(db_session, operation=operation, employee_code=actor.employee_code, pin="0000") is actor
+
+
 def test_operation_list_hydrates_history_logs_once_and_preserves_cancellation_fields(
     client, db_session, make_item, monkeypatch
 ) -> None:

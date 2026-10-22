@@ -23,10 +23,13 @@ from app.models import (
     DefectStockPool,
     Employee,
     InventoryOperation,
+    InventoryOperationEffect,
+    InventoryOperationEffectKindEnum,
     InventoryOperationKindEnum,
     Item,
     StocktakeApplication,
     StocktakeApplicationLine,
+    StockRequest,
     TransactionLog,
 )
 from app.routers._errors import ErrorCode, http_error
@@ -287,6 +290,7 @@ def _verified_canceller(
     employee_code: str,
     pin: str,
 ) -> Employee:
+    """승인 실행자 대신 원장으로 확인한 요청자에게 본인 취소를 허용한다."""
     employee = db.query(Employee).filter(Employee.employee_code == employee_code).one_or_none()
     if employee is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
@@ -294,7 +298,20 @@ def _verified_canceller(
         raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 작업을 취소할 수 없습니다.")
     if not verify_pin(employee.pin_hash, pin):
         raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
-    is_self = operation.actor_employee_id == employee.employee_id
+    # 승인 실행자는 원 요청자와 다르므로, 원장에 연결된 요청의 소유자를 우선한다.
+    # 표시용 이름이나 사용자가 입력한 참조번호는 취소 권한의 근거로 쓰지 않는다.
+    requester_ids = {
+        requester_id for (requester_id,) in db.query(StockRequest.requester_employee_id).join(
+            InventoryOperationEffect,
+            StockRequest.request_id == func.replace(InventoryOperationEffect.subject_id, "-", ""),
+        ).filter(
+            InventoryOperationEffect.operation_id == operation.operation_id,
+            InventoryOperationEffect.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW,
+            InventoryOperationEffect.subject_type == "StockRequest",
+            InventoryOperationEffect.role == "EXECUTION_STATUS",
+        ).distinct().all()
+    }
+    is_self = requester_ids == {employee.employee_id} if requester_ids else operation.actor_employee_id == employee.employee_id
     is_approver = (
         (employee.warehouse_role or "none").lower() != "none"
         or (employee.department_role or "none").lower() != "none"

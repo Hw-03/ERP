@@ -20,6 +20,9 @@ from app.models import (
     InventoryLocation,
     LocationStatusEnum,
     Supplier,
+    StockRequest,
+    StockRequestStatusEnum,
+    SystemSetting,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -1474,6 +1477,76 @@ def test_cancel_idempotent_double(client, db_session, make_item):
 # ---------------------------------------------------------------------------
 # 권한
 # ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("with_batch", [True, False])
+@pytest.mark.parametrize("cancel_as", ["requester", "approver", "other", "wrong_pin", "inactive"])
+def test_cancel_approved_transfer_operation_uses_requester(
+    client, db_session: Session, make_item, with_batch: bool, cancel_as: str,
+) -> None:
+    """승인 실행자와 요청자를 구분하고 재고·요청 상태를 함께 되돌린다."""
+    item = make_item(name="Approved transfer", process_type_code="AR", warehouse_qty=Decimal("100"))
+    requester = _make_employee(db_session, code="OP-REQ", name="Transfer requester")
+    approver = _make_employee(db_session, code="OP-APR", warehouse_role="primary")
+    other = _make_employee(db_session, code="OP-OTHER", name=requester.name)
+    db_session.add(SystemSetting(setting_key="inventory_operation_cutover_at", setting_value="2020-01-01T00:00:00"))
+    db_session.commit()
+    if with_batch:
+        payload = {
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io", "sub_type": "warehouse_to_dept",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+        }
+        preview = client.post("/api/io/preview", json={
+            **payload, "targets": [{"source_kind": "direct_item", "item_id": str(item.item_id), "quantity": 7}],
+        })
+        assert preview.status_code == 200, preview.text
+        submitted = client.post("/api/io/submit", json={**payload, "bundles": preview.json()["bundles"]})
+        assert submitted.status_code == 201, submitted.text
+        request_id = submitted.json()["stock_request_id"]
+    else:
+        submitted = client.post("/api/stock-requests", json={
+            "requester_employee_id": str(requester.employee_id), "request_type": "warehouse_to_dept",
+            "lines": [{"item_id": str(item.item_id), "quantity": 7, "from_bucket": "warehouse",
+                       "to_bucket": "production", "to_department": DepartmentEnum.ASSEMBLY.value}],
+        })
+        assert submitted.status_code == 201, submitted.text
+        request_id = submitted.json()["request_id"]
+    approved = _approve(client, request_id, approver)
+    assert approved.status_code == 200, approved.text
+    log = db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).one()
+    assert log.operation_id is not None
+    assert log.producer_employee_id == approver.employee_id
+    assert (log.operation_batch_id is not None) is with_batch
+    before = _cells(db_session, item.item_id)
+    assert before[0] == 93
+    operation_url = f"/api/inventory/operations/{log.operation_id}/cancel"
+    plan = client.post(f"{operation_url}/preview")
+    assert plan.status_code == 200, plan.text
+    assert plan.json()["can_cancel"] is True
+    actor = approver if cancel_as == "approver" else other if cancel_as == "other" else requester
+    if cancel_as == "inactive":
+        requester.is_active = False
+        db_session.commit()
+    response = client.post(operation_url, json={
+        "reason": "Requester cancellation regression", "employee_code": actor.employee_code,
+        "pin": "9999" if cancel_as == "wrong_pin" else "0000", "plan_hash": plan.json()["plan_hash"],
+    })
+    allowed = cancel_as in {"requester", "approver"}
+    assert response.status_code == (200 if allowed else 403), response.text
+    db_session.expire_all()
+    request = db_session.get(StockRequest, request_id)
+    after = _cells(db_session, item.item_id)
+    if allowed:
+        assert after[0] == 100
+        assert all(qty == 0 for (dept, _status), qty in after[2].items() if dept == DepartmentEnum.ASSEMBLY.value)
+        assert request.status == StockRequestStatusEnum.CANCELLED
+        reversal = db_session.query(TransactionLog).filter(TransactionLog.reverses_log_id == log.log_id).one()
+        assert reversal.operation_id is not None
+    else:
+        assert after == before
+        assert request.status == StockRequestStatusEnum.COMPLETED
+        assert db_session.query(TransactionLog).filter(TransactionLog.reverses_log_id == log.log_id).count() == 0
 
 
 @pytest.mark.parametrize("cancel_as", ["requester", "approver", "other"])
