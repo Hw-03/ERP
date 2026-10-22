@@ -6,7 +6,7 @@ import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { getStockState } from "@/lib/mes/inventory";
 import type { KpiCardData as KpiCard } from "../_inventory_sections/InventoryKpiPanel";
-import { getMinStock, isDisusedInventoryItem, safeQty } from "../_inventory_sections/inventoryFilter";
+import { isDisusedInventoryItem, matchesKpi, safeAvailableQty, safeQty } from "../_inventory_sections/inventoryFilter";
 
 /**
  * Round-13 (#20) 추출 — DesktopInventoryView 의 summary/kpiCards/badge derivation hook.
@@ -48,9 +48,9 @@ export function useDesktopInventoryDerivations({
 }): UseDesktopInventoryDerivationsResult {
   const summary = useMemo(() => {
     const totalQuantity = scopedItems.reduce((acc, item) => acc + safeQty(item), 0);
-    const normalCount = scopedItems.filter((item) => safeQty(item) > 0 && safeQty(item) >= getMinStock(item)).length;
-    const lowCount = scopedItems.filter((item) => safeQty(item) > 0 && safeQty(item) < getMinStock(item)).length;
-    const zeroCount = scopedItems.filter((item) => safeQty(item) <= 0).length;
+    const normalCount = scopedItems.filter((item) => matchesKpi(item, "NORMAL")).length;
+    const lowCount = scopedItems.filter((item) => matchesKpi(item, "LOW")).length;
+    const zeroCount = scopedItems.filter((item) => matchesKpi(item, "ZERO")).length;
     return { totalCount: scopedItems.length, totalQuantity, normalCount, lowCount, zeroCount };
   }, [scopedItems]);
 
@@ -60,9 +60,9 @@ export function useDesktopInventoryDerivations({
   );
 
   const kpiSummary = useMemo(() => {
-    const normalCount = kpiScopedItems.filter((item) => safeQty(item) > 0 && safeQty(item) >= getMinStock(item)).length;
-    const lowCount = kpiScopedItems.filter((item) => safeQty(item) > 0 && safeQty(item) < getMinStock(item)).length;
-    const zeroCount = kpiScopedItems.filter((item) => safeQty(item) <= 0).length;
+    const normalCount = kpiScopedItems.filter((item) => matchesKpi(item, "NORMAL")).length;
+    const lowCount = kpiScopedItems.filter((item) => matchesKpi(item, "LOW")).length;
+    const zeroCount = kpiScopedItems.filter((item) => matchesKpi(item, "ZERO")).length;
     return { normalCount, lowCount, zeroCount };
   }, [kpiScopedItems]);
 
@@ -97,7 +97,7 @@ export function useDesktopInventoryDerivations({
     {
       label: "전체",
       value: isFiltered ? kpiScopedItems.length : activeTotal,
-      hint: isFiltered ? `전체 ${activeTotal}건 · 클릭하면 초기화` : "전체 품목",
+      hint: isFiltered ? `전체 ${activeTotal}건 · 필터 해제` : "전체 품목",
       tone: LEGACY_COLORS.blue,
       key: "ALL",
     },
@@ -109,7 +109,7 @@ export function useDesktopInventoryDerivations({
   const headerBadge: ReactNode = displayItem
     ? (() => {
         const stock = getStockState(
-          Number(displayItem.quantity),
+          safeAvailableQty(displayItem),
           displayItem.min_stock == null ? null : Number(displayItem.min_stock),
         );
         return (

@@ -1,6 +1,7 @@
 ﻿import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Item } from "@/lib/api";
+import type { InventoryReservationSummary } from "@/lib/api/types/inventory";
 
 vi.mock("next/image", () => ({
   default: (props: Record<string, unknown>) => {
@@ -39,6 +40,51 @@ function makeItem(overrides: Partial<Item> = {}): Item {
 }
 
 describe("InventoryItemRow quantity summary", () => {
+  describe.each([false, true])("입고 예정 표시 (compact=%s)", (compact) => {
+    const forecast: InventoryReservationSummary = {
+      work_reserved_quantity: 0, approval_reserved_quantity: 0, shipping_reserved_quantity: 0,
+      expected_in_quantity: 0, expected_out_quantity: 0, transfer_in_quantity: 0, transfer_out_quantity: 0,
+      forecast_complete: true, reservation_by_location: [], forecast_by_location: [],
+    };
+
+    it.each([
+      { summary: { ...forecast, expected_in_quantity: 10 }, label: "조립 입고 예정 10" },
+      { summary: forecast, label: null },
+      { summary: { ...forecast, forecast_complete: false, expected_in_quantity: 10 }, label: "조립 확인된 입고 10" },
+      { summary: { ...forecast, forecast_complete: false }, label: "입고 예정 확인 필요" },
+      { summary: undefined, label: null },
+      { summary: { ...forecast, transfer_in_quantity: 10 }, label: null },
+    ])("집계 $summary 의 예정 문구는 $label", ({ summary, label }) => {
+      const locatedSummary = summary && { ...summary, forecast_by_location: summary.expected_in_quantity > 0
+        ? [{ location: { bucket: "production" as const, department: "조립" }, expected_in_quantity: summary.expected_in_quantity,
+          expected_out_quantity: 0, transfer_in_quantity: 0, transfer_out_quantity: 0 }] : [] };
+      render(<table><tbody><InventoryItemRow item={makeItem({ work_reservations: locatedSummary })}
+        selected={false} compact={compact} onSelect={() => {}} /></tbody></table>);
+      const labels = screen.queryAllByText(/입고 예정|확인된 입고/);
+      expect(labels).toHaveLength(label ? 1 : 0);
+      if (label) {
+        expect(labels[0]).toHaveTextContent(label);
+        expect(labels[0]).not.toHaveTextContent("EA");
+        expect(labels[0].closest('[data-testid="inventory-dept-stock-summary"]')).not.toBeNull();
+      }
+      expect(screen.getByTestId("inventory-total-stock")).toHaveTextContent("15");
+      expect(screen.getByRole("img", { name: /재고 분포/ })).not.toHaveAttribute("title", expect.stringContaining("입고 예정"));
+    });
+
+    it("품절과 가용 0을 유지하고 배지를 눌러 기존 상세를 연다", () => {
+      const onSelect = vi.fn();
+      const item = makeItem({ quantity: 0, warehouse_qty: 0, available_quantity: 0, locations: [],
+        work_reservations: { ...forecast, expected_in_quantity: 10, forecast_by_location: [
+          { location: { bucket: "production", department: "조립" }, expected_in_quantity: 10, expected_out_quantity: 0, transfer_in_quantity: 0, transfer_out_quantity: 0 },
+        ] } });
+      render(<table><tbody><InventoryItemRow item={item} selected={false} compact={compact} onSelect={onSelect} /></tbody></table>);
+      expect(screen.getByText("품절")).toBeInTheDocument();
+      expect(screen.getByTestId("inventory-total-stock")).toHaveTextContent(/^0$/);
+      fireEvent.click(screen.getByText("조립 입고 예정 10"));
+      expect(onSelect).toHaveBeenCalledWith(item);
+    });
+  });
+
   it("행 내부 컨트롤에서 전파된 키 입력은 품목 선택을 바꾸지 않는다", () => {
     const onSelect = vi.fn();
     render(<table><tbody><InventoryItemRow item={makeItem()} selected={false} onSelect={onSelect} /></tbody></table>);
@@ -160,7 +206,7 @@ describe("InventoryItemRow quantity summary", () => {
     expect(screen.getByRole("img", { name: /재고 분포/ })).toBeInTheDocument();
   });
 
-  it("shows a positive pending reservation between warehouse and department chips without changing stock totals or gauge", () => {
+  it("기존 집계의 예약도 현재고 칩 뒤에 표시하고 가용 수량과 막대는 보존한다", () => {
     render(
       <table>
         <tbody>
@@ -175,12 +221,12 @@ describe("InventoryItemRow quantity summary", () => {
 
     const summary = screen.getByTestId("inventory-dept-stock-summary");
     const warehouseChip = within(summary).getByText("창고 5");
-    const pendingChip = within(summary).getByText("예약 3");
+    const pendingChip = within(summary).getByText("부서 미확인 예약 3");
     const departmentChip = within(summary).getByText("조립 8");
     const defectiveChip = within(summary).getByText("불량 2");
     expect(warehouseChip.compareDocumentPosition(pendingChip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(pendingChip.compareDocumentPosition(departmentChip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(departmentChip.compareDocumentPosition(defectiveChip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(defectiveChip.compareDocumentPosition(pendingChip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByTestId("inventory-total-stock")).toHaveTextContent("15");
     expect(defectiveChip).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /재고 분포/ })).toBeInTheDocument();
@@ -199,7 +245,7 @@ describe("InventoryItemRow quantity summary", () => {
       </table>,
     );
 
-    expect(within(screen.getByTestId("inventory-dept-stock-summary")).getByText("예약 5")).toBeInTheDocument();
+    expect(within(screen.getByTestId("inventory-dept-stock-summary")).getByText("부서 미확인 예약 5")).toBeInTheDocument();
   });
 
   it("hides a zero pending reservation while keeping total, defective, and gauge displays", () => {

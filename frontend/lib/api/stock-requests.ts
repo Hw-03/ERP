@@ -8,9 +8,9 @@ import { deleteJson, fetcher, postJson, putJson, toApiUrl } from "../api-core";
 import type {
   StockRequest,
   StockRequestActionPayload,
+  StockRequestRevertPayload,
   StockRequestCreatePayload,
   StockRequestDraftUpsertPayload,
-  StockRequestReservationLine,
   StockRequestType,
   IoBatch,
 } from "./types";
@@ -114,13 +114,8 @@ export const stockRequestsApi = {
   cancelStockRequest: (requestId: string, payload: StockRequestActionPayload) =>
     postJson<StockRequest>(toApiUrl(`/api/stock-requests/${requestId}/cancel`), payload),
 
-  revertToDraft: (requestId: string, payload: StockRequestActionPayload) =>
+  revertToDraft: (requestId: string, payload: StockRequestRevertPayload) =>
     postJson<IoBatch>(toApiUrl(`/api/stock-requests/${requestId}/revert-to-draft`), payload),
-
-  getItemReservations: (itemId: string) =>
-    fetcher<StockRequestReservationLine[]>(
-      toApiUrl(`/api/stock-requests/reservations?item_id=${encodeURIComponent(itemId)}`),
-    ),
 
   // Stock request drafts (직원별 저장형 입출고 장바구니) -------------------
   upsertStockRequestDraft: (payload: StockRequestDraftUpsertPayload) =>

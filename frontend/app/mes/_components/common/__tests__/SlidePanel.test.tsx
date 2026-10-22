@@ -7,6 +7,14 @@ afterEach(() => {
 });
 
 describe("SlidePanel", () => {
+  it("preserves its width and animation clip while allowing only a 10px external rail", () => {
+    render(<SlidePanel open externalScrollbarRail onClose={vi.fn()} hideCloseButton labelledBy="external-rail-title"><h2 id="external-rail-title">외부 레일</h2></SlidePanel>);
+    const panel = screen.getByRole("dialog", { name: "외부 레일" });
+    expect(panel.parentElement).toHaveClass("overflow-visible");
+    expect(panel.parentElement).toHaveStyle({ width: "436px", clipPath: "inset(0 -10px 0 0)" });
+    expect(panel.firstElementChild).toHaveClass("overflow-visible");
+  });
+
   it("keeps the default modal dialog semantics and focus trap", () => {
     vi.spyOn(HTMLElement.prototype, "offsetParent", "get").mockReturnValue(document.body);
 

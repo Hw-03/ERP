@@ -3,6 +3,7 @@
 import type { ElementType } from "react";
 import {
   Box,
+  ClipboardList,
   Building2,
   Download,
   Layers,
@@ -38,6 +39,7 @@ const SECTION_GROUPS: { label: string; tabs: AdminSectionTab[] }[] = [
   {
     label: "시스템",
     tabs: [
+      { id: "workReservations", label: "작업 관리", icon: ClipboardList },
       { id: "export", label: "내보내기", icon: Download },
       { id: "integrity", label: "정합성", icon: ShieldAlert },
       { id: "settings", label: "보안", icon: ShieldCheck, danger: true },
@@ -92,7 +94,7 @@ export function AdminSectionTabs({ section, onSelect }: AdminSectionTabsProps) {
                     type="button"
                     onClick={() => onSelect(tab.id)}
                     aria-current={active ? "page" : undefined}
-                    className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[12px] border px-3 text-[14px] font-bold transition-colors hover:brightness-105 active:scale-[0.98]"
+                    className="flex h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-[12px] border px-3 text-[14px] font-bold transition-colors hover:brightness-105 active:scale-[0.98]"
                     style={{
                       background: active
                         ? `color-mix(in srgb, ${tone} 14%, transparent)`

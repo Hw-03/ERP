@@ -4,13 +4,17 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import type { IoBatch, IoLine, IoSubType } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { reservationIssueMessage } from "@/lib/io/reservation-message";
+import { SUB_TYPE_LABEL } from "@/lib/io/glossary";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatKstDateTime } from "@/lib/mes/format";
+import { Button } from "@/lib/ui/Button";
+import { StatusPill } from "../common/StatusPill";
+import { FlowBadge } from "../_history_sections/historyTableHelpers";
+import { getIoDraftOperationColor, getIoDraftOperationLabel, getIoDraftTransactionType } from "../common/WorkDraftTableParts";
+import { reservationStatusLabel } from "../_warehouse_v2/WorkReservationNotice";
 import {
-  IO_WORK_TYPES,
-  deptIoDisplayLabel,
   lineTagLabel,
-  subTypeLabel,
 } from "../_warehouse_v2/ioWorkType";
 
 interface Props {
@@ -98,8 +102,7 @@ export function IoDraftWorkCard({
       useLineLocations ? firstIncludedLine.to_department : draft.to_department,
       useLineLocations ? firstIncludedLine.to_bucket : null,
     );
-    const sub = deptIoDisplayLabel(draft.sub_type) ?? subTypeLabel(draft.sub_type);
-    const work = IO_WORK_TYPES.find((w) => w.id === draft.work_type) ?? null;
+    const sub = SUB_TYPE_LABEL[draft.sub_type];
     let shortage = 0;
     for (const b of draft.bundles) {
       for (const l of b.lines ?? []) {
@@ -112,47 +115,39 @@ export function IoDraftWorkCard({
       lineCount: lines,
       deptLabel: dept,
       subLabel: sub,
-      workMeta: work,
       shortageCount: shortage,
       startedText,
     };
   }, [draft]);
 
   const accent = LEGACY_COLORS.blue;
+  const operationLabel = getIoDraftOperationLabel(draft);
 
   return (
     // P3-1: 카드 컨테이너의 role="button" 제거 — 내부에 별도 액션 버튼(이어서 작업/삭제) 이
     // 있어 nested interactive 패턴이었다. 펼치기는 헤더의 명시적 토글 버튼으로 분리.
     <article
-      className="rounded-2xl border p-4"
+      className="rounded-[20px] border p-4"
       style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-      aria-label={`작업 카드: ${meta.workMeta?.label ?? draft.work_type}, ${meta.subLabel ?? draft.sub_type}`}
+      aria-label={`작업 카드: ${operationLabel}, ${meta.subLabel ?? "작업 내용 확인"}`}
     >
       {/* 헤더: work_type 칩 + 펼치기 토글 */}
       <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          {meta.workMeta && (
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-black"
-              style={{ background: tint(accent, 14), color: accent }}
-            >
-              <meta.workMeta.icon className="h-3.5 w-3.5" />
-              {meta.workMeta.label}
-            </span>
-          )}
-          <span
-            className="truncate text-[12px] font-bold"
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <FlowBadge type={getIoDraftTransactionType(draft)} label={operationLabel} color={getIoDraftOperationColor(draft)} variant="panel" />
+          {meta.subLabel !== operationLabel && <span
+            className="break-keep text-xs font-medium [overflow-wrap:anywhere]"
             style={{ color: LEGACY_COLORS.muted2 }}
           >
             {meta.subLabel}
-          </span>
+          </span>}
         </div>
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
           aria-label={expanded ? "자재 목록 접기" : "자재 목록 펼치기"}
-          className="shrink-0 rounded-[8px] p-1 transition-colors hover:bg-black/[0.05]"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] transition hover:bg-[var(--c-s2)] active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--c-blue)]"
           style={{ color: LEGACY_COLORS.muted2 }}
         >
           {expanded ? (
@@ -164,7 +159,9 @@ export function IoDraftWorkCard({
       </div>
 
       {/* 묶음 제목 — 모든 묶음을 한 줄씩 나열 */}
-      <ul className="mt-2 space-y-0.5">
+      {["반려됨", "예약 상태 확인 필요"].includes(reservationStatusLabel(draft)) && <StatusPill label={reservationStatusLabel(draft)} tone="warning" showDot={false} className="mt-2 !px-2.5 !py-1" />}
+      {draft.reservation_issue && <p className="mt-2 rounded-[12px] px-3 py-2 text-sm leading-6" style={{ color: LEGACY_COLORS.yellow, background: LEGACY_COLORS.warningBg }}>{reservationIssueMessage(draft.reservation_issue)}</p>}
+      <ul className="mt-3 space-y-2">
         {draft.bundles.map((b) => {
           const parentLine =
             b.source_kind === "bom_parent"
@@ -176,16 +173,16 @@ export function IoDraftWorkCard({
           return (
             <li
               key={b.bundle_id}
-              className="flex items-baseline gap-2 overflow-hidden text-base font-black leading-tight"
+              className="flex items-baseline justify-between gap-3 text-base font-semibold leading-6"
               style={{ color: LEGACY_COLORS.text }}
             >
-              <span className="min-w-0 truncate">{b.title}</span>
+              <span className="min-w-0 break-keep [overflow-wrap:anywhere]">{b.title}</span>
               <span
-                className="shrink-0 tabular-nums text-lg font-black leading-none"
+                className="shrink-0 tabular-nums text-lg font-semibold leading-6"
                 style={{ color: accent }}
               >
                 {formatQty(displayQty)}
-                <span className="ml-0.5 text-sm font-black">EA</span>
+                <span className="ml-1 text-xs font-medium">EA</span>
               </span>
             </li>
           );
@@ -193,12 +190,12 @@ export function IoDraftWorkCard({
       </ul>
 
       {/* 메트릭: 총 수량 + 자재 종수 + 부서 (제목보다 약하게 — 보조 정보) */}
-      <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[13px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+      <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
         <span>
           총 <span className="tabular-nums" style={{ color: LEGACY_COLORS.text }}>{formatQty(meta.totalQty)}</span>개
         </span>
         <span aria-hidden>·</span>
-        <span>자재 {meta.lineCount}종</span>
+        <span>구성 {meta.lineCount}종</span>
         {meta.deptLabel && (
           <>
             <span aria-hidden>·</span>
@@ -210,17 +207,17 @@ export function IoDraftWorkCard({
       {/* 시간 · 부족 경고 */}
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <span
-          className="whitespace-nowrap text-[11px] font-semibold tabular-nums"
+          className="text-xs font-medium tabular-nums"
           style={{ color: LEGACY_COLORS.muted2 }}
         >
           {meta.startedText} 작업 시작
         </span>
       {meta.shortageCount > 0 && (
           <span
-            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-black"
+            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
             style={{ background: tint(LEGACY_COLORS.red, 12), color: LEGACY_COLORS.red }}
           >
-            <AlertTriangle className="h-3 w-3" />
+            <AlertTriangle className="h-4 w-4" />
             자재 {meta.shortageCount}종 부족
           </span>
       )}
@@ -228,15 +225,15 @@ export function IoDraftWorkCard({
 
       {latestRejection?.rejected_reason && (
         <div
-          className="mt-3 rounded-[10px] border px-3 py-2 text-[12px] font-semibold"
+          className="mt-3 rounded-[12px] border px-3 py-2 text-sm leading-6"
           style={{
             background: tint(LEGACY_COLORS.red, 8),
             borderColor: tint(LEGACY_COLORS.red, 25),
             color: LEGACY_COLORS.red,
           }}
         >
-          <p className="font-black">반려 사유: {latestRejection.rejected_reason}</p>
-          <p className="mt-0.5">
+          <p className="break-keep font-semibold [overflow-wrap:anywhere]">반려 사유: {latestRejection.rejected_reason}</p>
+          <p className="mt-1 text-xs">
             {latestRejection.rejected_by_name ?? "결재자"} · {formatKstDateTime(latestRejection.rejected_at)}
           </p>
         </div>
@@ -245,14 +242,17 @@ export function IoDraftWorkCard({
       {/* 펼침: 자재 목록 */}
       {expanded && (
         <div
-          className="mt-3 border-t pt-3"
+          role="region"
+          aria-label="작업 자재 목록"
+          tabIndex={0}
+          className="mt-4 max-h-[360px] overflow-y-auto overscroll-contain border-t pt-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
           style={{ borderColor: LEGACY_COLORS.border }}
         >
           {draft.bundles.map((bundle, idx) => (
             <div key={bundle.bundle_id} className={idx > 0 ? "mt-3" : undefined}>
               {draft.bundles.length > 1 && (
                 <p
-                  className="mb-1 text-[12px] font-black"
+                  className="mb-2 break-keep text-sm font-semibold [overflow-wrap:anywhere]"
                   style={{ color: LEGACY_COLORS.text }}
                 >
                   {bundle.title}{" "}
@@ -261,7 +261,7 @@ export function IoDraftWorkCard({
                   </span>
                 </p>
               )}
-              <ul className="space-y-1">
+              <ul className="space-y-2">
                 {(bundle.lines ?? []).map((line) => (
                   <DraftLineRow
                     key={line.line_id}
@@ -276,34 +276,36 @@ export function IoDraftWorkCard({
       )}
 
       {/* 액션 */}
-      <div className="mt-3 flex flex-wrap justify-end gap-2">
-        <button
+      <div className="mt-4 flex justify-end gap-2 border-t pt-3" style={{ borderColor: LEGACY_COLORS.border }}>
+        <Button
+          variant="secondary"
           type="button"
           aria-label="이어서 작업"
           disabled={isBusy}
           onClick={onContinue}
-          className="rounded-[10px] border px-3 py-1.5 text-xs font-black disabled:opacity-50"
+          className="min-h-11 rounded-[12px] border px-4 text-sm font-semibold transition active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--c-blue)] disabled:opacity-50"
           style={{
-            background: LEGACY_COLORS.s1,
-            borderColor: LEGACY_COLORS.border,
-            color: LEGACY_COLORS.text,
+            background: tint(accent, 10),
+            borderColor: LEGACY_COLORS.borderStrong,
+            color: accent,
           }}
         >
           이어서 작업
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="secondary"
           type="button"
           aria-label="작업 삭제"
           disabled={isBusy}
           onClick={onRequestDelete}
-          className="rounded-[10px] px-3 py-1.5 text-xs font-black disabled:opacity-50"
+          className="min-h-11 min-w-11 rounded-[12px] !border-0 px-4 text-sm font-semibold transition active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--c-blue)] disabled:opacity-50"
           style={{
             background: tint(LEGACY_COLORS.red, 10),
             color: LEGACY_COLORS.red,
           }}
         >
           삭제
-        </button>
+        </Button>
       </div>
     </article>
   );
@@ -324,45 +326,22 @@ function DraftLineRow({ line, subType }: { line: IoLine; subType: IoSubType }) {
 
   return (
     <li
-      className="flex items-center gap-2 rounded-[8px] px-2 py-1.5 text-[12px]"
+      className="rounded-[12px] border px-3 py-2 text-sm"
       style={{
-        background: shortage ? tint(LEGACY_COLORS.red, 8) : "transparent",
-        opacity: excluded ? 0.45 : 1,
+        background: shortage ? LEGACY_COLORS.errorBg : LEGACY_COLORS.s2,
+        borderColor: LEGACY_COLORS.border,
         textDecoration: excluded ? "line-through" : "none",
       }}
     >
-      <span
-        className="shrink-0 font-mono text-[11px] font-bold"
-        style={{ color: LEGACY_COLORS.muted2 }}
-      >
-        {line.mes_code ?? "—"}
-      </span>
-      <span
-        className="min-w-0 flex-1 truncate font-bold"
-        style={{ color: LEGACY_COLORS.text }}
-      >
-        {line.item_name}
-      </span>
-      <span
-        className="shrink-0 font-black"
-        style={{ color: shortage ? LEGACY_COLORS.red : LEGACY_COLORS.text }}
-      >
-        ×{formatQty(line.quantity)}
-      </span>
-      <span
-        className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black"
-        style={{ background: tint(tone, 12), color: tone }}
-      >
-        {tag.text}
-      </span>
-      {dirArrow && (
-        <span
-          className="shrink-0 text-[11px] font-semibold"
-          style={{ color: LEGACY_COLORS.muted2 }}
-        >
-          {dirArrow}
-        </span>
-      )}
+      <div className="flex items-start justify-between gap-3">
+        <span className="min-w-0 break-keep font-medium leading-6 [overflow-wrap:anywhere]" style={{ color: excluded ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text }}>{line.item_name}</span>
+        <span className="shrink-0 font-semibold leading-6 tabular-nums" style={{ color: shortage ? LEGACY_COLORS.red : LEGACY_COLORS.text }}>×{formatQty(line.quantity)}</span>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+        <span className="break-keep font-mono [overflow-wrap:anywhere]">{line.mes_code ?? "—"}</span>
+        <span className="rounded-full px-2 py-0.5 font-medium" style={{ background: tint(tone, 12), color: tone }}>{tag.text}</span>
+        {dirArrow && <span>{dirArrow}</span>}
+      </div>
     </li>
   );
 }

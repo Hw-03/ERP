@@ -6,6 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import inspect
 
 from app.models import (
     DefectPoolCutover, DefectStockMovement, DefectStockPool, DepartmentEnum,
@@ -548,6 +549,9 @@ def test_pool_io_declares_all_items_before_live_route_normalization(
     observed: list[tuple[str, set[uuid.UUID], set[uuid.UUID]]] = []
 
     def snapshot(db, bundles, stage: str) -> None:
+        # The effective planner normalizes transient clones without mutating live rows.
+        if not any(inspect(bundle).persistent for bundle in bundles):
+            return
         state = db.info.get(stocktake_guard.STATE_KEY) or {}
         included = {line.item_id for bundle in bundles
                     for line in bundle.lines if line.included}
@@ -566,7 +570,7 @@ def test_pool_io_declares_all_items_before_live_route_normalization(
         inspect_token_refresh,
     )
     monkeypatch.setattr(io_dispatch, "_normalize_automatic_batch_routes", inspect_final_normalize)
-    io_actions.submit(db_session, payload)
+    submitted = io_actions.submit(db_session, payload)
 
     assert [stage for stage, _included, _prepared in observed] == [
         "token_refresh", "final_normalize",
@@ -574,3 +578,19 @@ def test_pool_io_declares_all_items_before_live_route_normalization(
     for _stage, included, prepared in observed:
         assert included == {warehouse_item.item_id, department_item.item_id}
         assert included.issubset(prepared)
+    requests = db_session.query(StockRequest).filter_by(
+        operation_batch_id=submitted["batch"]["batch_id"],
+    ).all()
+    assert len(requests) == 2
+    assert {request.status for request in requests} == {StockRequestStatusEnum.RESERVED}
+    warehouse_inventory = db_session.query(Inventory).filter_by(item_id=warehouse_item.item_id).one()
+    department_location = db_session.query(InventoryLocation).filter_by(
+        item_id=department_item.item_id, department=DepartmentEnum.HIGH_VOLTAGE,
+    ).one()
+    assert warehouse_inventory.warehouse_qty == 5
+    assert warehouse_inventory.pending_quantity == 1
+    assert department_location.quantity == 5
+    assert department_location.pending_quantity == 1
+    assert db_session.query(TransactionLog).filter(
+        TransactionLog.item_id.in_([warehouse_item.item_id, department_item.item_id]),
+    ).count() == 0

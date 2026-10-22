@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type LegacyRef } from "react";
+import { useRef, useState, type LegacyRef, type ReactNode } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -65,6 +65,8 @@ interface Props {
   onValidationError?: (message: string) => void;
   onSubmit: () => void;
   onSaveDraft: () => void;
+  saveDraftLabel?: string;
+  footerNotice?: ReactNode;
   mobilePresentation?: boolean;
 }
 
@@ -208,6 +210,8 @@ export function IoConfirmStep({
   onValidationError,
   onSubmit,
   onSaveDraft,
+  saveDraftLabel = "작업 중 등록",
+  footerNotice,
   mobilePresentation = false,
 }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -371,8 +375,9 @@ export function IoConfirmStep({
 
       {/* 액션 푸터 — Step4(IoBundleCart 126줄) 와 동일: 모바일 하단 sticky + 페이지 배경, PC(lg)는 정적·대형 그대로. */}
       <div data-io-confirm-actions className="sticky bottom-0 z-20 -mx-3 mt-auto flex flex-col gap-2 bg-[var(--c-bg)] px-4 pb-0 pt-2 lg:static lg:mx-0 lg:gap-3 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-1">
+        {footerNotice}
         {/* blocker */}
-        {blockerText && (
+        {blockerText && !submitting && !saving && (
           <div
             className="rounded-[16px] border px-4 py-3 text-center text-sm font-bold"
             style={{
@@ -387,12 +392,12 @@ export function IoConfirmStep({
 
         {/* 액션 버튼 행 — [저장] + [제출확인].
             항목 4-9 — 모바일은 Step4 버튼과 동일 크기/모서리(작게), PC(lg)는 기존 대형 그대로(lg: 페어로 PC 무변경). */}
-        <div className="flex items-stretch gap-2 lg:gap-3">
+        <div className="grid grid-cols-2 items-stretch gap-2 lg:gap-3">
           <button
             type="button"
             onClick={onSaveDraft}
             disabled={saveDisabled}
-            className="flex shrink-0 items-center justify-center gap-1.5 rounded-[14px] border px-5 py-3 text-sm font-black transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50 lg:gap-2 lg:px-6"
+            className="flex min-w-0 items-center justify-center gap-1.5 rounded-[14px] border px-5 py-3 text-sm font-black transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50 lg:gap-2 lg:px-6"
             style={{
               borderColor: LEGACY_COLORS.border,
               background: LEGACY_COLORS.s2,
@@ -400,7 +405,7 @@ export function IoConfirmStep({
             }}
           >
             <Save className="h-4 w-4 lg:h-5 lg:w-5" />
-            {saving ? "저장 중..." : "저장"}
+            {saving ? "반영 중..." : saveDraftLabel}
           </button>
           <button
             type="button"
@@ -414,7 +419,7 @@ export function IoConfirmStep({
               setConfirmOpen(true);
             }}
             disabled={submitDisabled}
-            className="flex flex-1 items-center justify-center gap-2 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50 lg:gap-3 lg:px-7"
+            className="flex min-w-0 items-center justify-center gap-2 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50 lg:gap-3 lg:px-7"
             style={{ background: accent }}
           >
             <ClipboardCheck className="h-4 w-4 lg:h-6 lg:w-6" />

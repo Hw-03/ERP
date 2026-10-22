@@ -20,6 +20,7 @@ export type AdminSection =
   | "bom"
   | "export"
   | "integrity"
+  | "workReservations"
   | "settings"
   | "departments";
 

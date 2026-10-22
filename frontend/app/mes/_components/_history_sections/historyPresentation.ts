@@ -651,16 +651,31 @@ function getStatusChips(
   return chips;
 }
 
-function getInternalUseListLabel(log: TransactionLog, batch?: IoBatch | null): string {
+function getInternalUseListLabel(log: Pick<TransactionLog, "department">, batch?: IoBatch | null): string {
   const destination = batch?.to_department?.trim() || log.department?.trim();
   if (destination === "AS") return "AS 사용";
   if (destination === "연구" || destination === "연구소") return "연구소 사용";
   return "AS·연구 사용";
 }
 
+/** 공정 묶음의 대표 거래는 개별 자재 거래와 다른 목록 작업명을 사용한다. */
+export function getHistoryProcessGroupLabel(displayType: TransactionLog["transaction_type"]): string | null {
+  if (displayType === "DISASSEMBLE") return "분해 출고";
+  if (displayType === "ADJUST") return "부서 입출고";
+  if (displayType === "PRODUCE") return "생산 입고";
+  return null;
+}
+
+/** 대표 목록의 불량 격리·취소 표기를 모든 조회 화면에서 동일하게 마무리한다. */
+export function finalizeHistoryGroupLabel(label: string, displayType: TransactionLog["transaction_type"] | null, operationKind?: TransactionLog["operation_kind"]): string {
+  if (displayType === "MARK_DEFECTIVE" && label === "불량" && operationKind !== "CANCELLATION") return "불량 격리";
+  return operationKind === "CANCELLATION" && !label.endsWith(" 취소") ? `${label} 취소` : label;
+}
+
 /** 입출고 내역 목록에서는 세부 작업명 대신 사용자가 선택한 메뉴 분류만 표시한다. */
 export function getHistoryListOperationLabel(
-  log: TransactionLog,
+  log: Pick<TransactionLog, "transaction_type" | "department" | "reference_no" | "notes">
+    & Partial<Pick<TransactionLog, "operation_domain" | "operation_action" | "operation_kind" | "shipping_phase" | "history_batch">>,
   batch?: IoBatch | null,
 ): string {
   if (isInitialStockOperation(log)) return getHistoryDisplayLabel(log, batch);
@@ -677,7 +692,8 @@ export function getHistoryListOperationLabel(
   if (subType === "tube_receive_supplier") return "튜브 원자재 입고";
   if (subType === "tube_outbound_supplier") return "튜브 원자재 출고";
   if (log.transaction_type === "MATERIAL_OUT") return "원자재 출고";
-  if (log.reference_no?.startsWith("defect-disassemble:")) return "재작업";
+  if (log.reference_no?.startsWith("defect-disassemble:")
+    || log.operation_action === "rework_normal" || log.operation_action === "defect_disassemble") return "재작업";
 
   const phaseLabel = getShippingPhaseOperationLabel(log.shipping_phase);
   if (phaseLabel) return phaseLabel;

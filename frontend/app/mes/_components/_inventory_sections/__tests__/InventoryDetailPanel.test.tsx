@@ -1,8 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { api, type BOMTreeNode, type Item, type StockRequestReservationLine } from "@/lib/api";
+import { api, type BOMTreeNode, type Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { formatQty } from "@/lib/mes/format";
 import { DesktopRightPanel } from "../../DesktopRightPanel";
 import { SlidePanel } from "../../common/SlidePanel";
 import { BomSubExpander } from "../../_warehouse_v2/BomSubExpander";
@@ -19,6 +18,14 @@ vi.mock("@/lib/queries/realtime", () => ({
 
 vi.mock("@/app/mes/_components/DepartmentsContext", () => ({
   useDeptColorLookup: () => () => LEGACY_COLORS.blue,
+}));
+
+vi.mock("@/lib/queries/useInventoryWorkStatus", () => ({
+  useInventoryWorkStatus: (itemId: string) => ({ data: { item_id: itemId, works: [], summary: {
+    work_reserved_quantity: 0, approval_reserved_quantity: 0, shipping_reserved_quantity: 0,
+    expected_in_quantity: 0, expected_out_quantity: 0, transfer_in_quantity: 0, transfer_out_quantity: 0,
+    forecast_complete: true, reservation_by_location: [], forecast_by_location: [],
+  } } }),
 }));
 
 vi.mock("next/image", () => ({
@@ -53,21 +60,6 @@ function makeItem(): Item {
 
 function makeBomItem(): Item {
   return { ...makeItem(), bom_completed_at: "2026-07-21T00:00:00Z" } as Item;
-}
-
-function makeReservation(lineId: string, requesterName: string): StockRequestReservationLine {
-  return {
-    line_id: lineId,
-    request_id: `request-${lineId}`,
-    request_code: null,
-    requester_name: requesterName,
-    requester_department: "production",
-    quantity: 5,
-    from_bucket: "warehouse",
-    to_bucket: "department",
-    to_department: "production",
-    created_at: "2026-08-04T00:00:00Z",
-  } as unknown as StockRequestReservationLine;
 }
 
 const bomTree: BOMTreeNode = {
@@ -127,39 +119,6 @@ describe("InventoryDetailPanel desktop quick actions", () => {
     expect(screen.queryByText("삭제된 품목입니다. 입출고 작업을 할 수 없습니다.")).not.toBeInTheDocument();
   });
 
-  it("shows obsolete stock instead of a misleading defective total", () => {
-    render(<InventoryDetailPanel item={{ ...makeItem(), defective_total: 42,
-      defective_breakdown: [{ department: "조립", management_category: "OBSOLETE", quantity: 42 }],
-    } as Item} onGoToWarehouse={() => {}} />);
-    expect(screen.queryByText("불량 재고")).toBeNull();
-    const card = screen.getByText("구형 재고").parentElement!;
-    expect(within(card).getByText("42")).toHaveStyle({ color: LEGACY_COLORS.stockObsolete });
-    expect(card.parentElement).toHaveClass("grid-cols-3");
-  });
-
-  it("sums managed categories across departments and hides zero categories", () => {
-    render(<InventoryDetailPanel item={{ ...makeItem(), available_quantity: 371, defective_total: 10,
-      defective_breakdown: [
-        { department: "조립", management_category: "DEFECT", quantity: 0 },
-        { department: "조립", management_category: "B_GRADE", quantity: 3 },
-        { department: "AS", management_category: "B_GRADE", quantity: 2 },
-        { department: "조립", management_category: "OBSOLETE", quantity: 5 },
-      ],
-    } as Item} onGoToWarehouse={() => {}} />);
-    expect(screen.queryByText("불량 재고")).toBeNull();
-    expect(within(screen.getByText("B급 재고").parentElement!).getByText("5")).toHaveStyle({ color: LEGACY_COLORS.stockBGrade });
-    expect(within(screen.getByText("구형 재고").parentElement!).getByText("5")).toHaveStyle({ color: LEGACY_COLORS.stockObsolete });
-    expect(within(screen.getByText("사용 가능 재고").parentElement!).getByText("371")).toBeInTheDocument();
-    expect(screen.getByText("사용 가능 재고").parentElement?.parentElement).toHaveClass("grid-cols-2");
-  });
-
-  it("treats an empty new breakdown as authoritative", () => {
-    render(<InventoryDetailPanel item={{ ...makeItem(), defective_total: 42, defective_breakdown: [] } as Item} onGoToWarehouse={() => {}} />);
-    expect(screen.queryByText("불량 재고")).toBeNull();
-    expect(screen.queryByText("B급 재고")).toBeNull();
-    expect(screen.queryByText("구형 재고")).toBeNull();
-  });
-
   it("keeps raw-material receiving on desktop but hides it from mobile detail", () => {
     const { rerender } = render(<InventoryDetailPanel item={makeItem()} canReceive onGoToWarehouse={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: "입고" }));
@@ -217,74 +176,6 @@ describe("InventoryDetailPanel desktop quick actions", () => {
     expect(screen.queryByTestId("quick-action-choices")).not.toBeInTheDocument();
   });
 
-  it("renders available stock before pending approval quantity", () => {
-    render(<InventoryDetailPanel item={makeItem()} onGoToWarehouse={() => {}} />);
-
-    const availableLabel = screen.getByText("사용 가능 재고");
-    const pendingLabel = screen.getByText("승인 대기 수량");
-    expect(availableLabel.compareDocumentPosition(pendingLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it("keeps the pending approval warning on the right-hand card", () => {
-    render(
-      <InventoryDetailPanel
-        item={{ ...makeItem(), available_quantity: 10, pending_quantity: 5 } as Item}
-        onGoToWarehouse={() => {}}
-      />,
-    );
-
-    const pendingCard = screen.getByText("승인 대기 수량").parentElement;
-    expect(pendingCard).toHaveStyle({
-      borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 40%, transparent)`,
-    });
-    expect(within(pendingCard!).getByText("5")).toHaveStyle({ color: LEGACY_COLORS.yellow });
-  });
-
-  it("shows the combined warehouse and department approval pending quantity", () => {
-    render(
-      <InventoryDetailPanel
-        item={{ ...makeItem(), available_quantity: 10, pending_quantity: 3, department_pending_quantity: 2 } as Item}
-        onGoToWarehouse={() => {}}
-      />,
-    );
-
-    expect(within(screen.getByText("승인 대기 수량").parentElement!).getByText("5")).toBeInTheDocument();
-  });
-
-  it("renders defective stock after available and pending quantities with red emphasis", () => {
-    render(
-      <InventoryDetailPanel
-        item={{ ...makeItem(), available_quantity: 10, pending_quantity: 5, defective_total: 3.5 } as Item}
-        onGoToWarehouse={() => {}}
-      />,
-    );
-
-    const availableLabel = screen.getByText("사용 가능 재고");
-    const pendingLabel = screen.getByText("승인 대기 수량");
-    const defectiveLabel = screen.getByText("불량 재고");
-    const defectiveCard = defectiveLabel.parentElement;
-
-    expect(availableLabel.compareDocumentPosition(pendingLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(pendingLabel.compareDocumentPosition(defectiveLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(defectiveLabel.parentElement?.parentElement).toHaveClass("grid-cols-3");
-    expect(defectiveCard).toHaveStyle({
-      borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 40%, transparent)`,
-    });
-    expect(within(defectiveCard!).getByText(formatQty(3.5))).toHaveStyle({ color: LEGACY_COLORS.red });
-  });
-
-  it("does not render defective stock or expand the quantity grid when its total is zero", () => {
-    render(
-      <InventoryDetailPanel
-        item={{ ...makeItem(), defective_total: 0 } as Item}
-        onGoToWarehouse={() => {}}
-      />,
-    );
-
-    expect(screen.queryByText("불량 재고")).not.toBeInTheDocument();
-    expect(screen.getByText("사용 가능 재고").parentElement?.parentElement).toHaveClass("grid-cols-2");
-  });
-
   it("portals desktop quick actions into the fixed right-panel footer", () => {
     render(
       <DesktopRightPanel title="테스트 항목">
@@ -301,36 +192,7 @@ describe("InventoryDetailPanel desktop quick actions", () => {
   });
 });
 
-describe("InventoryDetailPanel realtime reservations", () => {
-  it("모바일 예약 최초 조회는 실제 요청 행 자리에 골격을 표시한다", async () => {
-    const request = deferred<StockRequestReservationLine[]>();
-    vi.spyOn(api, "getItemReservations").mockReturnValueOnce(request.promise);
-    render(<InventoryDetailPanel item={{ ...makeItem(), pending_quantity: 5 } as Item} quickActionVariant="mobile" onGoToWarehouse={() => {}} />);
-    expect(screen.getByRole("status", { name: "승인 대기 요청을 불러오는 중" })).toHaveAttribute("aria-busy", "true");
-    expect(screen.getAllByTestId("reservation-skeleton-row")).toHaveLength(2);
-    await act(async () => request.resolve([]));
-    expect(screen.queryByRole("status", { name: "승인 대기 요청을 불러오는 중" })).not.toBeInTheDocument();
-    expect(screen.queryByText(/승인 대기 요청 \(0건\)/)).not.toBeInTheDocument();
-  });
-
-  it("모바일 예약 재조회 실패는 기존 행과 재시도 안내를 함께 표시한다", async () => {
-    vi.spyOn(api, "getItemReservations")
-      .mockResolvedValueOnce([makeReservation("old", "기존 요청자")])
-      .mockRejectedValueOnce(new Error("network failure"))
-      .mockResolvedValueOnce([makeReservation("new", "새 요청자")]);
-    const item = { ...makeItem(), pending_quantity: 5 } as Item;
-    const { rerender } = render(<InventoryDetailPanel item={item} quickActionVariant="mobile" onGoToWarehouse={() => {}} />);
-    await screen.findByText("기존 요청자");
-    realtimeState.revision = 2;
-    rerender(<InventoryDetailPanel item={item} quickActionVariant="mobile" onGoToWarehouse={() => {}} />);
-    expect(await screen.findByRole("alert")).toHaveTextContent("기존 내용을 표시합니다");
-    expect(screen.getByText("기존 요청자")).toBeInTheDocument();
-    expect(screen.queryByRole("status", { name: "승인 대기 요청을 불러오는 중" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
-    await screen.findByText("새 요청자");
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  });
-
+describe("InventoryDetailPanel BOM loading", () => {
   it("모바일 BOM 최초 조회는 이미지 대신 실제 이름·코드·재고 행 골격을 표시한다", async () => {
     const request = deferred<BOMTreeNode>();
     vi.spyOn(api, "getBOMTree").mockReturnValueOnce(request.promise);
@@ -341,78 +203,6 @@ describe("InventoryDetailPanel realtime reservations", () => {
     expect(within(loading).getAllByTestId("bom-mobile-skeleton-row")).toHaveLength(4);
     await act(async () => request.resolve(bomTree));
     expect(screen.queryByRole("status", { name: "BOM 구성을 불러오는 중…" })).not.toBeInTheDocument();
-  });
-  it("shows each reservation's actual warehouse, production, and defective source", async () => {
-    vi.spyOn(api, "getItemReservations").mockResolvedValue([
-      {
-        ...makeReservation("dept-source", "부서 요청"),
-        from_bucket: "production",
-        from_department: "조립",
-      },
-      {
-        ...makeReservation("defect-source", "불량 요청"),
-        from_bucket: "defective",
-        from_department: "고압",
-      },
-      makeReservation("warehouse-source", "창고 요청"),
-    ]);
-    render(
-      <InventoryDetailPanel
-        item={{ ...makeItem(), pending_quantity: 0, department_pending_quantity: 5 } as Item}
-        onGoToWarehouse={() => {}}
-      />,
-    );
-
-    expect(await screen.findByText(/조립 생산 →/)).toBeInTheDocument();
-    expect(screen.getByText(/고압 불량 →/)).toBeInTheDocument();
-    expect(screen.getByText(/창고 →/)).toBeInTheDocument();
-  });
-
-  it("refreshes unchanged pending quantity on a revision without closing the open quick action", async () => {
-    vi.spyOn(api, "getItemReservations")
-      .mockResolvedValueOnce([makeReservation("old", "기존 요청자")])
-      .mockResolvedValueOnce([makeReservation("new", "최신 요청자")]);
-    const item = { ...makeItem(), pending_quantity: 5 } as Item;
-    const { rerender } = render(<InventoryDetailPanel item={item} onGoToWarehouse={() => {}} />);
-
-    expect(await screen.findByText("기존 요청자")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "입고" }));
-    expect(screen.getByTestId("quick-action-choices")).toBeInTheDocument();
-
-    realtimeState.revision = 2;
-    rerender(<InventoryDetailPanel item={item} onGoToWarehouse={() => {}} />);
-
-    expect(await screen.findByText("최신 요청자")).toBeInTheDocument();
-    expect(api.getItemReservations).toHaveBeenCalledTimes(2);
-    expect(screen.getByTestId("quick-action-choices")).toBeInTheDocument();
-  });
-
-  it("ignores an earlier reservation response after a revision refresh", async () => {
-    const earlier = deferred<StockRequestReservationLine[]>();
-    const latest = deferred<StockRequestReservationLine[]>();
-    vi.spyOn(api, "getItemReservations")
-      .mockReturnValueOnce(earlier.promise)
-      .mockReturnValueOnce(latest.promise);
-    const item = { ...makeItem(), pending_quantity: 5 } as Item;
-    const { rerender } = render(<InventoryDetailPanel item={item} onGoToWarehouse={() => {}} />);
-    await waitFor(() => expect(api.getItemReservations).toHaveBeenCalledTimes(1));
-
-    realtimeState.revision = 2;
-    rerender(<InventoryDetailPanel item={item} onGoToWarehouse={() => {}} />);
-    await waitFor(() => expect(api.getItemReservations).toHaveBeenCalledTimes(2));
-
-    await act(async () => {
-      latest.resolve([makeReservation("new", "최신 요청자")]);
-      await latest.promise;
-    });
-    expect(await screen.findByText("최신 요청자")).toBeInTheDocument();
-
-    await act(async () => {
-      earlier.resolve([makeReservation("old", "뒤늦은 요청자")]);
-      await earlier.promise;
-    });
-    expect(screen.queryByText("뒤늦은 요청자")).not.toBeInTheDocument();
-    expect(screen.getByText("최신 요청자")).toBeInTheDocument();
   });
 });
 
@@ -836,21 +626,6 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     expect(closeButton).toHaveFocus();
     expect(fireEvent.keyDown(closeButton, { key: "Tab", shiftKey: true })).toBe(false);
     expect(closeButton).toHaveFocus();
-  });
-
-  it("keeps the previous reservation rows when a realtime refresh fails", async () => {
-    vi.spyOn(api, "getItemReservations")
-      .mockResolvedValueOnce([makeReservation("old", "기존 요청자")])
-      .mockRejectedValueOnce(new Error("refresh failed"));
-    const item = { ...makeItem(), pending_quantity: 5 } as Item;
-    const { rerender } = render(<InventoryDetailPanel item={item} onGoToWarehouse={() => {}} />);
-    expect(await screen.findByText("기존 요청자")).toBeInTheDocument();
-
-    realtimeState.revision = 2;
-    rerender(<InventoryDetailPanel item={item} onGoToWarehouse={() => {}} />);
-    await waitFor(() => expect(api.getItemReservations).toHaveBeenCalledTimes(2));
-
-    expect(screen.getByText("기존 요청자")).toBeInTheDocument();
   });
 
   it("renders modal BOM rows as a five-column grid without a type cell or tree rails", async () => {

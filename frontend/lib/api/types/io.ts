@@ -1,5 +1,6 @@
 import type { Department } from "./shared";
 import type { ShippingTransactionLog } from "./shipping";
+import type { WorkEffectivePlan, WorkReservationIssue, WorkReservationStatus } from "./work-reservations";
 
 export type IoWorkType =
   | "receive"
@@ -94,6 +95,8 @@ export interface IoPreviewTarget {
 
 export interface IoPreviewPayload {
   requester_employee_id?: string | null;
+  /** 본인 draft 확인 후 그 배치의 작업 예약만 가산한다. 출하 요청 ID와 별개다. */
+  owner_batch_id?: string | null;
   work_type: IoWorkType;
   sub_type: IoSubType;
   from_department?: Department | string | null;
@@ -123,11 +126,24 @@ export interface IoDraftPayload {
   client_request_id?: string | null;
   // 이어 작업 중인 draft의 batch_id. 있으면 갱신, 없으면 새 슬롯 생성.
   batch_id?: string | null;
+  /** 기존 응답 전환용 optional. CP3 서버는 기존 배치 변경 시 필수로 검증한다. */
+  expected_revision?: number;
   bundles: IoBundle[];
 }
 
+/** CP5 작성 화면은 생성 키와 수정 버전을 빠뜨리지 않도록 이 계약을 사용한다. */
+export type IoReservedDraftPayload = Omit<IoDraftPayload, "batch_id" | "client_request_id" | "expected_revision"> & (
+  | { batch_id?: null; client_request_id: string; expected_revision?: never }
+  | { batch_id: string; client_request_id?: string | null; expected_revision: number }
+);
+
 export interface IoBatch {
   batch_id: string;
+  /** CP3 이전 응답은 미제공. 누락된 버전을 0으로 간주해 변경 요청을 보내지 않는다. */
+  revision?: number;
+  reservation_status?: WorkReservationStatus;
+  reservation_issue?: WorkReservationIssue | null;
+  effective_plan?: WorkEffectivePlan | null;
   work_type: IoWorkType;
   sub_type: IoSubType;
   status: "draft" | "submitted" | "reserved" | "completed" | "partially_completed" | "rejected" | "cancelled" | "failed";

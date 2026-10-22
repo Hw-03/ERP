@@ -4,7 +4,7 @@ import { Fragment, useState, type ReactNode } from "react";
 import {
   Activity, AlertCircle, ArrowDownToLine, ArrowRightLeft, ArrowUpFromLine,
   BookmarkMinus, BookmarkPlus, ChevronDown, ChevronRight, ClipboardCheck, Hammer, Layers,
-  Package, PackageX, Recycle, ShieldAlert, Sliders, Trash2, Undo2, Wrench,
+  Package, PackageX, Recycle, ShieldAlert, Sliders, Trash2, Undo2, Wrench, type LucideIcon,
 } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import type { TransactionDisplayGroup, TransactionReferenceSummary } from "@/lib/api/production";
@@ -31,7 +31,7 @@ import {
 } from "./historyBatchInterpreter";
 import { isReworkOperation } from "./transactionTaxonomy";
 import { getInitialStockEffect, historyOperationColor, isStocktakeOperation } from "./historyOperationSource";
-import { getHistoryListOperationLabel, getHistoryRowPresentation, getReferenceBatchLinePresentation, getReferenceBatchPresentation, getShippingPhaseFlowLabel, isDepartmentCorrectionLog } from "./historyPresentation";
+import { finalizeHistoryGroupLabel, getHistoryListOperationLabel, getHistoryProcessGroupLabel, getHistoryRowPresentation, getReferenceBatchLinePresentation, getReferenceBatchPresentation, getShippingPhaseFlowLabel, isDepartmentCorrectionLog } from "./historyPresentation";
 import { formatHistoryDate } from "./historyFormat";
 import type { HistorySelection } from "./historyConstants";
 
@@ -137,6 +137,8 @@ export function FlowBadge({
   compact = false,
   accessibleLabel,
   variant = "table",
+  icon: IconOverride,
+  className = "",
 }: {
   type: TransactionLog["transaction_type"] | null;
   operation?: Pick<TransactionLog, "operation_domain" | "operation_action">;
@@ -145,8 +147,11 @@ export function FlowBadge({
   compact?: boolean;
   accessibleLabel?: string;
   variant?: "table" | "panel";
+  /** 거래 분류가 없는 구형 요청 등에 대체 아이콘을 표시한다. */
+  icon?: LucideIcon;
+  className?: string;
 }): ReactNode {
-  const Icon = operation && isStocktakeOperation(operation) ? ClipboardCheck : type ? TX_ICON[transactionIconName(type)] : null;
+  const Icon = IconOverride ?? (operation && isStocktakeOperation(operation) ? ClipboardCheck : type ? TX_ICON[transactionIconName(type)] : null);
   const fullLabel = accessibleLabel ?? label;
   return (
     <span
@@ -154,7 +159,7 @@ export function FlowBadge({
       title={fullLabel !== label ? fullLabel : undefined}
       className={`inline-flex min-w-0 items-center gap-1 rounded-full px-3 text-xs font-bold ${
         variant === "table" ? `h-6 justify-center leading-none ${HISTORY_TABLE_OPERATION_PILL_CLASS}` : "min-h-6 max-w-full py-1 leading-4"
-      }`}
+      } ${className}`}
       style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}
     >
       {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
@@ -861,10 +866,10 @@ export function getHistoryGroupSummary(group: LogGroup, batch?: IoBatch | null, 
     const hasBackflush = logs.some((log) => log.transaction_type === "BACKFLUSH");
     if (operationLabel.startsWith("disassemble") && hasProduce && hasBackflush) {
       displayType = "DISASSEMBLE";
-      label = "분해 출고";
+      label = getHistoryProcessGroupLabel(displayType)!;
     } else if ((operationLabel.startsWith("produce") || operationLabel.startsWith("disassemble")) && hasProduce !== hasBackflush) {
       displayType = "ADJUST";
-      label = "부서 입출고";
+      label = getHistoryProcessGroupLabel(displayType)!;
     }
     color = isReworkOperation(first) ? LEGACY_COLORS.red : historyOperationColor(first, displayType);
   } else if (group.type === "op_batch") {
@@ -891,12 +896,7 @@ export function getHistoryGroupSummary(group: LogGroup, batch?: IoBatch | null, 
     }
   }
   const primaryLog = group.type === "batch" || group.type === "op_batch" ? representative : first;
-  if (displayType === "MARK_DEFECTIVE" && label === "불량" && primaryLog.operation_kind !== "CANCELLATION") {
-    label = "불량 격리";
-  }
-  if (primaryLog.operation_kind === "CANCELLATION" && !label.endsWith(" 취소")) {
-    label = `${label} 취소`;
-  }
+  label = finalizeHistoryGroupLabel(label, displayType, primaryLog.operation_kind);
   return { primaryLog, title,
     additionalItemCount: getAdditionalDistinctItemCount(logs, representative), displayType, label,
     color: primaryLog.operation_kind === "CANCELLATION" ? LEGACY_COLORS.red : color,

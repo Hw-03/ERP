@@ -16,6 +16,7 @@ export interface AdminListPanelProps<T> {
   searchValue?: string;
   searchPlaceholder?: string;
   searchDisabled?: boolean;
+  inlineSearch?: boolean;
   onSearchChange?: (value: string) => void;
   filters?: ReactNode;
   action?: ReactNode;
@@ -40,6 +41,7 @@ export function AdminListPanel<T>({
   searchValue,
   searchPlaceholder = "검색...",
   searchDisabled = false,
+  inlineSearch = false,
   onSearchChange,
   filters,
   action,
@@ -58,6 +60,10 @@ export function AdminListPanel<T>({
   virtual,
 }: AdminListPanelProps<T>) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const searchControl = onSearchChange ? <SearchInput disabled={searchDisabled} value={searchValue ?? ""} onChange={onSearchChange}
+    ariaLabel={searchPlaceholder} placeholder={inlineSearch ? "검색" : searchPlaceholder}
+    className={inlineSearch ? "min-w-0 flex-1 !min-h-9 rounded-[10px] [&_button]:!min-h-9" : "shrink-0 rounded-[12px]"}
+    inputProps={{ className: `${inlineSearch ? "!h-9 " : ""}placeholder:font-medium` }} /> : null;
   useAdminScrollRestoration(`list.scroll:${listAriaLabel ?? title}`, scrollRef, !read?.loading);
 
   // 드래그 중 마우스 휠로 스크롤 — HTML5 drag가 기본 스크롤을 막으므로 non-passive 리스너로 수동 처리.
@@ -106,7 +112,7 @@ export function AdminListPanel<T>({
       }}
     >
       {(title || action) && (
-        <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 rounded-[14px] border px-2"
+        <div className={`flex ${inlineSearch ? "min-h-11" : "min-h-12"} shrink-0 items-center justify-between gap-2 rounded-[14px] border px-2`}
           style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
           <div className="flex min-w-0 flex-1 items-center gap-2">
             {title && (
@@ -115,11 +121,12 @@ export function AdminListPanel<T>({
                 style={{ color: LEGACY_COLORS.blue, background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 12%, transparent)` }}>
                 <List className="h-[18px] w-[18px]" />
               </span>
-              <div className="min-w-0 truncate text-base font-bold leading-6" style={{ color: LEGACY_COLORS.text }}>
+              <div className={`min-w-0 ${inlineSearch ? "shrink-0" : ""} truncate text-base font-bold leading-6`} style={{ color: LEGACY_COLORS.text }}>
                 {title}
               </div>
               </>
             )}
+            {inlineSearch && searchControl}
             {countLabel && (
               <div className="ml-auto flex min-h-7 shrink-0 items-center justify-center whitespace-nowrap rounded-full border px-2 text-sm font-bold leading-5 tabular-nums"
                 style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
@@ -130,10 +137,7 @@ export function AdminListPanel<T>({
           {action}
         </div>
       )}
-      {onSearchChange && (
-        <SearchInput disabled={searchDisabled} value={searchValue ?? ""} onChange={onSearchChange} placeholder={searchPlaceholder}
-          className="shrink-0 rounded-[12px]" inputProps={{ className: "placeholder:font-medium" }} />
-      )}
+      {!inlineSearch && searchControl}
       {filters && <div className="flex shrink-0 flex-wrap gap-1.5">{filters}</div>}
       {externalScrollbar ? <div data-scrollbar-rail-shell className="relative min-h-0 flex-1">
         {viewport}

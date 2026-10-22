@@ -1,6 +1,7 @@
 "use client";
 
 import { ClipboardCheck, Save } from "lucide-react";
+import type { ReactNode } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { EmptyState } from "../common";
@@ -30,8 +31,10 @@ interface Props {
   hasShortage?: boolean;
   hasInvalidQuantity?: boolean;
   invalidLineCodes?: string[];
-  /** 항목 3-4 — 모바일 전용: Step4에도 임시저장 버튼 노출. 데스크톱은 미전달(버튼 없음 → 무변경). */
+  /** 현재 작업을 작업 중 목록에 등록하거나 변경 내용을 반영한다. */
   onSaveDraft?: () => void;
+  saveDraftLabel?: string;
+  footerNotice?: ReactNode;
   /** 항목 7 — 부족 품목 '창고에서 가져오기'(생산 4단계, 데스크톱 전용). */
   pullEnabled?: boolean;
   pullSelected?: ReadonlySet<string>;
@@ -63,6 +66,8 @@ export function IoBundleCart({
   hasInvalidQuantity,
   invalidLineCodes = [],
   onSaveDraft,
+  saveDraftLabel = "작업 중 등록",
+  footerNotice,
   pullEnabled,
   pullSelected,
   onTogglePull,
@@ -134,10 +139,12 @@ export function IoBundleCart({
         </div>
       )}
 
+      {bundles.length === 0 && footerNotice}
       {bundles.length > 0 && (
         // 항목 13 — 모바일은 하단 고정(sticky), 데스크톱(lg)은 기존 mt-auto 정적 배치 그대로.
         // 항목 4-7C — 모바일 띠 배경/상단선 제거(저장·제출확인 버튼만 떠 보이게).
         <div data-io-cart-actions className="sticky bottom-0 z-20 -mx-3 mt-auto flex flex-col gap-2 bg-[var(--c-bg)] px-4 pb-0 pt-2 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-1">
+          {footerNotice}
           {!canAdvance && hasShortage && (
             <p className="text-center text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
               재고가 부족한 항목이 있습니다
@@ -174,23 +181,23 @@ export function IoBundleCart({
             </button>
           )}
           {onSaveDraft ? (
-            // 항목 3-4 — 모바일: 저장하기 + 제출확인 나란히(Step5와 동일하게 Step4에서도 저장 가능).
-            <div className="flex gap-2">
+            // 수량 조정과 최종 확인에서 같은 작업 등록·반영 동작을 제공한다.
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={onSaveDraft}
                 disabled={internalUseBomBusy}
-                className="flex shrink-0 items-center gap-1.5 rounded-[14px] border px-5 py-3 text-sm font-black transition-[transform] active:scale-[0.99]"
+                className="flex min-w-0 items-center justify-center gap-1.5 rounded-[14px] border px-5 py-3 text-sm font-black transition-[transform] active:scale-[0.99]"
                 style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
               >
                 <Save className="h-4 w-4" />
-                저장
+                {saveDraftLabel}
               </button>
               <button
                 type="button"
                 onClick={onAdvance}
                 disabled={!canAdvance || internalUseBomBusy}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
+                className="flex min-w-0 items-center justify-center gap-1.5 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
                 style={{ background: ioDirectionTone(subType) === LEGACY_COLORS.red ? LEGACY_COLORS.redSolid : LEGACY_COLORS.blueSolid }}
               >
                 <ClipboardCheck className="h-4 w-4" />

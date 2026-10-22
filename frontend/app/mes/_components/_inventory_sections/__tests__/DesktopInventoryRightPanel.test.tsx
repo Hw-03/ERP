@@ -190,15 +190,33 @@ describe("DesktopInventoryRightPanel", () => {
     expect(historyTab).toHaveClass("flex-1");
     const closeButton = screen.getByRole("button", { name: "패널 닫기" });
     expect(tablist.parentElement).toHaveClass("flex", "items-center", "gap-2", "mb-4");
-    expect(tablist.parentElement).toContainElement(closeButton);
+    expect(screen.getByTestId("desktop-right-panel-body")).not.toContainElement(closeButton);
     expect(screen.getByText("상세 내용")).toBeInTheDocument();
-    expect(screen.getByTestId("desktop-right-panel-body")).toHaveClass("-mr-2.5", "pr-2.5");
+    expect(screen.getByTestId("desktop-right-panel-body")).toHaveClass("-mr-[31px]", "pr-[31px]");
 
     fireEvent.click(historyTab);
 
     expect(historyTab).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("최근 내역 패널")).toBeInTheDocument();
     expect(screen.queryByText("상세 내용")).not.toBeInTheDocument();
+  });
+
+  it("resets the shared scroller on every tab change, item change and reopening", () => {
+    const item = makeItem();
+    const panel = (open: boolean, selectedItem = item) => <DesktopInventoryRightPanel open={open} selectedItem={selectedItem} displayItem={selectedItem} headerBadge={null} onClose={vi.fn()} onGoToWarehouse={vi.fn()} />;
+    const { rerender } = render(panel(true));
+    for (const name of ["최근 내역", "검색용 이름", "상세 정보"]) {
+      const body = screen.getByTestId("desktop-right-panel-body");
+      body.scrollTop = 150;
+      fireEvent.click(screen.getByRole("tab", { name }));
+      expect(body.scrollTop).toBe(0);
+    }
+    screen.getByTestId("desktop-right-panel-body").scrollTop = 150;
+    rerender(panel(true, { ...item, item_id: "next" }));
+    expect(screen.getByTestId("desktop-right-panel-body").scrollTop).toBe(0);
+    rerender(panel(false));
+    rerender(panel(true));
+    expect(screen.getByTestId("desktop-right-panel-body").scrollTop).toBe(0);
   });
 
   it("다른 품목을 열면 상세 정보 탭으로 돌아간다", () => {

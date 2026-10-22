@@ -14,6 +14,7 @@ import { AdminDangerZone } from "./AdminDangerZone";
 import { AdminDepartmentsProvider } from "./AdminDepartmentsContext";
 import { AdminDepartmentsSection } from "./AdminDepartmentsSection";
 import { AdminIntegritySection } from "./AdminIntegritySection";
+import { AdminWorkReservationsSection } from "./AdminWorkReservationsSection";
 import type { AdminPinForm } from "../_admin_hooks/adminPinValidation";
 
 /**
@@ -147,6 +148,9 @@ export const AdminSectionContent = memo(function AdminSectionContent(props: Admi
   }
   if (section === "integrity") {
     return <AdminIntegritySection />;
+  }
+  if (section === "workReservations") {
+    return <AdminWorkReservationsSection departments={departments} employees={employees} globalSearch={globalSearch} />;
   }
   if (section === "settings") {
     return (

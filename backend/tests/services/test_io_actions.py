@@ -33,6 +33,7 @@ from app.services import io_dispatch, io_draft, io_persist
 from app.services import sr_execution
 from app.services import warehouse_map as warehouse_map_svc
 from app.services.pin_auth import DEFAULT_PIN_HASH
+from app.services.work_reservation_errors import WorkReservationError
 
 def _make_requester(
     db_session,
@@ -116,6 +117,7 @@ def _internal_use_payload(requester: Employee, items: list) -> IoSubmitRequest:
             }
         )
     return IoSubmitRequest(
+        client_request_id=str(uuid.uuid4()),
         requester_employee_id=requester.employee_id,
         work_type="internal_use",
         sub_type="internal_use_out",
@@ -201,9 +203,10 @@ def _count_session_boundaries(db_session, monkeypatch):
 
 
 def test_save_internal_use_draft_accepts_server_derived_department_source(
-    db_session, make_item
+    db_session, make_item, make_location
 ):
     item = make_item(name="고압 부서 원본", process_type_code="HF")
+    make_location(item.item_id, department=DepartmentEnum.HIGH_VOLTAGE, quantity=Decimal(1))
     requester = _make_requester(
         db_session,
         department=DepartmentEnum.AS,
@@ -236,9 +239,10 @@ def test_save_internal_use_draft_rejects_tampered_department_source(
 
 
 def test_submit_existing_internal_use_draft_revalidates_department_source(
-    db_session, make_item
+    db_session, make_item, make_location
 ):
     item = make_item(name="고압 최종 제출 검증", process_type_code="HF")
+    make_location(item.item_id, department=DepartmentEnum.HIGH_VOLTAGE, quantity=Decimal(1))
     requester = _make_requester(
         db_session,
         department=DepartmentEnum.AS,
@@ -253,13 +257,18 @@ def test_submit_existing_internal_use_draft_revalidates_department_source(
     line.from_department = DepartmentEnum.TUBE.value
     db_session.commit()
 
-    with pytest.raises(ValueError, match="라인 구성이 올바르지"):
+    with pytest.raises(WorkReservationError) as error:
         actions.submit_existing_draft(
             db_session,
             batch_id=draft["batch_id"],
             requester_employee_id=requester.employee_id,
+            expected_revision=draft["revision"],
         )
 
+    assert error.value.code == "WORK_PLAN_CHANGED"
+    db_session.expire_all()
+    assert db_session.query(IoBatch).one().status == "draft"
+    assert db_session.query(IoBatch).one().revision == 1
 
 def test_save_internal_use_draft_rejects_duplicate_parent_sources(
     db_session, make_item
@@ -1038,7 +1047,7 @@ def test_as_research_action_rechecks_latest_permission_after_roster_lock(
     )
 
     assert response.status_code == 403, response.text
-    assert lock_calls == [True]
+    assert lock_calls and all(lock_calls)
     db_session.expire_all()
     request = db_session.get(StockRequest, request_id)
     assert request.as_research_approved_at is None
@@ -1143,7 +1152,7 @@ def test_requester_cancel_cancels_entire_internal_use_batch_even_after_sibling_a
 
     blocked_edit_before_decision = client.post(
         f"/api/stock-requests/{department_request.request_id}/revert-to-draft",
-        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000", "expected_revision": submitted["batch"]["revision"]},
     )
     assert blocked_edit_before_decision.status_code == 422
     assert "사용출고" in blocked_edit_before_decision.text
@@ -1157,7 +1166,7 @@ def test_requester_cancel_cancels_entire_internal_use_batch_even_after_sibling_a
 
     blocked_edit = client.post(
         f"/api/stock-requests/{department_request.request_id}/revert-to-draft",
-        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000", "expected_revision": submitted["batch"]["revision"] + 1},
     )
     assert blocked_edit.status_code == 422
     assert "사용출고" in blocked_edit.text
@@ -1427,7 +1436,7 @@ def test_internal_use_fully_self_approved_submit_failure_persists_failed_batch(
 
     monkeypatch.setattr(io_dispatch, "_apply_line", fail_second_line)
 
-    with pytest.raises(type(settle_error), match=str(settle_error)):
+    with pytest.raises(WorkReservationError, match=str(settle_error)) as raised:
         actions.submit(db_session, payload)
 
     batch = db_session.query(IoBatch).one()
@@ -1481,7 +1490,7 @@ def test_internal_use_submission_preflight_failure_does_not_persist_failed_batch
         warehouse_role="none",
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(WorkReservationError):
         actions.submit(db_session, _internal_use_payload(requester, [item]))
 
     assert db_session.query(IoBatch).count() == 0
@@ -1814,10 +1823,11 @@ def test_submit_settlement_failure_rolls_back_inventory_and_persists_failed_batc
 
     monkeypatch.setattr(io_dispatch, "_apply_line", fail_on_second_line)
 
-    with pytest.raises(RuntimeError) as raised:
+    with pytest.raises(WorkReservationError) as raised:
         actions.submit(db_session, _internal_use_payload(requester, [first, second]))
 
-    assert raised.value is boom
+    assert raised.value.code == "IO_SETTLEMENT_FAILED_PERSISTED"
+    assert raised.value.extra["state_committed"] is True
     assert line_calls == 2
     assert boundaries == {"commit": 1, "rollback": 0}
     db_session.expire_all()
@@ -1957,14 +1967,16 @@ def test_submit_existing_draft_settlement_failure_persists_failed_batch(
 
     monkeypatch.setattr(io_dispatch, "_apply_line", fail_on_second_line)
 
-    with pytest.raises(RuntimeError) as raised:
+    with pytest.raises(WorkReservationError) as raised:
         actions.submit_existing_draft(
             db_session,
             batch_id=draft_id,
             requester_employee_id=requester.employee_id,
+            expected_revision=draft["revision"],
         )
 
-    assert raised.value is boom
+    assert raised.value.code == "IO_SETTLEMENT_FAILED_PERSISTED"
+    assert raised.value.extra["state_committed"] is True
     assert line_calls == 2
     assert status_during_failure == ["submitted"]
     assert boundaries == {"commit": 1, "rollback": 0}
@@ -2006,6 +2018,7 @@ def test_submit_existing_draft_commits_once(
         db_session,
         batch_id=draft_id,
         requester_employee_id=requester.employee_id,
+            expected_revision=draft["revision"],
     )
 
     assert result["status"] == "completed"
@@ -2025,6 +2038,7 @@ def test_submit_existing_draft_rejects_when_conditional_draft_transition_loses_r
     draft = io_draft.save_draft(
         db_session,
         IoSubmitRequest(
+        client_request_id=str(uuid.uuid4()),
             requester_employee_id=requester.employee_id,
                 work_type="receive",
                 sub_type="receive_supplier",
@@ -2053,17 +2067,18 @@ def test_submit_existing_draft_rejects_when_conditional_draft_transition_loses_r
     real_execute = db_session.execute
 
     def lose_draft_transition(statement, *args, **kwargs):
-        if str(statement).startswith("UPDATE io_batches SET status"):
+        if str(statement).startswith("UPDATE io_batches SET revision") :
             return SimpleNamespace(rowcount=0)
         return real_execute(statement, *args, **kwargs)
 
     monkeypatch.setattr(db_session, "execute", lose_draft_transition)
 
-    with pytest.raises(ValueError, match="임시저장 상태가 아닙니다"):
+    with pytest.raises(WorkReservationError) as error:
         actions.submit_existing_draft(
             db_session,
             batch_id=draft["batch_id"],
             requester_employee_id=requester.employee_id,
+            expected_revision=draft["revision"],
         )
 
     db_session.expire_all()

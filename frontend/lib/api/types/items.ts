@@ -7,6 +7,7 @@
 
 import type { Department, InventoryLocationRow } from "./shared";
 import type { DefectManagementCategory } from "./defects";
+import type { InventoryReservationSummary } from "./inventory";
 
 export type BomUnmatchedStatus = "DISUSED" | "HOLD" | "DUPLICATE";
 
@@ -27,6 +28,8 @@ export interface Item {
   defective_breakdown?: DefectiveStockBreakdown[];
   pending_quantity: number;
   department_pending_quantity?: number;
+  /** CP4 이전 응답은 미제공. pending_quantity의 창고 전용 의미는 그대로 유지한다. */
+  work_reservations?: InventoryReservationSummary;
   available_quantity: number;
   last_reserver_name: string | null;
   location: string | null;

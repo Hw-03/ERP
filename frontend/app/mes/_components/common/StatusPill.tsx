@@ -4,8 +4,8 @@ import { memo } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { inferTone, type MesTone } from "@/lib/mes-status";
 
-// 기존 prop 타입을 깨지 않기 위한 alias — MesTone 의 부분 집합 + "brand".
-export type StatusPillTone = Extract<MesTone, "info" | "success" | "warning" | "danger" | "neutral"> | "brand";
+// 기존 prop 타입을 유지하며 MES의 작업 예약 색상을 함께 지원한다.
+export type StatusPillTone = Extract<MesTone, "info" | "success" | "warning" | "danger" | "neutral"> | "brand" | "purple";
 
 const TONE_COLOR: Record<StatusPillTone, string> = {
   info: LEGACY_COLORS.blue,
@@ -14,6 +14,7 @@ const TONE_COLOR: Record<StatusPillTone, string> = {
   danger: LEGACY_COLORS.red,
   neutral: LEGACY_COLORS.muted2,
   brand: LEGACY_COLORS.cyan,
+  purple: LEGACY_COLORS.purple,
 };
 
 interface Props {

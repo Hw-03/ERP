@@ -10,12 +10,7 @@ import { formatQty } from "@/lib/mes/format";
 import { ImageLightbox } from "@/lib/ui/ImageLightbox";
 import { InventoryTableRow } from "./InventoryTable";
 import { InventoryStockSummary } from "./InventoryStockSummary";
-import { isDisusedInventoryItem } from "./inventoryFilter";
-
-function safeAvailableQty(item: Item) {
-  const n = Number(item.available_quantity);
-  return isNaN(n) ? 0 : n;
-}
+import { isDisusedInventoryItem, safeAvailableQty } from "./inventoryFilter";
 
 function getMinStock(item: Item) {
   return item.min_stock == null ? 0 : Number(item.min_stock);
@@ -39,7 +34,9 @@ function InventoryItemRowImpl({ item, selected, detailOpen = true, onSelect, ima
     ? { label: "불용", color: LEGACY_COLORS.muted2 }
     : stock;
   const isCritical = qty <= 0 || (minStock > 0 && qty < minStock);
-
+  const reservations = item.work_reservations;
+  const hasWorkInfo = reservations && (reservations.expected_in_quantity > 0 || !reservations.forecast_complete
+    || reservations.reservation_by_location.some((row) => row.work_reserved_quantity + row.approval_reserved_quantity + row.shipping_reserved_quantity > 0));
 
   const StockIcon = statusBadge.label === "불용" ? Archive : stock.label === "품절" ? XCircle : stock.label === "부족" ? AlertTriangle : CheckCircle2;
   const handleSelect = () => onSelect(selected && detailOpen ? null : item);
@@ -80,9 +77,14 @@ function InventoryItemRowImpl({ item, selected, detailOpen = true, onSelect, ima
               <div className="line-clamp-2 min-w-0 whitespace-normal break-keep [overflow-wrap:anywhere] text-[15px] font-bold leading-5">{item.item_name}</div>
             </div>
           ) : (
-            <div className="font-semibold">{item.item_name}</div>
+            <div className="min-w-0 font-semibold [overflow-wrap:anywhere]">{item.item_name}</div>
           )}
-          <InventoryStockSummary item={item} compact={compact} mode="bar" />
+          <InventoryStockSummary item={item} compact={compact} mode="bar" showWorkReservations />
+          {compact && hasWorkInfo && (
+            <div className="mt-2">
+              <InventoryStockSummary item={item} compact={compact} showWorkReservations />
+            </div>
+          )}
         </td>
       {!compact && (
         <>
@@ -90,7 +92,7 @@ function InventoryItemRowImpl({ item, selected, detailOpen = true, onSelect, ima
         {item.mes_code ?? "-"}
       </td>
       <td className="hidden sm:table-cell border-b px-4 py-5 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
-        <InventoryStockSummary item={item} />
+        <InventoryStockSummary item={item} showWorkReservations />
       </td>
         </>
       )}

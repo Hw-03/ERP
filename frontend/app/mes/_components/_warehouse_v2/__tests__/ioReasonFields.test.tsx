@@ -65,7 +65,7 @@ function Confirm() {
 
 it("사유 미선택과 기타 빈 메모는 제출만 막고 임시저장을 허용한다", () => {
   render(<Confirm />);
-  expect(screen.getByRole("button", { name: "저장" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "작업 중 등록" })).toBeEnabled();
   expect(screen.getByRole("button", { name: /즉시 반영하기/ })).toBeDisabled();
   fireEvent.change(screen.getByLabelText("사유 카테고리"), { target: { value: "기타" } });
   expect(screen.getByRole("button", { name: /즉시 반영하기/ })).toBeDisabled();

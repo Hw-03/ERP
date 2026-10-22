@@ -18,6 +18,35 @@ function operationRefs(): IoOperationRefs {
 }
 
 describe("ioComposeOperations", () => {
+  it.each([null, "draft-1"])("같은 작업 %s의 제출 대기 중 내용이 바뀌어도 확정 성공을 숨기지 않는다", async (draftId) => {
+    const refs = operationRefs();
+    const setResult = vi.fn();
+    const reset = vi.fn();
+    const complete = vi.fn(async () => {
+      refs.contentRevision.current += 1;
+      return { requires_approval: false, message: "제출한 내용이 반영되었습니다." } as never;
+    });
+    await runCompositionSubmit(
+      "employee-1", "adjust_in", "조립", async () => {}, () => [{ bundle_id: "bundle-1", lines: [] } as never],
+      { current: draftId }, complete, vi.fn(), vi.fn(), setResult, reset, vi.fn(), vi.fn(), async () => [], vi.fn(),
+      undefined, complete, undefined, refs, async () => ({ batch_id: "draft-1" }),
+    );
+    expect(setResult).toHaveBeenCalledWith(expect.objectContaining({ kind: "success" }));
+    expect(reset).toHaveBeenCalledOnce();
+  });
+
+  it("제출 응답 대기 중 다른 세션으로 복귀했다면 늦은 성공이 원작업을 초기화하지 않는다", async () => {
+    const refs = operationRefs();
+    const reset = vi.fn();
+    const setResult = vi.fn();
+    await runCompositionSubmit(
+      "employee", "produce", "조립", async () => {}, () => [{ bundle_id: "bundle", lines: [] } as never],
+      { current: null }, async () => { refs.generation.current += 1; return { requires_approval: false, message: "done" } as never; },
+      vi.fn(), vi.fn(), setResult, reset, vi.fn(), vi.fn(), async () => [], vi.fn(), undefined, undefined, undefined, refs,
+    );
+    expect(reset).not.toHaveBeenCalled();
+    expect(setResult).not.toHaveBeenCalled();
+  });
   it("저장 응답 뒤 내용이 바뀌면 batch id만 보존하고 성공 전환은 막는다", async () => {
     const refs = operationRefs();
     const retainBatchId = vi.fn();

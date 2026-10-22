@@ -1,6 +1,7 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { IoBatch, StockRequest } from "@/lib/api";
+import { api, type IoBatch, type StockRequest } from "@/lib/api";
+vi.mock("@/lib/api", () => ({ api: { getBatch: vi.fn() } }));
 import { MyRequestsPanel } from "../MyRequestsPanel";
 
 const hooks = vi.hoisted(() => ({
@@ -71,6 +72,7 @@ let requests: StockRequest[] = internalUseRequests;
 
 describe("MyRequestsPanel", () => {
   beforeEach(() => {
+    vi.mocked(api.getBatch).mockResolvedValue({ batch_id: "approval-batch", revision: 5 } as IoBatch);
     requests = internalUseRequests;
     hooks.cancel.mutate.mockClear();
     hooks.revert.mutate.mockClear();
@@ -131,7 +133,7 @@ describe("MyRequestsPanel", () => {
     expect(screen.queryByText("수량 조정 비고")).not.toBeInTheDocument();
   });
 
-  it("수정 성공 시 반환된 입출고 draft를 이어서 작업 콜백으로 전달한다", () => {
+  it("수정 성공 시 관측 버전을 전달하고 반환된 입출고 draft를 이어서 작업 콜백으로 전달한다", async () => {
     requests = [request({ request_id: "editable-request", request_type: "warehouse_to_dept", status: "submitted" })];
     const onContinueIoDraft = vi.fn();
     const restoredDraft = { batch_id: "reverted-draft" } as IoBatch;
@@ -147,12 +149,13 @@ describe("MyRequestsPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "수정" }));
     const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveTextContent("결재 요청을 작성 중으로 되돌립니다");
+    expect(dialog).toHaveTextContent("결재 요청을 작업 중으로 되돌립니다");
+    await waitFor(() => expect(api.getBatch).toHaveBeenCalledWith("approval-batch"));
     fireEvent.change(screen.getByPlaceholderText("PIN"), { target: { value: "0000" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "수정 시작" }));
 
     expect(hooks.revert.mutate).toHaveBeenCalledWith(
-      { requestId: "editable-request", payload: { actor_employee_id: "requester", pin: "0000" } },
+      { requestId: "editable-request", payload: { actor_employee_id: "requester", pin: "0000", expected_revision: 5 } },
       expect.any(Object),
     );
     act(() => {
@@ -161,7 +164,7 @@ describe("MyRequestsPanel", () => {
     expect(onContinueIoDraft).toHaveBeenCalledWith(restoredDraft);
   });
 
-  it("수정 실패 시 모달을 유지하고 이어서 작업으로 이동하지 않는다", () => {
+  it("수정 실패 시 모달을 유지하고 이어서 작업으로 이동하지 않는다", async () => {
     requests = [request({ request_id: "editable-request", request_type: "warehouse_to_dept", status: "submitted" })];
     const onContinueIoDraft = vi.fn();
 
@@ -175,6 +178,7 @@ describe("MyRequestsPanel", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "수정" }));
+    await waitFor(() => expect(api.getBatch).toHaveBeenCalledWith("approval-batch"));
     fireEvent.change(screen.getByPlaceholderText("PIN"), { target: { value: "0000" } });
     fireEvent.click(screen.getByRole("button", { name: "수정 시작" }));
     act(() => {

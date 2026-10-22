@@ -3,6 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import { AdminSectionTabs } from "../AdminSectionTabs";
 
 describe("AdminSectionTabs", () => {
+  it("시스템 그룹에서 작업예약 관리로 진입한다", () => {
+    const onSelect = vi.fn();
+    render(<AdminSectionTabs section="items" onSelect={onSelect} />);
+    fireEvent.click(within(screen.getByRole("group", { name: "시스템" })).getByRole("button", { name: "작업 관리" }));
+    expect(onSelect).toHaveBeenCalledWith("workReservations");
+  });
   it("현재 섹션을 페이지 탭으로 표시하고 다른 탭 선택을 전달한다", () => {
     const onSelect = vi.fn();
 
@@ -78,7 +84,7 @@ describe("AdminSectionTabs", () => {
     expect(row).toHaveClass("min-w-[880px]", "lg:min-w-0", "flex-1");
     expect(groups[0]).toHaveStyle({ flexGrow: "4" });
     expect(groups[1]).toHaveStyle({ flexGrow: "1" });
-    expect(groups[2]).toHaveStyle({ flexGrow: "3" });
+    expect(groups[2]).toHaveStyle({ flexGrow: "4" });
     expect(groups[0]).toHaveStyle({ flexBasis: "0px" });
     expect(groups[1]).toHaveStyle({ flexBasis: "0px" });
     expect(groups[2]).toHaveStyle({ flexBasis: "0px" });

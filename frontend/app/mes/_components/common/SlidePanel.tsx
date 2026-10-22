@@ -17,6 +17,8 @@ interface Props {
   labelledBy?: string;
   /** 패널 콘텐츠의 좌측 inset 클래스. 기본값은 공통 상세 패널의 16px inset이다. */
   contentClassName?: string;
+  /** Preserve the panel width while allowing a 10px native scrollbar rail outside it. */
+  externalScrollbarRail?: boolean;
   children: React.ReactNode;
 }
 
@@ -33,6 +35,7 @@ function SlidePanelImpl({
   modal = true,
   labelledBy,
   contentClassName = "pl-4",
+  externalScrollbarRail = false,
   children,
 }: Props) {
   const panelRef = useFocusTrap<HTMLDivElement>(open && !!onClose && modal);
@@ -62,10 +65,11 @@ function SlidePanelImpl({
     <div
       ref={wrapperRef}
       aria-hidden={open ? undefined : true}
-      className="shrink-0 overflow-hidden"
+      className={`shrink-0 ${externalScrollbarRail ? "overflow-visible" : "overflow-hidden"}`}
       style={{
         width: open ? width : 0,
         transition: "width 160ms cubic-bezier(0.4, 0, 0.2, 1)",
+        clipPath: externalScrollbarRail ? "inset(0 -10px 0 0)" : undefined,
       }}
     >
       <div
@@ -94,7 +98,7 @@ function SlidePanelImpl({
             <X className="h-4 w-4" />
           </button>
         )}
-        <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+        <div className={`min-h-0 flex-1 ${externalScrollbarRail ? "overflow-visible" : "overflow-hidden"}`}>{children}</div>
       </div>
     </div>
   );

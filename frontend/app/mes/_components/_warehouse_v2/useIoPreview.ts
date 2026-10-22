@@ -2,12 +2,13 @@ import { useRef, useState } from "react";
 import { api, type IoPreviewTarget } from "@/lib/api";
 import type { IoSubType, IoWorkType } from "./types";
 
-export function useIoPreview() {
+export function useIoPreview(ownerBatchId?: () => string | null) {
   const [previewing, setPreviewing] = useState(false);
   const pendingCountRef = useRef(0);
 
   async function previewTarget(options: {
     employeeId?: string | null;
+    ownerBatchId?: string | null;
     workType: IoWorkType;
     subType: IoSubType;
     fromDepartment?: string | null;
@@ -19,6 +20,7 @@ export function useIoPreview() {
     try {
       return await api.preview({
         requester_employee_id: options.employeeId || null,
+        owner_batch_id: options.ownerBatchId === undefined ? ownerBatchId?.() ?? null : options.ownerBatchId,
         work_type: options.workType,
         sub_type: options.subType,
         from_department: options.fromDepartment || null,

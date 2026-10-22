@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render as renderUi, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+function render(ui: React.ReactNode) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return renderUi(ui, { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+}
 import { DesktopWarehouseView } from "../DesktopWarehouseView";
 
 const currentComposeProps = vi.hoisted(() => ({
@@ -10,6 +15,7 @@ const currentComposeProps = vi.hoisted(() => ({
     onItemPickerFullscreenChange?: (fullscreen: boolean) => void;
     onDraftSaved?: (batchId: string, step: number, persistInUrl?: boolean) => void;
     onNewWork?: () => void;
+    onStatusChange?: (status: string) => void;
   },
 }));
 
@@ -92,6 +98,7 @@ vi.mock("@/app/mes/_components/_warehouse_v2/IoComposeView", () => ({
     currentComposeProps.value = props;
     return (
       <div data-testid="io-compose-view">
+        <input aria-label="작성 세션 메모" defaultValue="" />
         <button type="button" data-testid="item-conversion-focus" onClick={() => props.onItemConversionFocusChange(true)}>
           품목 전환 포커스
         </button>
@@ -125,6 +132,23 @@ describe("DesktopWarehouseView", () => {
     currentWorkAreaProps.value = null;
   });
 
+  it("현재 작성기에서 저장한 창고 작업 URL은 원작업 보관 세션을 재마운트하지 않는다", async () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=4");
+    apiMocks.listStockRequestDrafts.mockResolvedValue([]);
+    apiMocks.listDrafts.mockResolvedValue([{ batch_id: "pull-draft", sub_type: "warehouse_to_dept" }]);
+    render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("작성 세션 메모"), { target: { value: "보관 중인 원작업 입력" } });
+
+    await act(async () => {
+      currentComposeProps.value?.onDraftSaved?.("pull-draft", 4);
+      currentComposeProps.value?.onStatusChange?.("작업을 저장했습니다.");
+    });
+
+    expect(new URLSearchParams(window.location.search).get("draftId")).toBe("pull-draft");
+    expect(screen.getByLabelText("작성 세션 메모")).toHaveValue("보관 중인 원작업 입력");
+    expect(currentComposeProps.value?.restoreDraft).toBeNull();
+  });
+
   it("내 요청 URL로 직접 진입해도 상단 기본 탭 3개를 표시한다", () => {
     render(
       <DesktopWarehouseView
@@ -137,7 +161,7 @@ describe("DesktopWarehouseView", () => {
 
     expect(tabs).toHaveLength(3);
     expect(tabs[0]).toHaveTextContent("요청 작성");
-    expect(tabs[1]).toHaveTextContent("작성 중");
+    expect(tabs[1]).toHaveTextContent("작업 중");
     expect(tabs[2]).toHaveTextContent("내 요청");
     tabs.forEach((tab) => expect(tab).toBeVisible());
   });
@@ -218,19 +242,19 @@ describe("DesktopWarehouseView", () => {
     expect(screen.getByTestId("warehouse-section-work-area")).toHaveClass("flex-1", "min-h-0");
   });
 
-  it("removes bottom scroll space only while a work-area panel is empty", () => {
+  it("작업 중 화면은 작업 유무에 관계없이 하단까지 채운다", () => {
     window.history.replaceState(null, "", "/mes?tab=warehouse&section=cart");
     render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
 
     const contentRoot = screen.getByTestId("desktop-warehouse-content");
-    expect(contentRoot).toHaveClass("pb-10");
+    expect(contentRoot).toHaveClass("pb-0");
 
     fireEvent.click(screen.getByRole("button", { name: "set empty" }));
     expect(contentRoot).toHaveClass("pb-0");
     expect(contentRoot).not.toHaveClass("pb-10");
 
     fireEvent.click(screen.getByRole("button", { name: "set populated" }));
-    expect(contentRoot).toHaveClass("pb-10");
+    expect(contentRoot).toHaveClass("pb-0");
   });
 
   it("keeps empty work-area spacing when its active tab is clicked again", () => {
@@ -240,7 +264,7 @@ describe("DesktopWarehouseView", () => {
     fireEvent.click(screen.getByRole("button", { name: "set empty" }));
     expect(screen.getByTestId("desktop-warehouse-content")).toHaveClass("pb-0");
 
-    fireEvent.click(screen.getByRole("tab", { name: /작성 중/ }));
+    fireEvent.click(screen.getByRole("tab", { name: /작업 중/ }));
 
     expect(screen.getByTestId("desktop-warehouse-content")).toHaveClass("pb-0");
   });
@@ -257,7 +281,7 @@ describe("DesktopWarehouseView", () => {
     expect(screen.getByTestId("desktop-warehouse-content")).toHaveClass("pb-0");
   });
 
-  it("restores bottom scroll space when popstate enters a work-area panel", () => {
+  it("다른 작업 영역은 기존 여백을 유지하고 작업 중으로 돌아오면 하단을 채운다", () => {
     window.history.replaceState(null, "", "/mes?tab=warehouse&section=cart");
     render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
 
@@ -266,10 +290,11 @@ describe("DesktopWarehouseView", () => {
 
     window.history.replaceState(null, "", "/mes?tab=warehouse&section=mine");
     act(() => window.dispatchEvent(new PopStateEvent("popstate")));
+    expect(screen.getByTestId("desktop-warehouse-content")).toHaveClass("pb-10");
     window.history.replaceState(null, "", "/mes?tab=warehouse&section=cart");
     act(() => window.dispatchEvent(new PopStateEvent("popstate")));
 
-    expect(screen.getByTestId("desktop-warehouse-content")).toHaveClass("pb-10");
+    expect(screen.getByTestId("desktop-warehouse-content")).toHaveClass("pb-0");
   });
 
   it("요청 작성에서는 섹션 탭 다음에 작성 본문을 바로 렌더한다", () => {

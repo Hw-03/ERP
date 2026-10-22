@@ -25,6 +25,7 @@ from . import (
     operations,
     transactions,
     weekly_report,
+    work_status,
 )
 from ._shared import to_response_bulk
 
@@ -36,6 +37,7 @@ router.include_router(transactions.router)
 router.include_router(operations.router)
 router.include_router(query.router)
 router.include_router(weekly_report.router)
+router.include_router(work_status.router)
 
 
 @router.get("", response_model=List[InventoryResponse])

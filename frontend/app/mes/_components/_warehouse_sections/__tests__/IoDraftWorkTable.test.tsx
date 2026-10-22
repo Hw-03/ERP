@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { IoBatch, IoBundle, IoLine } from "@/lib/api";
 import { IoDraftWorkTable } from "../IoDraftWorkTable";
@@ -86,6 +86,95 @@ function makeDraft(overrides: Partial<IoBatch> = {}): IoBatch {
 }
 
 describe("IoDraftWorkTable hierarchy", () => {
+  it.each([
+    ["receive", "receive_supplier", "창고", "원자재 입고"],
+    ["receive", "outbound_supplier", "창고", "원자재 출고"],
+    ["tube_material", "tube_receive_supplier", "튜브", "튜브 원자재 입고"],
+    ["tube_material", "tube_outbound_supplier", "튜브", "튜브 원자재 출고"],
+    ["process", "produce", "조립", "생산 입고"],
+    ["process", "disassemble", "조립", "분해 출고"],
+    ["internal_use", "internal_use_out", "AS", "AS 사용"],
+    ["internal_use", "internal_use_out", "연구", "연구소 사용"],
+  ] as const)("%s/%s 작업명도 완료 내역과 일치한다 (%s)", (workType, subType, department, label) => {
+    render(<IoDraftWorkTable drafts={[makeDraft({ work_type: workType, sub_type: subType, to_department: department })]}
+      busyId={null} onContinue={vi.fn()} onRequestDelete={vi.fn()} />);
+    expect(screen.getByText(label, { exact: true }).parentElement).toHaveClass("!w-40");
+  });
+
+  it.each([
+    ["produce", false, "yellow"], ["disassemble", false, "yellow"],
+    ["produce", true, "cyan"], ["disassemble", true, "red"],
+  ] as const)("%s는 저장 예정의 실제 방향으로 색상을 구분한다 (mixed=%s)", (subType, mixed, tone) => {
+    const draft = makeDraft({ sub_type: subType, effective_plan: { version: 1, fingerprint: "saved", effects: [{
+      effect_id: "effect", operation_line_id: "line-2", bundle_id: "bundle-1", item_id: "item-2",
+      item_name: "단독 입고", mes_code: "3-AR-0006", quantity: 2, unit: "EA",
+      kind: "in", from: null, to: { bucket: "production", department: "조립" },
+    }] } });
+    if (mixed) draft.effective_plan!.effects.push({ ...draft.effective_plan!.effects[0], effect_id: "out", kind: "out", from: { bucket: "warehouse", department: null }, to: null });
+    const { container } = render(<IoDraftWorkTable drafts={[draft]} busyId={null} onContinue={vi.fn()} onRequestDelete={vi.fn()} />);
+    expect(container.querySelector<HTMLElement>("tbody > tr > td:nth-child(3) > div > span")?.style.color).toBe(`var(--c-${tone})`);
+    expect(draft.bundles[0].lines.map((line) => line.direction)).toEqual(["out", "in"]);
+  });
+
+  it.each([
+    ["receive", "receive_supplier", "green", "arrow-down-to-line"],
+    ["receive", "outbound_supplier", "red", "arrow-up-from-line"],
+    ["tube_material", "tube_receive_supplier", "green", "arrow-down-to-line"],
+    ["warehouse_io", "warehouse_to_dept", "blue", "arrow-right-left"],
+    ["process", "produce", "cyan", "hammer"],
+    ["process", "disassemble", "red", "wrench"],
+    ["process", "adjust_in", "yellow", "sliders-vertical"],
+    ["internal_use", "internal_use_out", "red", "arrow-up-from-line"],
+  ] as const)("%s/%s 작업 배지는 내역의 %s 색상과 아이콘 기준을 따른다", (workType, subType, tone, icon) => {
+    const { container } = render(<IoDraftWorkTable drafts={[makeDraft({ work_type: workType, sub_type: subType })]}
+      busyId={null} onContinue={vi.fn()} onRequestDelete={vi.fn()} />);
+    const badge = container.querySelector<HTMLElement>("tbody > tr > td:nth-child(3) > div > span");
+    expect(badge?.style.color).toBe(`var(--c-${tone})`);
+    expect(badge?.querySelector("svg")).toHaveClass(`lucide-${icon}`);
+  });
+
+  it("접기와 펼치기 모두 같은 외부 스크롤 영역과 고정 머리글을 유지한다", () => {
+    render(<IoDraftWorkTable drafts={[makeDraft()]} busyId={null} onContinue={vi.fn()} onRequestDelete={vi.fn()} />);
+    const viewport = screen.getByRole("region", { name: "작업 중 목록" });
+    const table = viewport.querySelector("table")!;
+    const columns = table.querySelector("colgroup")!.outerHTML;
+    const header = table.querySelector("thead")!;
+    expect(viewport).toHaveClass("sg", "absolute", "inset-y-0", "-right-2.5", "overflow-auto");
+    expect(viewport.parentElement).toHaveClass("relative", "min-h-0", "flex-1");
+    expect(header).toHaveClass("sticky", "top-0");
+    expect(viewport.parentElement?.querySelector("[data-scrollbar-rail-frame]")).toHaveClass("inset-0", "pointer-events-none");
+    fireEvent.click(screen.getByRole("button", { name: "작업 상세 펼치기" }));
+    expect(viewport.querySelector("table")).toBe(table);
+    expect(table.querySelector("colgroup")!.outerHTML).toBe(columns);
+    expect(table.querySelector("thead")).toBe(header);
+    fireEvent.click(screen.getByRole("button", { name: "작업 상세 접기" }));
+    expect(viewport.querySelector("table")).toBe(table);
+    expect(table.querySelector("colgroup")!.outerHTML).toBe(columns);
+  });
+
+  it("일반 작업의 상태 배지는 생략하고 반려와 예약 확인 안내만 표시한다", () => {
+    const props = { busyId: null, onContinue: vi.fn(), onRequestDelete: vi.fn() };
+    const view = render(<IoDraftWorkTable {...props} drafts={[makeDraft({ reservation_status: "inactive" })]} />);
+    expect(screen.queryByText("작업 중")).not.toBeInTheDocument();
+    expect(screen.queryByText("예약 해제")).not.toBeInTheDocument();
+    view.rerender(<IoDraftWorkTable {...props} drafts={[makeDraft({ reservation_status: "reserved" })]} />);
+    expect(screen.queryByText("작업 중")).not.toBeInTheDocument();
+    view.rerender(<IoDraftWorkTable {...props} drafts={[makeDraft({ reservation_status: "inactive", reservation_issue: { code: "returned_after_rejection", message: "반려된 작업", shortages: [] } })]} />);
+    expect(screen.getByText("반려됨")).toBeInTheDocument();
+    view.rerender(<IoDraftWorkTable {...props} drafts={[makeDraft({ reservation_status: undefined })]} />);
+    expect(screen.getByText("예약 상태 확인 필요")).toBeInTheDocument();
+  });
+
+  it("작업 열은 입출고 내역과 같은 한 줄 배지로 작업 이름과 아이콘을 표시한다", () => {
+    render(<IoDraftWorkTable drafts={[makeDraft({ work_type: "warehouse_io", sub_type: "dept_to_warehouse" })]}
+      busyId={null} onContinue={vi.fn()} onRequestDelete={vi.fn()} />);
+    const label = screen.getByText("창고 입출고");
+    expect(label).toHaveClass("truncate");
+    expect(label.parentElement).toHaveClass("h-6", "leading-none", "!w-40");
+    expect(label.parentElement?.querySelector("svg")).toHaveClass("lucide-arrow-right-left");
+    expect(screen.queryByText("부서 → 창고")).toBeNull();
+  });
+
   it("shows a collapsed inventory-change summary and reveals the BOM rows on demand", () => {
     render(
       <IoDraftWorkTable
@@ -96,9 +185,12 @@ describe("IoDraftWorkTable hierarchy", () => {
       />,
     );
 
-    for (const label of ["상세", "작업 시작", "작업", "대상", "품목코드", "수량", "예정 변동"]) {
+    for (const label of ["상세", "작업 시작", "작업", "대상", "품목코드", "예정 변동"]) {
       expect(screen.getByRole("columnheader", { name: label })).toBeInTheDocument();
     }
+    expect(screen.queryByRole("columnheader", { name: "수량", exact: true })).not.toBeInTheDocument();
+    const target = screen.getByText("DX3000 분해 대상");
+    expect(screen.getByText("1 EA").closest("td")).toBe(target.closest("td"));
     const startedAt = screen.getByText("08/04 09:05");
     const toggle = screen.getByRole("button", { name: "작업 상세 펼치기" });
     expect(startedAt).toHaveClass("whitespace-nowrap");
@@ -112,10 +204,18 @@ describe("IoDraftWorkTable hierarchy", () => {
     fireEvent.click(toggle);
 
     expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("분해 대상")).toBeInTheDocument();
+    expect(screen.getByText("출고 예약")).toBeInTheDocument();
     expect(screen.getByText("DX3000 POWER BUTTON")).toBeInTheDocument();
-    expect(screen.getByText("회수 품목")).toBeInTheDocument();
+    expect(screen.getByText("입고 예약")).toBeInTheDocument();
     expect(screen.getByText("+2 EA")).toBeInTheDocument();
+    const child = screen.getByText("DX3000 POWER BUTTON").closest("tr")!;
+    expect(within(child).queryByText("2 EA", { exact: true })).not.toBeInTheDocument();
+    expect(within(child).getByText("+2 EA")).toBeVisible();
+    const bundle = screen.getAllByText("DX3000 분해 대상").at(-1)!.closest("tr")!;
+    expect(within(bundle.cells[2]).getByText("출고 예약")).toBeVisible();
+    expect(screen.queryByText("BOM", { exact: true })).not.toBeInTheDocument();
+    expect(within(bundle).queryByText("1 EA", { exact: true })).not.toBeInTheDocument();
+    expect(within(bundle).getByText("−1 EA")).toBeVisible();
   });
 
   it("shows a custom disassemble BOM as parent unchanged and selected children outbound", () => {
@@ -175,7 +275,7 @@ describe("IoDraftWorkTable hierarchy", () => {
     const selectedChildRow = screen.getByText("SOLO MAIN CONE").closest("tr");
     expect(parentRow).toHaveTextContent("상위 미반영");
     expect(parentRow).toHaveTextContent("변동 없음");
-    expect(selectedChildRow).toHaveTextContent("선택 출고");
+    expect(selectedChildRow).toHaveTextContent("출고 예약");
     expect(selectedChildRow).toHaveTextContent("−1 EA");
   });
 
@@ -301,7 +401,10 @@ describe("IoDraftWorkTable hierarchy", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "작업 상세 펼치기" }));
     expect(screen.getByText("3 EA 이동")).toBeInTheDocument();
+    const moving = screen.getByText("이동 품목").closest("tr")!;
+    expect(within(moving).getByText("이동 예약")).toBeVisible();
     expect(screen.getByText("제외 품목")).toHaveStyle({ textDecoration: "line-through" });
+    expect(within(screen.getByText("제외 품목").closest("tr")!).queryByText(/입고 예약|출고 예약|이동 예약/)).not.toBeInTheDocument();
     expect(screen.getByText("변동 없음")).toBeInTheDocument();
   });
 });

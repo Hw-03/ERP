@@ -10,13 +10,22 @@
  *
  * UI 와 분리해 단위 테스트 가능하게 둔다.
  */
-import type { IoBundle } from "./types";
+import type { IoBundle, IoLine, IoSubType } from "./types";
+import { processBomEffectLine } from "./ioWorkType";
+
+/** 저장된 부족량 대신 실제 효과의 현재 출발 위치 가용량으로 판단한다. */
+export function isShortageLine(line: IoLine | null, getAvailable?: (line: IoLine) => number | null): boolean {
+  if (!line?.included) return false;
+  if (!getAvailable) return line.shortage > 0;
+  if (line.from_bucket === "none") return false;
+  const available = getAvailable(line);
+  return available === null ? line.shortage > 0 : Number(line.quantity) > available;
+}
 
 /** included && shortage>0 인 라인들. */
-export function shortageLines(bundles: IoBundle[]) {
-  return bundles
-    .flatMap((bundle) => bundle.lines)
-    .filter((line) => line.included && line.shortage > 0);
+export function shortageLines(bundles: IoBundle[], subType?: IoSubType, getAvailable?: (line: IoLine) => number | null): IoLine[] {
+  return bundles.flatMap((bundle) => bundle.lines.filter((line) =>
+    isShortageLine(subType ? processBomEffectLine(subType, bundle, line) : line, getAvailable)));
 }
 
 /**
@@ -26,8 +35,10 @@ export function shortageLines(bundles: IoBundle[]) {
 export function collectShortageItemIds(
   bundles: IoBundle[],
   selectedLineIds?: ReadonlySet<string>,
+  subType?: IoSubType,
+  getAvailable?: (line: IoLine) => number | null,
 ): string[] {
-  const lines = shortageLines(bundles);
+  const lines = shortageLines(bundles, subType, getAvailable);
   const targets =
     selectedLineIds && selectedLineIds.size > 0
       ? lines.filter((line) => selectedLineIds.has(line.line_id))

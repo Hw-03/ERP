@@ -1,4 +1,9 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render as renderUi, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+function render(ui: React.ReactNode) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return renderUi(ui, { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+}
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MobileWarehouseScreen } from "../MobileWarehouseScreen";
 
@@ -113,11 +118,28 @@ vi.mock("../../warehouse/MobileIoComposeWizard", () => ({
     onDraftSaved?: (batchId: string, step: number, persistInUrl?: boolean) => void;
   }) => {
     currentWizardProps.value = props;
-    return <div data-testid="compose-wizard" />;
+    return <div data-testid="compose-wizard"><input aria-label="작성 세션 메모" defaultValue="" /></div>;
   },
 }));
 
 describe("MobileWarehouseScreen compact step header", () => {
+  it("현재 작성기의 창고 작업 저장 뒤에도 원작업 보관 세션을 유지한다", async () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=4");
+    apiMocks.listStockRequestDrafts.mockResolvedValue([]);
+    apiMocks.listDrafts.mockResolvedValue([{ batch_id: "pull-draft", sub_type: "warehouse_to_dept" }]);
+    render(<MobileWarehouseScreen globalSearch="" onStatusChange={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("작성 세션 메모"), { target: { value: "보관 중인 원작업 입력" } });
+
+    await act(async () => {
+      currentWizardProps.value?.onDraftSaved?.("pull-draft", 4);
+      currentWizardProps.value?.onStatusChange?.("작업을 저장했습니다.");
+    });
+
+    expect(new URLSearchParams(window.location.search).get("draftId")).toBe("pull-draft");
+    expect(screen.getByLabelText("작성 세션 메모")).toHaveValue("보관 중인 원작업 입력");
+    expect(currentWizardProps.value?.restoreDraft).toBeNull();
+  });
+
   it("섹션 이동은 임시저장이 끝날 때까지 기다리고 실패하면 작성 위치를 유지한다", async () => {
     let finish!: () => void;
     const flushDraftRef = { current: vi.fn(() => new Promise<void>((resolve) => { finish = resolve; })) };

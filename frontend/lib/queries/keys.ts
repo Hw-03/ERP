@@ -7,6 +7,9 @@
  * 후속 도메인 (departments, employees, items, inventory, ...)은 점진 추가.
  */
 
+import type { AdminWorkReservationFilters } from "../api/types/work-reservations";
+import type { WorkDraftFilters, WorkDraftSelection } from "../api/types/work-drafts";
+
 export const queryKeys = {
   itemSearch: { all: ["itemSearch"] as const, config: () => ["itemSearch", "config"] as const },
   models: {
@@ -95,6 +98,7 @@ export const queryKeys = {
     all: ["inventory"] as const,
     summary: () => ["inventory", "summary"] as const,
     locations: (itemId: string) => ["inventory", "locations", itemId] as const,
+    workStatus: (itemId: string) => ["inventory", "workStatus", itemId] as const,
   },
   settings: {
     all: ["settings"] as const,
@@ -112,6 +116,11 @@ export const queryKeys = {
       ["stockRequests", "myList", employeeId] as const,
     drafts: (employeeId: string) =>
       ["stockRequests", "drafts", employeeId] as const,
+    workDraftsAll: (employeeId: string) => ["stockRequests", "workDrafts", employeeId] as const,
+    workDrafts: (employeeId: string, filters: WorkDraftFilters) =>
+      ["stockRequests", "workDrafts", employeeId, "list", filters] as const,
+    workDraftDetail: (employeeId: string, selection: WorkDraftSelection | null) =>
+      ["stockRequests", "workDrafts", employeeId, "detail", selection?.kind, selection?.id] as const,
     reservations: (itemId: string) =>
       ["stockRequests", "reservations", itemId] as const,
   },
@@ -130,6 +139,11 @@ export const queryKeys = {
   },
   admin: {
     all: ["admin"] as const,
+    workReservationsAll: ["admin", "workReservations"] as const,
+    workReservations: (params?: AdminWorkReservationFilters) =>
+      ["admin", "workReservations", "list", params ?? {}] as const,
+    workReservationDetail: (batchId: string) =>
+      ["admin", "workReservations", "detail", batchId] as const,
     auditCsvList: () => ["admin", "auditCsvList"] as const,
   },
   myItemOrder: {

@@ -115,14 +115,6 @@ describe("stockRequestsApi", () => {
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/stock-requests/r-1/cancel");
   });
 
-  it("getItemReservations GET /reservations?item_id=", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
-    globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await stockRequestsApi.getItemReservations("i-1");
-    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/stock-requests/reservations");
-    expect(String(fetchSpy.mock.calls[0][0])).toContain("item_id=i-1");
-  });
-
   it("upsertStockRequestDraft PUT /api/stock-requests/draft", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;

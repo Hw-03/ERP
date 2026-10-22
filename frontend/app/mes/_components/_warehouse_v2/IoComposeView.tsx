@@ -23,6 +23,9 @@ import { applyBundleQuantityChange, applyLineQuantityChange, applyToggleLine } f
 import { collectShortageItemIds, shortageLines } from "./pullFromWarehouse";
 import { useIoDraftRestore } from "./useIoDraftRestore";
 import { useIoDraft } from "./useIoDraft";
+import { ownerReservationAvailable } from "./ownerReservationAvailable";
+import { useWarehousePullReturn } from "./useWarehousePullReturn";
+import { WorkReservationNotice } from "./WorkReservationNotice";
 import { useIoPreview } from "./useIoPreview";
 import { useIoSubmit } from "./useIoSubmit";
 import { IO_STEP_LABELS, useIoWorkState, type IoStep } from "./useIoWorkState";
@@ -46,13 +49,14 @@ import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { useBomListQuery } from "@/lib/queries/useBomQuery";
 import { LoadFailureCard } from "../common/LoadFailureCard";
 import {
+  captureIoOperation,
+  isCurrentIoOperation,
   runWarehousePull,
   runCompositionSubmit,
   refreshInternalUseBundle,
   saveCompositionDraft,
   useIoComposeOperationState,
 } from "./ioComposeOperations";
-import { ioLineAvailable } from "@/lib/mes/inventory";
 import {
   buildInternalUseBomPreviewTarget,
   isInternalUseBomBundle,
@@ -133,6 +137,8 @@ export function IoComposeView({
   globalSearch,
   operator,
   items,
+  inventoryQueryState,
+  onRefreshItems,
   productModels = [],
   setItems,
   preselectedItem,
@@ -143,6 +149,7 @@ export function IoComposeView({
   entryIntent,
   onStatusChange,
   onSubmitSuccess,
+  onReservationChanged,
   onItemConversionFocusChange,
   itemPickerFullscreen = false,
   onItemPickerFullscreenChange,
@@ -180,12 +187,17 @@ export function IoComposeView({
   // 마지막으로 복원을 발동시킨 '이어서 하기' nonce — 같은 draft 재선택(batch_id 불변) 재발동 판정용.
   const restoredNonceRef = useRef<number | null>(null);
   const autosaveBatchIdRef = useRef<string | null>(null);
+  const sessionCreationKeyRef = useRef<string | null>(null);
   // '저장하시겠습니까?' 경고용 — 사용자가 작업 내용을 입력/수정했는지.
   // 복원 직후·명시적 저장 후엔 false 로 리셋.
   const [contentDirty, setContentDirty] = useState(false);
   const [hasDraftOnServer, setHasDraftOnServer] = useState(false);
   const dirtyEffectMountedRef = useRef(false);
   const absorbedRestoreRef = useRef<string | null>(null);
+  const reservationOwnerRef = useRef(draftToRestore);
+  const draftSession = useIoDraft(draftToRestore, restoreNonce, onReservationChanged, sessionCreationKeyRef, { inventorySnapshot: items, inventoryQueryState, realtimeRevision: revision, employeeId });
+  const { drafting, saveDraft } = draftSession;
+  reservationOwnerRef.current = draftSession.currentReservationBatch;
   const state = useIoWorkState(defaultWorkType, operator?.department, getAvailable);
   const itemAddBlocked = state.workType !== "tube_material" && (bomListQuery.isPending || bomListQuery.isError);
   const authorizedEntryIntent = entryIntent
@@ -260,9 +272,16 @@ export function IoComposeView({
   const internalUsePreviewLock = useInternalUseBomPreviewLock();
   const intentAppliedRef = useRef(false);
 
-  const { previewing, previewTarget } = useIoPreview();
-  const { drafting, saveDraft } = useIoDraft();
-  const { submitting, run, submit } = useIoSubmit();
+  const { previewing, previewTarget } = useIoPreview(() => autosaveBatchIdRef.current);
+  const { submitting, run, submit, resetSession: resetSubmitSession, captureSession: captureSubmitSession } = useIoSubmit(onReservationChanged, draftSession.refreshAfterFailure, sessionCreationKeyRef);
+  const warehouseReturn = useWarehousePullReturn(state, autosaveBatchIdRef, () => {
+    const restoreDraftSession = draftSession.captureSession();
+    const restoreSubmitSession = captureSubmitSession();
+    return () => { restoreDraftSession(); restoreSubmitSession(); };
+  }, (batchId, step, replacedBatchId) => {
+    if (batchId) onDraftSaved?.(batchId, step);
+    else if (replacedBatchId) onDraftSaved?.(replacedBatchId, step, false);
+  });
 
   // 브라우저 뒤로/앞으로 ↔ step 동기화. URL ?step=N 으로 history 엔트리를 쌓아 입출고 위저드 내부에서도
   // 뒤/앞 버튼이 작동하게 함. effect 는 useIoUrlSync 로 격리.
@@ -369,11 +388,8 @@ export function IoComposeView({
   // 4단계 진입 시 재고 스냅샷 갱신 — 취소·승인 등으로 재고가 바뀐 뒤 재추가할 때 stale 표시 방지.
   useEffect(() => {
     if (state.step !== 4) return;
-    api.getItems({ limit: 2000, search: globalSearch.trim() || undefined })
-      .then(setItems)
-      .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.step, globalSearch]);
+    void onRefreshItems?.().catch(() => {});
+  }, [state.step, onRefreshItems]);
 
   useEffect(() => {
     if (bomRevisionRef.current === revision) return;
@@ -524,21 +540,25 @@ export function IoComposeView({
   // 경고 조건: 로그인 상태에서 마지막 저장/복원 이후 사용자가 수정했을 때,
   // AND (번들이 있거나 서버에 드래프트가 남아있을 때).
   // hasDraftOnServer: 이어서 작업으로 복원되면 true, 새 작업 슬롯 시작 시 false.
-  const ioDirty = !!employeeId && contentDirty && (state.bundles.length > 0 || hasDraftOnServer);
+  const ioDirty = warehouseReturn.pending || !!employeeId && contentDirty && (state.bundles.length > 0 || hasDraftOnServer);
   useRegisterDirty(
     "warehouse-io",
     ioDirty,
     async () => {
+      if (warehouseReturn.pending) throw new Error("보관 중인 원작업으로 돌아가 저장한 뒤 이동하세요.");
       if (!employeeId) return;
+      const version = captureIoOperation(operationRefs);
       await internalUsePreviewLock.waitForIdle();
+      if (!isCurrentIoOperation(operationRefs, version)) throw new Error("저장되지 않은 변경이 남아 있습니다.");
       const currentBundles = latestBundlesRef.current;
       if (currentBundles.length === 0) {
         // 모든 품목 삭제 후 "저장하고 나가기" = 서버 드래프트 삭제
         if (autosaveBatchIdRef.current) {
-          await api.deleteDraft(autosaveBatchIdRef.current, employeeId);
+          await draftSession.deleteDraft(autosaveBatchIdRef.current, employeeId);
           autosaveBatchIdRef.current = null;
         }
         setHasDraftOnServer(false);
+        if (isCurrentIoOperation(operationRefs, version)) setContentDirty(false);
         return;
       }
       const saved = await saveDraft({
@@ -556,6 +576,8 @@ export function IoComposeView({
       });
       autosaveBatchIdRef.current = saved.batch_id;
       onDraftSaved?.(saved.batch_id, state.step);
+      // 저장을 시작한 내용만 정리하고, 응답 대기 중 추가 입력은 이탈 경고로 남긴다.
+      if (isCurrentIoOperation(operationRefs, version)) setContentDirty(false);
     },
     async () => {
       // '저장하지 않고 이동' — 수동 저장본은 서버에 유지(다음 진입 시 복원됨).
@@ -565,7 +587,7 @@ export function IoComposeView({
   function getAvailable(line: IoLine): number | null {
     const item = items.find((row) => row.item_id === line.item_id);
     if (!item) return null;
-    return ioLineAvailable(item, line);
+    return ownerReservationAvailable(item, line, autosaveBatchIdRef.current === reservationOwnerRef.current?.batch_id ? reservationOwnerRef.current : null);
   }
 
   async function refreshInternalUseBom(
@@ -595,6 +617,8 @@ export function IoComposeView({
   // 그래야 다음 저장이 기존 슬롯을 덮지 않고 새 슬롯으로 쌓여 '작업 중' 탭에 누적된다.
   function beginNewCompositionSlot() {
     bumpOperationGeneration();
+    draftSession.resetSession();
+    resetSubmitSession();
     autosaveBatchIdRef.current = null;
     setHasDraftOnServer(false);
     // 새 작업 슬롯 시작 — 복원 추적 해제. 이래야 같은 '이어서 작업'을 다시 골랐을 때
@@ -712,6 +736,7 @@ export function IoComposeView({
         (nextBatchId) => { autosaveBatchIdRef.current = nextBatchId; },
       );
       if (!batchId) return null;
+      setHasDraftOnServer(true);
       if (persistInUrl) {
         onDraftSaved?.(batchId, state.step);
         setContentDirty(false); // 저장 버튼으로 명시적 저장 → 이후 수정 전까지 경고 없음
@@ -739,7 +764,7 @@ export function IoComposeView({
   }
 
   // 항목 7 — 부족 품목을 창고 반출(warehouse_to_dept) 새 작업으로 가져오기.
-  // ① 현재 작업을 '작업 중'으로 저장 ② 선택(or 전체) 부족 라인의 item_id 수집
+  // ① 원작업을 현재 세션에 보관 ② 선택(or 전체) 부족 라인의 item_id 수집
   // ③ 품목별 previewTarget(낱개·수량1) ④ 상태 전이(setWorkType→setSubType→
   //   setToDepartment→setBundles→goTo(4)) — setWorkType 이 bundles 를 리셋하므로
   //   setBundles 는 반드시 그 뒤. 새 슬롯은 beginNewCompositionSlot.
@@ -758,23 +783,28 @@ export function IoComposeView({
       setError("작업자 부서를 확인할 수 없습니다.");
       return;
     }
-    const itemIds = collectShortageItemIds(state.bundles, pullSelected);
+    const itemIds = collectShortageItemIds(state.bundles, pullSelected, state.subType, getAvailable);
     if (itemIds.length === 0) return;
+    if (warehouseReturn.pending) { setError("보관 중인 원작업으로 먼저 돌아가세요."); return; }
+    const restoreOriginal = warehouseReturn.capture();
+    const originalBatchId = autosaveBatchIdRef.current;
     try {
       await runWarehousePull(
         operationRefs,
         pullingRef,
         setPulling,
         itemIds,
-        () => saveCurrentDraft(false),
+        async () => originalBatchId ?? "local-composition",
         async (itemId) => (await previewTarget({
           employeeId,
+          ownerBatchId: null,
           workType: "warehouse_io",
           subType: "warehouse_to_dept",
           target: { source_kind: "manual", item_id: itemId, quantity: 1 },
         })).bundles,
-        (savedDraftId, newBundles) => {
-          onDraftSaved?.(savedDraftId, state.step, false);
+        (_originalSessionId, newBundles) => {
+          if (originalBatchId) onDraftSaved?.(originalBatchId, state.step, false);
+          warehouseReturn.retain(restoreOriginal);
           state.setWorkType("warehouse_io");
           state.setSubType("warehouse_to_dept");
           beginNewCompositionSlot();
@@ -835,13 +865,13 @@ export function IoComposeView({
       setError,
       state.goTo,
       setResult,
-      state.reset,
+      () => { state.reset(); draftSession.resetSession(); resetSubmitSession(); },
       resetTargetPickerFilters,
       onStatusChange,
-      () => api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
+      async () => { await onRefreshItems?.(); },
       setItems,
       onSubmitSuccess,
-      (draftId) => api.submitDraft(draftId, employeeId),
+      (draftId) => draftSession.submitDraft(draftId, employeeId),
       (draftId) => {
         restoredDraftRef.current = null;
         restoredNonceRef.current = null;
@@ -913,7 +943,7 @@ export function IoComposeView({
   const pullCount = pullEnabled
     ? pullSelected.size > 0
       ? pullSelected.size
-      : shortageLines(state.bundles).length
+      : shortageLines(state.bundles, state.subType, getAvailable).length
     : 0;
   const lineCount = state.bundles.reduce((acc, b) => acc + b.lines.length, 0);
   const itemMap = useMemo(() => new Map(items.map((item) => [item.item_id, item])), [items]);
@@ -979,7 +1009,7 @@ export function IoComposeView({
   function stepSummary(stepId: IoStep) {
     if (stepId === 6) return state.materialDirectionSelected ? subTypeLabel(state.subType) : "";
     if (stepId === 2) return stepTwoSummary;
-    if (stepId === 3) return `${state.bundles.length}개 묶음 · 라인 ${lineCount}개`;
+    if (stepId === 3) return `${state.bundles.length}개 묶음 · 구성 ${lineCount}종`;
     return `반영 ${includedCount}개 · 제외 ${excludedCount}개`;
   }
 
@@ -1213,10 +1243,7 @@ export function IoComposeView({
           onHistoryStepBack={backToItemConversionHistoryStep}
           onBack={backFromItemConversion}
           onComplete={() => {
-            void api
-              .getItems({ limit: 2000, search: globalSearch.trim() || undefined })
-              .then(setItems)
-              .catch(() => {});
+            void onRefreshItems?.().catch(() => {});
             closeItemConversion();
             onSubmitSuccess?.();
           }}
@@ -1224,6 +1251,11 @@ export function IoComposeView({
       </div>
     );
   }
+
+  const workNotice = <WorkReservationNotice batch={draftSession.savedBatch} latestBatch={draftSession.latestBatch}
+        busy={drafting || submitting || previewing || pulling}
+        onReturn={warehouseReturn.resume ? () => { bumpOperationGeneration(); warehouseReturn.resume?.(); setHasDraftOnServer(Boolean(autosaveBatchIdRef.current)); setContentDirty(true); } : null} />;
+  const saveDraftLabel = hasDraftOnServer ? "작업 내용 반영" : "작업 중 등록";
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
@@ -1509,6 +1541,8 @@ export function IoComposeView({
               pulling={pulling}
               pullBlocked={itemAddBlocked}
               onSaveDraft={handleSaveDraft}
+              saveDraftLabel={saveDraftLabel}
+              footerNotice={workNotice}
             />
           </WizardStepCard>
         </div>
@@ -1553,11 +1587,14 @@ export function IoComposeView({
               onValidationError={(message) => showFeedbackNotice(message, "error")}
               onSubmit={handleSubmit}
               onSaveDraft={handleSaveDraft}
+              saveDraftLabel={saveDraftLabel}
+              footerNotice={workNotice}
             />
           </WizardStepCard>
         </div>
       )}
 
+      {step !== 4 && step !== 5 && workNotice}
       <IoSubmitModals
         result={result}
         onClose={() => setResult(null)}

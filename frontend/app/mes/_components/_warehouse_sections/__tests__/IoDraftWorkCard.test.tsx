@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { IoBatch } from "@/lib/api";
 import { IoDraftWorkCard } from "../IoDraftWorkCard";
@@ -30,6 +30,47 @@ function makeDraft(): IoBatch {
 }
 
 describe("IoDraftWorkCard timestamp", () => {
+  it("내역의 작업 분류는 배지에 한 번 표시하고 세부 작업명은 별도로 보존한다", () => {
+    const draft = { ...makeDraft(), work_type: "warehouse_io", sub_type: "dept_to_warehouse" } as IoBatch;
+    render(<IoDraftWorkCard draft={draft} isBusy={false} onContinue={vi.fn()} onRequestDelete={vi.fn()} />);
+    const menu = screen.getByText("창고 입출고");
+    expect(menu.parentElement).toHaveTextContent(/^창고 입출고$/);
+    expect(menu.parentElement?.querySelector("svg")).toHaveClass("lucide-arrow-right-left");
+    expect(screen.getAllByText("창고 입출고")).toHaveLength(1);
+    expect(screen.getByText("부서 → 창고")).toBeInTheDocument();
+  });
+
+  it("일반 작업의 상태 배지는 생략하고 반려와 예약 확인 안내만 표시한다", () => {
+    const props = { isBusy: false, onContinue: vi.fn(), onRequestDelete: vi.fn() };
+    const view = render(<IoDraftWorkCard {...props} draft={{ ...makeDraft(), reservation_status: "reserved" }} />);
+    expect(screen.queryByText("작업 중")).not.toBeInTheDocument();
+    view.rerender(<IoDraftWorkCard {...props} draft={{ ...makeDraft(), reservation_status: "inactive" }} />);
+    expect(screen.queryByText("작업 중")).not.toBeInTheDocument();
+    expect(screen.queryByText("예약 해제")).not.toBeInTheDocument();
+    view.rerender(<IoDraftWorkCard {...props} draft={{ ...makeDraft(), reservation_status: "inactive", reservation_issue: { code: "returned_after_rejection", message: "반려된 작업", shortages: [] } }} />);
+    expect(screen.getByText("반려됨")).toBeInTheDocument();
+    view.rerender(<IoDraftWorkCard {...props} draft={{ ...makeDraft(), reservation_status: undefined }} />);
+    expect(screen.getByText("예약 상태 확인 필요")).toBeInTheDocument();
+  });
+
+  it("이어서 작업과 삭제 요청을 각각 전달하고 처리 중에는 잠근다", () => {
+    const onContinue = vi.fn();
+    const onRequestDelete = vi.fn();
+    const props = { draft: makeDraft(), onContinue, onRequestDelete };
+    const view = render(<IoDraftWorkCard {...props} isBusy={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "이어서 작업" }));
+    fireEvent.click(screen.getByRole("button", { name: "작업 삭제" }));
+    expect(onContinue).toHaveBeenCalledOnce();
+    expect(onRequestDelete).toHaveBeenCalledOnce();
+    view.rerender(<IoDraftWorkCard {...props} isBusy />);
+    fireEvent.click(screen.getByRole("button", { name: "이어서 작업" }));
+    fireEvent.click(screen.getByRole("button", { name: "작업 삭제" }));
+    expect(onContinue).toHaveBeenCalledOnce();
+    expect(onRequestDelete).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "이어서 작업" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "작업 삭제" })).toBeDisabled();
+  });
+
   it("상대시간 대신 작업 생성 일시를 KST 절대 시각으로 표시", () => {
     render(
       <IoDraftWorkCard

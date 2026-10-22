@@ -185,7 +185,7 @@ describe("IoBundleCart layout", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "저장" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "작업 중 등록" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "제출확인 →" })).toBeDisabled();
   });
 

@@ -139,7 +139,7 @@ def test_revert_to_draft_rejects_unlinked_request_without_mutation(
 
     response = client.post(
         f"/api/stock-requests/{request.request_id}/revert-to-draft",
-        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000", "expected_revision": 0},
     )
 
     assert response.status_code == 422, response.text
@@ -243,7 +243,7 @@ def test_revert_to_draft_cancels_all_open_linked_requests_and_releases_reservati
 
     response = client.post(
         f"/api/stock-requests/{clicked.request_id}/revert-to-draft",
-        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000", "expected_revision": batch.revision},
     )
 
     assert response.status_code == 200, response.text
@@ -293,7 +293,7 @@ def test_revert_to_draft_rejects_completed_sibling_without_mutation(
 
     response = client.post(
         f"/api/stock-requests/{clicked.request_id}/revert-to-draft",
-        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000", "expected_revision": batch.revision},
     )
 
     assert response.status_code == 422, response.text
@@ -339,6 +339,7 @@ def test_revert_to_draft_rolls_back_all_cancellations_when_later_cancel_fails(
             request=clicked,
             requester=requester,
             pin="0000",
+            expected_revision=batch.revision,
         )
 
     db_session.expire_all()
@@ -367,7 +368,7 @@ def test_revert_to_draft_cancels_single_open_linked_request(
 
     response = client.post(
         f"/api/stock-requests/{request.request_id}/revert-to-draft",
-        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000", "expected_revision": batch.revision},
     )
 
     assert response.status_code == 200, response.text
@@ -396,7 +397,7 @@ def test_revert_to_draft_rejects_completed_batch_without_mutation(
 
     response = client.post(
         f"/api/stock-requests/{request.request_id}/revert-to-draft",
-        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000", "expected_revision": batch.revision},
     )
 
     assert response.status_code == 422, response.text
@@ -438,7 +439,7 @@ def test_revert_to_draft_cancels_submitted_and_preserves_terminal_siblings(
 
     response = client.post(
         f"/api/stock-requests/{submitted.request_id}/revert-to-draft",
-        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000", "expected_revision": batch.revision},
     )
 
     assert response.status_code == 200, response.text
@@ -467,7 +468,7 @@ def test_revert_to_draft_requires_matching_batch_requester(
 
     response = client.post(
         f"/api/stock-requests/{request.request_id}/revert-to-draft",
-        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000", "expected_revision": batch.revision},
     )
 
     assert response.status_code == 403, response.text
@@ -498,7 +499,7 @@ def test_revert_to_draft_does_not_take_clicked_request_lock_before_batch_lock(
 
     response = client.post(
         f"/api/stock-requests/{request.request_id}/revert-to-draft",
-        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000", "expected_revision": batch.revision},
     )
 
     assert response.status_code == 200, response.text

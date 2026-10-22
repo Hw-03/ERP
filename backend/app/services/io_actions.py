@@ -12,6 +12,7 @@ from app.models import Employee
 from app.schemas import IoSubmitRequest
 from app.services import internal_use_approval, io_dispatch
 from app.services._tx import transactional
+from app.services.work_reservation_errors import WorkReservationError
 
 
 def _submit_with_failed_settlement_preserved(
@@ -34,7 +35,14 @@ def _submit_with_failed_settlement_preserved(
                 approver=approver,
                 reason=str(exc.original),
             )
-            settlement_error = exc.original
+            from app.models import IoBatch
+            from app.services.io_reservations import record_event
+            batch = db.get(IoBatch, exc.batch_id)
+            record_event(db, batch, "settlement_failed", batch.revision - 1,
+                         approver.employee_id, approver.name, str(exc.original))
+            settlement_error = WorkReservationError("IO_SETTLEMENT_FAILED_PERSISTED", str(exc.original), extra={
+                "state_committed": True, "batch_id": str(batch.batch_id),
+                "current_revision": batch.revision, "current_status": batch.status})
     if settlement_error is not None:
         raise settlement_error
     if result is None:
@@ -55,6 +63,7 @@ def submit_existing_draft(
     *,
     batch_id: uuid.UUID,
     requester_employee_id: uuid.UUID,
+    expected_revision: int | None = None,
 ) -> dict[str, Any]:
     """기존 draft 제출의 다라인 변경 전체를 원자적으로 확정한다."""
     return _submit_with_failed_settlement_preserved(
@@ -63,5 +72,6 @@ def submit_existing_draft(
             db,
             batch_id=batch_id,
             requester_employee_id=requester_employee_id,
+            expected_revision=expected_revision,
         ),
     )

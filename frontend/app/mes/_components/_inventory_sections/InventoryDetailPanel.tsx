@@ -1,37 +1,21 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Image from "next/image";
 import { ChevronRight, Eye } from "lucide-react";
-import { api, type Item, type StockRequestReservationLine } from "@/lib/api";
+import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { normalizeDepartment } from "@/lib/mes/department";
-import { formatQty } from "@/lib/mes/format";
-import { getStockState, totalApprovalPending } from "@/lib/mes/inventory";
 import { ImageLightbox } from "@/lib/ui/ImageLightbox";
-import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { useDeptColorLookup } from "../DepartmentsContext";
 import { DesktopRightPanelFooter } from "../DesktopRightPanel";
 import { InventoryDetailLocations } from "./InventoryDetailLocations";
-import { getManagedStockBreakdown, STOCK_CATEGORY_ORDER, STOCK_CATEGORY_STYLES } from "./inventoryManagedStock";
+import { InventoryWorkStatusPanel } from "./InventoryWorkStatusPanel";
 import { BomDetailModal } from "./BomDetailModal";
 import { inboundChoices, outboundChoices, quickChoiceToIntent } from "../_warehouse_v2/ioWorkType";
 import type { IoEntryIntent } from "../_warehouse_v2/types";
-import { ReadFailure, ReadLoading } from "../common/ReadState";
-import { SkeletonBlock, dataRevealClassName } from "../common/LoadingSkeleton";
 
 const mix = (color: string, amount: number, base = "transparent") =>
   `color-mix(in srgb, ${color} ${amount}%, ${base})`;
-
-function reservationSourceLabel(reservation: StockRequestReservationLine): string {
-  if (reservation.from_bucket === "production") {
-    return `${reservation.from_department ? normalizeDepartment(reservation.from_department) : "부서"} 생산`;
-  }
-  if (reservation.from_bucket === "defective") {
-    return `${reservation.from_department ? normalizeDepartment(reservation.from_department) : "부서"} 불량`;
-  }
-  return "창고";
-}
 
 type Props = {
   item: Item;
@@ -54,12 +38,7 @@ export function InventoryDetailPanel({
   const mobile = quickActionVariant === "mobile";
   const writeBlocked = actionsDisabled || !!item.deleted_at;
   const QuickActionContainer = mobile ? Fragment : DesktopRightPanelFooter;
-  const revision = useRealtimeRevision();
   const getDeptColor = useDeptColorLookup();
-  const [reservationRows, setReservations] = useState<StockRequestReservationLine[]>([]);
-  const reservationsItemRef = useRef<string | null>(null);
-  const [reservationFailure, setReservationFailure] = useState<{ itemId: string; message: string; refresh: boolean } | null>(null);
-  const [reservationRetry, setReservationRetry] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [bomModalOpen, setBomModalOpen] = useState(false);
   const [ioMenu, setIoMenu] = useState<"in" | "out" | null>(null);
@@ -72,66 +51,8 @@ export function InventoryDetailPanel({
   useEffect(() => {
     if (writeBlocked) setIoMenu(null);
   }, [writeBlocked]);
-  const pendingQty = totalApprovalPending(item);
-  const availableQty = Number(item.available_quantity) || 0;
-  const managedStock = getManagedStockBreakdown(item);
-  const managedTotals = STOCK_CATEGORY_ORDER.map((category) => {
-    const { label, color } = STOCK_CATEGORY_STYLES[category];
-    const sum = managedStock.filter((entry) => entry.management_category === category)
-      .reduce((total, entry) => total + Number(entry.quantity), 0);
-    return {
-      category,
-      label,
-      color: category === "DEFECT" ? LEGACY_COLORS.red : color,
-      quantity: category === "DEFECT" && item.defective_breakdown == null ? Number(item.defective_total ?? sum) : sum,
-    };
-  }).filter((entry) => entry.quantity > 0);
-  const minStockRaw = item.min_stock == null ? 0 : Number(item.min_stock);
-  const availableState = getStockState(availableQty, minStockRaw > 0 ? minStockRaw : null);
-  const reservations = reservationsItemRef.current === item.item_id ? reservationRows : [];
-  const currentReservationFailure = reservationFailure?.itemId === item.item_id ? reservationFailure : null;
-  const reservationsLoading = pendingQty > 0 && reservationsItemRef.current !== item.item_id && !currentReservationFailure;
-  const managedCards = managedTotals.map(({ category, label, color, quantity }) => (
-    <div key={category}
-      className={mobile ? "min-w-0 rounded-[12px] px-2 py-1 text-center" : "min-w-0 rounded-[18px] border px-2 py-3 text-center"}
-      style={{ background: LEGACY_COLORS.s1, borderColor: mix(color, 40) }}>
-      <div className="whitespace-nowrap text-xs tracking-tight" style={{ color: LEGACY_COLORS.muted2 }}>{label} 재고</div>
-      <div className={mobile ? "mt-1 break-all font-sans text-xl font-medium leading-7" : "mt-1 break-all text-xl font-black"} style={{ color }}>
-        {formatQty(quantity)}
-      </div>
-    </div>
-  ));
-
-  useEffect(() => {
-    let cancelled = false;
-    setReservationFailure(null);
-    if (reservationsItemRef.current !== item.item_id) {
-      setReservations([]);
-    }
-    if (pendingQty <= 0) {
-      reservationsItemRef.current = item.item_id;
-      setReservations([]);
-      return;
-    }
-    api
-      .getItemReservations(item.item_id)
-      .then((rows) => {
-        if (!cancelled) {
-          reservationsItemRef.current = item.item_id;
-          setReservations(rows);
-        }
-      })
-      .catch((caught: unknown) => {
-        if (!cancelled) setReservationFailure({
-          itemId: item.item_id,
-          message: caught instanceof Error ? caught.message : "승인 대기 요청을 불러오지 못했습니다.",
-          refresh: reservationsItemRef.current === item.item_id,
-        });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [item.item_id, pendingQty, revision, reservationRetry]);
+  const locationSection = (Number(item.warehouse_qty) > 0 || (item.locations ?? []).some((location) => Number(location.quantity) > 0))
+    ? <InventoryDetailLocations item={item} getDeptColor={getDeptColor} mobile={mobile} /> : null;
 
   return (
     <div className={mobile ? "flex flex-col gap-2" : "space-y-4"}>
@@ -153,6 +74,7 @@ export function InventoryDetailPanel({
         // 데스크톱 — 기존 인라인 썸네일(사진 있을 때만, 무변경).
         imageFilename && (
           <section
+            data-panel-scroll-card={!mobile || undefined}
             className="flex items-center justify-center rounded-[28px] border p-4"
             style={{ borderColor: LEGACY_COLORS.border, background: mobile ? "transparent" : LEGACY_COLORS.s2 }}
           >
@@ -184,103 +106,13 @@ export function InventoryDetailPanel({
         />
       )}
       {/* 수량 현황 */}
-      <section
-        className={mobile ? "rounded-[20px] border px-3 py-2" : "rounded-[28px] border p-5"}
-        style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
-      >
-        <div className={mobile ? "mb-1 text-sm font-semibold" : "mb-3 text-sm font-bold uppercase tracking-[0.18em]"} style={{ color: mobile ? LEGACY_COLORS.text : LEGACY_COLORS.muted2 }}>
-          수량 현황
-        </div>
-        <div className="grid gap-3 text-base">
-          <div className={`grid ${managedTotals.length === 1 ? "grid-cols-3" : "grid-cols-2"} gap-3`}>
-            <div
-              className={mobile ? "min-w-0 rounded-[12px] px-2 py-1 text-center" : "min-w-0 rounded-[18px] border px-2 py-3 text-center"}
-              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-            >
-              <div className="whitespace-nowrap text-xs tracking-tight" style={{ color: LEGACY_COLORS.muted2 }}>
-                사용 가능 재고
-              </div>
-              <div className={mobile ? "mt-1 break-all font-sans text-xl font-medium leading-7" : "mt-1 text-xl font-black"} style={{ color: availableState.color }}>
-                {formatQty(availableQty)}
-              </div>
-            </div>
-            <div
-              className={mobile ? "min-w-0 rounded-[12px] px-2 py-1 text-center" : "min-w-0 rounded-[18px] border px-2 py-3 text-center"}
-              style={{
-                background: LEGACY_COLORS.s1,
-                borderColor: pendingQty > 0
-                  ? mix(LEGACY_COLORS.yellow, 40)
-                  : LEGACY_COLORS.border,
-              }}
-            >
-              <div className="whitespace-nowrap text-xs tracking-tight" style={{ color: LEGACY_COLORS.muted2 }}>
-                승인 대기 수량
-              </div>
-              <div
-                className={mobile ? "mt-1 break-all font-sans text-xl font-medium leading-7" : "mt-1 text-xl font-black"}
-                style={{ color: pendingQty > 0 ? LEGACY_COLORS.yellow : LEGACY_COLORS.text }}
-              >
-                {formatQty(pendingQty)}
-              </div>
-            </div>
-            {managedTotals.length === 1 && managedCards}
-          </div>
-          {managedTotals.length > 1 && <div className={`grid ${managedTotals.length === 3 ? "grid-cols-3" : "grid-cols-2"} gap-3`}>{managedCards}</div>}
-          {item.supplier && (
-            <div
-              className={mobile ? "border-t pt-3" : "rounded-[18px] border px-4 py-3"}
-              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-            >
-              <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                공급처
-              </div>
-              <div className={mobile ? "mt-1 break-words text-sm" : "mt-1 text-sm truncate"}>{item.supplier}</div>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* 승인 대기 요청 목록 */}
-      {(reservations.length > 0 || (mobile && pendingQty > 0 && (reservationsLoading || currentReservationFailure))) && (
-        <section
-          className={mobile ? "border-t" : "rounded-[28px] border p-5"}
-          style={{ borderColor: LEGACY_COLORS.border, background: mobile ? "transparent" : LEGACY_COLORS.s2 }}
-        >
-          <div className="mb-3 text-sm font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
-            승인 대기 요청{reservations.length > 0 ? ` (${reservations.length}건)` : ""}
-          </div>
-          {mobile && currentReservationFailure && <ReadFailure message={currentReservationFailure.message} refresh={currentReservationFailure.refresh}
-            onRetry={() => { setReservationFailure(null); setReservationRetry((value) => value + 1); }} />}
-          {mobile && reservationsLoading ? <ReadLoading label="승인 대기 요청을 불러오는 중" skeleton={
-            <div className="space-y-2">{[0, 1].map((index) => <div key={index} data-testid="reservation-skeleton-row"
-              className="flex min-h-11 flex-wrap items-center gap-2 rounded-[14px] border px-3 py-2" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-              <SkeletonBlock className="h-5 w-20" /><SkeletonBlock className="h-4 w-16" />
-              <SkeletonBlock className="h-4 w-24" /><SkeletonBlock className="ml-auto h-5 w-12" />
-            </div>)}</div>
-          } /> : <div className={`space-y-2 ${mobile ? dataRevealClassName : ""}`}>
-            {reservations.map((r) => (
-              <div
-                key={r.line_id}
-                className="flex flex-wrap items-center gap-2 rounded-[14px] border px-3 py-2 text-sm"
-                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-              >
-                <span className="font-bold">{r.requester_name}</span>
-                <span style={{ color: LEGACY_COLORS.muted }}>
-                  · {normalizeDepartment(r.requester_department)}
-                </span>
-                <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                  {reservationSourceLabel(r)} → {r.to_department ? normalizeDepartment(r.to_department) : "외부"}
-                </span>
-                <span className="ml-auto font-bold">{formatQty(r.quantity)} 개</span>
-              </div>
-            ))}
-          </div>}
-        </section>
-      )}
-
-      {(Number(item.warehouse_qty) > 0 || (item.locations ?? []).some((l) => Number(l.quantity) > 0)) && (
-        <InventoryDetailLocations item={item} getDeptColor={getDeptColor} mobile={mobile} />
-      )}
+      <InventoryWorkStatusPanel key={item.item_id} item={item} mobile={mobile}>
+        {item.supplier && <section data-panel-scroll-card={!mobile || undefined} className={mobile ? "rounded-[20px] border px-3 py-2" : "rounded-[28px] border p-4"}
+          style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
+          <p className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>공급처</p><p className="mt-1 break-words text-sm">{item.supplier}</p>
+        </section>}
+        {locationSection}
+      </InventoryWorkStatusPanel>
 
       {/* BOM 하위 구성 */}
       {item.bom_completed_at != null && (
@@ -317,9 +149,6 @@ export function InventoryDetailPanel({
         {item.deleted_at && <p role="status" className="mb-3 text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>
           삭제된 품목입니다. 입출고 작업을 할 수 없습니다.
         </p>}
-        <div className="mb-2 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
-          빠른 작업
-        </div>
         {quickActionVariant === "mobile" ? (
           // 항목 3 — 모바일: 입고(파랑)/출고(빨강) 나란히 + 선택 시 서브옵션을 아래 전폭 파스텔로.
           <div className="flex flex-col gap-2">

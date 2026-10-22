@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Item } from "@/lib/api";
 import { SlidePanel } from "../common";
-import { DesktopPanelCloseButton, DesktopRightPanel } from "../DesktopRightPanel";
+import { DesktopRightPanel } from "../DesktopRightPanel";
 import { InventoryDetailPanel } from "./InventoryDetailPanel";
 import { InventoryRecentHistoryPanel } from "./InventoryRecentHistoryPanel";
 import type { IoEntryIntent } from "../_warehouse_v2/types";
@@ -94,18 +94,22 @@ export function DesktopInventoryRightPanel({
       open={open}
       onClose={onClose}
       hideCloseButton
+      externalScrollbarRail
       labelledBy={INVENTORY_DETAIL_TITLE_ID}
     >
       {(displayItem || open) && (
         <DesktopRightPanel
           bodyScrollbarOutset
+          collapsibleHeader
+          scrollResetKey={`${open}:${selectedItem?.item_id}:${activeTab}`}
+          onClose={onClose}
           title={displayItem?.item_name ?? "품목 상세"}
           titleId={INVENTORY_DETAIL_TITLE_ID}
           subtitle={displayItem?.legacy_part ? `${displayItem.mes_code} · ${displayItem.legacy_part}` : (displayItem?.mes_code ?? undefined)}
           subtitleBadge={headerBadge}
           subtitleAction={nameCopy.button}
           topContent={
-            <div className="mb-4 flex items-center gap-2">
+            <div className="mb-4 flex items-center gap-2 pr-10">
               <div
                 aria-label="재고 상세 보기"
                 className="flex min-w-0 flex-1 w-full gap-1 rounded-[12px] p-1"
@@ -167,7 +171,6 @@ export function DesktopInventoryRightPanel({
                   검색용 이름
                 </button>
               </div>
-              <DesktopPanelCloseButton onClick={onClose} />
             </div>
           }
         >
@@ -188,7 +191,7 @@ export function DesktopInventoryRightPanel({
               />}
             </div>
           ) : activeTab === "history" && selectedItem && displayItem && selectedItem.item_id === displayItem.item_id ? (
-            <div id={INVENTORY_HISTORY_PANEL_ID} role="tabpanel" aria-labelledby={INVENTORY_HISTORY_TAB_ID} className="flex h-full min-h-0 flex-col">
+            <div id={INVENTORY_HISTORY_PANEL_ID} role="tabpanel" aria-labelledby={INVENTORY_HISTORY_TAB_ID} className="flex min-h-0 flex-col">
               <InventoryRecentHistoryPanel key={selectedItem.item_id} item={selectedItem} />
             </div>
           ) : null}

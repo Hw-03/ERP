@@ -719,6 +719,10 @@ def test_department_reject_returns_process_single_adjustment_to_same_draft(
     assert second_location.pending_quantity == D("0")
     assert batch.status == "draft"
     assert batch.completed_at is None
+    assert batch.reservation_status == "inactive"
+    assert batch.reservation_issue["code"] == "returned_after_rejection"
+    from app.schemas.work_reservations import WorkReservationIssue
+    WorkReservationIssue.model_validate(batch.reservation_issue)
     assert batch.notes == "반려 후 수정할 다품목 메모"
     assert batch.reference_no == "ADJ-REF-01"
     assert [(line.item_name_snapshot, line.quantity) for bundle in batch.bundles for line in bundle.lines] == [
@@ -732,13 +736,22 @@ def test_department_reject_returns_process_single_adjustment_to_same_draft(
     assert drafts[0]["stock_requests"][0]["rejected_reason"] == "수량 근거 확인 필요"
     assert io_draft.list_drafts(db_session, requester_employee_id=other.employee_id) == []
 
-    # 같은 batch 재제출은 새 결재 요청을 만들고, 더는 작성 중 반려 배너 대상이 아니다.
+    # 반려 복귀는 재저장으로 전량 확보한 뒤 같은 batch를 새 결재 요청으로 제출한다.
     from app.services import io_dispatch
+    from app.schemas.io import IoDraftUpsert
+    from app.services.io_persist import get_batch
+
+    current = get_batch(db_session, batch_id=batch.batch_id)
+    current.pop("shipping_request_id", None)
+    io_draft.save_draft(db_session, payload=IoDraftUpsert.model_validate({
+        **current, "expected_revision": batch.revision,
+    }))
 
     result = io_dispatch.submit_existing_draft(
         db_session,
         batch_id=batch.batch_id,
         requester_employee_id=requester.employee_id,
+        expected_revision=batch.revision,
     )
     db_session.flush()
     db_session.refresh(batch)

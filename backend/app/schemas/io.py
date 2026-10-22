@@ -3,7 +3,7 @@
 from typing import Any, List, Literal, Optional
 import uuid
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.schemas.common import UtcDatetime
 
@@ -35,7 +35,7 @@ class IoLinePayload(BaseModel):
     from_department: Optional[str] = None
     to_bucket: str
     to_department: Optional[str] = None
-    quantity: int
+    quantity: int = Field(..., ge=0)
     bom_expected: Optional[int] = None
     bom_stock_exempt: bool = False
     bom_auto_token: Optional[str] = Field(None, pattern="^[0-9a-f]{64}$")
@@ -48,6 +48,14 @@ class IoLinePayload(BaseModel):
     exclusion_note: Optional[str] = None
     approval_kind: Optional[Literal["warehouse", "department", "as_research", "none"]] = None
     approval_outcome: Optional[Literal["approved", "rejected"]] = None
+
+    @field_validator("quantity", mode="before")
+    @classmethod
+    def reject_boolean_quantity(cls, value: Any) -> Any:
+        """Boolean input is not stock; ORM Decimal integer response values remain valid."""
+        if isinstance(value, bool):
+            raise ValueError("수량은 정수여야 합니다.")
+        return value
 
 
 class IoBundlePayload(BaseModel):
@@ -67,6 +75,7 @@ class IoBundlePayload(BaseModel):
 
 class IoPreviewRequest(BaseModel):
     requester_employee_id: Optional[uuid.UUID] = None
+    owner_batch_id: Optional[uuid.UUID] = None
     work_type: str
     sub_type: str
     from_department: Optional[str] = None
@@ -94,8 +103,8 @@ class IoDraftUpsert(BaseModel):
     notes: Optional[str] = None
     client_request_id: Optional[str] = Field(None, max_length=64)
     # 이어 작업 중인 draft의 batch_id. 있으면 해당 draft를 갱신, 없으면 새 슬롯 생성.
-    # submit 경로(IoSubmitRequest)는 이 값을 무시한다.
     batch_id: Optional[uuid.UUID] = None
+    expected_revision: Optional[int] = Field(None, ge=0, strict=True)
     bundles: List[IoBundlePayload] = Field(default_factory=list)
 
     @model_validator(mode="before")
@@ -108,6 +117,10 @@ class IoDraftUpsert(BaseModel):
 
 class IoSubmitRequest(IoDraftUpsert):
     pass
+
+
+class IoDraftSubmitRequest(BaseModel):
+    expected_revision: int = Field(..., ge=0, strict=True)
 
 
 class IoStockRequestSummary(BaseModel):
@@ -131,6 +144,10 @@ class IoStockRequestSummary(BaseModel):
 
 class IoBatchResponse(BaseModel):
     batch_id: uuid.UUID
+    revision: int
+    reservation_status: Literal["reserved", "not_required", "inactive"]
+    reservation_issue: Optional[dict[str, Any]] = None
+    effective_plan: Optional[dict[str, Any]] = None
     work_type: str
     sub_type: str
     status: str

@@ -114,7 +114,7 @@ def test_empty_sqlite_upgrade_creates_current_schema_and_is_rerunnable(tmp_path)
         with engine.connect() as connection:
             assert connection.scalar(
                 sa.text("SELECT version_num FROM alembic_version")
-            ) == "20261014_0046"
+            ) == "20261021_0048"
             location_columns = {
                 column["name"]: column
                 for column in inspector.get_columns("inventory_locations")
@@ -349,6 +349,10 @@ def test_inventory_location_pending_migration_backfills_and_enforces_constraints
     url = f"sqlite:///{path.as_posix()}"
     command.upgrade(_config(url), "20260812_0018")
     with sqlite3.connect(path) as db:
+        db.execute(
+            "INSERT INTO process_types (code, prefix, suffix, stage_order) "
+            "VALUES ('TR', 'T', 'R', 1)"
+        )
         db.execute(
             "INSERT INTO items "
             "(item_id, item_name, unit, model_symbol, process_type_code, serial_no) "

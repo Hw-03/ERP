@@ -23,6 +23,7 @@ const OPERATIONAL_QUERY_ROOTS = [
   queryKeys.weekly.all,
   queryKeys.dailyWorkReports.all,
   queryKeys.stocktake.all,
+  queryKeys.admin.workReservationsAll,
 ] as const;
 
 type RevisionSnapshot = {
@@ -56,6 +57,7 @@ export async function invalidateOperationalQueries(queryClient: QueryClient, onM
     catch { return false; }
   }
   onMetadataReady?.();
+  await queryClient.cancelQueries({ queryKey: queryKeys.items.all });
   await Promise.all(
     OPERATIONAL_QUERY_ROOTS.map((queryKey) => queryClient.invalidateQueries({ queryKey })),
   );

@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import { IoComposeView } from "../IoComposeView";
@@ -107,7 +108,8 @@ vi.mock("../IoWorkTypeStep", () => ({
   ),
 }));
 vi.mock("../IoBundleCart", () => ({
-  IoBundleCart: ({ bundles, subType, onPullFromWarehouse, onTogglePull, onQuantityChange, onSaveDraft, pulling, pullBlocked }: {
+  IoBundleCart: ({ bundles, subType, onPullFromWarehouse, onTogglePull, onQuantityChange, onSaveDraft, pulling, pullBlocked, footerNotice }: {
+    footerNotice?: ReactNode;
     bundles: { bundle_id: string; lines: { line_id: string; quantity: number }[] }[];
     subType: string;
     onPullFromWarehouse: () => void;
@@ -119,6 +121,7 @@ vi.mock("../IoBundleCart", () => ({
   }) => (
     <>
       <output data-testid="pull-cart-state">{`${subType}:${bundles.map((bundle) => bundle.bundle_id).join(",")}`}</output>
+      {footerNotice}
       <output data-testid="pull-cart-quantity">{bundles[0]?.lines[0]?.quantity ?? "none"}</output>
       <output data-testid="pull-busy-state">{pulling ? "pulling" : "idle"}</output>
       <button type="button" onClick={() => onTogglePull("short-2")}>두 번째 부족 품목 선택</button>
@@ -148,6 +151,7 @@ const operator = {
 
 const sourceDraft = {
   batch_id: "source-draft",
+  revision: 3,
   work_type: "process",
   sub_type: "produce",
   from_department: "조립",
@@ -274,13 +278,27 @@ beforeEach(() => {
   dirtyRegistration.dirty = false;
   vi.mocked(api.getAllBOM).mockResolvedValue([]);
   vi.mocked(api.getItems).mockResolvedValue([]);
-  vi.mocked(api.saveDraft).mockResolvedValue({ batch_id: "source-draft" } as never);
+  vi.mocked(api.saveDraft).mockResolvedValue({ batch_id: "source-draft", revision: 4 } as never);
   vi.mocked(api.preview).mockImplementation(({ targets }) =>
     Promise.resolve(previewBundle(targets[0].item_id)),
   );
 });
 
 describe("IoComposeView 부족 품목 가져오기", () => {
+  it("원작업 전량예약 저장 없이 창고 작업으로 이동하고 수정한 원작업으로 복귀한다", async () => {
+    vi.mocked(api.saveDraft).mockRejectedValue(new Error("원작업 자재 부족"));
+    renderCompose();
+    await screen.findByTestId("pull-cart-state");
+    fireEvent.click(screen.getByRole("button", { name: "첫 품목 수량 변경" }));
+    fireEvent.click(screen.getByRole("button", { name: "부족 품목 가져오기" }));
+    await waitFor(() => expect(screen.getByTestId("pull-cart-state")).toHaveTextContent("warehouse_to_dept:"));
+    expect(api.saveDraft).not.toHaveBeenCalled();
+    expect(screen.getByText(/미저장 변경은 예약되지/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "원작업으로 돌아가기" }));
+    fireEvent.click(screen.getByRole("button", { name: "돌아가기", exact: true }));
+    await waitFor(() => expect(screen.getByTestId("pull-cart-state")).toHaveTextContent("produce:source-bundle"));
+    expect(screen.getByTestId("pull-cart-quantity")).toHaveTextContent("7");
+  });
   it("부족 품목 가져오기 새 작업은 이전 작업 history와 초안 복원을 분리한다", async () => {
     window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=4&draftId=source-draft");
     const onNewWork = vi.fn();
@@ -363,22 +381,22 @@ describe("IoComposeView 부족 품목 가져오기", () => {
     }));
   });
 
-  it("처리 중 중복 클릭은 원 초안 저장과 preview를 한 번만 실행한다", async () => {
+  it("처리 중 중복 클릭은 원 초안 저장 없이 preview를 한 번만 실행한다", async () => {
     renderCompose();
     await screen.findByTestId("pull-cart-state");
     const button = screen.getByRole("button", { name: "부족 품목 가져오기" });
     fireEvent.click(button);
     fireEvent.click(button);
     await waitFor(() => expect(api.preview).toHaveBeenCalledTimes(2));
-    expect(api.saveDraft).toHaveBeenCalledTimes(1);
+    expect(api.saveDraft).not.toHaveBeenCalled();
   });
 
-  it("원 초안 저장에 실패하면 원 작업을 유지하고 미리보기를 시작하지 않는다", async () => {
+  it("명시적 저장에 실패하면 원 작업을 유지하고 미리보기를 시작하지 않는다", async () => {
     vi.mocked(api.saveDraft).mockRejectedValue(new Error("초안 저장 실패"));
     renderCompose();
 
     await screen.findByTestId("pull-cart-state");
-    fireEvent.click(screen.getByRole("button", { name: "부족 품목 가져오기" }));
+    fireEvent.click(screen.getByRole("button", { name: "임시저장" }));
 
     await waitFor(() => {
       expect(screen.getByText("초안 저장 실패")).toBeInTheDocument();
@@ -449,19 +467,19 @@ describe("IoComposeView 부족 품목 가져오기", () => {
     );
   });
 
-  it("복원 뒤 늦게 끝난 pull 저장이 새 draft ID와 저장 알림을 오염시키지 않는다", async () => {
+  it("복원 뒤 늦게 끝난 명시적 저장이 새 draft ID와 저장 알림을 오염시키지 않는다", async () => {
     const pendingSave = deferred<Awaited<ReturnType<typeof api.saveDraft>>>();
     const onDraftSaved = vi.fn();
     vi.mocked(api.saveDraft)
       .mockReturnValueOnce(pendingSave.promise)
-      .mockResolvedValueOnce({ batch_id: "replacement-draft" } as never);
+      .mockResolvedValueOnce({ batch_id: "replacement-draft", revision: 4 } as never);
     const view = renderCompose(onDraftSaved);
 
     await screen.findByTestId("pull-cart-state");
     fireEvent.click(screen.getByRole("button", { name: "두 번째 부족 품목 선택" }));
-    fireEvent.click(screen.getByRole("button", { name: "부족 품목 가져오기" }));
+    fireEvent.click(screen.getByRole("button", { name: "임시저장" }));
     await waitFor(() => expect(api.saveDraft).toHaveBeenCalledTimes(1));
-    expect(screen.getByTestId("pull-busy-state")).toHaveTextContent("pulling");
+    expect(onDraftSaved).not.toHaveBeenCalled();
 
     view.rerender(
       <IoComposeView
@@ -506,7 +524,7 @@ describe("IoComposeView 부족 품목 가져오기", () => {
     });
   });
 
-  it("pull 저장 대기 중 수량 편집을 보존하고 오래된 저장 부수효과를 버린다", async () => {
+  it("명시적 저장 대기 중 수량 편집을 보존하고 오래된 저장 부수효과를 버린다", async () => {
     const pendingSave = deferred<Awaited<ReturnType<typeof api.saveDraft>>>();
     const onDraftSaved = vi.fn();
     const onStatusChange = vi.fn();
@@ -516,7 +534,7 @@ describe("IoComposeView 부족 품목 가져오기", () => {
     await screen.findByTestId("pull-cart-state");
     onStatusChange.mockClear();
     fireEvent.click(screen.getByRole("button", { name: "두 번째 부족 품목 선택" }));
-    fireEvent.click(screen.getByRole("button", { name: "부족 품목 가져오기" }));
+    fireEvent.click(screen.getByRole("button", { name: "임시저장" }));
     await waitFor(() => expect(api.saveDraft).toHaveBeenCalledTimes(1));
 
     fireEvent.click(screen.getByRole("button", { name: "첫 품목 수량 변경" }));
@@ -551,7 +569,7 @@ describe("IoComposeView 부족 품목 가져오기", () => {
     } as never);
     vi.mocked(api.saveDraft)
       .mockReturnValueOnce(pendingSave.promise)
-      .mockResolvedValueOnce({ batch_id: "stale-content-draft" } as never);
+      .mockResolvedValueOnce({ batch_id: "stale-content-draft", revision: 4 } as never);
     renderCompose(onDraftSaved, 3, onStatusChange);
 
     await screen.findByTestId("picker-filter-state");
@@ -568,7 +586,7 @@ describe("IoComposeView 부족 품목 가져오기", () => {
     onStatusChange.mockClear();
     onDraftSaved.mockClear();
 
-    fireEvent.click(screen.getByRole("button", { name: "부족 품목 가져오기" }));
+    fireEvent.click(screen.getByRole("button", { name: "임시저장" }));
     await waitFor(() => expect(api.saveDraft).toHaveBeenCalledTimes(1));
     expect(vi.mocked(api.saveDraft).mock.calls[0][0]).toEqual(expect.objectContaining({
       batch_id: null,
@@ -579,7 +597,7 @@ describe("IoComposeView 부족 품목 가져오기", () => {
     });
 
     await act(async () => {
-      pendingSave.resolve({ batch_id: "stale-content-draft" } as never);
+      pendingSave.resolve({ batch_id: "stale-content-draft", revision: 3 } as never);
       await pendingSave.promise;
     });
     await waitFor(() => {

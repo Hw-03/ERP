@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { KeyRound, ShieldCheck } from "lucide-react";
+import { KeyRound } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
 import {
@@ -10,7 +10,6 @@ import {
   isAdminPinLengthValid,
   type AdminPinForm,
 } from "../_admin_hooks/adminPinValidation";
-import { AdminPageHeader } from "./_admin_primitives";
 
 type Props = {
   pinForm: AdminPinForm;
@@ -52,11 +51,6 @@ export function AdminDangerZone({
   return (
     <>
       <div className="flex min-h-0 flex-1 flex-col">
-        <AdminPageHeader
-          icon={ShieldCheck}
-          title="보안"
-        />
-
         <div className="min-h-0 flex-1 overflow-y-auto rounded-[20px] border p-6" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
           <div className="grid min-h-full w-full items-center gap-6 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)_minmax(0,1fr)]">
             <div

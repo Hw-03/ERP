@@ -239,6 +239,7 @@ def _submit_final_pf_production(
         db_session,
         IoSubmitRequest(
             requester_employee_id=actor.employee_id,
+            client_request_id=str(uuid.uuid4()),
             work_type="process",
             sub_type="produce",
             to_department=DepartmentEnum.SHIPPING.value,
