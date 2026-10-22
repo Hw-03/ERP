@@ -10,7 +10,7 @@ import { InventoryTableStickyHeader } from "./_inventory_sections/InventoryFilte
 import { HistoryTableSkeleton } from "./_history_sections/HistoryTable";
 import { HistoryStatsBar } from "./_history_sections/HistoryStatsBar";
 import { HistoryFilterBar } from "./_history_sections/HistoryFilterBar";
-import type { ElementType, ReactNode } from "react";
+import type { ElementType, ReactNode, RefObject } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, BarChart2, Boxes, ClipboardList, History, MapPinned, Settings, Settings2, Truck, Warehouse } from "lucide-react";
@@ -62,6 +62,7 @@ import {
 const VALID_TABS = new Set<DesktopTabId>([...SIDEBAR_TAB_IDS, "settings"]);
 const DEFAULT_STATUS = "DEXCOWIN MES";
 const MS_PER_DAY = 86400000;
+type DashboardScrollGeometry = { height: number; width: number };
 
 type DesktopTabNavigation = "push" | "replace" | "none";
 
@@ -104,6 +105,7 @@ function DesktopMesShellInner({
   const confirmAdminNavigation = useConfirmNavigation();
   const { requestHome, returnSequence } = useDesktopTabHomeController();
   const homeMotionRef = useRef<HTMLDivElement>(null);
+  const dashboardScrollGeometry = useRef<DashboardScrollGeometry | null>(null);
   useLayoutEffect(() => {
     if (!returnSequence || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const body = homeMotionRef.current;
@@ -586,7 +588,7 @@ function DesktopMesShellInner({
               >
                 <AccessRevocationGuard allowed={!operator || canOpenTab(activeTab) || (activeTab === "stocktake" && stocktakeAccessPending)} onLeave={() => commitDesktopTab(fallbackTab, { navigation: "replace" })}>
                 {activeTab === "dashboard" || activeTab === "history" ? (
-                  <DesktopDataTransition ready={activeTab === contentTab} tab={activeTab}>
+                  <DesktopDataTransition ready={activeTab === contentTab} tab={activeTab} dashboardScrollGeometry={dashboardScrollGeometry}>
                     {content}
                   </DesktopDataTransition>
                 ) : content}
@@ -601,8 +603,39 @@ function DesktopMesShellInner({
 }
 
 /** 메뉴·제목을 먼저 그리는 동안 대상 화면의 공간을 유지한다. */
-function DesktopDataTransition({ ready, tab, children }: { ready: boolean; tab: DesktopTabId; children: ReactNode }) {
+function DesktopDataTransition({ ready, tab, children, dashboardScrollGeometry }: {
+  ready: boolean;
+  tab: DesktopTabId;
+  children: ReactNode;
+  dashboardScrollGeometry: RefObject<DashboardScrollGeometry | null>;
+}) {
   const [coverVisible, setCoverVisible] = useState(!ready);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [scrollGeometry, setScrollGeometry] = useState(dashboardScrollGeometry.current);
+
+  // 이미지가 있는 행은 더 높으므로 행 수로 스크롤 길이를 추정하지 않는다.
+  useLayoutEffect(() => {
+    if (tab !== "dashboard") return;
+    const root = rootRef.current;
+    const viewport = root?.querySelector<HTMLElement>('[data-testid="inventory-left-content"]');
+    if (!viewport) {
+      const loading = root?.querySelector<HTMLElement>('[data-testid="dashboard-loading-scroll"]');
+      if (loading?.clientWidth && loading.clientWidth !== dashboardScrollGeometry.current?.width) setScrollGeometry(null);
+      return;
+    }
+    const measure = () => {
+      if (!viewport.clientWidth || !viewport.scrollHeight) return;
+      const next = { height: viewport.scrollHeight, width: viewport.clientWidth };
+      dashboardScrollGeometry.current = next;
+      setScrollGeometry((previous) => previous?.height === next.height && previous.width === next.width ? previous : next);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(viewport);
+    const surface = viewport.querySelector('[data-testid="inventory-scroll-surface"]');
+    if (surface) observer.observe(surface);
+    return () => observer.disconnect();
+  }, [ready, tab, dashboardScrollGeometry]);
 
   // 실제 내용을 먼저 마운트하고 덮개만 걷어내므로 카드와 검색창이 배경으로 깜빡이지 않는다.
   useEffect(() => {
@@ -612,7 +645,7 @@ function DesktopDataTransition({ ready, tab, children }: { ready: boolean; tab: 
   }, [ready, coverVisible]);
 
   return (
-    <div className="desktop-data-transition relative flex min-h-0 min-w-0 flex-1">
+    <div ref={rootRef} className="desktop-data-transition relative flex min-h-0 min-w-0 flex-1">
       {ready && children}
       {coverVisible && (
         <div
@@ -622,24 +655,25 @@ function DesktopDataTransition({ ready, tab, children }: { ready: boolean; tab: 
           className={`absolute inset-0 z-40 flex ${ready ? "desktop-loading-cover-exit pointer-events-none" : ""}`}
           style={{ background: LEGACY_COLORS.bg }}
         >
-          <DesktopTabLoading tab={tab} />
+          <DesktopTabLoading tab={tab} dashboardScrollHeight={scrollGeometry?.height} />
         </div>
       )}
     </div>
   );
 }
 
-function DesktopTabLoading({ tab }: { tab: DesktopTabId }) {
-  if (tab === "dashboard") return <DashboardTabLoading />;
+function DesktopTabLoading({ tab, dashboardScrollHeight }: { tab: DesktopTabId; dashboardScrollHeight?: number }) {
+  if (tab === "dashboard") return <DashboardTabLoading scrollHeight={dashboardScrollHeight} />;
   if (tab === "history") return <HistoryTabLoading />;
   return null;
 }
 
-function DashboardTabLoading() {
+function DashboardTabLoading({ scrollHeight }: { scrollHeight?: number }) {
   return <div role="status" aria-busy="true" aria-label="대시보드 화면을 불러오는 중입니다" className="flex min-h-0 min-w-0 flex-1 pl-0 lg:pr-4">
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="sg min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable] sm:block sm:overflow-y-scroll">
-        <div className="min-h-full">
+      <div data-testid="dashboard-loading-scroll" className="sg min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable] sm:block sm:overflow-y-scroll"
+        style={{ overflowY: scrollHeight === undefined ? "hidden" : undefined }}>
+        <div className="min-h-full" style={scrollHeight === undefined ? undefined : { height: scrollHeight, overflow: "hidden" }}>
           <div className="flex flex-col gap-3">
             <section className="card desktop-flat-surface" style={{ padding: "14px 16px" }}>
               <InventoryKpiPanel cards={[]} activeKey="ALL" onChange={() => {}} loading />

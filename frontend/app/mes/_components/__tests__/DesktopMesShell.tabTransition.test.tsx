@@ -31,6 +31,15 @@ const adminViewMounts = vi.hoisted(() => vi.fn());
 const defectViewStates = vi.hoisted(() => vi.fn());
 const slowDashboard = vi.hoisted(() => ({ pending: false, promise: new Promise<void>(() => {}) }));
 const slowHistory = vi.hoisted(() => ({ pending: false, promise: new Promise<void>(() => {}) }));
+const resizeCallbacks = new Set<() => void>();
+beforeEach(() => {
+  resizeCallbacks.clear();
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(private callback: () => void) { resizeCallbacks.add(callback); }
+    observe() {}
+    disconnect() { resizeCallbacks.delete(this.callback); }
+  });
+});
 
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => queryClientMock,
@@ -119,7 +128,12 @@ vi.mock("../DesktopTopbar", () => ({
 
 vi.mock("../DesktopInventoryView", () => ({ DesktopInventoryView: () => {
   if (slowDashboard.pending) throw slowDashboard.promise;
-  return <main>dashboard content</main>;
+  return <main data-testid="inventory-left-content" ref={(node) => {
+    if (node) Object.defineProperties(node, {
+      scrollHeight: { configurable: true, value: 2290 },
+      clientWidth: { configurable: true, value: 1700 },
+    });
+  }}><div data-testid="inventory-scroll-surface">dashboard content</div></main>;
 } }));
 
 it("updates the selected menu and header before a slow destination renders", () => {
@@ -663,6 +677,30 @@ describe("DesktopMesShell tab transition", () => {
       slow.pending = false;
       resolve();
     }
+  });
+
+  it("matches the dashboard loading scrollbar to the measured list height and reuses it on return", async () => {
+    let resolve!: () => void;
+    slowDashboard.promise = new Promise<void>((done) => { resolve = done; });
+    render(<Suspense fallback={<div>root loading</div>}><DesktopMesShell /></Suspense>);
+    slowDashboard.pending = true;
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "dashboard", exact: true }));
+      const scroll = screen.getByTestId("dashboard-loading-scroll");
+      expect(scroll).toHaveStyle({ overflowY: "hidden" });
+      await act(async () => { slowDashboard.pending = false; resolve(); await slowDashboard.promise; });
+      expect(scroll.firstElementChild).toHaveStyle({ height: "2290px", overflow: "hidden" });
+      Object.defineProperty(screen.getByTestId("inventory-left-content"), "scrollHeight", { configurable: true, value: 2450 });
+      act(() => resizeCallbacks.forEach((callback) => callback()));
+      expect(scroll.firstElementChild).toHaveStyle({ height: "2450px" });
+      await waitFor(() => expect(screen.queryByTestId("desktop-loading-cover")).not.toBeInTheDocument());
+      fireEvent.click(screen.getByRole("button", { name: "history", exact: true }));
+      await screen.findByText("history content");
+      slowDashboard.pending = true;
+      slowDashboard.promise = new Promise<void>(() => {});
+      fireEvent.click(screen.getByRole("button", { name: "dashboard", exact: true }));
+      expect(screen.getByTestId("dashboard-loading-scroll").firstElementChild).toHaveStyle({ height: "2450px" });
+    } finally { slowDashboard.pending = false; resolve(); }
   });
 
   it("does not restart the shared transition when the active tab is refreshed", () => {
