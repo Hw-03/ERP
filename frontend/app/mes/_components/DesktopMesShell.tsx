@@ -648,9 +648,9 @@ function DashboardTabLoading() {
                 <InventoryFilterToggleButton filtersOpen={false} logic="AND" onLogicChange={() => {}} onToggle={() => {}} disabled />
               </div>
             </section>
-            <section aria-label="자재 목록" className="card desktop-flat-surface">
-              <InventoryTableStickyHeader searchValue="" onSearchChange={() => {}} count={0} isFiltered={false} disabled />
-              <InventoryItemsTable loading error={null} filteredItems={[]} displayLimit={100} skeletonRowCount={20}
+            <section aria-label="자재 목록" className="card desktop-flat-surface flex flex-1 flex-col">
+              <InventoryTableStickyHeader searchValue="" searchPlaceholder="품명 · 품목 코드 · 검색용 이름" onSearchChange={() => {}} onManageSearch={() => {}} count={0} isFiltered={false} disabled />
+              <InventoryItemsTable loading error={null} filteredItems={[]} displayLimit={100}
                 setDisplayLimit={() => {}} selectedItem={null} onSelectItem={() => {}} activeFilterCount={0}
                 hasKpiFilter={false} onRetry={() => {}} onResetAllFilters={() => {}} />
             </section>

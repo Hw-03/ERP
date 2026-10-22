@@ -12,6 +12,7 @@ import { InventoryTable, type InventoryTableColumn } from "./InventoryTable";
 import { useChunkedRender } from "../_hooks/useChunkedRender";
 
 const PAGE_SIZE = 100;
+const INITIAL_RENDER_SIZE = 20;
 
 type Props = {
   error: string | null;
@@ -50,7 +51,7 @@ export function InventoryItemsTable({
   onResetAllFilters,
   imageManifest,
   compact,
-  skeletonRowCount = 8,
+  skeletonRowCount = compact ? 8 : INITIAL_RENDER_SIZE,
 }: Props) {
   const emptySpaceRef = useRef<HTMLDivElement>(null);
   const [largeEmpty, setLargeEmpty] = useState(false);
@@ -84,7 +85,7 @@ export function InventoryItemsTable({
   // count가 늘어나 리렌더될 때마다 새 slice 참조가 리셋을 유발해 chunk가
   // 영원히 20개에서 멈춘다.
   const displayedItems = useMemo(() => filteredItems.slice(0, displayLimit), [filteredItems, displayLimit]);
-  const { visible: chunkedItems, sentinelRef, hasMore: hasMoreChunk } = useChunkedRender(displayedItems, 20, !compact || !loading);
+  const { visible: chunkedItems, sentinelRef, hasMore: hasMoreChunk } = useChunkedRender(displayedItems, INITIAL_RENDER_SIZE, !compact || !loading);
 
   if (error) {
     return <ReadFailure message={error} onRetry={onRetry} />;
@@ -158,8 +159,11 @@ export function InventoryItemsTable({
       </InventoryTable>
       {hasMoreChunk && <div ref={sentinelRef as React.RefObject<HTMLDivElement>} aria-hidden className="h-px" />}
 
-      {filteredItems.length > displayLimit && (
+      {((loading && !compact) || filteredItems.length > displayLimit) && (
         <button
+          type="button"
+          disabled={loading}
+          aria-hidden={loading || undefined}
           onClick={() => setDisplayLimit((prev) => prev + PAGE_SIZE)}
           className="mt-4 w-full rounded-[24px] border py-4 text-base font-semibold"
           style={{
@@ -168,12 +172,12 @@ export function InventoryItemsTable({
             color: LEGACY_COLORS.muted2,
           }}
         >
-          100개 더 보기 ({formatQty(Math.min(displayLimit + PAGE_SIZE, filteredItems.length))} / {formatQty(filteredItems.length)})
+          {loading ? <SkeletonBlock className="mx-auto !block h-6 w-40" /> : <>100개 더 보기 ({formatQty(Math.min(displayLimit + PAGE_SIZE, filteredItems.length))} / {formatQty(filteredItems.length)})</>}
         </button>
       )}
-      {filteredItems.length > 0 && (
+      {((loading && !compact) || filteredItems.length > 0) && (
         <div className="mt-2 text-center text-xs" style={{ color: LEGACY_COLORS.muted }}>
-          {formatQty(Math.min(displayLimit, filteredItems.length))} / {formatQty(filteredItems.length)}개 표시
+          {loading ? <SkeletonBlock className="mx-auto !block h-4 w-24" /> : <>{formatQty(Math.min(displayLimit, filteredItems.length))} / {formatQty(filteredItems.length)}개 표시</>}
         </div>
       )}
     </>
