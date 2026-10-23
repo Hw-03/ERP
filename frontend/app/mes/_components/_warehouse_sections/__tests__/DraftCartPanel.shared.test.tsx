@@ -38,6 +38,25 @@ const props = { layout: "desktop" as const, employeeId: "emp-1", refreshNonce: 0
 function openAll(): void { fireEvent.click(screen.getByRole("button", { name: "전체 작업" })); }
 
 describe("공유 작업함", () => {
+  it.each(["desktop", "mobile"] as const)("%s 부서 승인 담당자는 전체 작업으로 진입하고 내 작업도 선택할 수 있다", (layout) => {
+    const { rerender, unmount } = render(<DraftCartPanel {...props} layout={layout} defaultScope="all" />);
+    expect(screen.getByRole("button", { name: "전체 작업", exact: true })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "내 작업", exact: true }));
+    rerender(<DraftCartPanel {...props} layout={layout} defaultScope="all" refreshNonce={1} />);
+    expect(screen.getByRole("button", { name: "내 작업", exact: true })).toHaveAttribute("aria-pressed", "true");
+    unmount();
+    render(<DraftCartPanel {...props} layout={layout} defaultScope="all" />);
+    expect(screen.getByRole("button", { name: "전체 작업", exact: true })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("직원·부서 승인 권한이 바뀌면 해당 기본 조회 범위로 초기화한다", () => {
+    const { rerender } = render(<DraftCartPanel {...props} defaultScope="all" />);
+    expect(screen.getByRole("button", { name: "전체 작업", exact: true })).toHaveAttribute("aria-pressed", "true");
+    rerender(<DraftCartPanel {...props} defaultScope="mine" />);
+    expect(screen.getByRole("button", { name: "내 작업", exact: true })).toHaveAttribute("aria-pressed", "true");
+    rerender(<DraftCartPanel {...props} employeeId="emp-3" defaultScope="all" />);
+    expect(screen.getByRole("button", { name: "전체 작업", exact: true })).toHaveAttribute("aria-pressed", "true");
+  });
   it.each(["desktop", "mobile"] as const)("%s 전체 작업의 구형 메모는 내부 JSON 대신 사용자 메모를 표시한다", (layout) => {
     const legacy = { ...other, kind: "stock_request", notes: JSON.stringify({ memo: "구형 사용자 메모", internal: "INTERNAL-PAYLOAD" }) };
     state.list.data = { items: [legacy], total: 1, skip: 0, limit: 30 };

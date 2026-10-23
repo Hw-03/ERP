@@ -25,6 +25,7 @@ import {
 interface Props {
   layout: "desktop" | "mobile";
   employeeId: string | null;
+  defaultScope?: "mine" | "all";
   refreshNonce: number;
   onContinue: (draft: StockRequest) => void;
   onContinueIo?: (draft: IoBatch) => void;
@@ -40,13 +41,14 @@ type DeleteTarget =
   | null;
 
 export function DraftCartPanel(props: Props) {
-  return <DraftCartPanelContent key={props.employeeId ?? "no-employee"} {...props} />;
+  return <DraftCartPanelContent key={`${props.employeeId ?? "no-employee"}:${props.defaultScope ?? "mine"}`} {...props} />;
 }
 
-/** 직원이 바뀌면 조회 범위를 내 작업으로 초기화한다. */
+/** 직원·부서 승인 권한이 바뀌면 역할에 맞는 기본 조회 범위로 초기화한다. */
 function DraftCartPanelContent({
   layout,
   employeeId,
+  defaultScope = "mine",
   refreshNonce,
   onContinue,
   onContinueIo,
@@ -68,7 +70,7 @@ function DraftCartPanelContent({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [opError, setOpError] = useState<string | null>(null);
-  const [scope, setScope] = useState<"mine" | "all">("mine");
+  const [scope, setScope] = useState<"mine" | "all">(defaultScope);
   const empty = Boolean(employeeId) && !loading && drafts.length === 0 && ioDrafts.length === 0 && (data !== undefined || !loadError);
 
   useEffect(() => {

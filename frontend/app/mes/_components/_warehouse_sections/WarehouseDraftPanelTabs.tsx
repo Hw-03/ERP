@@ -55,6 +55,7 @@ export function WarehouseDraftPanelTabs(props: WarehouseDraftPanelTabsProps) {
 function WarehouseDraftPanelContent({
   layout,
   sectionTab,
+  canSeeDeptQueue,
   operator,
   operatorEmployeeId,
   employeeId,
@@ -77,6 +78,7 @@ function WarehouseDraftPanelContent({
       <DraftCartPanel
         layout={layout}
         employeeId={operatorEmployeeId ?? employeeId ?? null}
+        defaultScope={canSeeDeptQueue ? "all" : "mine"}
         refreshNonce={refreshNonce}
         onContinue={(draft) => {
           onContinueDraft(draft);
