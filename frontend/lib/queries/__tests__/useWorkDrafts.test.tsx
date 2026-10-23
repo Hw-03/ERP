@@ -9,19 +9,21 @@ import type { WorkDraftList, WorkDraftSelection } from "@/lib/api/types/work-dra
 import { queryKeys } from "../keys";
 import { useWorkDrafts } from "../useWorkDrafts";
 import { invalidateWorkReservationQueries } from "../workReservationInvalidation";
+import { installWorkDraftCacheGuard } from "../workDraftCache";
 
 vi.mock("@/lib/auth/operator-session", () => ({
-  restoreOperatorSession: (employeeId?: string) => !employeeId || employeeId === "a"
-    ? { employee_id: "a", token: "renewed-a" } : null,
+  restoreOperatorSession: (employeeId = "a") => ({ employee_id: employeeId, token: `renewed-${employeeId}` }),
 }));
 
+const cleanups: Array<() => void> = [];
 function setup() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  cleanups.push(installWorkDraftCacheGuard(client, () => "test-session"), () => client.clear());
   const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
   return { client, wrapper };
 }
 const empty: WorkDraftList = { items: [], total: 0, skip: 0, limit: 30 };
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { cleanups.splice(0).forEach((cleanup) => cleanup()); vi.restoreAllMocks(); });
 
 describe("직원 전체 저장 작업 쿼리", () => {
   it("로그인 직원이 없을 때 조회하지 않는다", async () => {
@@ -73,7 +75,7 @@ describe("직원 전체 저장 작업 쿼리", () => {
     expect(list).toHaveBeenCalledTimes(2);
   });
 
-  it("전체 작업에서 나가면 진행 중인 요청과 상세 캐시를 폐기한다", async () => {
+  it("전체 작업에서 나가면 진행 중 요청은 취소하고 성공한 상세 캐시는 보존한다", async () => {
     let requestSignal: AbortSignal | undefined;
     vi.spyOn(workDraftsApi, "list").mockImplementation((_actor, _filters, options) => {
       requestSignal = options?.signal;
@@ -86,7 +88,20 @@ describe("직원 전체 저장 작업 쿼리", () => {
     await waitFor(() => expect(result.current.detail.isSuccess).toBe(true));
     unmount();
     expect(requestSignal?.aborted).toBe(true);
-    expect(client.getQueriesData({ queryKey: queryKeys.stockRequests.workDraftsAll("a") })).toEqual([]);
+    expect(client.getQueryData(queryKeys.stockRequests.workDraftDetail("a", selection))).toEqual({ id: "work", kind: "io" });
+  });
+
+  it("재진입은 이전 목록을 즉시 표시하고 한 번만 백그라운드 검증한다", async () => {
+    const list = vi.spyOn(workDraftsApi, "list").mockResolvedValueOnce({ ...empty, total: 3 })
+      .mockImplementation(() => new Promise(() => undefined));
+    const { wrapper } = setup();
+    const first = renderHook(() => useWorkDrafts("a", {}, null), { wrapper });
+    await waitFor(() => expect(first.result.current.list.data?.total).toBe(3));
+    first.unmount();
+    const next = renderHook(() => useWorkDrafts("a", {}, null), { wrapper });
+    expect(next.result.current.list.data?.total).toBe(3);
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
+    expect(next.result.current.list.isPending).toBe(false);
   });
 
   it("상세가 더 이상 draft가 아니면 오류를 보존하고 자동 재시도하지 않는다", async () => {

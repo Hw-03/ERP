@@ -1,44 +1,40 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { workDraftsApi } from "@/lib/api/work-drafts";
-import { OPERATOR_LOGIN_CHANGED } from "@/lib/auth/login-recovery";
 import { restoreOperatorSession } from "@/lib/auth/operator-session";
 import type { WorkDraftFilters, WorkDraftSelection } from "@/lib/api/types/work-drafts";
 import { queryKeys } from "./keys";
+import { isDraftAuthError, WORK_DRAFT_GC_TIME } from "./workDraftCache";
+import { STALE_TIME } from "./client";
 
-/** 전체 작업이 열린 동안만 조회하고 직원 전환·퇴장 시 이전 조회를 폐기한다. */
+/** 같은 로그인 안에서는 목록을 재사용하고 계정 경계에서만 폐기한다. */
 export function useWorkDrafts(employeeId: string | null, filters: WorkDraftFilters, selected: WorkDraftSelection | null) {
   const client = useQueryClient();
-  useEffect(() => () => {
-    if (!employeeId) return;
-    const queryKey = queryKeys.stockRequests.workDraftsAll(employeeId);
-    void client.cancelQueries({ queryKey });
-    client.removeQueries({ queryKey });
-  }, [client, employeeId]);
+  const previousEmployee = useRef(employeeId);
   useEffect(() => {
-    if (!employeeId) return;
-    const changed = () => {
-      if (!restoreOperatorSession(employeeId)) return;
-      const queryKey = queryKeys.stockRequests.workDraftsAll(employeeId);
-      void client.cancelQueries({ queryKey }).then(() => client.invalidateQueries({ queryKey }));
-    };
-    window.addEventListener(OPERATOR_LOGIN_CHANGED, changed);
-    return () => window.removeEventListener(OPERATOR_LOGIN_CHANGED, changed);
+    if (previousEmployee.current && previousEmployee.current !== employeeId) {
+      const queryKey = queryKeys.stockRequests.workDraftsAll(previousEmployee.current);
+      void client.cancelQueries({ queryKey });
+      client.removeQueries({ queryKey });
+    }
+    previousEmployee.current = employeeId;
   }, [client, employeeId]);
 
   const list = useQuery({
     queryKey: queryKeys.stockRequests.workDrafts(employeeId ?? "", filters),
     queryFn: ({ signal }) => workDraftsApi.list(employeeId!, filters, { signal }),
     enabled: Boolean(employeeId),
-    retry: false, staleTime: 0, gcTime: 0, refetchOnWindowFocus: true,
+    retry: false, staleTime: STALE_TIME.VOLATILE, gcTime: WORK_DRAFT_GC_TIME, refetchOnMount: "always", refetchOnWindowFocus: true,
   });
   const detail = useQuery({
     queryKey: queryKeys.stockRequests.workDraftDetail(employeeId ?? "", selected),
     queryFn: ({ signal }) => workDraftsApi.getDetail(employeeId!, selected!, { signal }),
     enabled: Boolean(employeeId && selected),
-    retry: false, staleTime: 0, gcTime: 0, refetchOnWindowFocus: true,
+    retry: false, staleTime: 0, gcTime: WORK_DRAFT_GC_TIME, refetchOnWindowFocus: true,
   });
-  return { list, detail };
+  const authenticated = Boolean(employeeId && restoreOperatorSession(employeeId));
+  return { list: { ...list, data: !authenticated || isDraftAuthError(list.error) ? undefined : list.data },
+    detail: { ...detail, data: !authenticated || isDraftAuthError(detail.error) ? undefined : detail.data } };
 }

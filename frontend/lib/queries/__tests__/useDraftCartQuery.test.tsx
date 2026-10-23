@@ -17,6 +17,10 @@ import {
 } from "../useDraftCartQuery";
 import { queryKeys } from "../keys";
 
+vi.mock("@/lib/auth/operator-session", () => ({
+  restoreOperatorSession: (employeeId: string) => ({ employee_id: employeeId, token: "test-token" }),
+}));
+
 function makeResponse(body: unknown, ok = true): Response {
   return {
     ok,

@@ -9,27 +9,45 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
 import { ioApi } from "@/lib/api/io";
+import { restoreOperatorSession } from "@/lib/auth/operator-session";
+import { requestOperatorLogin } from "@/lib/auth/login-recovery";
+import { ApiError } from "@/lib/api-core";
 import { STALE_TIME } from "./client";
 import { queryKeys } from "./keys";
 import { invalidateWorkReservationQueries, shouldRefreshWorkReservations } from "./workReservationInvalidation";
+import { isDraftAuthError, WORK_DRAFT_GC_TIME } from "./workDraftCache";
 
 /** 직원 draft 장바구니(재고요청 draft + IO draft 합본) */
-export function useDraftCartQuery(employeeId: string | null) {
-  return useQuery({
+export function useDraftCartQuery(employeeId: string | null, options?: { enabled?: boolean }) {
+  const query = useQuery({
     queryKey: queryKeys.stockRequests.drafts(employeeId ?? ""),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
+      if (!restoreOperatorSession(employeeId!)) {
+        requestOperatorLogin();
+        throw new ApiError("작업자 인증을 다시 진행해 주세요.", 401, "OPERATOR_SESSION_INVALID");
+      }
       const [stockDrafts, ioDrafts] = await Promise.all([
-        stockRequestsApi.listStockRequestDrafts(employeeId!),
-        ioApi.listDrafts(employeeId!),
+        stockRequestsApi.listStockRequestDrafts(employeeId!, { signal }),
+        ioApi.listDrafts(employeeId!, { signal }),
       ]);
       return { stockDrafts, ioDrafts };
     },
-    enabled: !!employeeId,
+    enabled: !!employeeId && options?.enabled !== false,
     // draft 는 다른 기기/세션에서 추가될 수 있어 짧게 (R2-1).
     staleTime: STALE_TIME.VOLATILE,
+    gcTime: WORK_DRAFT_GC_TIME, refetchOnMount: "always", refetchOnWindowFocus: true,
   });
+  const wasEnabled = useRef(options?.enabled !== false);
+  useEffect(() => {
+    const enabled = options?.enabled !== false;
+    if (enabled && !wasEnabled.current && employeeId) void query.refetch({ cancelRefetch: false });
+    wasEnabled.current = enabled;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [options?.enabled, employeeId]);
+  return { ...query, data: isDraftAuthError(query.error) || !employeeId || !restoreOperatorSession(employeeId) ? undefined : query.data };
 }
 
 /** 재고요청 draft 삭제 */
