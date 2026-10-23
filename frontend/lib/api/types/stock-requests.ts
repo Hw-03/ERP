@@ -5,6 +5,7 @@
  */
 
 import type { Department } from "./shared";
+import type { StocktakeWorkPause } from "./io";
 
 export type StockRequestStatus =
   | "draft"
@@ -57,6 +58,7 @@ export interface StockRequestLine {
 }
 
 export interface StockRequest {
+  stocktake_pause?: StocktakeWorkPause | null;
   reason_category_id?: string | null;
   submission_id?: string | null;
   request_id: string;
@@ -123,6 +125,7 @@ export interface StockRequestCreatePayload {
 }
 
 export interface StockRequestDraftUpsertPayload {
+  stocktake_resume_token?: string;
   reason_category_id?: string | null;
   submission_id?: string | null;
   requester_employee_id: string;

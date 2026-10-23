@@ -6,15 +6,17 @@ import type { AdminWorkReservationDetail, WorkReservationEvent, WorkReservationS
 import { LEGACY_COLORS as C } from "@/lib/mes/color";
 import { reservationIssueMessage } from "@/lib/io/reservation-message";
 import { WorkExpectedEffects, WorkReservedInputs, WorkTargets, workDate } from "../common/WorkReservationDetails";
+import { StocktakePauseNotice } from "../common/StocktakePauseNotice";
 export { workLocationLabel } from "../common/WorkReservationDetails";
 
-const EVENT_LABEL = { saved: "작업 저장", submitted: "작업 제출", returned: "작업 회수", backfilled: "기존 작업 확인", admin_cancelled: "관리자 취소", owner_deleted: "담당자 삭제", approval_changed: "승인 상태 변경", settlement_failed: "완료 처리 실패" };
+const EVENT_LABEL = { saved: "작업 저장", submitted: "작업 제출", returned: "작업 회수", backfilled: "기존 작업 확인", admin_cancelled: "관리자 취소", owner_deleted: "담당자 삭제", approval_changed: "승인 상태 변경", settlement_failed: "완료 처리 실패", stocktake_paused: "전수조사로 일시중지", stocktake_resumed: "작업 재개" };
 const DISCLOSURE_CLASS = "group rounded-[12px] border px-3";
 const SUMMARY_CLASS = "flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-[12px] text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--c-blue)] [&::-webkit-details-marker]:hidden";
 const STATUS_LABEL = { draft: "작업 중", submitted: "승인 대기", reserved: "승인 대기", completed: "완료", partially_completed: "일부 완료", rejected: "반려", cancelled: "취소됨", failed: "처리 실패" };
 
 /** 자재 확보 여부 대신 실제 작업 진행 상태와 조치가 필요한 반려를 표시한다. */
 export function adminWorkReservationLabel(work: WorkReservationSummary): string {
+  if (work.stocktake_pause) return "일시중지";
   if (work.status === "draft" && work.reservation_issue?.code === "returned_after_rejection") return "반려됨";
   return STATUS_LABEL[work.status];
 }
@@ -41,17 +43,18 @@ export function workElapsed(value: string, now: number): string {
 /** 작업 목적과 완료 결과를 먼저 보여주고 자재와 기록을 단계적으로 확인한다. */
 export function AdminWorkReservationDetailBody({ work }: { work: AdminWorkReservationDetail }): JSX.Element {
   const latestEvent = work.history[work.history.length - 1];
-  const visibleEvents = work.history.filter((event) => event.reason || ["admin_cancelled", "owner_deleted", "settlement_failed", "backfilled", "approval_changed"].includes(event.action));
+  const visibleEvents = work.history.filter((event) => event.reason || ["admin_cancelled", "owner_deleted", "settlement_failed", "backfilled", "approval_changed", "stocktake_paused", "stocktake_resumed"].includes(event.action));
   return <div className="space-y-4 break-keep text-sm leading-6 [overflow-wrap:anywhere]" style={{ color: C.text }}>
     <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] gap-x-6 gap-y-4">
     <section className="min-w-0 space-y-3">
       <WorkTargets targets={work.targets} />
       <dl className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs leading-5" style={{ color: C.muted2 }}>
         <div className="flex flex-wrap items-baseline gap-x-2"><dt>담당</dt><dd><span className="text-sm font-bold" style={{ color: C.text }}>{work.requester_name}</span> · {work.requester_department}</dd></div>
-        <div className="flex items-baseline gap-2"><dt className="sr-only">작업 상태</dt><dd>{STATUS_LABEL[work.status]}</dd></div>
+        <div className="flex items-baseline gap-2"><dt className="sr-only">작업 상태</dt><dd>{adminWorkReservationLabel(work)}</dd></div>
         <div className="flex flex-wrap items-baseline gap-x-2"><dt>저장</dt><dd><time dateTime={work.updated_at}>{workDate(work.updated_at)}</time></dd></div>
       </dl>
       {work.notes && <p className="whitespace-pre-wrap" style={{ color: C.muted2 }}>{work.notes}</p>}
+      <StocktakePauseNotice pause={work.stocktake_pause} />
       {!work.requester_active && <p role="status" className="rounded-[12px] p-3" style={{ background: C.warningBg, color: C.yellow }}>비활성 담당자 · 관리자 확인이 필요합니다.</p>}
       {work.reservation_issue && <p role="status" className="rounded-[12px] p-3" style={{ background: C.warningBg, color: C.yellow }}>{reservationIssueMessage(work.reservation_issue)}</p>}
     </section>

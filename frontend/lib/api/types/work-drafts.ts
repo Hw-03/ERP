@@ -1,4 +1,4 @@
-import type { IoSubType, IoWorkType } from "./io";
+import type { IoSubType, IoWorkType, StocktakeWorkPause } from "./io";
 import type { TransactionType } from "./shared";
 import type { InventoryRelatedWork, WorkReservationIssue, WorkReservationStatus, WorkReservedInput, WorkInventoryEffect } from "./work-reservations";
 
@@ -17,6 +17,7 @@ export interface WorkDraftTarget {
 }
 
 export interface WorkDraftSummary extends WorkDraftSelection {
+  stocktake_pause?: StocktakeWorkPause | null;
   requester_employee_id: string;
   requester_name: string;
   requester_department: string;

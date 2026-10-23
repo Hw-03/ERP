@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, defer, selectinload
 from app.models import Employee, IoBatch, IoBundle, IoLine, Item, StockRequest, StockRequestLine, StockRequestStatusEnum
 from app.services.io_dispatch import _dept_for_line, _operation_role_for_line, _transaction_type_for_line
 from app.services.sr_validation import _TX_TYPE_BY_REQUEST
+from app.services.work_stocktake_pause import batch_pause_payloads, pause_payload
 from app.services.work_reservation_queries import (
     SUB_TYPE_LABELS, WORK_TYPE_LABELS, _load_batches, _open_effects, _summary, _value, batch_detail,
 )
@@ -27,6 +28,7 @@ REQUEST_TYPE_LABELS = {
     "rework_normal": "정상 재작업", "return_normal": "정상 반품",
 }
 PUBLIC_SUMMARY_FIELDS = (
+    "stocktake_pause",
     "requester_employee_id", "requester_name", "requester_department", "requester_active",
     "work_type", "sub_type", "targets", "created_at", "updated_at",
 )
@@ -119,6 +121,7 @@ def _stock_summary(request: StockRequest, owners: dict[uuid.UUID, Employee]) -> 
         "work_type": None, "sub_type": None, "request_type": _value(request.request_type),
         "movement_summary": None,
         "history_operation": _stock_history_operation(request),
+        "stocktake_pause": None,
         "targets": [{"item_id": str(line.item_id) if line.item_id else None,
             "item_name": line.item_name_snapshot, "mes_code": line.mes_code_snapshot,
             "unit": line.item.unit if line.item else "EA", "quantity": int(line.quantity)} for line in request.lines],
@@ -194,6 +197,9 @@ def list_work_drafts(
         owners = {owner.employee_id: owner for owner in db.query(Employee).filter(Employee.employee_id.in_(owner_ids)).all()}
         summaries = {("io", batch.batch_id): _io_summary(_summary(batch, owners), batch) for batch in batches}
         summaries.update({("stock_request", request.request_id): _stock_summary(request, owners) for request in requests})
+        pauses = batch_pause_payloads(db, summaries.keys())
+        for key, summary in summaries.items():
+            summary["stocktake_pause"] = pauses.get(key)
         return {"items": [summaries[(row.kind, row.id)] for row in page], "total": total, "skip": skip, "limit": limit}
 
 
@@ -212,4 +218,5 @@ def get_work_draft(db: Session, kind: Literal["io", "stock_request"], work_id: u
             return None
         owner = db.get(Employee, request.requester_employee_id)
         return {**_stock_summary(request, {owner.employee_id: owner} if owner else {}),
+            "stocktake_pause": pause_payload(db, "stock_request", request.request_id),
             **dict.fromkeys(PUBLIC_RESERVATION_FIELDS)}
