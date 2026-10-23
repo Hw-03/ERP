@@ -41,18 +41,18 @@ router = APIRouter()
 
 
 def _load_item_conversion_requester(db: Session, employee_id: uuid.UUID) -> Employee:
-    """활성 조립·출하 직원만 품목 전환 요청자로 반환한다."""
+    """활성 조립·출하·튜닝 직원만 품목 전환 요청자로 반환한다."""
     requester = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if requester is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "요청자(직원)를 찾을 수 없습니다.")
     if not bool(requester.is_active):
         raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 요청할 수 없습니다.")
     department = getattr(requester.department, "value", requester.department)
-    if department not in {"조립", "출하"}:
+    if department not in {"조립", "출하", "튜닝"}:
         raise http_error(
             403,
             ErrorCode.FORBIDDEN,
-            "조립 또는 출하 부서 직원만 품목 전환이 가능합니다.",
+            "조립·출하·튜닝 부서 직원만 품목 전환이 가능합니다.",
         )
     return requester
 

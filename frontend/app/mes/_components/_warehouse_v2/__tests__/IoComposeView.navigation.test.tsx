@@ -1058,6 +1058,12 @@ describe("IoComposeView navigation chrome", () => {
     });
   });
 
+  it("튜닝 작업자는 입출고에서 품목 전환 화면에 진입할 수 있다", () => {
+    renderCompose(conversionItems, { ...operator, department: "튜닝" });
+    fireEvent.click(screen.getByTestId("warehouse-item-conversion-card"));
+    expect(screen.getByTestId("item-conversion-source-search")).toBeInTheDocument();
+  });
+
   it("AS 작업자에게 독립 사용출고 카드를 보이고 품목 전환은 숨긴다", async () => {
     renderCompose([], { ...operator, department: "AS" });
     await waitFor(() => {

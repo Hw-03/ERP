@@ -29,7 +29,7 @@ export function IoWorkTypeStep({ selectedWorkType = null, operator, onWorkTypeCh
   preload("/images/warehouse/dexray-stock-out.webp", { as: "image", fetchPriority: "high" });
   const visibleWorkTypes = IO_WORK_TYPES.filter((row) => canSeeWorkType(row.id, operator));
   const canItemConversion = Boolean(
-    onItemConversion && (operator?.department === "조립" || operator?.department === "출하"),
+    onItemConversion && (operator?.department === "조립" || operator?.department === "출하" || operator?.department === "튜닝"),
   );
   const n = visibleWorkTypes.length + (canItemConversion ? 1 : 0);
   const cols = n <= 3 ? n : n === 4 ? 2 : 3;

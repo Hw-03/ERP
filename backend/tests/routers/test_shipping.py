@@ -983,7 +983,7 @@ def test_item_conversion_api_returns_403_for_inactive_requester(client, db_sessi
     assert response.json()["detail"]["code"] == "FORBIDDEN"
 
 
-def test_item_conversion_api_allows_only_assembly_or_shipping_department(
+def test_item_conversion_api_rejects_as_department(
     client, db_session
 ):
     requester = _employee(
@@ -1014,14 +1014,15 @@ def test_item_conversion_api_allows_only_assembly_or_shipping_department(
     assert executed.status_code == 403, executed.text
 
 
-def test_item_conversion_shipping_department_can_preview_and_execute(
-    client, db_session, make_item, make_bom, make_location
+@pytest.mark.parametrize("department", [DepartmentEnum.SHIPPING, DepartmentEnum.TUNING])
+def test_item_conversion_allowed_department_can_preview_and_execute(
+    client, db_session, make_item, make_bom, make_location, department
 ):
     requester = _employee(
         db_session,
         code="item-conversion-shipping",
         name="출하 전환 요청자",
-        department=DepartmentEnum.SHIPPING,
+        department=department,
     )
     payload = _component_change_payload(db_session, make_item, make_bom, make_location)
     preview = client.get(
