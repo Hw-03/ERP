@@ -160,6 +160,9 @@ def activate_set(db: Session, actor: Employee, payload: dict, *, append: bool = 
         control.active_round_id = row.round_id
     target_set.round_id = row.round_id
     target_set.activated_at = datetime.utcnow()
+    db.flush()
+    from app.services.work_stocktake_pause import pause_drafts
+    pause_drafts(db, row.round_id, affected_cells=current if append else None)
     event = append_event(db, actor, row.round_id, "TARGETS_APPENDED" if append else "ROUND_STARTED", {
         "set_id": str(target_set.set_id), "preview_id": str(preview.preview_id), "target_count": len(current), "target_generation": row.target_generation})
     return {"round_id": str(row.round_id), "epoch": row.epoch, "status": row.status,

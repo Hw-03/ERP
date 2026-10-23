@@ -129,6 +129,9 @@ def backfill_work_reservations(db: Session, *, apply: bool = False) -> list[dict
     report = []
     for batch_id in ids:
         try:
+            from app.services import stocktake_guard, work_stocktake_pause
+            from app.models import StocktakeWorkPause
+            stocktake_guard.lock_control(db)
             if apply:
                 hint = db.get(IoBatch, batch_id)
                 if hint is not None and hint.sub_type == "internal_use_out":
@@ -141,6 +144,12 @@ def backfill_work_reservations(db: Session, *, apply: bool = False) -> list[dict
                 if apply:
                     db.rollback()
                 continue
+            if (db.get(StocktakeWorkPause, ("io", batch_id)) is not None or
+                    work_stocktake_pause.has_unapplied_cells(db, work_stocktake_pause.io_required_cells(db, batch))):
+                report.append({"batch_id": str(batch_id), "status": "skipped", "issue": "stocktake_paused"})
+                if apply:
+                    db.rollback()
+                continue
             old = reservations.ledger_quantities(db, batch_id)
             if _existing_reservation_matches(batch, old):
                 report.append({"batch_id": str(batch_id), "status": "unchanged", "issue": None})
@@ -148,6 +157,14 @@ def backfill_work_reservations(db: Session, *, apply: bool = False) -> list[dict
                     db.commit()
                 continue
             plan, issue = _assess(db, batch, simulated)
+            if plan is not None:
+                cells = [*work_stocktake_pause.io_required_cells(db, batch),
+                         *work_stocktake_pause.io_required_cells(db, batch, plan)]
+                if work_stocktake_pause.has_unapplied_cells(db, cells):
+                    report.append({"batch_id": str(batch_id), "status": "skipped", "issue": "stocktake_paused"})
+                    if apply:
+                        db.rollback()
+                    continue
             status = "blocked" if issue else "would_reserve"
             if apply:
                 if issue:
@@ -155,12 +172,17 @@ def backfill_work_reservations(db: Session, *, apply: bool = False) -> list[dict
                 else:
                     try:
                         with db.begin_nested():
+                            work_stocktake_pause.ensure_work_submit(db, "io", batch_id, cells)
                             revision = batch.revision
                             reservations.advance_revision(db, batch, revision)
                             reservations.replace_reservations(db, batch, plan)
                             reservations.record_event(db, batch, "backfilled", revision, None, "기존 작업 전환")
                         status = batch.reservation_status
                     except WorkReservationError as exc:
+                        if exc.code == "WORK_STOCKTAKE_PAUSED":
+                            db.rollback()
+                            report.append({"batch_id": str(batch_id), "status": "skipped", "issue": "stocktake_paused"})
+                            continue
                         if exc.code != "STOCK_SHORTAGE":
                             raise
                         issue = _error_issue(exc)

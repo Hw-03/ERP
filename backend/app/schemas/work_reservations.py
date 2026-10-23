@@ -4,6 +4,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.schemas.common import UtcDatetime
+from app.schemas.work_stocktake_pause import WorkStocktakePause
 
 
 WorkReservationStatus = Literal["reserved", "not_required", "inactive"]
@@ -96,6 +97,7 @@ class WorkTarget(WorkItemIdentity):
 
 
 class WorkReservationSummary(BaseModel):
+    stocktake_pause: WorkStocktakePause | None = None
     batch_id: str
     revision: int
     status: str
@@ -164,7 +166,7 @@ class InventoryWorkStatus(BaseModel):
 
 class WorkReservationEvent(BaseModel):
     event_id: str
-    action: Literal["saved", "submitted", "returned", "backfilled", "admin_cancelled", "owner_deleted", "approval_changed", "settlement_failed"]
+    action: Literal["saved", "submitted", "returned", "backfilled", "admin_cancelled", "owner_deleted", "approval_changed", "settlement_failed", "stocktake_paused", "stocktake_resumed"]
     revision: int
     occurred_at: UtcDatetime
     actor_employee_id: str | None

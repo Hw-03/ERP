@@ -402,6 +402,10 @@ def _stock_request_summary(request: StockRequest) -> dict:
 
 
 def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None) -> dict:
+    from app.services.work_stocktake_pause import pause_payload
+    from sqlalchemy.orm import object_session
+    pause_db = db if db is not None else object_session(batch)
+
     linked_requests: list[StockRequest] = []
     if db is not None:
         linked_requests = (
@@ -479,6 +483,7 @@ def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None) -> dict:
             approver_name = summary["approver_name"] or batch.requester_name
     return {
         "batch_id": batch.batch_id,
+        "stocktake_pause": pause_payload(pause_db, "io", batch.batch_id) if pause_db is not None and batch.status == "draft" else None,
         "revision": batch.revision,
         "reservation_status": batch.reservation_status,
         "reservation_issue": batch.reservation_issue,
@@ -872,6 +877,9 @@ def sync_batch_from_stock_requests(
                 batch.bundles
             )
     batch.updated_at = datetime.utcnow()
+    if batch.status == "draft":
+        from app.services.work_stocktake_pause import pause_returned_draft
+        pause_returned_draft(db, batch)
     db.flush()
 
 
