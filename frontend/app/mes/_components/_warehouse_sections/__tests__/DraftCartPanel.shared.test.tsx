@@ -62,7 +62,7 @@ describe("공유 작업함", () => {
     expect(screen.queryByText("2건")).not.toBeInTheDocument();
     expect(screen.queryByText("최근 저장순")).not.toBeInTheDocument();
     expect(count).toHaveBeenLastCalledWith(0);
-    expect(state.query).toHaveBeenLastCalledWith("emp-1", { skip: 0, limit: 30 }, null);
+    expect(state.query).toHaveBeenLastCalledWith("emp-1", { skip: 0, limit: 30, sort: "department" }, null);
   });
 
   it("직원 변경 시 내 작업으로 돌아오고 범위와 필터를 초기화한다", () => {
@@ -76,7 +76,7 @@ describe("공유 작업함", () => {
     expect(screen.getByRole("button", { name: "내 작업" })).toHaveAttribute("aria-pressed", "true");
     openAll();
     expect(screen.getByRole("textbox", { name: "전체 작업 검색" })).toHaveValue("");
-    expect(state.query).toHaveBeenLastCalledWith("emp-3", { skip: 0, limit: 30 }, null);
+    expect(state.query).toHaveBeenLastCalledWith("emp-3", { skip: 0, limit: 30, sort: "department" }, null);
   });
 
   it.each(["desktop", "mobile"] as const)("%s 전체 목록은 본인 작업에도 상세 조회만 제공한다", (layout) => {
@@ -387,7 +387,7 @@ describe("공유 작업함", () => {
       expect(screen.queryByText(label, { exact: true })).not.toBeInTheDocument();
     }
     fireEvent.click(within(departments).getByRole("button", { name: "조립", exact: true }));
-    expect(state.query).toHaveBeenLastCalledWith("emp-1", { skip: 0, limit: 30, requester_department: "조립" }, null);
+    expect(state.query).toHaveBeenLastCalledWith("emp-1", { skip: 0, limit: 30, sort: "department", requester_department: "조립" }, null);
     fireEvent.click(toggle);
     expect(screen.queryByRole("group", { name: "부서 구분" })).not.toBeInTheDocument();
     expect(departments.closest("[inert]")).not.toBeNull();
@@ -395,9 +395,9 @@ describe("공유 작업함", () => {
     expect(screen.getByRole("group", { name: "부서 구분" })).toBe(departments);
     expect(screen.getByRole("button", { name: "조립", exact: true })).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(screen.getByRole("button", { name: "전체", exact: true }));
-    expect(state.query).toHaveBeenLastCalledWith("emp-1", { skip: 0, limit: 30, requester_department: undefined }, null);
+    expect(state.query).toHaveBeenLastCalledWith("emp-1", { skip: 0, limit: 30, sort: "department", requester_department: undefined }, null);
     fireEvent.click(screen.getByRole("button", { name: "AS", exact: true }));
-    expect(state.query).toHaveBeenLastCalledWith("emp-1", { skip: 0, limit: 30, requester_department: "AS" }, null);
+    expect(state.query).toHaveBeenLastCalledWith("emp-1", { skip: 0, limit: 30, sort: "department", requester_department: "AS" }, null);
   });
 
   it("필터를 바꾸면 페이지와 상세 선택을 함께 초기화한다", () => {
@@ -405,17 +405,20 @@ describe("공유 작업함", () => {
     render(<DraftCartPanel {...props} />);
     openAll();
     fireEvent.click(screen.getByRole("button", { name: "다음" }));
-    expect(state.query).toHaveBeenLastCalledWith("emp-1", { skip: 30, limit: 30 }, null);
+    expect(state.query).toHaveBeenLastCalledWith("emp-1", { skip: 30, limit: 30, sort: "department" }, null);
     fireEvent.click(screen.getByRole("button", { name: "다른 담당자 작업 상세 펼치기" }));
-    expect(state.query).toHaveBeenLastCalledWith("emp-1", { skip: 30, limit: 30 }, { kind: "io", id: "other-work" });
+    expect(state.query).toHaveBeenLastCalledWith("emp-1", { skip: 30, limit: 30, sort: "department" }, { kind: "io", id: "other-work" });
     fireEvent.change(screen.getByRole("textbox", { name: "전체 작업 검색" }), { target: { value: "자재" } });
-    expect(state.query).toHaveBeenLastCalledWith("emp-1", { skip: 0, limit: 30, search: "자재" }, null);
+    expect(state.query).toHaveBeenLastCalledWith("emp-1", { skip: 0, limit: 30, sort: "department", search: "자재" }, null);
   });
 
   it("저장 시각 머리글은 시간순을 왕복하며 페이지와 상세 선택을 초기화한다", () => {
     state.list.data = { items: [other], total: 65, skip: 0, limit: 30 };
     render(<DraftCartPanel {...props} />);
     openAll();
+    expect(screen.getByRole("columnheader", { name: "담당자 · 부서" })).toHaveAttribute("aria-sort", "ascending");
+    expect(screen.getByRole("columnheader", { name: "저장 시각" })).not.toHaveAttribute("aria-sort");
+    fireEvent.click(screen.getByRole("button", { name: "저장 시각 정렬" }));
     expect(screen.getByRole("columnheader", { name: "저장 시각" })).toHaveAttribute("aria-sort", "descending");
     fireEvent.click(screen.getByRole("button", { name: "다음" }));
     fireEvent.click(screen.getByRole("button", { name: "다른 담당자 작업 상세 펼치기" }));
@@ -452,13 +455,13 @@ describe("공유 작업함", () => {
     rerender(<DraftCartPanel {...props} layout={layout} />);
     expect(screen.getByRole("button", { name: "이전" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "다음" }));
-    expect(state.query).toHaveBeenLastCalledWith("emp-1", { skip: 30, limit: 30 }, null);
+    expect(state.query).toHaveBeenLastCalledWith("emp-1", { skip: 30, limit: 30, sort: "department" }, null);
     state.list.data = { items: [own], total: 31, skip: 30, limit: 30 };
     rerender(<DraftCartPanel {...props} layout={layout} />);
     expect(screen.getByRole("button", { name: "다음" })).toBeDisabled();
     expect(screen.getByText("31–31 / 31건")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "이전" }));
-    expect(state.query).toHaveBeenLastCalledWith("emp-1", { skip: 0, limit: 30 }, null);
+    expect(state.query).toHaveBeenLastCalledWith("emp-1", { skip: 0, limit: 30, sort: "department" }, null);
   });
 
   it("목록 조회 실패를 0건이나 빈 작업으로 바꾸지 않는다", () => {
@@ -479,7 +482,7 @@ describe("공유 작업함", () => {
     fireEvent.click(screen.getByRole("button", { name: "다른 담당자 작업 상세 펼치기" }));
     state.list.data = { items: [], total: 29, skip: 30, limit: 30 };
     rerender(<DraftCartPanel {...props} />);
-    expect(state.query).toHaveBeenLastCalledWith("emp-1", { skip: 0, limit: 30 }, null);
+    expect(state.query).toHaveBeenLastCalledWith("emp-1", { skip: 0, limit: 30, sort: "department" }, null);
     expect(screen.queryByText("31–29 / 29건")).not.toBeInTheDocument();
   });
 

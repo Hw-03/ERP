@@ -38,7 +38,7 @@ interface Props {
 
 /** 전체 작업은 담당자에 관계없이 상세 조회만 제공한다. */
 export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props): JSX.Element {
-  const [filters, setFilters] = useState<WorkDraftFilters>({ skip: 0, limit: PAGE_SIZE });
+  const [filters, setFilters] = useState<WorkDraftFilters>({ skip: 0, limit: PAGE_SIZE, sort: "department" });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selected, setSelected] = useState<WorkDraftSelection | null>(null);
   const { list, detail } = useWorkDrafts(employeeId, filters, selected);
@@ -109,7 +109,7 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
   const failure = list.isError ? <ReadFailure message={list.error instanceof Error ? list.error.message : "작업 목록을 불러오지 못했습니다."} refresh={data !== undefined} onRetry={() => void list.refetch()} /> : null;
   const emptyState = !pending && data?.total === 0 && !list.isError ? <EmptyState compact comfortable variant={hasFilters ? "no-search-result" : "no-data"} title={hasFilters ? "조건에 맞는 작업이 없습니다." : "저장된 작업이 없습니다."} description={hasFilters ? "검색어나 필터를 바꿔 확인해 주세요." : "작업을 저장하면 이곳에서 확인할 수 있습니다."} /> : null;
   const columns = <colgroup><col className="w-[52px]" /><col className="w-[104px]" /><col className="w-44" /><col className="w-48" /><col /><col className="w-[152px]" /><col className="w-[156px]" /></colgroup>;
-  const sort = filters.sort ?? "updated_desc";
+  const sort = filters.sort ?? "department";
   const header = <thead className="sticky top-0 z-10" style={{ color: C.muted2, background: C.s1 }}><tr><th scope="col" aria-label="상세" className="border-b p-0" style={{ borderColor: C.border }} />{["저장 시각", "담당자 · 부서", "작업", "대상", "품목코드", "예정 변동"].map((label, index) => {
     const sortable = index < 2;
     const active = index === 0 ? sort !== "department" : index === 1 && sort === "department";
