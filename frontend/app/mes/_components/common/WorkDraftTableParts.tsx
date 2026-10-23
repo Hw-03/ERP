@@ -87,7 +87,7 @@ export function WorkMovementSummary({ counts, shortageCount = 0 }: {
     { count: counts.increase, label: "증가", color: C.green },
     { count: counts.move, label: "이동", color: C.blue },
   ].filter((item) => item.count > 0) : [];
-  return <div className="flex flex-wrap items-center justify-center gap-1.5">
+  return <div className="flex flex-wrap items-center justify-center gap-1.5 lg:flex-nowrap">
     {items.length === 0 && <span style={{ color: C.muted2 }}>{counts ? "변동 없음" : "예정 확인 필요"}</span>}
     {items.map((item) => <span key={item.label} className="inline-flex h-6 items-center whitespace-nowrap rounded-full px-2.5 text-xs font-bold" style={{ background: tint(item.color, 12), color: item.color }}>{item.label} {item.count}종</span>)}
     {shortageCount > 0 && <span className="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-full px-2.5 text-xs font-bold" style={{ background: tint(C.red, 12), color: C.red }}><AlertTriangle className="h-4 w-4" aria-hidden /> 부족 {shortageCount}종</span>}

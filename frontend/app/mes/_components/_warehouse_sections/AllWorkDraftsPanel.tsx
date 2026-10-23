@@ -30,7 +30,7 @@ const PAGE_SIZE = 30;
 const DEPARTMENT_OPTIONS = ["창고", "튜브", "고압", "진공", "튜닝", "조립", "출하", "AS"] as const;
 const CONTROL_CLASS = "min-h-11 min-w-11 !text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--c-blue)]";
 const ITEM_CLASS = "min-w-0 break-keep [overflow-wrap:anywhere]";
-const TABLE_CLASS = "w-full min-w-[1360px] table-fixed border-collapse text-left text-sm";
+const TABLE_CLASS = "w-full min-w-[1480px] table-fixed border-collapse text-left text-sm";
 
 interface Props {
   employeeId: string;
@@ -111,7 +111,7 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
   const hasFilters = Boolean(filters.search?.trim() || filters.requester_department);
   const failure = list.isError ? <ReadFailure message={list.error instanceof Error ? list.error.message : "작업 목록을 불러오지 못했습니다."} refresh={data !== undefined} onRetry={() => void list.refetch()} /> : null;
   const emptyState = !pending && data?.total === 0 && !list.isError ? <EmptyState compact comfortable variant={hasFilters ? "no-search-result" : "no-data"} title={hasFilters ? "조건에 맞는 작업이 없습니다." : "저장된 작업이 없습니다."} description={hasFilters ? "검색어나 필터를 바꿔 확인해 주세요." : "작업을 저장하면 이곳에서 확인할 수 있습니다."} /> : null;
-  const columns = <colgroup><col className="w-[52px]" /><col className="w-[104px]" /><col className="w-44" /><col className="w-48" /><col /><col className="w-[200px]" /><col className="w-[152px]" /><col className="w-[156px]" /></colgroup>;
+  const columns = <colgroup><col className="w-[52px]" /><col className="w-[104px]" /><col className="w-44" /><col className="w-48" /><col /><col className="w-[200px]" /><col className="w-[152px]" /><col className="w-[280px]" /></colgroup>;
   const sort = filters.sort ?? "department";
   const header = <thead className="sticky top-0 z-10" style={{ color: C.muted2, background: C.s1 }}><tr><th scope="col" aria-label="상세" className="border-b p-0" style={{ borderColor: C.border }} />{["저장 시각", "담당자 · 부서", "작업", "대상", "메모", "품목코드", "예정 변동"].map((label, index) => {
     const sortable = index < 2;
@@ -157,7 +157,7 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
     </div>
     {layout === "desktop" ? <div className="relative min-h-0 flex-1" data-scrollbar-rail-shell>
       <div role="region" aria-label="전체 작업 중 목록" aria-busy={pending} tabIndex={0} data-scrollbar-rail-viewport className="sg absolute inset-y-0 left-0 -right-2.5 overflow-auto [scrollbar-gutter:stable] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]">
-      <div className="relative flex min-h-full min-w-[1360px] flex-col" style={{ background: C.s1 }}>
+      <div className="relative flex min-h-full min-w-[1480px] flex-col" style={{ background: C.s1 }}>
       {pending && <span role="status" className="sr-only">전체 작업 목록 불러오는 중</span>}
       {failure && <div className="p-4">{failure}</div>}
       <table className={TABLE_CLASS} aria-label="전체 작업">

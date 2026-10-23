@@ -126,8 +126,8 @@ export function IoDraftWorkTable({
       data-scrollbar-rail-viewport
       className="sg absolute inset-y-0 left-0 -right-2.5 overflow-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
     >
-      <div className="min-h-full min-w-[1240px]" style={{ background: LEGACY_COLORS.s1 }}>
-      <table className="w-full min-w-[1240px] table-fixed border-collapse text-sm">
+      <div className="min-h-full min-w-[1440px]" style={{ background: LEGACY_COLORS.s1 }}>
+      <table className="w-full min-w-[1440px] table-fixed border-collapse text-sm">
         <colgroup>
           <col className="w-[52px]" />
           <col className="w-[104px]" />
@@ -135,7 +135,7 @@ export function IoDraftWorkTable({
           <col />
           <col className="w-[200px]" />
           <col className="w-[112px]" />
-          <col className="w-[156px]" />
+          <col className="w-[360px]" />
           <col className="w-[176px]" />
         </colgroup>
         <thead className="sticky top-0 z-10" style={{ background: LEGACY_COLORS.s1 }}>
