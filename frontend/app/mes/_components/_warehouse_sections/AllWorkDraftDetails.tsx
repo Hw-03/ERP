@@ -8,6 +8,8 @@ import { formatQty } from "@/lib/mes/format";
 import { reservationIssueMessage } from "@/lib/io/reservation-message";
 import { workLocationLabel } from "../common/WorkReservationDetails";
 import { WORK_ITEM_CODE_CLASS, WORK_TYPE_BADGE_CLASS } from "../common/WorkDraftTableParts";
+import { WorkDraftMemo } from "../common/WorkDraftMemo";
+import { formatRequestNotes } from "./ioRequestLabels";
 
 interface DetailLine {
   key: string;
@@ -59,7 +61,7 @@ export function AllWorkDraftDetails({ work, layout, columns }: {
       <h3 className="sr-only">{title}</h3>
       {lines.length > 0 ? layout === "desktop" ? <table aria-label={title} className="w-full table-fixed border-collapse text-left text-sm">
         {columns}
-        <thead className="sr-only"><tr>{["상세", "저장 시각", "담당자", "구분", "품목", "품목코드", "예정 변동"].map((label) => <th key={label} scope="col">{label}</th>)}</tr></thead>
+        <thead className="sr-only"><tr>{["상세", "저장 시각", "담당자", "구분", "품목", "메모", "품목코드", "예정 변동"].map((label) => <th key={label} scope="col">{label}</th>)}</tr></thead>
         <tbody>{lines.map((line) => <tr key={line.key} className="border-t align-middle" style={{ borderColor: C.border, background: C.s1 }}>
           <td colSpan={3} aria-hidden className="px-6 py-2">
             <svg viewBox="0 0 280 40" preserveAspectRatio="none" className="ml-auto h-10 w-[190px]" fill="none" style={{ color: C.muted2 }}>
@@ -68,6 +70,7 @@ export function AllWorkDraftDetails({ work, layout, columns }: {
           </td>
           <td className="px-3 py-2 text-center">{badge(line)}</td>
           <td className="px-4 py-2">{identity(line)}</td>
+          <td aria-hidden />
           <td className={WORK_ITEM_CODE_CLASS} style={{ color: C.muted2 }}>{line.code ?? "—"}</td>
           <td className="whitespace-nowrap px-3 py-2 text-center font-bold tabular-nums" style={{ color: line.change ? line.color : C.muted2 }}>{line.change ?? "—"}</td>
         </tr>)}</tbody>
@@ -96,9 +99,10 @@ export function AllWorkDraftDetails({ work, layout, columns }: {
   </div>;
 
   return <div>
+    {work.notes?.trim() && <section aria-label="전체 작업 메모" className="border-b p-4" style={{ borderColor: C.border }}><WorkDraftMemo notes={work.kind === "stock_request" ? formatRequestNotes(work.notes) : work.notes} expanded /></section>}
     {work.reservation_issue && <p role="status" className="m-3 rounded-[12px] p-3" style={{ background: C.warningBg, color: C.yellow }}>{reservationIssueMessage(work.reservation_issue)}</p>}
     {work.forecast_issue && <p role="status" className="m-3 rounded-[12px] p-3 text-xs leading-6" style={{ background: C.warningBg, color: C.yellow }}>이 작업의 입고·출고 예정을 모두 확인할 수 없습니다. 담당자에게 작업 내용을 확인해 주세요.</p>}
-    {work.targets.length > 2 && section("작업 대상", targets)}
+    {effects.length === 0 && targets.length > 0 && section("작업 대상", targets)}
     {section("완료 시 재고 변동", effects, work.expected_effects === null ? "이전 요청은 예정 변동 정보를 제공하지 않습니다."
       : work.forecast_issue ? "예정 수량을 확인할 수 없습니다. 수량이 없는 것은 아닙니다." : "확정된 예정이 없습니다.")}
   </div>;

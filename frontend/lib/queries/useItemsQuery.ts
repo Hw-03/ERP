@@ -22,13 +22,17 @@ export function useItemsQuery(params?: Parameters<typeof itemsApi.getItems>[0], 
   });
 }
 
-export function useItemQuery(itemId: string | null | undefined, options?: { refetchOnMount?: "always" }) {
+export function useItemQuery(itemId: string | null | undefined, options?: { refetchOnMount?: "always"; onRead?: () => void }) {
+  const { onRead, ...queryOptions } = options ?? {};
   return useQuery({
     queryKey: queryKeys.items.detail(itemId ?? ""),
-    queryFn: ({ signal }) => itemsApi.getItem(itemId as string, { signal }),
+    queryFn: ({ signal }) => {
+      onRead?.();
+      return itemsApi.getItem(itemId as string, { signal });
+    },
     enabled: !!itemId,
     ...(options?.refetchOnMount === "always" ? { staleTime: 0 } : {}),
-    ...options,
+    ...queryOptions,
   });
 }
 

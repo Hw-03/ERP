@@ -45,6 +45,20 @@ def test_shipping_never_joins_employee_scoped_work(client, authenticated, owner,
     assert page["total"] == 0
 
 
+def test_shipping_preserves_personal_counts_and_shared_nullable_fields(client, authenticated, drafts, shipping):
+    """Shipping does not become owned work or acquire stocktake pause metadata."""
+    count = client.get("/api/work-drafts/count", headers=authenticated[0])
+    assert count.status_code == 200
+    assert count.json() == {"io_count": 1, "stock_request_count": 0, "total": 1}
+    page = client.get("/api/work-drafts", headers=authenticated[0], params={"requester_department": "출하"})
+    assert page.status_code == 200
+    row = page.json()["items"][0]
+    assert row["notes"] is None and row["stocktake_pause"] is None
+    detail = client.get(f"/api/work-drafts/shipping/{shipping[0].request_id}", headers=authenticated[0])
+    assert detail.status_code == 200
+    assert detail.json()["notes"] is None and detail.json()["stocktake_pause"] is None
+
+
 def test_shipping_detail_readonly_unknown_reservations_and_status_gate(client, db_session, authenticated, shipping):
     request, final, companion = shipping
     path = f"/api/work-drafts/shipping/{request.request_id}"

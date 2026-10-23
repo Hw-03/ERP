@@ -19,7 +19,7 @@ from app.services.work_reservation_errors import WorkReservationError
 
 def creation_hash(payload: Any, command: str = "draft") -> str:
     """Hash user intent, excluding preview identity, derived stock and server tokens."""
-    excluded = {"batch_id", "expected_revision", "client_request_id", "bundle_id", "line_id",
+    excluded = {"batch_id", "expected_revision", "stocktake_resume_token", "client_request_id", "bundle_id", "line_id",
                 "shortage", "bom_auto_token", "item_name", "mes_code", "title", "unit",
                 "has_children", "bom_expected", "bom_stock_exempt", "edited"}
 

@@ -373,7 +373,8 @@ export function DailyWorkReportScreen({
                 setSaveError(null);
               }}
               saveRef={editorSaveRef}
-              fillAvailableHeight={mobile ? mobileCompact : !isActivityDetailOpen}
+              fillAvailableHeight={mobile ? mobileCompact : true}
+              preserveHeight={!mobile && isActivityDetailOpen}
               mobile={mobile}
               />
           </div>

@@ -6,6 +6,7 @@ import uuid
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.schemas.common import UtcDatetime
+from app.schemas.work_stocktake_pause import WorkStocktakePause
 
 
 class IoPreviewTarget(BaseModel):
@@ -105,6 +106,7 @@ class IoDraftUpsert(BaseModel):
     # 이어 작업 중인 draft의 batch_id. 있으면 해당 draft를 갱신, 없으면 새 슬롯 생성.
     batch_id: Optional[uuid.UUID] = None
     expected_revision: Optional[int] = Field(None, ge=0, strict=True)
+    stocktake_resume_token: Optional[uuid.UUID] = None
     bundles: List[IoBundlePayload] = Field(default_factory=list)
 
     @model_validator(mode="before")
@@ -143,6 +145,7 @@ class IoStockRequestSummary(BaseModel):
 
 
 class IoBatchResponse(BaseModel):
+    stocktake_pause: Optional[WorkStocktakePause] = None
     batch_id: uuid.UUID
     revision: int
     reservation_status: Literal["reserved", "not_required", "inactive"]

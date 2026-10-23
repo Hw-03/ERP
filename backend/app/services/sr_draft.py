@@ -46,6 +46,7 @@ def upsert_draft_request(
     reason_memo: Optional[str] = None,
     supplier_id: uuid.UUID | None = None,
     submission_id: Optional[uuid.UUID] = None,
+    stocktake_resume_token: Optional[uuid.UUID] = None,
 ) -> StockRequest:
     """직원 + request_type 기준 active draft 를 upsert.
 
@@ -53,6 +54,10 @@ def upsert_draft_request(
     - lines_input 이 비어 있지 않으면 1차 shape 검증 통과 필수.
     - 기존 DRAFT 가 있으면 lines 전체 교체 + notes/reference_no 갱신, 신규 row 생성 금지.
     """
+    from app.services import stocktake_guard, work_stocktake_pause
+    from app.services.work_stocktake_legacy import required_cells
+
+    stocktake_guard.lock_control(db)
     validate_request_entrypoint(
         requester,
         request_type,
@@ -84,9 +89,14 @@ def upsert_draft_request(
             StockRequest.request_type == request_type,
             StockRequest.status == StockRequestStatusEnum.DRAFT,
         )
+        .with_for_update()
+        .populate_existing()
         .first()
     )
     if existing is not None:
+        if stocktake_resume_token is not None:
+            from app.services.work_stocktake_legacy import refresh_resume_notes
+            notes = refresh_resume_notes(db, existing, lines_input, notes)
         # 기존 lines 명시 삭제 (cascade 의존하지 않음).
         # bulk delete 로 ORM 추적 우회 → cascade 재진입에 의한 중복 DELETE 회피.
         db.query(StockRequestLine).filter(
@@ -130,13 +140,20 @@ def upsert_draft_request(
                 )
             )
         db.flush()
+        if work_stocktake_pause.ensure_work_save(db, "stock_request", existing.request_id,
+                required_cells(db, existing), stocktake_resume_token):
+            if stocktake_resume_token is not None:
+                from app.services.work_stocktake_legacy import validate_remaining_stock
+                validate_remaining_stock(db, request_type, lines_input)
+                _preflight_defective_check(db, lines_input)
+            work_stocktake_pause.complete_work_save(db, "stock_request", existing.request_id)
         return existing
 
     # 신규 DRAFT 생성 — request_code=None, submitted_at=None.
     # _build_request_and_lines 는 stock_requests.py 에 있으나 순환 import 방지를 위해
     # 지연 import 사용.
     from app.services.stock_requests import _build_request_and_lines
-    return _build_request_and_lines(
+    request = _build_request_and_lines(
         db,
         requester=requester,
         request_type=request_type,
@@ -153,6 +170,10 @@ def upsert_draft_request(
         supplier_name_snapshot=supplier.name if supplier is not None else None,
         submission_id=submission_id,
     )
+    if work_stocktake_pause.ensure_work_save(db, "stock_request", request.request_id,
+            required_cells(db, request), stocktake_resume_token):
+        work_stocktake_pause.complete_work_save(db, "stock_request", request.request_id)
+    return request
 
 
 def get_draft_request(
@@ -197,8 +218,12 @@ def delete_draft_request(
     requester_employee_id: uuid.UUID,
 ) -> None:
     """DRAFT를 삭제하며, 이미 없는 대상은 성공한 재시도로 간주한다."""
+    from app.services import stocktake_guard, work_stocktake_pause
+
+    stocktake_guard.lock_control(db)
     request = (
-        db.query(StockRequest).filter(StockRequest.request_id == request_id).first()
+        db.query(StockRequest).filter(StockRequest.request_id == request_id)
+        .with_for_update().populate_existing().first()
     )
     if request is None:
         return
@@ -206,6 +231,8 @@ def delete_draft_request(
         raise PermissionError("본인 장바구니만 삭제할 수 있습니다.")
     if request.status != StockRequestStatusEnum.DRAFT:
         raise ValueError("장바구니(DRAFT) 상태가 아닙니다.")
+
+    work_stocktake_pause.remove_pause(db, "stock_request", request_id)
 
     # Lines 명시 삭제 — bulk delete 로 ORM 추적 우회 (cascade 재진입 방지).
     db.query(StockRequestLine).filter(
@@ -225,8 +252,13 @@ def submit_draft_request(
     requester_employee_id: uuid.UUID,
 ) -> StockRequest:
     """DRAFT 제출. 본인 검증 → shape 재검증 → request_code 발급 → _finalize_submission."""
+    from app.services import stocktake_guard, work_stocktake_pause
+    from app.services.work_stocktake_legacy import required_cells
+
+    stocktake_guard.lock_control(db)
     request = (
-        db.query(StockRequest).filter(StockRequest.request_id == request_id).first()
+        db.query(StockRequest).filter(StockRequest.request_id == request_id)
+        .with_for_update().populate_existing().first()
     )
     if request is None:
         raise RequestNotFoundError("요청을 찾을 수 없습니다.")
@@ -234,6 +266,7 @@ def submit_draft_request(
         raise PermissionError("본인 장바구니만 제출할 수 있습니다.")
     if request.status != StockRequestStatusEnum.DRAFT:
         raise ValueError("장바구니(DRAFT) 상태가 아닙니다.")
+    work_stocktake_pause.ensure_work_submit(db, "stock_request", request_id, required_cells(db, request))
     from app.services.item_write_validation import validate_active_items
     validate_active_items(db, (line.item_id for line in request.lines),
                           raw_receive=request.request_type == StockRequestTypeEnum.RAW_RECEIVE)

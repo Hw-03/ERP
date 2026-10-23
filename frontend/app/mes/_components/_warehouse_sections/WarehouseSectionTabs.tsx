@@ -125,6 +125,7 @@ export function WarehouseSectionTabs({
           label={t.label}
           badge={badgeFor(t.id)}
           loading={loadingCounts.includes(t.id)}
+          unavailable={unavailableCounts.includes(t.id)}
           tone={t.tone}
           active={active === t.id}
           onClick={() => onChange(t.id)}
@@ -142,6 +143,7 @@ function TabButton({
   active,
   onClick,
   loading = false,
+  unavailable = false,
   mobilePresentation = false,
 }: {
   label: string;
@@ -150,6 +152,7 @@ function TabButton({
   active: boolean;
   onClick: () => void;
   loading?: boolean;
+  unavailable?: boolean;
   mobilePresentation?: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
@@ -186,14 +189,14 @@ function TabButton({
           {label}
         </span>
       </div>
-      {(loading || badge !== null) && (
+      {(loading || unavailable || badge !== null) && (
         <div
           className={mobilePresentation
             ? "flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1 text-xs font-bold leading-none text-white"
             : "absolute right-0.5 top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-black leading-none tabular-nums text-white lg:right-3 lg:top-1/2 lg:h-7 lg:min-w-7 lg:-translate-y-1/2 lg:px-1.5 lg:text-[18px] lg:leading-none"}
           style={{ background: tone }}
         >
-          {loading ? <span role="status" aria-label={`${label} 건수 불러오는 중`} className="h-2.5 w-2 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.white }} /> : badge}
+          {unavailable ? <span aria-label={`${label} 건수 확인 실패`}>—</span> : loading ? <span role="status" aria-label={`${label} 건수 불러오는 중`} className="h-2.5 w-2 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.white }} /> : badge}
         </div>
       )}
     </button>

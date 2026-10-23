@@ -1,15 +1,18 @@
 "use client";
 
 import type { StockRequest } from "@/lib/api";
+import { useState } from "react";
+import { WorkDraftMemo } from "../common/WorkDraftMemo";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { formatKstDateTime, formatQty } from "@/lib/mes/format";
 import { REQUEST_TYPE_LABEL, formatRequestNotes } from "./ioRequestLabels";
+import { StocktakePauseNotice } from "../common/StocktakePauseNotice";
 
 /**
  * Round-13 (#7) 추출 — DraftCartPanel 의 단일 draft 카드.
  *
- * draft 메타 + lines 미리보기 (최대 5건) + 이어서/삭제 버튼 2개 행.
+ * 대표 품목과 메모를 요약하고 펼치면 전체 품목을 표시한다.
  */
 export interface DraftCartItemRowProps {
   draft: StockRequest;
@@ -24,6 +27,7 @@ export function DraftCartItemRow({
   onContinue,
   onRequestDelete,
 }: DraftCartItemRowProps) {
+  const [expanded, setExpanded] = useState(false);
   const totalQty = draft.lines.reduce((sum, l) => sum + (Number(l.quantity) || 0), 0);
   const noteText = formatRequestNotes(draft.notes);
 
@@ -63,7 +67,7 @@ export function DraftCartItemRow({
 
       {draft.lines.length > 0 && (
         <div className="mt-2 flex flex-col gap-1 text-sm" style={{ color: LEGACY_COLORS.text }}>
-          {draft.lines.slice(0, 5).map((line) => (
+          {(expanded ? draft.lines : draft.lines.slice(0, 1)).map((line) => (
             <div key={line.line_id} className="flex flex-wrap items-center gap-2">
               <span style={{ color: LEGACY_COLORS.muted2 }}>{line.mes_code_snapshot ?? "-"}</span>
               <span>{line.item_name_snapshot}</span>
@@ -75,13 +79,14 @@ export function DraftCartItemRow({
               )}
             </div>
           ))}
-          {draft.lines.length > 5 && (
+          {!expanded && draft.lines.length > 1 && (
             <div className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
-              외 {draft.lines.length - 5}건
+              외 {draft.lines.length - 1}개 품목
             </div>
           )}
         </div>
       )}
+      <StocktakePauseNotice pause={draft.stocktake_pause} />
 
       {draft.reference_no && (
         <div className="mt-2 text-xs" style={{ color: LEGACY_COLORS.muted }}>
@@ -89,17 +94,22 @@ export function DraftCartItemRow({
         </div>
       )}
       {noteText && (
-        <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted }}>
-          비고: {noteText}
+        <div className="mt-2">
+          <WorkDraftMemo notes={noteText} expanded={expanded} />
         </div>
       )}
 
       <div className="mt-3 flex flex-wrap justify-end gap-2">
+        <button type="button" aria-expanded={expanded} onClick={() => setExpanded((current) => !current)}
+          className="min-h-11 min-w-11 rounded-[10px] border px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+          style={{ borderColor: LEGACY_COLORS.borderStrong, color: LEGACY_COLORS.text, background: LEGACY_COLORS.s1 }}>
+          {expanded ? "상세 접기" : "상세 펼치기"}
+        </button>
         <button
           type="button"
           onClick={onContinue}
-          disabled={isBusy}
-          className="rounded-[10px] border px-3 py-1.5 text-xs"
+          disabled={isBusy || draft.stocktake_pause?.state === "blocked"}
+          className="min-h-11 rounded-[10px] border px-3 py-1.5 text-sm"
           style={{
             borderColor: LEGACY_COLORS.borderStrong,
             color: LEGACY_COLORS.text,

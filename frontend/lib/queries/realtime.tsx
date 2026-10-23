@@ -4,6 +4,7 @@ import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { queryKeys } from "./keys";
 import { itemSearchConfigOptions } from "./useItemSearch";
+import { cancelWorkInventoryQueries } from "./workReservationInvalidation";
 
 const STREAM_URL = "/api/realtime/stream";
 const REVISION_URL = "/api/realtime/revision";
@@ -57,7 +58,7 @@ export async function invalidateOperationalQueries(queryClient: QueryClient, onM
     catch { return false; }
   }
   onMetadataReady?.();
-  await queryClient.cancelQueries({ queryKey: queryKeys.items.all });
+  await cancelWorkInventoryQueries(queryClient);
   await Promise.all(
     OPERATIONAL_QUERY_ROOTS.map((queryKey) => queryClient.invalidateQueries({ queryKey })),
   );

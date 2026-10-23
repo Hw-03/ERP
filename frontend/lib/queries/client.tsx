@@ -15,7 +15,8 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { installWorkDraftCacheGuard } from "./workDraftCache";
 import { RealtimeSyncProvider } from "./realtime";
 import { SearchConfigProvider } from "./useItemSearch";
 import { SearchConfigStatus } from "@/app/mes/_components/common/SearchConfigStatus";
@@ -47,6 +48,7 @@ const defaultOptions = {
 
 export function QueryProvider({ children }: { children: ReactNode }) {
   const [client] = useState(() => new QueryClient({ defaultOptions }));
+  useEffect(() => installWorkDraftCacheGuard(client), [client]);
   return (
     <QueryClientProvider client={client}>
       <SearchConfigProvider><SearchConfigStatus floating /><RealtimeSyncProvider>{children}</RealtimeSyncProvider></SearchConfigProvider>

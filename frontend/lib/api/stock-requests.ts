@@ -133,13 +133,14 @@ export const stockRequestsApi = {
       ),
     ),
 
-  listStockRequestDrafts: (requesterEmployeeId: string) =>
+  listStockRequestDrafts: (requesterEmployeeId: string, options?: { signal?: AbortSignal }) =>
     fetcher<StockRequest[]>(
       toApiUrl(
         `/api/stock-requests/drafts?requester_employee_id=${encodeURIComponent(
           requesterEmployeeId,
         )}`,
       ),
+      options?.signal,
     ),
 
   deleteStockRequestDraft: (requestId: string, requesterEmployeeId: string) =>

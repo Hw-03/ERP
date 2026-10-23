@@ -58,6 +58,7 @@ export function restoreInternalUseBundles(
   batch: IoBatch,
   getAvailable?: GetAvailable,
 ): IoBundle[] {
+  if (batch.stocktake_pause || batch.stocktake_resumed) return batch.bundles;
   if (
     batch.work_type !== "internal_use" ||
     batch.sub_type !== "internal_use_out"

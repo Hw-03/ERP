@@ -3,8 +3,8 @@ from alembic import context, op
 import sqlalchemy as sa
 
 
-revision = "20261023_0049"
-down_revision = "20261021_0048"
+revision = "20261023_0050"
+down_revision = "20261023_0049"
 branch_labels = None
 depends_on = None
 EMPLOYEE_AUTO_DEPLOY_POLICY = {"kind": "schema-only"}

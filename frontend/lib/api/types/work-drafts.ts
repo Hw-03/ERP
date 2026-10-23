@@ -1,8 +1,9 @@
-import type { IoSubType, IoWorkType } from "./io";
+import type { IoSubType, IoWorkType, StocktakeWorkPause } from "./io";
 import type { TransactionType } from "./shared";
 import type { InventoryRelatedWork, WorkReservationIssue, WorkReservationStatus, WorkReservedInput, WorkInventoryEffect } from "./work-reservations";
 
 export type WorkDraftKind = "io" | "stock_request" | "shipping";
+export interface WorkDraftCount { io_count: number; stock_request_count: number; total: number }
 export interface WorkDraftSelection { kind: WorkDraftKind; id: string }
 
 export interface WorkDraftMovementSummary { increase: number; decrease: number; move: number }
@@ -17,6 +18,7 @@ export interface WorkDraftTarget {
 }
 
 export interface WorkDraftSummary extends WorkDraftSelection {
+  stocktake_pause?: StocktakeWorkPause | null;
   requester_employee_id: string | null;
   requester_name: string;
   requester_department: string;
@@ -25,6 +27,7 @@ export interface WorkDraftSummary extends WorkDraftSelection {
   work_type: IoWorkType | null;
   sub_type: IoSubType | null;
   request_type: string | null;
+  notes: string | null;
   /** 완료 내역과 같은 분류를 위한 공개 정보. 구 응답에서는 없을 수 있다. */
   history_operation?: { transaction_type: TransactionType; department: string | null } | null;
   targets: WorkDraftTarget[];

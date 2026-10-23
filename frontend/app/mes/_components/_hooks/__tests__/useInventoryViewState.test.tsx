@@ -83,6 +83,57 @@ describe("품목 상세 복원", () => {
 });
 
 describe("삭제와 조회 실패", () => {
+  it("목록 수량이 갱신되면 이전 단건 상세보다 우선하며 목록 밖에서도 마지막 표시를 보존한다", async () => {
+    saveSnapshot();
+    const old = { ...item, available_quantity: 10, work_reservations: { work_reserved_quantity: 0 } } as Item;
+    const current = { ...old, available_quantity: 7, work_reservations: { work_reserved_quantity: 3 } } as Item;
+    vi.mocked(api.getItem).mockResolvedValue(old);
+    const { result, rerender } = renderHook(({ items }) => useInventoryViewState(items), { initialProps: { items: [old] }, wrapper: wrapper() });
+    await waitFor(() => expect(result.current.detailStatus).toBe("active"));
+    rerender({ items: [current] });
+    expect(result.current.displayItem).toEqual(current);
+    rerender({ items: [] });
+    expect(result.current.displayItem).toEqual(current);
+  });
+
+  it("새 목록 뒤에 도착한 이전 단건 응답은 수량을 되돌리지 않는다", async () => {
+    saveSnapshot();
+    let finish!: (value: Item) => void;
+    vi.mocked(api.getItem).mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    const current = { ...item, available_quantity: 7 };
+    const { result } = renderHook(() => useInventoryViewState([current]), { wrapper: wrapper() });
+    await act(async () => finish({ ...item, available_quantity: 10 }));
+    await waitFor(() => expect(result.current.detailStatus).toBe("active"));
+    expect(result.current.displayItem?.available_quantity).toBe(7);
+  });
+
+  it("목록에서 사라진 뒤 이전 단건이 도착해도 마지막 공통 수량을 보존하고 재조회로 복구한다", async () => {
+    saveSnapshot();
+    let finish!: (value: Item) => void;
+    vi.mocked(api.getItem).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const old = { ...item, available_quantity: 10 };
+    const current = { ...item, available_quantity: 7 };
+    const { result, rerender } = renderHook(({ items }) => useInventoryViewState(items), { initialProps: { items: [old] }, wrapper: wrapper() });
+    rerender({ items: [current] });
+    rerender({ items: [] });
+    await act(async () => finish(old));
+    await waitFor(() => expect(result.current.detailStatus).toBe("active"));
+    expect(result.current.displayItem?.available_quantity).toBe(7);
+    vi.mocked(api.getItem).mockResolvedValue({ ...item, available_quantity: 5 });
+    await act(async () => result.current.retryDetail());
+    await waitFor(() => expect(result.current.displayItem?.available_quantity).toBe(5));
+  });
+
+  it("이전 목록이 남아 있어도 단건에서 확인한 삭제는 표시와 작업을 차단한다", async () => {
+    saveSnapshot();
+    const deleted = { ...item, deleted_at: "2026-10-23T00:00:00Z" };
+    vi.mocked(api.getItem).mockResolvedValue(deleted);
+    const { result } = renderHook(() => useInventoryViewState([item]), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.detailStatus).toBe("deleted"));
+    expect(result.current.displayItem?.deleted_at).toBe(deleted.deleted_at);
+    expect(result.current.actionsDisabled).toBe(true);
+  });
+
   it("정상 상세의 배경 갱신은 작업 메뉴 상태를 유지하고 삭제 확인 후 차단한다", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
     saveSnapshot();

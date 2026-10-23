@@ -164,6 +164,8 @@ export function MobileIoComposeWizard({
   const sessionCreationKeyRef = useRef<string | null>(null);
   const draftSession = useIoDraft(draftToRestore, restoreNonce, onReservationChanged, sessionCreationKeyRef, { inventorySnapshot: items, inventoryQueryState, realtimeRevision: revision, employeeId });
   const { drafting, saveDraft } = draftSession;
+  const stocktakePause = draftSession.stocktakePause;
+  const pauseRevisionStale = Boolean(stocktakePause && draftSession.latestBatch && draftSession.latestBatch.revision !== draftSession.savedBatch?.revision);
   reservationOwnerRef.current = draftSession.currentReservationBatch;
   const state = useIoWorkState(defaultWorkType, operator?.department, getAvailable);
   const itemAddBlocked = state.workType !== "tube_material" && (bomListQuery.isPending || bomListQuery.isError);
@@ -504,6 +506,7 @@ export function MobileIoComposeWizard({
   }
 
   async function saveCurrentDraft(persistInUrl = true): Promise<string | null> {
+    if (stocktakePause && (stocktakePause.state !== "ready" || pauseRevisionStale)) throw new Error("관련 품목 조사 반영 후 작업 중 목록에서 다시 열어 주세요.");
     if (!employeeId) {
       setError("작업자를 선택하세요.");
       throw new Error("작업자를 선택하세요.");
@@ -591,6 +594,10 @@ export function MobileIoComposeWizard({
   }
 
   async function handleSubmit() {
+    if (stocktakePause && (stocktakePause.state !== "ready" || pauseRevisionStale)) {
+      setError("관련 품목 조사 반영 후 작업 중 목록에서 다시 열어 주세요.");
+      return;
+    }
     if (!canSeeWorkType(state.workType, operator)) return;
     if (isMaterialWorkType(state.workType) && !state.canAdvance[2]) {
       state.goTo(2);
@@ -883,6 +890,13 @@ export function MobileIoComposeWizard({
         {step === 4 && (
           <div className={`min-h-0 flex-1 ${quantityStyles.cart}`}>
           <IoBundleCart
+            workType={state.workType}
+            notes={state.notes}
+            onNotesChange={state.setNotes}
+            employeeId={employeeId}
+            reasonCategory={state.reasonCategory}
+            reasonCategoryId={state.reasonCategoryId}
+            onReasonCategoryChange={state.setReasonCategory}
             mobilePresentation
             bundles={state.bundles}
             subType={state.subType}

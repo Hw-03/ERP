@@ -55,6 +55,9 @@ function makeItem(): Item {
     process_type: null,
     image_filename: null,
     locations: [],
+    work_reservations: { work_reserved_quantity: 0, approval_reserved_quantity: 0, shipping_reserved_quantity: 0,
+      expected_in_quantity: 0, expected_out_quantity: 0, transfer_in_quantity: 0, transfer_out_quantity: 0,
+      forecast_complete: true, reservation_by_location: [], forecast_by_location: [] },
   } as unknown as Item;
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type LegacyRef, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -31,7 +31,7 @@ import { formatQty } from "@/lib/mes/format";
 import { ConfirmModal, type ConfirmTone } from "@/lib/ui/ConfirmModal";
 import { IoLocationBadge } from "./IoLocationBadge";
 import { lineInventoryLocation } from "./ioInventoryLocation";
-import { ReasonFormFields } from "../_defect_hub/ReasonFormFields";
+import { IoWorkMemo, MEMO_REQUIRED_MESSAGE } from "./IoWorkMemo";
 import { hasDefectReason } from "../_defect_hub/defectCartValidation";
 import panelStyles from "../mobile/screens/mobileWarehousePanels.module.css";
 import {
@@ -112,8 +112,6 @@ const AUTO_APPROVAL_META = {
   submitText: (n: number) => `자동 승인 후 즉시 반영 ${n}건`,
   accentColor: "green" as const,
 };
-
-const MEMO_REQUIRED_MESSAGE = "메모를 입력해야 작업을 진행할 수 있습니다.";
 
 function confirmCopy(
   subType: IoSubType,
@@ -216,7 +214,7 @@ export function IoConfirmStep({
 }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [memoValidationAttempted, setMemoValidationAttempted] = useState(false);
-  const memoInputRef = useRef<HTMLInputElement>(null);
+  const memoInputRef = useRef<HTMLTextAreaElement>(null);
   const isApproval = approvalKind !== "none" && !autoApprove;
   const copy = confirmCopy(subType, approvalKind, autoApprove);
   const headerLabel = workType === "process"
@@ -338,9 +336,8 @@ export function IoConfirmStep({
 
       {/* 묶음 카드 목록 (1단 세로 스크롤) */}
       <div className="min-h-0 flex-1 overflow-y-auto space-y-4">
-        {defectQuarantine && <ReasonFormFields employeeId={employeeId} category={reasonCategory} categoryId={reasonCategoryId}
-          memo={notes} onCategoryChange={(name, id) => onReasonCategoryChange?.(name, id)} onMemoChange={onNotesChange}
-          mobilePresentation={mobilePresentation} required />}
+        {defectQuarantine && <IoWorkMemo workType={workType} subType={subType} bundles={bundles} notes={notes} onNotesChange={onNotesChange}
+          employeeId={employeeId} reasonCategory={reasonCategory} reasonCategoryId={reasonCategoryId} onReasonCategoryChange={onReasonCategoryChange} mobilePresentation={mobilePresentation} />}
         {displayBundles.map((bundle) => (
           <ConfirmBundleCard
             key={bundle.bundle_id}
@@ -359,18 +356,12 @@ export function IoConfirmStep({
 
       {/* 항목 7-4 — 메모를 액션 푸터 밖(스크롤 영역 바로 아래 정적 요소)으로 분리해 버튼 위에 끼지 않게 한다.
           버튼 행은 Step4(IoBundleCart) 와 동일한 sticky 푸터로 통일 → 두 단계 버튼의 화면상 위치(네비바와의 간격)가 일치. */}
-      {!defectQuarantine && <Field
-        label={materialOutbound ? "출고 사유 (필수)" : memoRequired ? "메모 (필수)" : "메모 (선택)"}
-        value={notes}
-        onChange={(value) => {
+      {!defectQuarantine && <IoWorkMemo workType={workType} subType={subType} bundles={bundles} notes={notes}
+        onNotesChange={(value) => {
           if (value.trim()) setMemoValidationAttempted(false);
           onNotesChange(value);
         }}
-        placeholder={materialOutbound ? "사급·샘플 등 출고 사유를 입력하세요" : memoRequired ? "결재 사유를 입력하세요" : "작업 메모"}
-        required={memoRequired}
-        invalid={showMemoError}
-        errorMessage={materialOutbound ? "출고 사유를 입력하세요." : MEMO_REQUIRED_MESSAGE}
-        inputRef={memoInputRef}
+        invalid={showMemoError} inputRef={memoInputRef}
       />}
 
       {/* 액션 푸터 — Step4(IoBundleCart 126줄) 와 동일: 모바일 하단 sticky + 페이지 배경, PC(lg)는 정적·대형 그대로. */}
@@ -819,60 +810,5 @@ function ConfirmLineRow({
         </span>
       </div>
     </li>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-  required = false,
-  invalid = false,
-  errorMessage = MEMO_REQUIRED_MESSAGE,
-  inputRef,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-  required?: boolean;
-  invalid?: boolean;
-  errorMessage?: string;
-  inputRef?: LegacyRef<HTMLInputElement>;
-}) {
-  const errorId = "department-approval-memo-error";
-  return (
-    <label className="flex flex-col gap-2" htmlFor="department-approval-memo">
-      <div className="text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
-        {label}
-      </div>
-      <input
-        ref={inputRef}
-        id="department-approval-memo"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={invalid ? errorMessage : placeholder}
-        required={required}
-        aria-required={required}
-        aria-invalid={invalid || undefined}
-        aria-describedby={invalid ? errorId : undefined}
-        className={`h-14 rounded-[16px] border px-4 text-base font-bold outline-none focus-visible:ring-2 ${
-          invalid
-            ? "placeholder:font-bold placeholder:text-[var(--c-red)] focus-visible:ring-[var(--c-red)]"
-            : "focus-visible:border-[var(--c-blue)] focus-visible:ring-[var(--c-blue)]"
-        }`}
-        style={{
-          background: LEGACY_COLORS.s2,
-          borderColor: invalid ? LEGACY_COLORS.red : LEGACY_COLORS.border,
-          color: LEGACY_COLORS.text,
-        }}
-      />
-      {invalid && (
-        <span id={errorId} className="sr-only">
-          {errorMessage}
-        </span>
-      )}
-    </label>
   );
 }

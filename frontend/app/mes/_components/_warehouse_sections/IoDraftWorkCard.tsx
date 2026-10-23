@@ -9,7 +9,9 @@ import { SUB_TYPE_LABEL } from "@/lib/io/glossary";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatKstDateTime } from "@/lib/mes/format";
 import { Button } from "@/lib/ui/Button";
+import { WorkDraftMemo } from "../common/WorkDraftMemo";
 import { StatusPill } from "../common/StatusPill";
+import { StocktakePauseNotice } from "../common/StocktakePauseNotice";
 import { FlowBadge } from "../_history_sections/historyTableHelpers";
 import { getIoDraftOperationColor, getIoDraftOperationLabel, getIoDraftTransactionType } from "../common/WorkDraftTableParts";
 import { reservationStatusLabel } from "../_warehouse_v2/WorkReservationNotice";
@@ -85,10 +87,6 @@ export function IoDraftWorkCard({
     : undefined;
 
   const meta = useMemo(() => {
-    const qty = draft.bundles.reduce(
-      (sum, b) => sum + (Number(b.quantity) || 0),
-      0,
-    );
     const lines = draft.bundles.reduce((sum, b) => sum + (b.lines?.length ?? 0), 0);
     const firstIncludedLine = draft.bundles
       .flatMap((bundle) => bundle.lines ?? [])
@@ -111,7 +109,6 @@ export function IoDraftWorkCard({
     }
     const startedText = formatKstDateTime(draft.created_at);
     return {
-      totalQty: qty,
       lineCount: lines,
       deptLabel: dept,
       subLabel: sub,
@@ -158,15 +155,14 @@ export function IoDraftWorkCard({
         </button>
       </div>
 
-      {/* 묶음 제목 — 모든 묶음을 한 줄씩 나열 */}
+      {/* 대표 품목과 나머지 개수는 접힌 상태에서도 확인한다. */}
+      <StocktakePauseNotice pause={draft.stocktake_pause} />
       {["반려됨", "예약 상태 확인 필요"].includes(reservationStatusLabel(draft)) && <StatusPill label={reservationStatusLabel(draft)} tone="warning" showDot={false} className="mt-2 !px-2.5 !py-1" />}
       {draft.reservation_issue && <p className="mt-2 rounded-[12px] px-3 py-2 text-sm leading-6" style={{ color: LEGACY_COLORS.yellow, background: LEGACY_COLORS.warningBg }}>{reservationIssueMessage(draft.reservation_issue)}</p>}
       <ul className="mt-3 space-y-2">
-        {draft.bundles.map((b) => {
-          const parentLine =
-            b.source_kind === "bom_parent"
-              ? (b.lines ?? []).find((l) => l.origin === "direct")
-              : null;
+        {draft.bundles.slice(0, 1).map((b) => {
+          const parentLine = (b.lines ?? []).find((line) => line.origin === "direct")
+            ?? (b.source_kind !== "bom_parent" && b.lines.length === 1 ? b.lines[0] : null);
           const displayQty = parentLine
             ? Number(parentLine.quantity) || 0
             : Number(b.quantity) || 0;
@@ -182,19 +178,18 @@ export function IoDraftWorkCard({
                 style={{ color: accent }}
               >
                 {formatQty(displayQty)}
-                <span className="ml-1 text-xs font-medium">EA</span>
+                <span className="ml-1 text-xs font-medium">{parentLine?.unit || b.lines[0]?.unit || "EA"}</span>
               </span>
             </li>
           );
         })}
       </ul>
+      {draft.bundles.length > 1 && <p className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>외 {draft.bundles.length - 1}개 품목</p>}
+      {draft.bundles[0]?.source_mes_code && <p className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{draft.bundles[0].source_mes_code}</p>}
+      {draft.notes?.trim() && <div className="mt-2"><WorkDraftMemo notes={draft.notes} expanded={expanded} /></div>}
 
-      {/* 메트릭: 총 수량 + 자재 종수 + 부서 (제목보다 약하게 — 보조 정보) */}
+      {/* 품목별 수량은 제목 옆에 표시하고 구성 종수·부서는 보조 정보로 둔다. */}
       <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
-        <span>
-          총 <span className="tabular-nums" style={{ color: LEGACY_COLORS.text }}>{formatQty(meta.totalQty)}</span>개
-        </span>
-        <span aria-hidden>·</span>
         <span>구성 {meta.lineCount}종</span>
         {meta.deptLabel && (
           <>
@@ -281,7 +276,7 @@ export function IoDraftWorkCard({
           variant="secondary"
           type="button"
           aria-label="이어서 작업"
-          disabled={isBusy}
+          disabled={isBusy || draft.stocktake_pause?.state === "blocked"}
           onClick={onContinue}
           className="min-h-11 rounded-[12px] border px-4 text-sm font-semibold transition active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--c-blue)] disabled:opacity-50"
           style={{

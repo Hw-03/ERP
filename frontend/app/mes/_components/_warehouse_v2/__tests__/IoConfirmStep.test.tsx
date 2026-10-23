@@ -476,7 +476,7 @@ describe("IoConfirmStep", () => {
     expect(onSubmit).not.toHaveBeenCalled();
     expect(memoInput).toHaveFocus();
     expect(memoInput).toHaveAttribute("aria-invalid", "true");
-    expect(memoInput).toHaveAttribute("aria-describedby", "department-approval-memo-error");
+    expect(memoInput).toHaveAttribute("aria-describedby", `${memoInput.id}-error`);
     expect(memoInput).toHaveAttribute("placeholder", "메모를 입력해야 작업을 진행할 수 있습니다.");
     expect(screen.getByText("메모를 입력해야 작업을 진행할 수 있습니다.")).toHaveClass("sr-only");
     expect(screen.queryByText("부서 출고를 요청하시겠습니까?")).not.toBeInTheDocument();

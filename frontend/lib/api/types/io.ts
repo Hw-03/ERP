@@ -112,6 +112,7 @@ export interface IoPreviewResponse {
 }
 
 export interface IoDraftPayload {
+  stocktake_resume_token?: string;
   requester_employee_id: string;
   work_type: IoWorkType;
   sub_type: IoSubType;
@@ -138,6 +139,9 @@ export type IoReservedDraftPayload = Omit<IoDraftPayload, "batch_id" | "client_r
 );
 
 export interface IoBatch {
+  /** 목록에서 방금 재개한 작업의 수량 보존용 UI 힌트. 서버 저장 필드는 아니다. */
+  stocktake_resumed?: boolean;
+  stocktake_pause?: StocktakeWorkPause | null;
   batch_id: string;
   /** CP3 이전 응답은 미제공. 누락된 버전을 0으로 간주해 변경 요청을 보내지 않는다. */
   revision?: number;
@@ -177,6 +181,16 @@ export interface IoBatch {
   /** 최근 이력의 축약 배치가 표와 같은 작업 분류를 재사용할 때만 전달된다. */
   display_transaction_type?: string | null;
   stock_requests?: IoStockRequestSummary[];
+}
+
+/** 관련 품목·위치의 최신 조사 반영 여부에 따라 이어서 작업을 허용한다. */
+export interface StocktakeWorkPause {
+  token: string;
+  round_id: string;
+  state: "blocked" | "ready";
+  paused_at: string;
+  pending_target_count: number;
+  missing_target_count: number;
 }
 
 export type SupplierScope = "warehouse" | "tube";

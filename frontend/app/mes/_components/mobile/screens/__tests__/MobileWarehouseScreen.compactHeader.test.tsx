@@ -41,8 +41,23 @@ const operatorState = vi.hoisted(() => ({
 
 const apiMocks = vi.hoisted(() => ({
   listStockRequestDrafts: vi.fn(),
-  listDrafts: vi.fn(),
+  ownedDraftRows: vi.fn(),
+  countDrafts: vi.fn(),
   countAsResearchQueue: vi.fn(),
+}));
+
+vi.mock("@/lib/api/work-drafts", () => ({
+  workDraftsApi: {
+    count: (...args: unknown[]) => apiMocks.countDrafts(...args),
+    getOwnedIo: async (_employeeId: string, batchId: string) => {
+      const rows = await apiMocks.ownedDraftRows();
+      return rows.find((row: { batch_id: string }) => row.batch_id === batchId);
+    },
+  },
+}));
+
+vi.mock("@/lib/auth/operator-session", () => ({
+  restoreOperatorSession: (employeeId: string) => ({ employee_id: employeeId, token: "test-token" }),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -98,7 +113,7 @@ vi.mock("../../../_warehouse_sections/WarehouseDraftPanelTabs", () => ({
     <div data-testid="draft-panels" data-section-tab={sectionTab} data-target-request-id={targetRequestId ?? ""}>
       <button
         type="button"
-        onClick={() => onContinueIoDraft?.({ batch_id: "adjust-draft", sub_type: "adjust_out" } as never)}
+        onClick={() => onContinueIoDraft?.({ batch_id: "adjust-draft", sub_type: "adjust_out", stocktake_resumed: true } as never)}
       >
         continue adjust draft
       </button>
@@ -126,7 +141,7 @@ describe("MobileWarehouseScreen compact step header", () => {
   it("현재 작성기의 창고 작업 저장 뒤에도 원작업 보관 세션을 유지한다", async () => {
     window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=4");
     apiMocks.listStockRequestDrafts.mockResolvedValue([]);
-    apiMocks.listDrafts.mockResolvedValue([{ batch_id: "pull-draft", sub_type: "warehouse_to_dept" }]);
+    apiMocks.ownedDraftRows.mockResolvedValue([{ batch_id: "pull-draft", sub_type: "warehouse_to_dept" }]);
     render(<MobileWarehouseScreen globalSearch="" onStatusChange={vi.fn()} />);
     fireEvent.change(screen.getByLabelText("작성 세션 메모"), { target: { value: "보관 중인 원작업 입력" } });
 
@@ -186,44 +201,40 @@ describe("MobileWarehouseScreen compact step header", () => {
   });
   it("distinguishes first count failure, pending retry, and successful zero", async () => {
     operatorState.value = { ...operatorState.value, employee_id: "count-retry" };
-    apiMocks.listStockRequestDrafts.mockRejectedValueOnce(new Error("count failed"));
-    apiMocks.listDrafts.mockResolvedValueOnce([]);
+    apiMocks.countDrafts.mockRejectedValueOnce(new Error("count failed"));
     await act(async () => { render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />); });
-    expect(currentTabsProps.unavailableCounts).toContain("cart");
+    await waitFor(() => expect(currentTabsProps.unavailableCounts).toContain("cart"));
     expect(currentTabsProps.loadingCounts).not.toContain("cart");
-    let resolveLegacy!: (rows: unknown[]) => void;
-    let resolveIo!: (rows: unknown[]) => void;
-    apiMocks.listStockRequestDrafts.mockReturnValueOnce(new Promise((resolve) => { resolveLegacy = resolve; }));
-    apiMocks.listDrafts.mockReturnValueOnce(new Promise((resolve) => { resolveIo = resolve; }));
+    let resolveCount!: (count: { total: number; io_count: number; stock_request_count: number }) => void;
+    apiMocks.countDrafts.mockReturnValueOnce(new Promise((resolve) => { resolveCount = resolve; }));
     act(() => currentWizardProps.value?.onStatusChange?.("retry"));
-    expect(currentTabsProps.unavailableCounts).not.toContain("cart");
-    expect(currentTabsProps.loadingCounts).toContain("cart");
-    await act(async () => { resolveLegacy([]); resolveIo([]); });
-    expect(currentTabsProps.loadingCounts).not.toContain("cart");
+    await waitFor(() => expect(currentTabsProps.unavailableCounts).not.toContain("cart"));
+    await waitFor(() => expect(currentTabsProps.loadingCounts).toContain("cart"));
+    await act(async () => { resolveCount({ total: 0, io_count: 0, stock_request_count: 0 }); });
+    await waitFor(() => expect(currentTabsProps.loadingCounts).not.toContain("cart"));
     expect(currentTabsProps.unavailableCounts).not.toContain("cart");
     expect(currentTabsProps.cartCount).toBe(0);
   });
   it("keeps the known combined draft count when one refresh request fails", async () => {
     operatorState.value = { ...operatorState.value, employee_id: "count-preserve" };
-    apiMocks.listStockRequestDrafts.mockResolvedValueOnce([{}]);
-    apiMocks.listDrafts.mockResolvedValueOnce([{}, {}]);
+    apiMocks.countDrafts.mockResolvedValueOnce({ total: 3, io_count: 2, stock_request_count: 1 });
     await act(async () => { render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />); });
-    expect(currentTabsProps.cartCount).toBe(3);
-    apiMocks.listStockRequestDrafts.mockRejectedValueOnce(new Error("legacy failed"));
-    apiMocks.listDrafts.mockResolvedValueOnce([]);
+    await waitFor(() => expect(currentTabsProps.cartCount).toBe(3));
+    apiMocks.countDrafts.mockRejectedValueOnce(new Error("count failed"));
     await act(async () => { currentWizardProps.value?.onStatusChange?.("refresh"); });
     expect(currentTabsProps.cartCount).toBe(3);
     expect(currentTabsProps.unavailableCounts).not.toContain("cart");
   });
   it("does not reuse the previous operator's loaded counts for an unknown operator", async () => {
+    apiMocks.countDrafts.mockResolvedValueOnce({ total: 0, io_count: 0, stock_request_count: 0 });
     apiMocks.listStockRequestDrafts.mockResolvedValue([]);
-    apiMocks.listDrafts.mockResolvedValue([]);
+    apiMocks.ownedDraftRows.mockResolvedValue([]);
     let rerender!: ReturnType<typeof render>["rerender"];
     await act(async () => { ({ rerender } = render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />)); });
-    expect(currentTabsProps.loadingCounts).not.toContain("cart");
+    await waitFor(() => expect(currentTabsProps.loadingCounts).not.toContain("cart"));
     operatorState.value = { ...operatorState.value, employee_id: "unknown-operator" };
     apiMocks.listStockRequestDrafts.mockReturnValueOnce(new Promise(() => {}));
-    apiMocks.listDrafts.mockReturnValueOnce(new Promise(() => {}));
+    apiMocks.ownedDraftRows.mockReturnValueOnce(new Promise(() => {}));
     await act(async () => { rerender(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />); });
     expect(currentTabsProps.loadingCounts).toContain("cart");
   });
@@ -251,10 +262,12 @@ describe("MobileWarehouseScreen compact step header", () => {
   beforeEach(() => {
     window.history.replaceState({}, "", "/mes?tab=warehouse&section=compose");
     apiMocks.listStockRequestDrafts.mockReset();
-    apiMocks.listDrafts.mockReset();
+    apiMocks.ownedDraftRows.mockReset();
+    apiMocks.countDrafts.mockReset();
+    apiMocks.countDrafts.mockReturnValue(new Promise(() => {}));
     apiMocks.countAsResearchQueue.mockReset();
     apiMocks.listStockRequestDrafts.mockReturnValue(new Promise(() => {}));
-    apiMocks.listDrafts.mockReturnValue(new Promise(() => {}));
+    apiMocks.ownedDraftRows.mockReturnValue(new Promise(() => {}));
     apiMocks.countAsResearchQueue.mockResolvedValue({ count: 0 });
     currentWizardProps.value = null;
     currentTabsProps.showAsResearchQueue = undefined;
@@ -276,7 +289,7 @@ describe("MobileWarehouseScreen compact step header", () => {
   it("새 작업 전환용 원 초안 저장은 URL과 복원 상태를 함께 지운다", async () => {
     window.history.replaceState({}, "", "/mes?tab=warehouse&section=compose&step=4&draftId=source-draft");
     apiMocks.listStockRequestDrafts.mockResolvedValue([]);
-    apiMocks.listDrafts.mockResolvedValue([{ batch_id: "source-draft" }]);
+    apiMocks.ownedDraftRows.mockResolvedValue([{ batch_id: "source-draft" }]);
     render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
 
     await waitFor(() => expect(currentWizardProps.value?.restoreDraft?.batch_id).toBe("source-draft"));
@@ -326,10 +339,20 @@ describe("MobileWarehouseScreen compact step header", () => {
     expect(params.get("draftId")).toBe("adjust-draft");
   });
 
+  it("목록에서 재개한 수량 보존 정보가 URL 재조회로 사라지지 않는다", async () => {
+    window.history.replaceState({}, "", "/mes?tab=warehouse&section=mine");
+    apiMocks.ownedDraftRows.mockResolvedValue([{ batch_id: "adjust-draft", sub_type: "adjust_out" }]);
+    render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "mine" }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "continue adjust draft" })); });
+    expect(currentWizardProps.value?.restoreDraft).toMatchObject({ batch_id: "adjust-draft", stocktake_resumed: true });
+    expect(apiMocks.ownedDraftRows).not.toHaveBeenCalled();
+  });
+
   it("늦게 끝난 A 전환은 현재 B draftId와 복원 상태를 지우지 않는다", async () => {
     window.history.replaceState({}, "", "/mes?tab=warehouse&section=compose&step=4&draftId=draft-a");
     apiMocks.listStockRequestDrafts.mockResolvedValue([]);
-    apiMocks.listDrafts.mockResolvedValue([{ batch_id: "draft-a" }, { batch_id: "draft-b" }]);
+    apiMocks.ownedDraftRows.mockResolvedValue([{ batch_id: "draft-a" }, { batch_id: "draft-b" }]);
     const { rerender } = render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
     await waitFor(() => expect(currentWizardProps.value?.restoreDraft?.batch_id).toBe("draft-a"));
     window.history.replaceState({}, "", "/mes?tab=warehouse&section=compose&step=4&draftId=draft-b");
@@ -397,7 +420,7 @@ describe("MobileWarehouseScreen compact step header", () => {
       "/mes?tab=warehouse&section=compose&step=5&draftId=draft-1",
     );
     apiMocks.listStockRequestDrafts.mockResolvedValue([]);
-    apiMocks.listDrafts.mockResolvedValue([{ batch_id: "draft-1" }]);
+    apiMocks.ownedDraftRows.mockResolvedValue([{ batch_id: "draft-1" }]);
 
     render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
 
@@ -414,7 +437,7 @@ describe("MobileWarehouseScreen compact step header", () => {
       "/mes?tab=warehouse&section=compose&step=4&draftId=draft-1",
     );
     apiMocks.listStockRequestDrafts.mockRejectedValue(new Error("legacy unavailable"));
-    apiMocks.listDrafts.mockResolvedValue([{ batch_id: "draft-1" }]);
+    apiMocks.ownedDraftRows.mockResolvedValue([{ batch_id: "draft-1" }]);
 
     render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
 
@@ -430,7 +453,7 @@ describe("MobileWarehouseScreen compact step header", () => {
       "/mes?tab=warehouse&section=compose&step=3&draftId=draft-1",
     );
     apiMocks.listStockRequestDrafts.mockResolvedValue([]);
-    apiMocks.listDrafts
+    apiMocks.ownedDraftRows
       .mockRejectedValueOnce(new Error("draft unavailable"))
       .mockResolvedValueOnce([{ batch_id: "draft-1" }]);
 
@@ -441,7 +464,7 @@ describe("MobileWarehouseScreen compact step header", () => {
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
 
     await waitFor(() => expect(currentWizardProps.value?.restoreDraft?.batch_id).toBe("draft-1"));
-    expect(apiMocks.listDrafts).toHaveBeenCalledTimes(2);
+    expect(apiMocks.ownedDraftRows).toHaveBeenCalledTimes(2);
   });
 
   it("does not open a blank compose when the URL draft no longer exists", async () => {
@@ -451,7 +474,7 @@ describe("MobileWarehouseScreen compact step header", () => {
       "/mes?tab=warehouse&section=compose&step=2&draftId=missing",
     );
     apiMocks.listStockRequestDrafts.mockResolvedValue([]);
-    apiMocks.listDrafts.mockResolvedValue([]);
+    apiMocks.ownedDraftRows.mockResolvedValue([]);
 
     render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
 

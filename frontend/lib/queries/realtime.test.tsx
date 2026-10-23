@@ -105,16 +105,17 @@ afterEach(() => {
 });
 
 describe("invalidateOperationalQueries", () => {
-  it("realtime 변경 전 최초 재고 요청에 캐시가 없어도 오래된 첫 응답을 재사용하지 않는다", async () => {
+  it.each([{ key: queryKeys.items.list({ limit: 2000 }) }, { key: queryKeys.inventory.workStatus("item-1") }])("realtime 변경 전 최초 요청 $key에 캐시가 없어도 오래된 첫 응답을 재사용하지 않는다", async ({ key }) => {
     const client = makeClient();
-    const key = queryKeys.items.list({ limit: 2000 });
     const oldResponse = deferred<number>();
     const fetchItems = vi.fn<() => Promise<number>>().mockReturnValueOnce(oldResponse.promise).mockResolvedValue(5);
     const observer = new QueryObserver(client, { queryKey: key, queryFn: fetchItems });
     const unsubscribe = observer.subscribe(() => {});
     expect(fetchItems).toHaveBeenCalledTimes(1);
     const publish = vi.fn();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
     const refreshing = invalidateOperationalQueries(client, publish);
+    await waitFor(() => expect(invalidate).toHaveBeenCalledTimes(13));
     oldResponse.resolve(3);
     await refreshing;
     expect(publish).toHaveBeenCalledTimes(1);

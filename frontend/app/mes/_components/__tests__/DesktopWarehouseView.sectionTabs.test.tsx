@@ -28,7 +28,8 @@ const currentWorkAreaProps = vi.hoisted(() => ({
 
 const apiMocks = vi.hoisted(() => ({
   listStockRequestDrafts: vi.fn(),
-  listDrafts: vi.fn(),
+  ownedDraftRows: vi.fn(),
+  countDrafts: vi.fn(),
   countAsResearchQueue: vi.fn(),
 }));
 
@@ -40,6 +41,20 @@ const operatorState = vi.hoisted(() => ({
     department: "조립",
     as_research_approver: false,
   },
+}));
+
+vi.mock("@/lib/api/work-drafts", () => ({
+  workDraftsApi: {
+    count: (...args: unknown[]) => apiMocks.countDrafts(...args),
+    getOwnedIo: async (_employeeId: string, batchId: string) => {
+      const rows = await apiMocks.ownedDraftRows();
+      return rows.find((row: { batch_id: string }) => row.batch_id === batchId);
+    },
+  },
+}));
+
+vi.mock("@/lib/auth/operator-session", () => ({
+  restoreOperatorSession: (employeeId: string) => ({ employee_id: employeeId, token: "test-token" }),
 }));
 
 vi.mock("@/lib/api", () => ({ api: apiMocks }));
@@ -77,7 +92,7 @@ vi.mock("@/app/mes/_components/_warehouse_sections/WarehouseDraftPanelTabs", () 
       <>
         <button
           type="button"
-          onClick={() => onContinueIoDraft?.({ batch_id: "draft-2", sub_type: "adjust_out" } as never)}
+          onClick={() => onContinueIoDraft?.({ batch_id: "draft-2", sub_type: "adjust_out", stocktake_resumed: true } as never)}
         >
           continue draft
         </button>
@@ -116,10 +131,12 @@ describe("DesktopWarehouseView", () => {
   beforeEach(() => {
     window.history.replaceState(null, "", "/mes?tab=warehouse&section=mine");
     apiMocks.listStockRequestDrafts.mockReset();
-    apiMocks.listDrafts.mockReset();
+    apiMocks.ownedDraftRows.mockReset();
+    apiMocks.countDrafts.mockReset();
+    apiMocks.countDrafts.mockReturnValue(new Promise(() => {}));
     apiMocks.countAsResearchQueue.mockReset();
     apiMocks.listStockRequestDrafts.mockReturnValue(new Promise(() => {}));
-    apiMocks.listDrafts.mockReturnValue(new Promise(() => {}));
+    apiMocks.ownedDraftRows.mockReturnValue(new Promise(() => {}));
     apiMocks.countAsResearchQueue.mockResolvedValue({ count: 0 });
     operatorState.value = {
       employee_id: "emp-1",
@@ -135,7 +152,7 @@ describe("DesktopWarehouseView", () => {
   it("현재 작성기에서 저장한 창고 작업 URL은 원작업 보관 세션을 재마운트하지 않는다", async () => {
     window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=4");
     apiMocks.listStockRequestDrafts.mockResolvedValue([]);
-    apiMocks.listDrafts.mockResolvedValue([{ batch_id: "pull-draft", sub_type: "warehouse_to_dept" }]);
+    apiMocks.ownedDraftRows.mockResolvedValue([{ batch_id: "pull-draft", sub_type: "warehouse_to_dept" }]);
     render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
     fireEvent.change(screen.getByLabelText("작성 세션 메모"), { target: { value: "보관 중인 원작업 입력" } });
 
@@ -410,10 +427,19 @@ describe("DesktopWarehouseView", () => {
     expect(params.get("draftId")).toBe("draft-2");
   });
 
+  it("목록에서 재개한 수량 보존 정보가 URL 재조회로 사라지지 않는다", async () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=cart");
+    apiMocks.ownedDraftRows.mockResolvedValue([{ batch_id: "draft-2", sub_type: "adjust_out" }]);
+    render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "continue draft" })); });
+    expect(currentComposeProps.value?.restoreDraft).toMatchObject({ batch_id: "draft-2", stocktake_resumed: true });
+    expect(apiMocks.ownedDraftRows).not.toHaveBeenCalled();
+  });
+
   it("새 작업 전환용 원 초안 저장은 URL draftId를 남기지 않는다", async () => {
     window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=4&draftId=source-draft");
     apiMocks.listStockRequestDrafts.mockResolvedValue([]);
-    apiMocks.listDrafts.mockResolvedValue([{ batch_id: "source-draft" }]);
+    apiMocks.ownedDraftRows.mockResolvedValue([{ batch_id: "source-draft" }]);
     render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
 
     await waitFor(() => expect(currentComposeProps.value?.restoreDraft?.batch_id).toBe("source-draft"));
@@ -429,7 +455,7 @@ describe("DesktopWarehouseView", () => {
   it("새 작업은 부모 초안 복원 추적을 해제하며 같은 저장 초안을 다시 복원할 수 있다", async () => {
     window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=4&draftId=saved-draft");
     apiMocks.listStockRequestDrafts.mockResolvedValue([]);
-    apiMocks.listDrafts.mockResolvedValue([{ batch_id: "saved-draft" }]);
+    apiMocks.ownedDraftRows.mockResolvedValue([{ batch_id: "saved-draft" }]);
     const { rerender } = render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
     await waitFor(() => expect(currentComposeProps.value?.restoreDraft?.batch_id).toBe("saved-draft"));
     act(() => {
@@ -445,7 +471,7 @@ describe("DesktopWarehouseView", () => {
   it("늦게 끝난 A 전환은 현재 B draftId를 지우지 않는다", async () => {
     window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=4&draftId=draft-a");
     apiMocks.listStockRequestDrafts.mockResolvedValue([]);
-    apiMocks.listDrafts.mockResolvedValue([{ batch_id: "draft-a" }, { batch_id: "draft-b" }]);
+    apiMocks.ownedDraftRows.mockResolvedValue([{ batch_id: "draft-a" }, { batch_id: "draft-b" }]);
     const { rerender } = render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
     await waitFor(() => expect(currentComposeProps.value?.restoreDraft?.batch_id).toBe("draft-a"));
     window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=4&draftId=draft-b");
@@ -459,7 +485,7 @@ describe("DesktopWarehouseView", () => {
   it("restores the URL draft even when the legacy draft count fails", async () => {
     window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=4&draftId=draft-1");
     apiMocks.listStockRequestDrafts.mockRejectedValue(new Error("legacy unavailable"));
-    apiMocks.listDrafts.mockResolvedValue([{ batch_id: "draft-1" }]);
+    apiMocks.ownedDraftRows.mockResolvedValue([{ batch_id: "draft-1" }]);
 
     render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
 
@@ -471,7 +497,7 @@ describe("DesktopWarehouseView", () => {
   it("keeps a URL draft restore error visible and retries instead of opening a blank compose", async () => {
     window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=3&draftId=draft-1");
     apiMocks.listStockRequestDrafts.mockResolvedValue([]);
-    apiMocks.listDrafts
+    apiMocks.ownedDraftRows
       .mockRejectedValueOnce(new Error("draft unavailable"))
       .mockResolvedValueOnce([{ batch_id: "draft-1" }]);
 
@@ -482,13 +508,13 @@ describe("DesktopWarehouseView", () => {
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
 
     await waitFor(() => expect(currentComposeProps.value?.restoreDraft?.batch_id).toBe("draft-1"));
-    expect(apiMocks.listDrafts).toHaveBeenCalledTimes(2);
+    expect(apiMocks.ownedDraftRows).toHaveBeenCalledTimes(2);
   });
 
   it("does not open a blank compose when the URL draft no longer exists", async () => {
     window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=2&draftId=missing");
     apiMocks.listStockRequestDrafts.mockResolvedValue([]);
-    apiMocks.listDrafts.mockResolvedValue([]);
+    apiMocks.ownedDraftRows.mockResolvedValue([]);
 
     render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
 

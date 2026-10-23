@@ -21,6 +21,23 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("직원 전체 저장 작업 조회 계약", () => {
+  it("건수는 현재 인증 직원 전용 경로만 사용한다", async () => {
+    respond({ io_count: 3, stock_request_count: 0, total: 3 });
+    expect(await workDraftsApi.count("actor-a")).toEqual({ io_count: 3, stock_request_count: 0, total: 3 });
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/work-drafts/count");
+    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get("X-Operator-Session")).toBe("tab-token");
+  });
+
+  it("단건 복원은 취소 signal과 현재 직원의 인증만 전달한다", async () => {
+    respond({ batch_id: "saved/1" });
+    const controller = new AbortController();
+    await workDraftsApi.getOwnedIo("actor-a", "saved/1", { signal: controller.signal });
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/work-drafts/owned-io/saved%2F1");
+    expect(fetchMock.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
+    auth.token = null;
+    await expect(workDraftsApi.getOwnedIo("actor-a", "saved/1")).rejects.toMatchObject({ status: 401 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
   it("검색과 페이지를 인코딩하고 현재 탭의 작업자 세션만 헤더로 전달한다", async () => {
     respond({ items: [], total: 0, skip: 0, limit: 30 });
     await workDraftsApi.list("actor-a", { search: "튜브 & 부품", requester_department: "조립", requester_employee_id: "owner/b", skip: 0, limit: 30 });
@@ -68,12 +85,13 @@ describe("직원 전체 저장 작업 조회 계약", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
-  it("직원 전환의 취소 signal을 실제 조회에 전달한다", async () => {
+  it.each(["list", "owned"] as const)("%s 직원 전환의 취소 signal을 실제 조회에 전달한다", async (kind) => {
     const controller = new AbortController();
     fetchMock.mockImplementationOnce((_url, init) => new Promise((_resolve, reject) => {
       init?.signal?.addEventListener("abort", () => reject(new DOMException("Cancelled", "AbortError")), { once: true });
     }));
-    const pending = workDraftsApi.list("actor-a", {}, { signal: controller.signal });
+    const pending = kind === "list" ? workDraftsApi.list("actor-a", {}, { signal: controller.signal })
+      : workDraftsApi.getOwnedIo("actor-a", "saved", { signal: controller.signal });
     controller.abort();
     await expect(pending).rejects.toMatchObject({ name: "AbortError" });
     expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(true);

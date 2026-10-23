@@ -401,9 +401,15 @@ def _stock_request_summary(request: StockRequest) -> dict:
     }
 
 
-def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None) -> dict:
-    linked_requests: list[StockRequest] = []
-    if db is not None:
+def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None,
+                      *, linked_requests: list[StockRequest] | None = None,
+                      pause_payloads: dict[tuple[str, uuid.UUID], dict] | None = None) -> dict:
+    """Reuse request-local projections when available; direct callers read current state."""
+    from app.services.work_stocktake_pause import pause_payload
+    from sqlalchemy.orm import object_session
+    pause_db = db if db is not None else object_session(batch)
+
+    if linked_requests is None and db is not None:
         linked_requests = (
             db.query(StockRequest)
             .filter(StockRequest.operation_batch_id == batch.batch_id)
@@ -418,6 +424,7 @@ def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None) -> dict:
             )
             if legacy_request is not None:
                 linked_requests = [legacy_request]
+    linked_requests = linked_requests or []
     approval_by_line_id: dict[uuid.UUID, tuple[str, str | None]] = {}
     for request in linked_requests:
         summary = _stock_request_summary(request)
@@ -479,6 +486,8 @@ def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None) -> dict:
             approver_name = summary["approver_name"] or batch.requester_name
     return {
         "batch_id": batch.batch_id,
+        "stocktake_pause": (pause_payloads.get(("io", batch.batch_id)) if pause_payloads is not None
+            else pause_payload(pause_db, "io", batch.batch_id) if pause_db is not None and batch.status == "draft" else None),
         "revision": batch.revision,
         "reservation_status": batch.reservation_status,
         "reservation_issue": batch.reservation_issue,
@@ -763,12 +772,22 @@ def get_batch(db: Session, *, batch_id: uuid.UUID) -> Optional[dict]:
     return _batch_to_payload(batch, db=db) if batch else None
 
 
+def current_submission_requests(batch: IoBatch, requests: Iterable[StockRequest]) -> list[StockRequest]:
+    """재제출 전 취소 시각이 확인되는 이력만 제외하고 불명확한 요청은 보존한다."""
+    return [request for request in requests if not (
+        _enum_value(request.status) == StockRequestStatusEnum.CANCELLED.value
+        and request.cancelled_at is not None
+        and batch.submitted_at is not None
+        and request.cancelled_at < batch.submitted_at
+    )]
+
+
 def sync_batch_from_stock_requests(
     db: Session,
     batch: IoBatch,
     requests: Optional[list[StockRequest]] = None,
 ) -> None:
-    """연결된 모든 결재 요청을 집계해 배치 상태와 단일 호환 필드를 갱신한다."""
+    """이전 제출분 취소를 제외해 배치 상태와 단일 호환 필드를 갱신한다."""
     linked_requests = requests
     if linked_requests is None:
         linked_requests = (
@@ -780,16 +799,7 @@ def sync_batch_from_stock_requests(
     if not linked_requests:
         return
 
-    status_requests = [
-        request
-        for request in linked_requests
-        if not (
-            _enum_value(request.status) == StockRequestStatusEnum.CANCELLED.value
-            and request.cancelled_at is not None
-            and batch.submitted_at is not None
-            and request.cancelled_at < batch.submitted_at
-        )
-    ]
+    status_requests = current_submission_requests(batch, linked_requests)
     if not status_requests:
         return
 
@@ -871,6 +881,9 @@ def sync_batch_from_stock_requests(
                 batch.bundles
             )
     batch.updated_at = datetime.utcnow()
+    if batch.status == "draft":
+        from app.services.work_stocktake_pause import pause_returned_draft
+        pause_returned_draft(db, batch)
     db.flush()
 
 

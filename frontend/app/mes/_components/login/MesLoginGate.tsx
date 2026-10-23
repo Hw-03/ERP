@@ -53,6 +53,8 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
   const [logoState, setLogoState] = useState<LogoState>("center");
   // 항목 5-2 — 모바일(<1024px)만 인트로 시작 스케일을 작게(작게→크게 반전). 데스크톱은 현행 유지.
   const [isNarrow, setIsNarrow] = useState(false);
+  const [logoLoaded, setLogoLoaded] = useState(false);
+  const [introReady, setIntroReady] = useState(false);
   const [recoveryAttempt, setRecoveryAttempt] = useState(0);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const idleConfirmation = useIdleOperatorConfirmation(phase === "authed");
@@ -80,6 +82,15 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
   useLayoutEffect(() => {
     setIsNarrow(window.matchMedia("(max-width: 1023px)").matches);
   }, []);
+
+  useEffect(() => {
+    if (!logoLoaded) return;
+    let secondFrame = 0;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => setIntroReady(true));
+    });
+    return () => { cancelAnimationFrame(firstFrame); cancelAnimationFrame(secondFrame); };
+  }, [logoLoaded]);
 
   useEffect(() => {
     let cancelled = false;
@@ -162,12 +173,12 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
 
   // 인트로 단계 진입 → 로고 축소 → 카드 등장 (≤ 1.5s 절제된 시퀀스)
   useEffect(() => {
-    if (phase !== "intro") return;
+    if (phase !== "intro" || !introReady) return;
     const t1 = setTimeout(() => setLogoState("above-card"), 600);
     const t2 = setTimeout(() => setPhase("form"), 1100);
     timersRef.current = [t1, t2];
     return clearTimers;
-  }, [phase]);
+  }, [phase, introReady]);
 
   const handleLogin = () => {
     setWorkspaceOwner(readCurrentOperator()?.employee_id ?? null);
@@ -219,7 +230,7 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
       {/* 영구 로고 — phase 와 무관하게 항상 같은 element 로 렌더 (flicker 방지) */}
       {/* outer: 위치 이동 transform / inner: 인트로 fade+scale 애니메이션 (충돌 방지) */}
       <div
-        className={`pointer-events-none absolute${logoState === "above-card" ? ` ${mobileStyles.logoAbove}` : ""}`}
+        className={`pointer-events-none absolute ${mobileStyles.logo}${logoState === "above-card" ? ` ${mobileStyles.logoAbove}` : ""}`}
         style={{
           transform: logoState === "above-card"
             ? SHRINK_TRANSFORM
@@ -230,7 +241,8 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
       >
         <div
           style={{
-            animation: phase === "intro" ? "mes-logo-fade-in 0.5s ease both" : undefined,
+            opacity: phase === "intro" && !introReady ? 0 : undefined,
+            animation: phase === "intro" && introReady ? "mes-logo-fade-in 0.5s ease both" : undefined,
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -238,6 +250,10 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
             src="/dexcowin-logo.png"
             alt="DEXCOWIN"
             width={840}
+            height={280}
+            fetchPriority="high"
+            onLoad={() => setLogoLoaded(true)}
+            onError={() => setLogoLoaded(true)}
             draggable={false}
             style={{ width: 840, maxWidth: "none", height: "auto", userSelect: "none" }}
           />

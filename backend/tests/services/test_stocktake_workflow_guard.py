@@ -42,12 +42,13 @@ def _actor(db, *, code: str, warehouse_role: str = "none") -> Employee:
     return actor
 
 
-def _pool_round(db) -> uuid.UUID:
+def _pool_round(db, *, active: bool = True) -> uuid.UUID:
     round_id = uuid.uuid4()
     actor = _actor(db, code="ROUND-OWNER")
-    db.add(StocktakeRound(round_id=round_id, title="Guard fixture", epoch=1, started_by=actor.employee_id))
+    db.add(StocktakeRound(round_id=round_id, title="Guard fixture", epoch=1,
+                         status="ACTIVE" if active else "CLOSED_FULL", started_by=actor.employee_id))
     db.flush()
-    db.add(StocktakeControl(id=1, inventory_mode="POOL", active_round_id=round_id, epoch=1))
+    db.add(StocktakeControl(id=1, inventory_mode="POOL", active_round_id=round_id if active else None, epoch=1))
     db.add_all([
         InventoryScope(scope_key="warehouse", physical_department="창고"),
         InventoryScope(scope_key="assembly", physical_department=DepartmentEnum.ASSEMBLY.value),
@@ -112,8 +113,8 @@ def test_counted_warehouse_blocks_request_approval_without_failing_request_or_re
     item = make_item(name="Counted approval", process_type_code="AR", warehouse_qty=Decimal(10))
     requester = _actor(db_session, code="ST-WF-REQUESTER")
     approver = _actor(db_session, code="ST-WF-APPROVER", warehouse_role="primary")
-    round_id = _pool_round(db_session)
     request_id = _request(client, requester, [(item.item_id, 3)])
+    round_id = _pool_round(db_session)
     _count_cell(db_session, item.item_id, round_id)
 
     response = client.post(f"/api/stock-requests/{request_id}/approve", json={
@@ -138,8 +139,8 @@ def test_counted_warehouse_allows_request_cancellation_to_release_only_reservati
 ) -> None:
     item = make_item(name="Counted cancellation", process_type_code="AR", warehouse_qty=Decimal(10))
     requester = _actor(db_session, code="ST-WF-CANCEL")
-    round_id = _pool_round(db_session)
     request_id = _request(client, requester, [(item.item_id, 3)])
+    round_id = _pool_round(db_session)
     _count_cell(db_session, item.item_id, round_id)
 
     response = client.post(f"/api/stock-requests/{request_id}/cancel", json={
@@ -165,8 +166,8 @@ def test_counted_second_request_line_rolls_back_entire_approval(
     second = make_item(name="Counted second line", process_type_code="AR", warehouse_qty=Decimal(10))
     requester = _actor(db_session, code="ST-WF-MULTI-REQ")
     approver = _actor(db_session, code="ST-WF-MULTI-APP", warehouse_role="primary")
-    round_id = _pool_round(db_session)
     request_id = _request(client, requester, [(first.item_id, 3), (second.item_id, 4)])
+    round_id = _pool_round(db_session)
     _count_cell(db_session, second.item_id, round_id)
 
     response = client.post(f"/api/stock-requests/{request_id}/approve", json={
@@ -359,7 +360,7 @@ def test_pool_internal_use_submit_prepares_all_approval_groups_before_reserving(
     requester = _make_requester(
         db_session, department=DepartmentEnum.AS, warehouse_role="none",
     )
-    _pool_round(db_session)
+    _pool_round(db_session, active=False)
     payload = _internal_use_payload(requester, [warehouse_item, department_item])
     department_line = payload.bundles[1].lines[0]
     department_line.from_bucket = "production"
@@ -539,7 +540,7 @@ def test_pool_io_declares_all_items_before_live_route_normalization(
     requester = _make_requester(
         db_session, department=DepartmentEnum.AS, warehouse_role="none",
     )
-    _pool_round(db_session)
+    _pool_round(db_session, active=False)
     payload = _internal_use_payload(requester, [warehouse_item, department_item])
     department_line = payload.bundles[1].lines[0]
     department_line.from_bucket = "production"

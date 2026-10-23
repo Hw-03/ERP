@@ -2,9 +2,17 @@ import type { QueryClient } from "@tanstack/react-query";
 import { ApiError } from "@/lib/api-core";
 import { queryKeys } from "./keys";
 
+/** 변경 전에 시작한 최초 응답도 취소하여 예약 변경 후 다시 조회한다. */
+export async function cancelWorkInventoryQueries(client: QueryClient): Promise<void> {
+  await Promise.all([
+    client.cancelQueries({ queryKey: queryKeys.items.all }),
+    client.cancelQueries({ queryKey: queryKeys.inventory.workStatusAll }),
+  ]);
+}
+
 /** 예약 변경 후 같은 세션의 재고·작업·관리자 조회를 함께 만료시킨다. */
 export async function invalidateWorkReservationQueries(client: QueryClient, options?: { throwOnError?: boolean }): Promise<void> {
-  if (options?.throwOnError) await client.cancelQueries({ queryKey: queryKeys.items.all });
+  await cancelWorkInventoryQueries(client);
   await Promise.all([
     queryKeys.items.all,
     queryKeys.inventory.all,

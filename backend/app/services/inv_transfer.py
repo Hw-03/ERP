@@ -257,9 +257,9 @@ def lock_items_for_department_routing(
 ) -> dict[uuid.UUID, Item]:
     """부서 산정 전에 품목 행을 전역 item_id 순서로 잠근다.
 
-    SQLite는 ``FOR UPDATE`` 절을 생략하지만 SQLAlchemy의 잠금 쿼리 경로는
-    동일하게 거친다. 호출자는 반환된 Item으로 부서를 산정한 뒤 같은 트랜잭션에서
-    재고를 변경해야 한다.
+    PostgreSQL은 ``FOR NO KEY UPDATE``로 부서 변경을 막되 다른 작업 행의
+    FK 잠금과 충돌하지 않는다. SQLite는 잠금 절을 생략한다. 호출자는 반환된
+    Item으로 부서를 산정한 뒤 같은 트랜잭션에서 재고를 변경해야 한다.
     """
     ordered_item_ids = sorted(set(item_ids))
     if not ordered_item_ids:
@@ -269,7 +269,7 @@ def lock_items_for_department_routing(
         db.query(Item)
         .filter(Item.item_id.in_(ordered_item_ids))
         .order_by(Item.item_id)
-        .with_for_update()
+        .with_for_update(key_share=True)
         .all()
     )
     return {item.item_id: item for item in items}

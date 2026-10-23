@@ -127,6 +127,27 @@ def _validate_direct_automatic_department_routes(
             )
 
 
+def _normalize_resuming_automatic_department_routes(
+    db: Session, payload: StockRequestDraftUpsert,
+) -> StockRequestDraftUpsert:
+    """Resume saved work against live execution routes; the service validates its token and old/new cells."""
+    normalized = payload.model_copy(deep=True)
+    for line in normalized.lines:
+        field = None
+        if (payload.request_type == StockRequestTypeEnum.WAREHOUSE_TO_DEPT
+                and line.to_bucket == RequestBucketEnum.PRODUCTION):
+            field = "to_department"
+        elif (payload.request_type in {StockRequestTypeEnum.DEPT_TO_WAREHOUSE,
+                StockRequestTypeEnum.SCRAP_NORMAL, StockRequestTypeEnum.REWORK_NORMAL}
+                and line.from_bucket == RequestBucketEnum.PRODUCTION):
+            field = "from_department"
+        if field is not None:
+            item = db.get(Item, line.item_id)
+            if item is not None:
+                setattr(line, field, department_for_item(item).value)
+    return normalized
+
+
 # ---------------------------------------------------------------------------
 # 요청 생성
 # ---------------------------------------------------------------------------
@@ -488,6 +509,8 @@ def upsert_stock_request_draft(
         raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 요청할 수 없습니다.")
 
     try:
+        if payload.stocktake_resume_token is not None:
+            payload = _normalize_resuming_automatic_department_routes(db, payload)
         _validate_direct_automatic_department_routes(db, payload)
     except ValueError as exc:
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
@@ -519,6 +542,7 @@ def upsert_stock_request_draft(
             reason_memo=payload.reason_memo,
             supplier_id=payload.supplier_id,
             submission_id=payload.submission_id,
+            stocktake_resume_token=payload.stocktake_resume_token,
         )
     except ValueError as exc:
         db.rollback()

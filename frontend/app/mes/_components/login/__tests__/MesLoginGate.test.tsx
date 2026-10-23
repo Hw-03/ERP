@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MesLoginGate } from "../MesLoginGate";
@@ -77,6 +77,9 @@ describe("MesLoginGate mascot", () => {
 
     expect(getMascotImages(container)).toHaveLength(0);
 
+    fireEvent.load(screen.getByRole("img", { name: "DEXCOWIN" }));
+    act(() => vi.advanceTimersByTime(40));
+
     act(() => {
       vi.advanceTimersByTime(1100);
     });
@@ -96,6 +99,23 @@ describe("MesLoginGate mascot", () => {
       bottom: "clamp(120px, 25vh, 228px)",
       width: "clamp(260px, min(18vw, 40vh), 380px)",
     });
+  });
+
+  it("로고의 크기를 확보하고 이미지 로딩 후에 인트로를 시작한다", () => {
+    installMatchMedia({ narrow: true });
+    renderLoginGate();
+    const image = screen.getByRole("img", { name: "DEXCOWIN" });
+    const fade = image.parentElement!;
+    expect(image).toHaveAttribute("height", "280");
+    expect(fade.style.opacity).toBe("0");
+    act(() => vi.advanceTimersByTime(2000));
+    expect(getMascotImages(document.body)).toHaveLength(0);
+    fireEvent.load(image);
+    act(() => vi.advanceTimersByTime(40));
+    expect(fade.style.animation).toBe("mes-logo-fade-in 0.5s ease both");
+    expect(fade.parentElement?.className).toMatch(/logo/);
+    act(() => vi.advanceTimersByTime(1100));
+    expect(getMascotImages(document.body)).toHaveLength(1);
   });
 
   it("shows the mascot immediately with the form when reduced motion is preferred", () => {

@@ -1497,6 +1497,8 @@ def _handoff_saved_reservation(db: Session, batch: IoBatch, requester: Employee,
     """Hold every source/output parent lock while replacing draft ownership with approval ownership."""
     from app.services import io_reservations as reservations
     from app.services.item_write_validation import validate_io_items
+    from app.services.work_stocktake_pause import ensure_work_submit, io_required_cells
+    ensure_work_submit(db, "io", batch.batch_id, io_required_cells(db, batch))
     validate_io_items(db, batch.bundles, sub_type=batch.sub_type)
     reservations.validate_saved_plan(db, batch)
     supplier = validate_supplier_for_operation(db, work_type=batch.work_type,
@@ -1526,6 +1528,9 @@ def submit_existing_draft(
 ) -> dict:
     """Check owner and version before atomically handing the draft reservation off."""
     from app.services import io_reservations as reservations
+    from app.services import stocktake_guard
+    from app.services.work_stocktake_pause import ensure_work_submit, io_required_cells
+    stocktake_guard.lock_control(db)
     hint = db.get(IoBatch, batch_id)
     if hint is not None and hint.sub_type == INTERNAL_USE_SUB_TYPE:
         from app.services.internal_use_approval import lock_approver_roster
@@ -1542,6 +1547,7 @@ def submit_existing_draft(
     )
     reservations.check_revision(batch, expected_revision)
     reservations.check_draft(batch)
+    ensure_work_submit(db, "io", batch.batch_id, io_required_cells(db, batch))
     if batch.reservation_status not in {"reserved", "not_required"}:
         raise WorkReservationError("WORK_RESAVE_REQUIRED", "다시 저장해 작업 재고를 확보해 주세요.")
     ensure_batch_is_mutable(batch)

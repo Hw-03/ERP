@@ -9,6 +9,47 @@ vi.mock("@/lib/api", () => ({ api: { saveDraft: vi.fn(), getBatch: vi.fn(), subm
 const payload = { employeeId: "employee", workType: "process" as const, subType: "produce" as const, bundles: [] };
 beforeEach(() => vi.clearAllMocks());
 describe("작업 예약 작성 계약", () => {
+  const pause = { token: "pause", round_id: "round", state: "ready" as const, paused_at: "now", pending_target_count: 0, missing_target_count: 0 };
+  it("일시중지된 작업의 일반 저장과 제출을 차단한다", async () => {
+    const draft = { batch_id: "batch", revision: 7, stocktake_pause: { ...pause, state: "blocked" } } as IoBatch;
+    const { result } = renderHook(() => useIoDraft(draft, 1));
+    await act(async () => {
+      await expect(result.current.saveDraft({ ...payload, batchId: "batch" })).rejects.toThrow("작업 재개");
+      await expect(result.current.submitDraft("batch", "employee")).rejects.toThrow("작업 재개");
+    });
+    expect(api.saveDraft).not.toHaveBeenCalled();
+    expect(api.submitDraft).not.toHaveBeenCalled();
+  });
+  it("조사 반영된 작업의 일반 저장은 재개 토큰과 기존 버전을 함께 보낸다", async () => {
+    const draft = { batch_id: "batch", revision: 7, stocktake_pause: pause } as IoBatch;
+    vi.mocked(api.saveDraft).mockResolvedValue({ ...draft, revision: 8, stocktake_pause: null });
+    const { result } = renderHook(() => useIoDraft(draft, 1));
+    await act(async () => { await result.current.saveDraft({ ...payload, batchId: "batch" }); });
+    expect(api.saveDraft).toHaveBeenCalledWith(expect.objectContaining({ expected_revision: 7, stocktake_resume_token: "pause" }));
+    expect(result.current.stocktakePause).toBeNull();
+  });
+  it("오래 열린 편집기도 최신 조회의 일시중지를 감지하되 입력용 배치를 보존한다", async () => {
+    const draft = { batch_id: "batch", revision: 7, status: "draft", requester_employee_id: "employee" } as IoBatch;
+    vi.mocked(api.getBatch).mockResolvedValue({ ...draft, stocktake_pause: { ...pause, state: "blocked" } });
+    const context = { employeeId: "employee", inventorySnapshot: [] as Item[], realtimeRevision: 1 };
+    const { result } = renderHook(() => useIoDraft(draft, 1, undefined, undefined, context));
+    await act(async () => {});
+    expect(result.current.stocktakePause?.state).toBe("blocked");
+    expect(result.current.savedBatch).toEqual(draft);
+    await act(async () => { await expect(result.current.saveDraft({ ...payload, batchId: "batch" })).rejects.toThrow("작업 재개"); });
+    expect(api.saveDraft).not.toHaveBeenCalled();
+  });
+  it("조회 전에 캡처한 저장 콜백도 나중에 감지된 일시중지를 우회하지 못한다", async () => {
+    const draft = { batch_id: "batch", revision: 7, status: "draft", requester_employee_id: "employee" } as IoBatch;
+    let finish!: (batch: IoBatch) => void;
+    vi.mocked(api.getBatch).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    const context = { employeeId: "employee", inventorySnapshot: [] as Item[], realtimeRevision: 1 };
+    const { result } = renderHook(() => useIoDraft(draft, 1, undefined, undefined, context));
+    const save = result.current.saveDraft;
+    await act(async () => { finish({ ...draft, stocktake_pause: { ...pause, state: "blocked" } }); });
+    await act(async () => { await expect(save({ ...payload, batchId: "batch" })).rejects.toThrow("작업 재개"); });
+    expect(api.saveDraft).not.toHaveBeenCalled();
+  });
   it("복귀 후 늦은 창고 저장 응답이 원작업의 관측 배치를 덮지 않는다", async () => {
     let finish!: (batch: IoBatch) => void;
     vi.mocked(api.saveDraft).mockReturnValue(new Promise((resolve) => { finish = resolve; }));

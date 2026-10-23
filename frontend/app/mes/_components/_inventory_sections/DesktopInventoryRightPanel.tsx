@@ -39,6 +39,7 @@ export interface DesktopInventoryRightPanelProps {
   canReceive?: boolean;
   imageFilename?: string;
   detailLoading?: boolean;
+  refreshing?: boolean;
   detailError?: string | null;
   onRetryDetail?: () => void;
   actionsDisabled?: boolean;
@@ -54,6 +55,7 @@ export function DesktopInventoryRightPanel({
   imageFilename,
   open = !!selectedItem,
   detailLoading = false,
+  refreshing = false,
   detailError,
   onRetryDetail = () => {},
   actionsDisabled = false,
@@ -188,6 +190,7 @@ export function DesktopInventoryRightPanel({
                 canReceive={canReceive}
                 imageFilename={imageFilename}
                 actionsDisabled={actionsDisabled}
+                refreshing={refreshing}
               />}
             </div>
           ) : activeTab === "history" && selectedItem && displayItem && selectedItem.item_id === displayItem.item_id ? (

@@ -58,6 +58,8 @@ function StockChange({
 function operationKeyForGroup(group: DailyWorkActivityData["details"][number]): string {
   const log = group.logs[0];
   if (!log) return "process";
+  // 일보 API와 같이 배치 없는 재작업을 입고/분해 거래보다 먼저 분류한다.
+  if (!log.operation_batch_id && log.reference_no?.startsWith("defect-disassemble:")) return "defect";
   if (log.shipping_phase === "COMPONENT_CHANGE") return "item_conversion";
   if (log.shipping_phase === "PREPARE" || log.shipping_phase === "PICKUP") return "shipping";
   if (["RECEIVE", "TRANSFER_TO_PROD", "TRANSFER_TO_WH", "INTERNAL_USE"].includes(log.transaction_type)) return "warehouse";

@@ -33,6 +33,22 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 describe("관리자 작업 예약 표시", () => {
+  it("전수조사로 멈춘 작업의 상태와 일시중지·재개 기록을 표시한다", async () => {
+    const paused = { ...work, reservation_status: "inactive" as const, reserved_inputs: [],
+      stocktake_pause: { token: "pause", round_id: "round", state: "blocked" as const, paused_at: work.updated_at, pending_target_count: 1, missing_target_count: 0 },
+      history: [
+        { event_id: "paused", action: "stocktake_paused" as const, revision: 4, occurred_at: work.updated_at, actor_employee_id: null, actor_name: "system", reason: null },
+        { event_id: "resumed", action: "stocktake_resumed" as const, revision: 5, occurred_at: work.updated_at, actor_employee_id: "owner", actor_name: "작업 담당자", reason: null },
+      ],
+    };
+    vi.mocked(workReservationsApi.listAdmin).mockResolvedValue({ items: [paused], total: 1, skip: 0, limit: 30 });
+    vi.mocked(workReservationsApi.getAdminDetail).mockResolvedValue(paused);
+    mount(); await selectWork();
+    expect(within(screen.getByRole("button", { name: /작업 담당자/ })).getByText("일시중지")).toBeVisible();
+    expect(screen.getByText("재고 조사 중")).toBeVisible();
+    expect(screen.getByText("전수조사로 일시중지", { exact: true })).toBeVisible();
+    expect(screen.getByText("작업 재개", { exact: true })).toBeVisible();
+  });
   it("저장된 작업이 없을 때 검색 실패나 선택 지시 대신 빈 작업 안내를 보여준다", async () => {
     vi.mocked(workReservationsApi.listAdmin).mockResolvedValue({ items: [], total: 0, skip: 0, limit: 30 });
     mount();

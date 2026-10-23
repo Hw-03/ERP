@@ -1,6 +1,7 @@
 "use client";
+import { StocktakePauseNotice } from "../common/StocktakePauseNotice";
 
-import { Fragment, useEffect, useState, type CSSProperties, type JSX } from "react";
+import { Fragment, useEffect, useRef, useState, type CSSProperties, type JSX } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ClipboardList, Sparkles, Truck } from "lucide-react";
 import { ApiError } from "@/lib/api-core";
 import type { WorkDraftFilters, WorkDraftSelection, WorkDraftSummary } from "@/lib/api/types/work-drafts";
@@ -22,13 +23,15 @@ import { workDate } from "../common/WorkReservationDetails";
 import { FlowBadge } from "../_history_sections/historyTableHelpers";
 import { finalizeHistoryGroupLabel, getHistoryListOperationLabel, getHistoryProcessGroupLabel } from "../_history_sections/historyPresentation";
 import { IO_WORK_TYPES } from "../_warehouse_v2/ioWorkType";
+import { WorkDraftMemo } from "../common/WorkDraftMemo";
+import { formatRequestNotes } from "./ioRequestLabels";
 import { formatWorkTimestamp, WORK_ITEM_CODE_CLASS, WORK_TIMESTAMP_CLASS, WORK_TYPE_BADGE_CLASS, WorkExpandButton, WorkMovementSummary } from "../common/WorkDraftTableParts";
 
 const PAGE_SIZE = 30;
 const DEPARTMENT_OPTIONS = ["창고", "튜브", "고압", "진공", "튜닝", "조립", "출하", "AS"] as const;
 const CONTROL_CLASS = "min-h-11 min-w-11 !text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--c-blue)]";
 const ITEM_CLASS = "min-w-0 break-keep [overflow-wrap:anywhere]";
-const TABLE_CLASS = "w-full min-w-[1160px] table-fixed border-collapse text-left text-sm";
+const TABLE_CLASS = "w-full min-w-[1480px] table-fixed border-collapse text-left text-sm";
 
 interface Props {
   employeeId: string;
@@ -38,7 +41,7 @@ interface Props {
 
 /** 전체 작업은 담당자에 관계없이 상세 조회만 제공한다. */
 export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props): JSX.Element {
-  const [filters, setFilters] = useState<WorkDraftFilters>({ skip: 0, limit: PAGE_SIZE });
+  const [filters, setFilters] = useState<WorkDraftFilters>({ skip: 0, limit: PAGE_SIZE, sort: "department" });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selected, setSelected] = useState<WorkDraftSelection | null>(null);
   const { list, detail } = useWorkDrafts(employeeId, filters, selected);
@@ -50,8 +53,10 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
   const pending = !list.isError && (list.isPending || pageOutOfRange);
   const work = detail.data?.kind === selected?.kind && detail.data?.id === selected?.id ? detail.data : undefined;
 
+  const previousRefresh = useRef(refreshNonce);
   useEffect(() => {
-    if (refreshNonce !== 0) void list.refetch();
+    if (previousRefresh.current !== refreshNonce) void list.refetch({ cancelRefetch: false });
+    previousRefresh.current = refreshNonce;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshNonce]);
   useEffect(() => {
@@ -94,7 +99,8 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
     return <FlowBadge type={row.history_operation?.transaction_type ?? null} icon={row.history_operation ? undefined : ClipboardList} label={finalizeHistoryGroupLabel(label, row.history_operation?.transaction_type ?? null)} color={row.history_operation ? transactionColor(row.history_operation.transaction_type) : C.blue} variant={layout === "mobile" ? "panel" : "table"} className={WORK_TYPE_BADGE_CLASS} />;
   }
   function targets(row: WorkDraftSummary): JSX.Element {
-    return <div className="space-y-1">{row.targets.length ? row.targets.slice(0, 2).map((target, index) => <div key={`${target.item_id}:${index}`} className="flex items-start justify-between gap-3"><div className={ITEM_CLASS}><p className="font-bold">{target.item_name}</p>{target.mes_code && <p className="text-xs" style={{ color: C.muted2 }}>{target.mes_code}</p>}</div><p className="shrink-0 whitespace-nowrap font-bold tabular-nums">{formatQty(target.quantity)} {target.unit}</p></div>) : <p style={{ color: C.muted2 }}>등록된 목적 품목이 없습니다.</p>}{row.targets.length > 2 && <p className="text-xs" style={{ color: C.muted2 }}>외 {row.targets.length - 2}개 품목</p>}</div>;
+    const target = row.targets[0];
+    return <div className="space-y-1">{target ? <div className="flex items-start justify-between gap-3"><div className={ITEM_CLASS}><p className="font-bold">{target.item_name}</p>{target.mes_code && <p className="text-xs" style={{ color: C.muted2 }}>{target.mes_code}</p>}</div><p className="shrink-0 whitespace-nowrap font-bold tabular-nums">{formatQty(target.quantity)} {target.unit}</p></div> : <p style={{ color: C.muted2 }}>등록된 목적 품목이 없습니다.</p>}{row.targets.length > 1 && <p className="text-xs" style={{ color: C.muted2 }}>외 {row.targets.length - 1}개 품목</p>}<WorkDraftMemo notes={row.kind === "stock_request" ? formatRequestNotes(row.notes) : row.notes} /></div>;
   }
   function movement(row: WorkDraftSummary): JSX.Element {
     return row.kind === "shipping" ? <span className="text-xs font-normal" style={{ color: C.muted2 }}>픽업 시 출고</span> : <WorkMovementSummary counts={row.movement_summary} />;
@@ -115,9 +121,9 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
   const hasFilters = Boolean(filters.search?.trim() || filters.requester_department);
   const failure = list.isError ? <ReadFailure message={list.error instanceof Error ? list.error.message : "작업 목록을 불러오지 못했습니다."} refresh={data !== undefined} onRetry={() => void list.refetch()} /> : null;
   const emptyState = !pending && data?.total === 0 && !list.isError ? <EmptyState compact comfortable variant={hasFilters ? "no-search-result" : "no-data"} title={hasFilters ? "조건에 맞는 작업이 없습니다." : "저장된 작업이 없습니다."} description={hasFilters ? "검색어나 필터를 바꿔 확인해 주세요." : "작업을 저장하면 이곳에서 확인할 수 있습니다."} /> : null;
-  const columns = <colgroup><col className="w-[52px]" /><col className="w-[104px]" /><col className="w-44" /><col className="w-48" /><col /><col className="w-[152px]" /><col className="w-[156px]" /></colgroup>;
-  const sort = filters.sort ?? "updated_desc";
-  const header = <thead className="sticky top-0 z-10" style={{ color: C.muted2, background: C.s1 }}><tr><th scope="col" aria-label="상세" className="border-b p-0" style={{ borderColor: C.border }} />{["저장 시각", "담당자 · 부서", "작업", "대상", "품목코드", "예정 변동"].map((label, index) => {
+  const columns = <colgroup><col className="w-[52px]" /><col className="w-[104px]" /><col className="w-44" /><col className="w-48" /><col /><col className="w-[200px]" /><col className="w-[152px]" /><col className="w-[280px]" /></colgroup>;
+  const sort = filters.sort ?? "department";
+  const header = <thead className="sticky top-0 z-10" style={{ color: C.muted2, background: C.s1 }}><tr><th scope="col" aria-label="상세" className="border-b p-0" style={{ borderColor: C.border }} />{["저장 시각", "담당자 · 부서", "작업", "대상", "메모", "품목코드", "예정 변동"].map((label, index) => {
     const sortable = index < 2;
     const active = index === 0 ? sort !== "department" : index === 1 && sort === "department";
     const ascending = sort === "updated_asc" || sort === "department";
@@ -161,14 +167,14 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
     </div>
     {layout === "desktop" ? <div className="relative min-h-0 flex-1" data-scrollbar-rail-shell>
       <div role="region" aria-label="전체 작업 중 목록" aria-busy={pending} tabIndex={0} data-scrollbar-rail-viewport className="sg absolute inset-y-0 left-0 -right-2.5 overflow-auto [scrollbar-gutter:stable] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]">
-      <div className="relative flex min-h-full min-w-[1160px] flex-col" style={{ background: C.s1 }}>
+      <div className="relative flex min-h-full min-w-[1480px] flex-col" style={{ background: C.s1 }}>
       {pending && <span role="status" className="sr-only">전체 작업 목록 불러오는 중</span>}
       {failure && <div className="p-4">{failure}</div>}
       <table className={TABLE_CLASS} aria-label="전체 작업">
         {columns}{header}
         <tbody aria-hidden={pending || undefined} inert={pending || undefined}>
           {rows.map((row) => {
-          const targetRows = row.targets.length ? row.targets.slice(0, 2) : [null];
+          const target = row.targets[0];
           const expanded = selected?.id === row.id && selected.kind === row.kind;
           const controlsId = `work-draft-${row.kind}-${row.id}`;
           const tuning = row.requester_department === "튜닝";
@@ -176,24 +182,22 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
             ? tuning ? "bg-[color-mix(in_srgb,var(--work-department-color)_20%,transparent)]" : "bg-[color-mix(in_srgb,var(--work-department-color)_14%,transparent)]"
             : tuning ? "bg-[color-mix(in_srgb,var(--work-department-color)_14%,transparent)]" : "bg-[color-mix(in_srgb,var(--work-department-color)_7%,transparent)]";
           return <Fragment key={`${row.kind}:${row.id}`}>
-            {targetRows.map((target, index) => <tr key={`${target?.item_id}:${index}`} tabIndex={index === 0 ? 0 : undefined} aria-expanded={expanded} aria-controls={controlsId}
-              className={`cursor-pointer align-middle font-bold leading-5 transition-colors ${background} ${tuning ? "hover:bg-[color-mix(in_srgb,var(--work-department-color)_24%,transparent)]" : "hover:bg-[color-mix(in_srgb,var(--work-department-color)_18%,transparent)]"} focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] ${index === 0 ? "border-t" : ""}`}
-              style={{ height: 72 / targetRows.length, borderColor: C.border, "--work-department-color": row.requester_department === "창고" ? C.green : getDeptColor(row.requester_department) } as CSSProperties} onClick={() => toggle(row)}
+            <tr tabIndex={0} aria-expanded={expanded} aria-controls={controlsId}
+              className={`cursor-pointer border-t align-middle font-bold leading-5 transition-colors ${background} ${tuning ? "hover:bg-[color-mix(in_srgb,var(--work-department-color)_24%,transparent)]" : "hover:bg-[color-mix(in_srgb,var(--work-department-color)_18%,transparent)]"} focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]`}
+              style={{ height: 72, borderColor: C.border, "--work-department-color": row.requester_department === "창고" ? C.green : getDeptColor(row.requester_department) } as CSSProperties} onClick={() => toggle(row)}
               onKeyDown={(event) => { if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return; event.preventDefault(); toggle(row); }}>
-              {index === 0 && <>
-                <td rowSpan={targetRows.length} className="p-1 text-center"><WorkExpandButton expanded={expanded} controlsId={controlsId} label={`${workerLabel(row)} 작업 상세`} onToggle={() => toggle(row)} /></td>
-                <td rowSpan={targetRows.length} className={WORK_TIMESTAMP_CLASS} style={{ color: C.muted2 }}><time dateTime={row.updated_at} title={workDate(row.updated_at)}>{formatWorkTimestamp(row.updated_at)}</time></td>
-                <td rowSpan={targetRows.length} className="px-4 py-2 text-center">{owner(row)}</td>
-                <td rowSpan={targetRows.length} className="px-3 py-2 text-center"><div className="flex justify-center">{kind(row)}</div></td>
-              </>}
+                <td className="p-1 text-center"><WorkExpandButton expanded={expanded} controlsId={controlsId} label={`${workerLabel(row)} 작업 상세`} onToggle={() => toggle(row)} /></td>
+                <td className={WORK_TIMESTAMP_CLASS} style={{ color: C.muted2 }}><time dateTime={row.updated_at} title={workDate(row.updated_at)}>{formatWorkTimestamp(row.updated_at)}</time></td>
+                <td className="px-4 py-2 text-center">{owner(row)}</td>
+                <td className="px-3 py-2 text-center"><div className="flex justify-center">{kind(row)}</div><StocktakePauseNotice pause={row.stocktake_pause} /></td>
               <td className="px-4 py-2">
-                {target ? <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1"><p className={ITEM_CLASS}>{target.item_name}</p><span className="shrink-0 whitespace-nowrap font-semibold tabular-nums" style={{ color: C.muted2 }}>{formatQty(target.quantity)} {target.unit}</span></div> : <p style={{ color: C.muted2 }}>등록된 목적 품목이 없습니다.</p>}
-                {index === targetRows.length - 1 && row.targets.length > 2 && <p className="text-xs" style={{ color: C.muted2 }}>외 {row.targets.length - 2}개 품목</p>}
+                {target ? <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1"><p className={ITEM_CLASS}>{target.item_name}</p><span className="shrink-0 whitespace-nowrap font-semibold tabular-nums" style={{ color: C.muted2 }}>{formatQty(target.quantity)} {target.unit}</span>{row.targets.length > 1 && <span className="shrink-0 whitespace-nowrap text-xs font-normal" style={{ color: C.muted2 }}>외 {row.targets.length - 1}개 품목</span>}</div> : <p style={{ color: C.muted2 }}>등록된 목적 품목이 없습니다.</p>}
               </td>
+              <td className="px-3 py-2"><WorkDraftMemo notes={row.kind === "stock_request" ? formatRequestNotes(row.notes) : row.notes} showEmpty /></td>
               <td className={`whitespace-nowrap ${WORK_ITEM_CODE_CLASS}`} style={{ color: C.muted2 }}>{target?.mes_code ?? "—"}</td>
-              {index === 0 && <td rowSpan={targetRows.length} className="px-3 py-2 text-center">{movement(row)}</td>}
-            </tr>)}
-            {expanded && <tr><td colSpan={7} className="p-0">{expandedDetail(row)}</td></tr>}
+              <td className="px-3 py-2 text-center">{movement(row)}</td>
+            </tr>
+            {expanded && <tr><td colSpan={8} className="p-0">{expandedDetail(row)}</td></tr>}
           </Fragment>;
         })}</tbody>
       </table>
@@ -211,7 +215,7 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
       <div className="col-start-1 row-start-1" aria-hidden={pending || undefined} inert={pending || undefined}>
       {failure}
       {emptyState}
-      {rows.length > 0 && <div className="space-y-3">{rows.map((row) => <article key={`${row.kind}:${row.id}`} aria-label={`${workerLabel(row)} 작업`} className="overflow-hidden rounded-[20px] border" style={{ borderColor: C.border, background: C.s1 }}><div className="space-y-3 p-4">{owner(row)}{kind(row)}{targets(row)}{movement(row)}<p className="text-xs tabular-nums" style={{ color: C.muted2 }}>저장 <time dateTime={row.updated_at}>{workDate(row.updated_at)}</time></p>{actions(row)}</div>{expandedDetail(row)}</article>)}</div>}
+      {rows.length > 0 && <div className="space-y-3">{rows.map((row) => <article key={`${row.kind}:${row.id}`} aria-label={`${workerLabel(row)} 작업`} className="overflow-hidden rounded-[20px] border" style={{ borderColor: C.border, background: C.s1 }}><div className="space-y-3 p-4">{owner(row)}{kind(row)}<StocktakePauseNotice pause={row.stocktake_pause} />{targets(row)}{movement(row)}<p className="text-xs tabular-nums" style={{ color: C.muted2 }}>저장 <time dateTime={row.updated_at}>{workDate(row.updated_at)}</time></p>{actions(row)}</div>{expandedDetail(row)}</article>)}</div>}
       </div>
       <WorkContentCover pending={pending} failed={list.isError} />
     </div>}

@@ -1,7 +1,9 @@
 "use client";
 
 import { FilePenLine } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { workDraftsApi } from "@/lib/api/work-drafts";
+import { restoreOperatorSession } from "@/lib/auth/operator-session";
 import type { IoBatch, StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
@@ -12,6 +14,7 @@ import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { Button } from "@/lib/ui/Button";
 import { AllWorkDraftsPanel } from "./AllWorkDraftsPanel";
 import { DraftCartItemRow } from "./DraftCartItemRow";
+import { LegacyDraftResumeDialog } from "./LegacyDraftResumeDialog";
 import { IoDraftWorkCard } from "./IoDraftWorkCard";
 import { IoDraftWorkTable } from "./IoDraftWorkTable";
 import { WarehouseEmptyWorkArea } from "./WarehouseEmptyWorkArea";
@@ -25,6 +28,7 @@ import {
 interface Props {
   layout: "desktop" | "mobile";
   employeeId: string | null;
+  defaultScope?: "mine" | "all";
   refreshNonce: number;
   onContinue: (draft: StockRequest) => void;
   onContinueIo?: (draft: IoBatch) => void;
@@ -40,22 +44,23 @@ type DeleteTarget =
   | null;
 
 export function DraftCartPanel(props: Props) {
-  return <DraftCartPanelContent key={props.employeeId ?? "no-employee"} {...props} />;
+  return <DraftCartPanelContent key={`${props.employeeId ?? "no-employee"}:${props.defaultScope ?? "mine"}`} {...props} />;
 }
 
-/** 직원이 바뀌면 조회 범위를 내 작업으로 초기화한다. */
+/** 직원·부서 승인 권한이 바뀌면 역할에 맞는 기본 조회 범위로 초기화한다. */
 function DraftCartPanelContent({
   layout,
   employeeId,
+  defaultScope = "mine",
   refreshNonce,
-  onContinue,
   onContinueIo,
   onChanged,
   onCountChange,
   onEmptyStateChange,
   onStartCompose,
 }: Props) {
-  const { data, isLoading: loading, error: qError, refetch } = useDraftCartQuery(employeeId);
+  const [scope, setScope] = useState<"mine" | "all">(defaultScope);
+  const { data, isLoading: loading, error: qError, refetch } = useDraftCartQuery(employeeId, { enabled: scope === "mine" });
   const drafts = data?.stockDrafts ?? [];
   const ioDrafts = data?.ioDrafts ?? [];
   const loadError = qError
@@ -68,7 +73,14 @@ function DraftCartPanelContent({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [opError, setOpError] = useState<string | null>(null);
-  const [scope, setScope] = useState<"mine" | "all">("mine");
+  const [legacyDraft, setLegacyDraft] = useState<StockRequest | null>(null);
+  const active = useRef(true);
+  const reads = useRef(new Set<AbortController>());
+  useEffect(() => {
+    active.current = true;
+    const controllers = reads.current;
+    return () => { active.current = false; for (const controller of controllers) controller.abort(); };
+  }, []);
   const empty = Boolean(employeeId) && !loading && drafts.length === 0 && ioDrafts.length === 0 && (data !== undefined || !loadError);
 
   useEffect(() => {
@@ -76,16 +88,50 @@ function DraftCartPanelContent({
   }, [empty, loading, onEmptyStateChange, opError, scope]);
 
   // refreshNonce 변경 시 수동 refetch (외부 트리거)
+  const previousRefresh = useRef(refreshNonce);
   useEffect(() => {
-    void refetch();
+    if (scope === "mine" && previousRefresh.current !== refreshNonce) void refetch({ cancelRefetch: false });
+    previousRefresh.current = refreshNonce;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshNonce]);
+  }, [refreshNonce, scope]);
 
   // 부모 탭 badge 카운트 동기화 (draft 수 변할 때)
   useEffect(() => {
-    onCountChange?.(drafts.length + ioDrafts.length);
+    if (data !== undefined) onCountChange?.(drafts.length + ioDrafts.length);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drafts.length, ioDrafts.length]);
+
+  async function continueIo(draft: IoBatch): Promise<void> {
+    if (!employeeId || busyId) return;
+    const token = restoreOperatorSession(employeeId)?.token;
+    const controller = new AbortController();
+    reads.current.add(controller);
+    setBusyId(draft.batch_id);
+    try {
+      const current = await workDraftsApi.getOwnedIo(employeeId, draft.batch_id, { signal: controller.signal });
+      if (active.current && restoreOperatorSession(employeeId)?.token === token) onContinueIo?.(current);
+    }
+    catch (error) {
+      if (!active.current || restoreOperatorSession(employeeId)?.token !== token) return;
+      setOpError(error instanceof Error ? error.message : "저장한 작업을 불러오지 못했습니다.");
+      void refetch();
+    } finally { reads.current.delete(controller); if (active.current) setBusyId(null); }
+  }
+
+  async function continueStock(draft: StockRequest): Promise<void> {
+    if (busyId) return;
+    const token = employeeId ? restoreOperatorSession(employeeId)?.token : undefined;
+    setBusyId(draft.request_id);
+    try {
+      const result = await refetch();
+      if (!active.current || (employeeId && restoreOperatorSession(employeeId)?.token !== token)) return;
+      if (result.error) throw result.error;
+      const current = result.data?.stockDrafts.find((row) => row.request_id === draft.request_id);
+      if (!current) throw new Error("저장한 작업을 찾을 수 없습니다. 최신 목록을 확인해 주세요.");
+      setLegacyDraft(current);
+    } catch (error) { if (active.current) setOpError(error instanceof Error ? error.message : "저장한 작업을 불러오지 못했습니다."); }
+    finally { if (active.current) setBusyId(null); }
+  }
 
   const handleDeleteConfirm = () => {
     if (!employeeId || !deleteTarget || busyId) return;
@@ -161,7 +207,7 @@ function DraftCartPanelContent({
         <IoDraftWorkTable
           drafts={ioDrafts}
           busyId={busyId}
-          onContinue={(draft) => onContinueIo?.(draft)}
+          onContinue={(draft) => void continueIo(draft)}
           onRequestDelete={(draft) => setDeleteTarget({ kind: "io", draft })}
         />
       ) : (
@@ -170,7 +216,7 @@ function DraftCartPanelContent({
             key={draft.batch_id}
             draft={draft}
             isBusy={busyId === draft.batch_id}
-            onContinue={() => onContinueIo?.(draft)}
+            onContinue={() => void continueIo(draft)}
             onRequestDelete={() => setDeleteTarget({ kind: "io", draft })}
           />
         ))
@@ -181,7 +227,7 @@ function DraftCartPanelContent({
           key={draft.request_id}
           draft={draft}
           isBusy={busyId === draft.request_id}
-          onContinue={() => onContinue(draft)}
+          onContinue={() => void continueStock(draft)}
           onRequestDelete={() => setDeleteTarget({ kind: "stock", draft })}
         />
       ))}
@@ -189,6 +235,7 @@ function DraftCartPanelContent({
       </>}
       </div>
 
+      {legacyDraft && <LegacyDraftResumeDialog key={legacyDraft.request_id} draft={legacyDraft} onClose={() => setLegacyDraft(null)} onChanged={() => { void refetch(); onChanged(); }} />}
       <ConfirmModal
         className={layout === "mobile" ? panelStyles.touchScope : undefined}
         open={deleteTarget !== null}

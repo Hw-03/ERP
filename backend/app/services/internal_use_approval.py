@@ -21,7 +21,7 @@ from app.models import (
     TransactionLog,
 )
 from app.services import inventory_operations as operation_svc
-from app.services.io_persist import ensure_batch_is_mutable
+from app.services.io_persist import current_submission_requests, ensure_batch_is_mutable
 from app.services.sr_execution import release_reservation
 
 
@@ -252,6 +252,9 @@ def settle_if_decided(
 ) -> bool:
     """반환 모드는 첫 반려에 전체 취소하고 전부 승인 시 한 번 실행하며, 기존 모드는 부분 승인한다."""
     if batch.status in {"completed", "partially_completed", "rejected", "failed", "cancelled"}:
+        return False
+    requests = current_submission_requests(batch, requests)
+    if not requests:
         return False
     batch.reservation_status = "inactive"
     batch.reservation_issue = None

@@ -11,6 +11,7 @@ from app.models import Employee, IoBatch, IoBundle, IoLine, Item, StockRequest, 
 from app.models import ShippingRequest, ShippingRequestCompanionLine, ShippingRequestStatusEnum
 from app.services.io_dispatch import _dept_for_line, _operation_role_for_line, _transaction_type_for_line
 from app.services.sr_validation import _TX_TYPE_BY_REQUEST
+from app.services.work_stocktake_pause import batch_pause_payloads, pause_payload
 from app.services.work_reservation_queries import (
     SUB_TYPE_LABELS, WORK_TYPE_LABELS, _load_batches, _open_effects, _summary, _value, batch_detail,
 )
@@ -28,6 +29,7 @@ REQUEST_TYPE_LABELS = {
     "rework_normal": "정상 재작업", "return_normal": "정상 반품",
 }
 PUBLIC_SUMMARY_FIELDS = (
+    "stocktake_pause",
     "requester_employee_id", "requester_name", "requester_department", "requester_active",
     "work_type", "sub_type", "targets", "created_at", "updated_at",
 )
@@ -105,7 +107,7 @@ def _io_summary(summary: dict[str, Any], batch: IoBatch) -> dict[str, Any]:
         "move": sum(effect["kind"] == "move" for effect in effects),
     }
     return {"kind": "io", "id": summary["batch_id"], "request_type": None,
-        "movement_summary": movement_summary,
+        "movement_summary": movement_summary, "notes": batch.notes,
         "history_operation": _history_operation(batch, effects),
         **{field: summary[field] for field in PUBLIC_SUMMARY_FIELDS}}
 
@@ -118,8 +120,9 @@ def _stock_summary(request: StockRequest, owners: dict[uuid.UUID, Employee]) -> 
         "requester_employee_id": str(request.requester_employee_id), "requester_name": request.requester_name,
         "requester_department": request.requester_department, "requester_active": bool(owner and owner.is_active),
         "work_type": None, "sub_type": None, "request_type": _value(request.request_type),
-        "movement_summary": None,
+        "movement_summary": None, "notes": request.notes,
         "history_operation": _stock_history_operation(request),
+        "stocktake_pause": None,
         "targets": [{"item_id": str(line.item_id) if line.item_id else None,
             "item_name": line.item_name_snapshot, "mes_code": line.mes_code_snapshot,
             "unit": line.item.unit if line.item else "EA", "quantity": int(line.quantity)} for line in request.lines],
@@ -142,7 +145,7 @@ def _stock_history_operation(request: StockRequest) -> dict[str, Any] | None:
 def _stock_query(db: Session) -> Any:
     """Load line identities in one bounded eager query, including optional item masters."""
     return db.query(StockRequest).options(
-        defer(StockRequest.notes), defer(StockRequest.reason_memo),
+        defer(StockRequest.reason_memo),
         selectinload(StockRequest.lines).joinedload(StockRequestLine.item))
 
 
@@ -167,10 +170,19 @@ def _shipping_summary(request: ShippingRequest) -> dict[str, Any]:
         "requester_name": request.requested_by_name or "", "requester_department": "출하",
         "requester_active": False, "worker_names": request.worker_names,
         "work_type": None, "sub_type": None, "request_type": None,
-        "movement_summary": None, "history_operation": None,
+        "movement_summary": None, "history_operation": None, "notes": None, "stocktake_pause": None,
         "targets": [_shipping_target(target, request.request_quantity, target.unit)],
         "created_at": request.created_at, "updated_at": request.updated_at,
     }
+
+
+def count_work_drafts(db: Session, employee_id: uuid.UUID) -> dict[str, int]:
+    """건수 조회는 묶음·라인·재고를 읽지 않는 두 집계만 실행한다."""
+    io_count = db.scalar(select(func.count()).select_from(IoBatch).where(
+        IoBatch.requester_employee_id == employee_id, IoBatch.status == "draft")) or 0
+    stock_count = db.scalar(select(func.count()).select_from(StockRequest).where(
+        StockRequest.requester_employee_id == employee_id, StockRequest.status == StockRequestStatusEnum.DRAFT)) or 0
+    return {"io_count": io_count, "stock_request_count": stock_count, "total": io_count + stock_count}
 
 
 def list_work_drafts(
@@ -230,13 +242,16 @@ def list_work_drafts(
         io_ids = [row.id for row in page if row.kind == "io"]
         stock_ids = [row.id for row in page if row.kind == "stock_request"]
         shipping_ids = [row.id for row in page if row.kind == "shipping"]
-        batches = _load_batches(db, db.query(IoBatch).options(defer(IoBatch.notes)).filter(IoBatch.batch_id.in_(io_ids))) if io_ids else []
+        batches = _load_batches(db, db.query(IoBatch).filter(IoBatch.batch_id.in_(io_ids))) if io_ids else []
         requests = _stock_query(db).filter(StockRequest.request_id.in_(stock_ids)).all() if stock_ids else []
         shipping_requests = _shipping_query(db).filter(ShippingRequest.request_id.in_(shipping_ids)).all() if shipping_ids else []
         owner_ids = {work.requester_employee_id for work in [*batches, *requests]}
         owners = {owner.employee_id: owner for owner in db.query(Employee).filter(Employee.employee_id.in_(owner_ids)).all()}
         summaries = {("io", batch.batch_id): _io_summary(_summary(batch, owners), batch) for batch in batches}
         summaries.update({("stock_request", request.request_id): _stock_summary(request, owners) for request in requests})
+        pauses = batch_pause_payloads(db, summaries.keys())
+        for key, summary in summaries.items():
+            summary["stocktake_pause"] = pauses.get(key)
         summaries.update({("shipping", request.request_id): _shipping_summary(request) for request in shipping_requests})
         return {"items": [summaries[(row.kind, row.id)] for row in page], "total": total, "skip": skip, "limit": limit}
 
@@ -265,4 +280,5 @@ def get_work_draft(db: Session, kind: Literal["io", "stock_request", "shipping"]
             return None
         owner = db.get(Employee, request.requester_employee_id)
         return {**_stock_summary(request, {owner.employee_id: owner} if owner else {}),
+            "stocktake_pause": pause_payload(db, "stock_request", request.request_id),
             **dict.fromkeys(PUBLIC_RESERVATION_FIELDS)}

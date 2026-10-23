@@ -13,7 +13,7 @@ from app.services import stocktake_counts, stocktake_guard, stocktake_targets
 from app.services.inventory_conflicts import InventoryConflict
 from app.services.stocktake_common import ROUND_COMMANDS, fingerprint, receipt_response, require_round_manager
 
-EXCLUSIVE_COMMANDS = {"round_start", "target_append", "round_close"}
+EXCLUSIVE_COMMANDS = {"round_start", "target_append", "round_close", "count_start"}
 PREPARATION_COMMANDS = {"round_start_preview", "target_append_preview"}
 
 
@@ -53,7 +53,7 @@ def execute(db: Session, actor: Employee, kind: str, key: str, payload: dict) ->
             result = close(db, actor, data, receipt.receipt_id)
         elif kind in PREPARATION_COMMANDS:
             result = stocktake_targets.prepare_set(db, actor, data, append=kind == "target_append_preview")
-        elif kind in EXCLUSIVE_COMMANDS:
+        elif kind in {"round_start", "target_append"}:
             result = stocktake_targets.activate_set(db, actor, data, append=kind == "target_append")
         elif kind.startswith("correction_"):
             from app.services import business_corrections

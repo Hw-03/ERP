@@ -197,8 +197,10 @@ export function IoComposeView({
   const reservationOwnerRef = useRef(draftToRestore);
   const draftSession = useIoDraft(draftToRestore, restoreNonce, onReservationChanged, sessionCreationKeyRef, { inventorySnapshot: items, inventoryQueryState, realtimeRevision: revision, employeeId });
   const { drafting, saveDraft } = draftSession;
+  const stocktakePause = draftSession.stocktakePause;
   reservationOwnerRef.current = draftSession.currentReservationBatch;
   const state = useIoWorkState(defaultWorkType, operator?.department, getAvailable);
+  const pauseRevisionStale = Boolean(stocktakePause && draftSession.latestBatch && draftSession.latestBatch.revision !== draftSession.savedBatch?.revision);
   const itemAddBlocked = state.workType !== "tube_material" && (bomListQuery.isPending || bomListQuery.isError);
   const authorizedEntryIntent = entryIntent
     && IO_WORK_TYPES.some((row) => row.id === entryIntent.workType)
@@ -545,6 +547,7 @@ export function IoComposeView({
     "warehouse-io",
     ioDirty,
     async () => {
+      if (stocktakePause && (stocktakePause.state !== "ready" || pauseRevisionStale)) throw new Error("관련 품목 조사 반영 후 작업 중 목록에서 다시 열어 주세요.");
       if (warehouseReturn.pending) throw new Error("보관 중인 원작업으로 돌아가 저장한 뒤 이동하세요.");
       if (!employeeId) return;
       const version = captureIoOperation(operationRefs);
@@ -821,6 +824,10 @@ export function IoComposeView({
   }
 
   async function handleSubmit() {
+    if (stocktakePause && (stocktakePause.state !== "ready" || pauseRevisionStale)) {
+      setError("관련 품목 조사 반영 후 작업 중 목록에서 다시 열어 주세요.");
+      return;
+    }
     if (!canSeeWorkType(state.workType, operator)) return;
     if (isMaterialWorkType(state.workType) && !state.canAdvance[2]) {
       state.goTo(2);
@@ -1252,9 +1259,10 @@ export function IoComposeView({
     );
   }
 
-  const workNotice = <WorkReservationNotice batch={draftSession.savedBatch} latestBatch={draftSession.latestBatch}
+  const workNotice = <><WorkReservationNotice batch={draftSession.savedBatch} latestBatch={draftSession.latestBatch}
         busy={drafting || submitting || previewing || pulling}
-        onReturn={warehouseReturn.resume ? () => { bumpOperationGeneration(); warehouseReturn.resume?.(); setHasDraftOnServer(Boolean(autosaveBatchIdRef.current)); setContentDirty(true); } : null} />;
+        onReturn={warehouseReturn.resume ? () => { bumpOperationGeneration(); warehouseReturn.resume?.(); setHasDraftOnServer(Boolean(autosaveBatchIdRef.current)); setContentDirty(true); } : null} />
+    </>;
   const saveDraftLabel = hasDraftOnServer ? "작업 내용 반영" : "작업 중 등록";
 
   return (
@@ -1468,6 +1476,13 @@ export function IoComposeView({
             fill
           >
             <IoBundleCart
+              workType={state.workType}
+              notes={state.notes}
+              onNotesChange={state.setNotes}
+              employeeId={employeeId}
+              reasonCategory={state.reasonCategory}
+              reasonCategoryId={state.reasonCategoryId}
+              onReasonCategoryChange={state.setReasonCategory}
               bundles={state.bundles}
               subType={state.subType}
               itemMap={itemMap}
@@ -1602,7 +1617,7 @@ export function IoComposeView({
       />
       {draftSaveNotice && (
         <StatusTargetNotice
-          key={draftSaveNotice.id}
+          key={`draft-save-${draftSaveNotice.id}`}
           notice={draftSaveNotice}
           icon={CheckCircle2}
           dataTestId="io-draft-save-notice"
@@ -1615,7 +1630,7 @@ export function IoComposeView({
       )}
       {feedbackNotice && (
         <StatusTargetNotice
-          key={feedbackNotice.id}
+          key={`feedback-${feedbackNotice.id}`}
           notice={feedbackNotice}
           onArrive={dismissFeedbackNotice}
         />

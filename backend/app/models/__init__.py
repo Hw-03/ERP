@@ -130,8 +130,10 @@ from app.models.stocktake import (
 
 from .business_correction import BusinessCorrection, BusinessCorrectionEvent, BusinessCorrectionSource, BusinessCorrectionEffectLink, StocktakeReservationEpoch
 from .stocktake_close import StocktakeCloseManifest, StocktakeCloseChunk, StocktakeCloseSeal, StocktakeCloseCommit
+from .stocktake_work_pause import StocktakeWorkPause
 
 __all__ = [
+    "StocktakeWorkPause",
     "ItemAlias", "ItemSynonymGroup", "ItemSynonymTerm",
     "BusinessCorrection", "BusinessCorrectionEvent", "BusinessCorrectionSource", "BusinessCorrectionEffectLink",
     "StocktakeRound", "StocktakePreview", "StocktakeTargetSet", "StocktakeTarget",

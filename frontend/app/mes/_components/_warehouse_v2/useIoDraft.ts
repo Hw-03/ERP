@@ -46,8 +46,10 @@ export function useIoDraft(draftToRestore?: IoBatch | null, restoreNonce?: numbe
   const creationKey = sessionCreationKey ?? standaloneCreationKey;
   const busy = useRef(false);
   const generation = useRef(0);
+  const observedBatch = useRef<IoBatch | null>(null);
 
   function observeBatch(batch: IoBatch, afterSave = false): void {
+    observedBatch.current = batch;
     reservationRead.current += 1;
     if (Number.isInteger(batch.revision)) revisions.current.set(batch.batch_id, batch.revision!);
     else revisions.current.delete(batch.batch_id);
@@ -78,8 +80,9 @@ export function useIoDraft(draftToRestore?: IoBatch | null, restoreNonce?: numbe
       try {
         const batch = await api.getBatch(batchId);
         if (!cancelled && requestedGeneration === generation.current && requestedRead === reservationRead.current) {
+          observedBatch.current = batch;
           setReservationSnapshot({ batch, context });
-          if (batch.revision !== savedBatch.revision || batch.status !== savedBatch.status || batch.reservation_status !== savedBatch.reservation_status) setLatestBatch(batch);
+          if (batch.revision !== savedBatch.revision || batch.status !== savedBatch.status || batch.reservation_status !== savedBatch.reservation_status || JSON.stringify(batch.stocktake_pause ?? null) !== JSON.stringify(savedBatch.stocktake_pause ?? null)) setLatestBatch(batch);
         }
       } catch { /* 복원 당시 동일 스냅샷은 보존하되 오래된 재고에 가산하지 않는다. */ }
     })();
@@ -110,6 +113,7 @@ export function useIoDraft(draftToRestore?: IoBatch | null, restoreNonce?: numbe
     try {
       const batch = await api.getBatch(batchId);
       if (requestedGeneration === generation.current && requestedRead === reservationRead.current) {
+        observedBatch.current = batch;
         setLatestBatch(batch);
         const context = latestContext.current;
         setReservationSnapshot(inventoryRefreshed && context && inventoryIsReady(context, realtimeInventoryFloor.current, awaitingInventory.current) ? { batch, context } : null);
@@ -118,6 +122,7 @@ export function useIoDraft(draftToRestore?: IoBatch | null, restoreNonce?: numbe
   }
 
   function resetSession(): void {
+    observedBatch.current = null;
     generation.current += 1;
     creationKey.current = null;
     setSavedBatch(null);
@@ -130,10 +135,11 @@ export function useIoDraft(draftToRestore?: IoBatch | null, restoreNonce?: numbe
     const key = creationKey.current;
     const batch = savedBatch;
     const snapshot = reservationSnapshot;
-    return () => { generation.current += 1; creationKey.current = key; setSavedBatch(batch); setLatestBatch(null); setReservationSnapshot(snapshot); awaitingInventory.current = null; };
+    return () => { generation.current += 1; creationKey.current = key; observedBatch.current = batch; setSavedBatch(batch); setLatestBatch(null); setReservationSnapshot(snapshot); awaitingInventory.current = null; };
   }
 
   async function submitDraft(batchId: string, employeeId: string) {
+    if (observedBatch.current?.stocktake_pause) throw new Error("작업 재개를 위해 관련 품목 조사 반영 후 작업을 저장해 주세요.");
     try {
       const result = await api.submitDraft(batchId, employeeId, getRevision(batchId));
       reservationRead.current += 1;
@@ -166,9 +172,13 @@ export function useIoDraft(draftToRestore?: IoBatch | null, restoreNonce?: numbe
     reasonCategory?: string | null;
     supplierId?: string | null;
     batchId?: string | null;
+    stocktakeResumeToken?: string;
     bundles: IoBundle[];
   }) {
     if (busy.current) throw new Error("작업을 저장 중입니다. 잠시 후 다시 시도하세요.");
+    const pause = observedBatch.current?.stocktake_pause;
+    const resumeToken = payload.stocktakeResumeToken ?? (pause?.state === "ready" ? pause.token : undefined);
+    if (payload.batchId && pause && (pause.state !== "ready" || resumeToken !== pause.token)) throw new Error("작업 재개는 관련 품목 조사 반영 후 가능합니다.");
     const revision = payload.batchId ? getRevision(payload.batchId) : undefined;
     const savedGeneration = generation.current;
     if (!payload.batchId && !creationKey.current) creationKey.current = makeClientRequestId();
@@ -191,6 +201,7 @@ export function useIoDraft(draftToRestore?: IoBatch | null, restoreNonce?: numbe
         batch_id: payload.batchId ?? null,
         ...(payload.batchId ? { expected_revision: revision } : { client_request_id: creationKey.current }),
         bundles: payload.bundles,
+        ...(resumeToken ? { stocktake_resume_token: resumeToken } : {}),
       });
       if (savedGeneration === generation.current) observeBatch(batch, true);
       try {
@@ -222,5 +233,5 @@ export function useIoDraft(draftToRestore?: IoBatch | null, restoreNonce?: numbe
     }
   }
 
-  return { drafting, saveDraft, restoreDraft, savedBatch, latestBatch, currentReservationBatch, getRevision, observeBatch, resetSession, captureSession, submitDraft, deleteDraft, refreshAfterFailure };
+  return { drafting, saveDraft, restoreDraft, savedBatch, latestBatch, stocktakePause: (latestBatch ?? savedBatch)?.stocktake_pause ?? null, currentReservationBatch, getRevision, observeBatch, resetSession, captureSession, submitDraft, deleteDraft, refreshAfterFailure };
 }

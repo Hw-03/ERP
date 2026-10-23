@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from datetime import datetime
 
-from app.models import IoBatch, IoWorkReservationEvent
+from app.models import IoBatch, IoWorkReservationEvent, LocationStatusEnum
 from app.schemas.io import IoDraftUpsert
 from app.services import io_reservations as reservations
 from app.services.work_reservation_errors import WorkReservationError
@@ -42,14 +42,34 @@ from app.services.io_persist import (
     normalize_automatic_routes_with_bom_token_refresh,
 )
 from app.services.supplier import validate_supplier_for_operation
+from app.services.io_draft_reads import DraftReadContext, draft_read_context, load_draft_graph
+from app.services.stock_availability import AvailabilityCell
 
 
-def _draft_to_current_stock_payload(db: Session, batch: IoBatch) -> dict:
+def _draft_available(db: Session, *, item_id: uuid.UUID, bucket: str, department: str | None,
+                     context: DraftReadContext | None) -> Decimal:
+    """Legacy route normalization can discover an extra cell; read it at most once."""
+    if context is None:
+        return _bucket_available(db, item_id=item_id, bucket=bucket, department=department)
+    if bucket == "warehouse":
+        cell = AvailabilityCell.warehouse(item_id)
+    elif bucket in {"production", "defective"} and department:
+        cell = AvailabilityCell.location(item_id, department,
+            LocationStatusEnum.DEFECTIVE if bucket == "defective" else LocationStatusEnum.PRODUCTION)
+    else:
+        return Decimal(0)
+    if cell not in context.available:
+        context.available[cell] = _bucket_available(db, item_id=item_id, bucket=bucket, department=department)
+    return context.available[cell]
+
+
+def _draft_to_current_stock_payload(db: Session, batch: IoBatch, context: DraftReadContext | None = None) -> dict:
     """저장 내용은 보존하고 자동 부서 경로·부족 수량만 현재 기준으로 계산한다."""
-    payload = _batch_to_payload(batch, db=db)
-    credit = reservations.ledger_quantities(db, batch.batch_id)
+    payload = _batch_to_payload(batch, db=db, linked_requests=context.requests[batch.batch_id] if context else None,
+                                pause_payloads=context.pauses if context else None)
+    credit = context.credits[batch.batch_id] if context else reservations.ledger_quantities(db, batch.batch_id)
     if batch.effective_plan is not None:
-        _apply_preview_shortages(db, payload, credit, batch.effective_plan)
+        _apply_preview_shortages(db, payload, credit, batch.effective_plan, context)
         return payload
     bundle_views = []
     for bundle in payload["bundles"]:
@@ -81,13 +101,13 @@ def _draft_to_current_stock_payload(db: Session, batch: IoBatch) -> dict:
             if not line["included"] or line["from_bucket"] == "none":
                 line["shortage"] = Decimal("0")
                 continue
-            available = _bucket_available(
+            available = _draft_available(
                 db,
                 item_id=line["item_id"],
                 bucket=line["from_bucket"],
                 department=line["from_department"],
+                context=context,
             )
-            from app.services.stock_availability import AvailabilityCell
             cell = (AvailabilityCell.warehouse(line["item_id"]) if line["from_bucket"] == "warehouse"
                     else AvailabilityCell.location(line["item_id"], line["from_department"]))
             available += credit.get(cell, Decimal(0))
@@ -95,9 +115,9 @@ def _draft_to_current_stock_payload(db: Session, batch: IoBatch) -> dict:
     return payload
 
 
-def _apply_preview_shortages(db: Session, preview: dict, credit: dict, plan: dict | None = None) -> None:
+def _apply_preview_shortages(db: Session, preview: dict, credit: dict, plan: dict | None = None,
+                             context: DraftReadContext | None = None) -> None:
     """Allocate availability once per source cell, optionally using frozen effective routes."""
-    from app.services.stock_availability import AvailabilityCell
     effects = {effect["operation_line_id"]: effect for effect in (plan or {}).get("effects", [])}
     used: dict[AvailabilityCell, Decimal] = {}
     for bundle in preview["bundles"]:
@@ -115,7 +135,7 @@ def _apply_preview_shortages(db: Session, preview: dict, credit: dict, plan: dic
             item_id = uuid.UUID(str(line["item_id"]))
             cell = AvailabilityCell.warehouse(item_id) if bucket == "warehouse" else AvailabilityCell.location(item_id, department)
             quantity = _d(effect["quantity"] if effect else line["quantity"])
-            available = _bucket_available(db, item_id=item_id, bucket=bucket, department=department) + credit.get(cell, Decimal(0))
+            available = _draft_available(db, item_id=item_id, bucket=bucket, department=department, context=context) + credit.get(cell, Decimal(0))
             line["shortage"] = max(Decimal(0), quantity - max(Decimal(0), available - used.get(cell, Decimal(0))))
             used[cell] = used.get(cell, Decimal(0)) + quantity
 
@@ -142,7 +162,9 @@ def save_draft(db: Session, payload: IoDraftUpsert, *, creation_command: str = "
     from app.services.io_preview import validate_receive_requester, validate_material_outbound
     from app.services.item_write_validation import validate_io_items
     from app.services.io_effective_plan import build_effective_plan
+    from app.services import stocktake_guard, work_stocktake_pause as stocktake_pause
 
+    stocktake_guard.lock_control(db)
     payload = payload.model_copy(deep=True)
     incoming_batch_id = getattr(payload, "batch_id", None)
     expected_revision = getattr(payload, "expected_revision", None)
@@ -261,8 +283,14 @@ def save_draft(db: Session, payload: IoDraftUpsert, *, creation_command: str = "
         db.flush()
         _add_bundles_and_lines(db, batch, payload)
         db.refresh(batch)
-        reservations.replace_reservations(db, batch, build_effective_plan(db, batch))
-        reservations.record_event(db, batch, "saved", expected_revision, requester.employee_id, requester.name)
+        plan = build_effective_plan(db, batch)
+        cells = stocktake_pause.io_required_cells(db, batch) + stocktake_pause.io_required_cells(db, batch, plan)
+        can_reserve = stocktake_pause.ensure_work_save(db, "io", batch.batch_id, cells,
+            getattr(payload, "stocktake_resume_token", None))
+        reservations.replace_reservations(db, batch, plan if can_reserve else None)
+        batch.effective_plan = plan
+        resumed = can_reserve and stocktake_pause.complete_work_save(db, "io", batch.batch_id)
+        reservations.record_event(db, batch, "stocktake_resumed" if resumed else "saved", expected_revision, requester.employee_id, requester.name)
         return _batch_to_payload(batch)
 
     batch = _persist_batch(db, requester=requester, payload=payload, status="draft")
@@ -272,7 +300,12 @@ def save_draft(db: Session, payload: IoDraftUpsert, *, creation_command: str = "
         from app.services.io_dispatch import _custom_process_bom_bundle_ids, requires_department_approval
         if requires_department_approval(batch, _custom_process_bom_bundle_ids(db, batch)) and not (batch.notes or "").strip():
             raise ValueError("부서 결재 요청에는 메모를 입력해야 합니다.")
-    reservations.replace_reservations(db, batch, build_effective_plan(db, batch))
+    plan = build_effective_plan(db, batch)
+    can_reserve = stocktake_pause.ensure_work_save(db, "io", batch.batch_id,
+        stocktake_pause.io_required_cells(db, batch, plan), getattr(payload, "stocktake_resume_token", None),
+        direct_submit=creation_command == "direct_submit")
+    reservations.replace_reservations(db, batch, plan if can_reserve else None)
+    batch.effective_plan = plan
     if creation_command == "draft":
         reservations.record_event(db, batch, "saved", 0, requester.employee_id, requester.name)
     return _batch_to_payload(batch)
@@ -306,21 +339,31 @@ def get_draft(
 
 
 def list_drafts(db: Session, *, requester_employee_id: uuid.UUID) -> list[dict]:
-    rows = (
+    rows = load_draft_graph(
         db.query(IoBatch)
         .filter(
             IoBatch.requester_employee_id == requester_employee_id,
             IoBatch.status == "draft",
         )
         .order_by(IoBatch.updated_at.desc())
-        .all()
     )
-    return [_draft_to_current_stock_payload(db, row) for row in rows]
+    context = draft_read_context(db, rows)
+    return [_draft_to_current_stock_payload(db, row, context) for row in rows]
+
+
+def get_owned_draft(db: Session, *, batch_id: uuid.UUID, requester_employee_id: uuid.UUID) -> dict | None:
+    """Never restore another owner's or a no-longer-draft operation."""
+    rows = load_draft_graph(db.query(IoBatch).filter(
+        IoBatch.batch_id == batch_id, IoBatch.requester_employee_id == requester_employee_id, IoBatch.status == "draft"))
+    return _draft_to_current_stock_payload(db, rows[0], draft_read_context(db, rows)) if rows else None
 
 
 def delete_draft(db: Session, *, batch_id: uuid.UUID, requester_employee_id: uuid.UUID,
                  expected_revision: int | None = None) -> None:
     """임시저장을 삭제하며, 이미 없는 대상은 성공한 재시도로 간주한다."""
+    from app.services import stocktake_guard
+    from app.services.work_stocktake_pause import remove_pause
+    stocktake_guard.lock_control(db)
     batch = reservations.lock_owned_batch(db, batch_id, requester_employee_id)
     if batch is None:
         return
@@ -338,6 +381,7 @@ def delete_draft(db: Session, *, batch_id: uuid.UUID, requester_employee_id: uui
     reservations.replace_reservations(db, batch, None)
     batch.effective_plan = original_plan
     batch.status = "cancelled"
+    remove_pause(db, "io", batch.batch_id)
     reservations.record_event(db, batch, "owner_deleted", expected_revision, requester.employee_id, requester.name)
     db.flush()
 

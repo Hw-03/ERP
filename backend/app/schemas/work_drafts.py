@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from app.schemas.common import UtcDatetime
+from app.schemas.work_stocktake_pause import WorkStocktakePause
 from app.schemas.work_reservations import (
     WorkForecastIssue, WorkInventoryEffect, WorkReservationIssue,
     WorkReservationStatus, WorkReservedInput,
@@ -30,6 +31,7 @@ class WorkDraftHistoryOperation(BaseModel):
 
 
 class WorkDraftSummary(BaseModel):
+    stocktake_pause: WorkStocktakePause | None = None
     kind: Literal["io", "stock_request", "shipping"]
     id: str
     requester_employee_id: str | None
@@ -40,6 +42,7 @@ class WorkDraftSummary(BaseModel):
     work_type: str | None
     sub_type: str | None
     request_type: str | None
+    notes: str | None
     targets: list[WorkDraftTarget]
     movement_summary: WorkDraftMovementSummary | None
     history_operation: WorkDraftHistoryOperation | None
@@ -57,6 +60,12 @@ class WorkDraftList(BaseModel):
 class WorkDraftShippingSummary(BaseModel):
     invoice_number: str | None
     companion_lines: list[WorkDraftTarget]
+
+
+class WorkDraftCount(BaseModel):
+    io_count: int
+    stock_request_count: int
+    total: int
 
 
 class WorkDraftDetail(WorkDraftSummary):

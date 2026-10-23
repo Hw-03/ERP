@@ -98,6 +98,7 @@ export const queryKeys = {
     all: ["inventory"] as const,
     summary: () => ["inventory", "summary"] as const,
     locations: (itemId: string) => ["inventory", "locations", itemId] as const,
+    workStatusAll: ["inventory", "workStatus"] as const,
     workStatus: (itemId: string) => ["inventory", "workStatus", itemId] as const,
   },
   settings: {
