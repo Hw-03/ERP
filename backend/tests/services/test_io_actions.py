@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 
@@ -20,6 +20,7 @@ from app.models import (
     IoLine,
     Notification,
     StockRequest,
+    StockRequestLine,
     StockRequestStatusEnum,
     StockRequestTypeEnum,
     TransactionLog,
@@ -131,6 +132,62 @@ def _use_department_source(payload: IoSubmitRequest, department: str) -> None:
         for line in bundle.lines:
             line.from_bucket = "production"
             line.from_department = department
+
+
+@pytest.mark.parametrize("cancel_timing", ["before", "equal", "after", "unknown_cancelled_at", "unknown_submission"])
+def test_internal_use_resubmission_ignores_only_proven_previous_cancellations(
+    db_session, make_item, cancel_timing,
+):
+    """과거 취소는 완료 건수에서 제외하되 현재 취소와 불명확한 이력은 보존한다."""
+    from app.services import internal_use_approval, sr_approval
+
+    item = make_item(name="resubmission-use", process_type_code="AF", warehouse_qty=Decimal("5"))
+    requester = _make_requester(db_session, department=DepartmentEnum.AS, warehouse_role="none")
+    approver = _make_requester(db_session)
+    result = actions.submit(db_session, _internal_use_payload(requester, [item]))
+    batch = db_session.get(IoBatch, result["batch"]["batch_id"])
+    current = db_session.query(StockRequest).filter_by(operation_batch_id=batch.batch_id).one()
+    submitted_at = batch.submitted_at
+    old = StockRequest(
+        request_code=f"OLD-{uuid.uuid4().hex}", requester_employee_id=requester.employee_id,
+        requester_name=requester.name, requester_department=requester.department,
+        request_type=StockRequestTypeEnum.INTERNAL_USE, status=StockRequestStatusEnum.CANCELLED,
+        operation_batch_id=batch.batch_id, requires_warehouse_approval=True,
+        created_at=submitted_at - timedelta(seconds=5),
+        cancelled_at=submitted_at + timedelta(seconds={"before": -1, "equal": 0}.get(cancel_timing, 1)),
+    )
+    old.lines = [StockRequestLine(
+        item_id=item.item_id, item_name_snapshot=item.item_name, quantity=1,
+        operation_line_id=current.lines[0].operation_line_id,
+        from_bucket="warehouse", to_bucket="none", to_department=DepartmentEnum.AS,
+        status=StockRequestStatusEnum.CANCELLED,
+    )]
+    if cancel_timing == "unknown_cancelled_at":
+        old.cancelled_at = None
+    if cancel_timing == "unknown_submission":
+        batch.submitted_at = None
+    db_session.add(old)
+    db_session.flush()
+    if cancel_timing == "before":
+        previous_status = batch.status
+        previous_reservation_status = batch.reservation_status
+        assert not internal_use_approval.settle_if_decided(db_session, batch=batch, requests=[old], actor=approver)
+        assert batch.status == previous_status
+        assert batch.reservation_status == previous_reservation_status
+    assert not internal_use_approval.settle_if_decided(db_session, batch=batch, requests=[old, current], actor=approver)
+    assert db_session.query(TransactionLog).count() == 0
+
+    sr_approval.approve_request(db_session, current, approver=approver, pin="0000")
+    db_session.refresh(batch)
+    assert batch.status == ("completed" if cancel_timing == "before" else "partially_completed")
+    inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("4")
+    assert inventory.pending_quantity == Decimal("0")
+    assert old.status == StockRequestStatusEnum.CANCELLED
+    assert old.lines[0].status == StockRequestStatusEnum.CANCELLED
+    assert db_session.query(TransactionLog).count() == 1
+    assert not internal_use_approval.settle_if_decided(db_session, batch=batch, requests=[old, current], actor=approver)
+    assert db_session.query(TransactionLog).count() == 1
 
 
 def test_department_role_grant_revoke_regrant_preserves_pending_and_executes_once(

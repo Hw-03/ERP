@@ -763,12 +763,22 @@ def get_batch(db: Session, *, batch_id: uuid.UUID) -> Optional[dict]:
     return _batch_to_payload(batch, db=db) if batch else None
 
 
+def current_submission_requests(batch: IoBatch, requests: Iterable[StockRequest]) -> list[StockRequest]:
+    """재제출 전 취소 시각이 확인되는 이력만 제외하고 불명확한 요청은 보존한다."""
+    return [request for request in requests if not (
+        _enum_value(request.status) == StockRequestStatusEnum.CANCELLED.value
+        and request.cancelled_at is not None
+        and batch.submitted_at is not None
+        and request.cancelled_at < batch.submitted_at
+    )]
+
+
 def sync_batch_from_stock_requests(
     db: Session,
     batch: IoBatch,
     requests: Optional[list[StockRequest]] = None,
 ) -> None:
-    """연결된 모든 결재 요청을 집계해 배치 상태와 단일 호환 필드를 갱신한다."""
+    """이전 제출분 취소를 제외해 배치 상태와 단일 호환 필드를 갱신한다."""
     linked_requests = requests
     if linked_requests is None:
         linked_requests = (
@@ -780,16 +790,7 @@ def sync_batch_from_stock_requests(
     if not linked_requests:
         return
 
-    status_requests = [
-        request
-        for request in linked_requests
-        if not (
-            _enum_value(request.status) == StockRequestStatusEnum.CANCELLED.value
-            and request.cancelled_at is not None
-            and batch.submitted_at is not None
-            and request.cancelled_at < batch.submitted_at
-        )
-    ]
+    status_requests = current_submission_requests(batch, linked_requests)
     if not status_requests:
         return
 
