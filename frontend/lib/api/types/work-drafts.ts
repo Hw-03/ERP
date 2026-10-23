@@ -3,6 +3,7 @@ import type { TransactionType } from "./shared";
 import type { InventoryRelatedWork, WorkReservationIssue, WorkReservationStatus, WorkReservedInput, WorkInventoryEffect } from "./work-reservations";
 
 export type WorkDraftKind = "io" | "stock_request";
+export interface WorkDraftCount { io_count: number; stock_request_count: number; total: number }
 export interface WorkDraftSelection { kind: WorkDraftKind; id: string }
 
 export interface WorkDraftMovementSummary { increase: number; decrease: number; move: number }

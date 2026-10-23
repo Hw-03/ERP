@@ -54,6 +54,12 @@ class WorkDraftList(BaseModel):
     limit: int
 
 
+class WorkDraftCount(BaseModel):
+    io_count: int
+    stock_request_count: int
+    total: int
+
+
 class WorkDraftDetail(WorkDraftSummary):
     reservation_status: WorkReservationStatus | None
     reservation_issue: WorkReservationIssue | None

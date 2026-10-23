@@ -2,7 +2,8 @@ import { ApiError } from "../api-core";
 import { requestOperatorLogin } from "../auth/login-recovery";
 import { restoreOperatorSession } from "../auth/operator-session";
 import { requestJson } from "./stocktake";
-import type { WorkDraftDetail, WorkDraftFilters, WorkDraftList, WorkDraftSelection } from "./types/work-drafts";
+import type { WorkDraftCount, WorkDraftDetail, WorkDraftFilters, WorkDraftList, WorkDraftSelection } from "./types/work-drafts";
+import type { IoBatch } from "./types/io";
 
 /** 화면의 직원과 현재 탭의 세션이 같을 때만 전체 저장 작업을 조회한다. */
 function operatorToken(employeeId: string): string {
@@ -13,6 +14,12 @@ function operatorToken(employeeId: string): string {
 }
 
 export const workDraftsApi = {
+  async count(employeeId: string, options?: { signal?: AbortSignal }): Promise<WorkDraftCount> {
+    return requestJson("/api/work-drafts/count", operatorToken(employeeId), { signal: options?.signal, cache: "no-store" });
+  },
+  async getOwnedIo(employeeId: string, batchId: string, options?: { signal?: AbortSignal }): Promise<IoBatch> {
+    return requestJson(`/api/work-drafts/owned-io/${encodeURIComponent(batchId)}`, operatorToken(employeeId), { signal: options?.signal, cache: "no-store" });
+  },
   async list(employeeId: string, filters: WorkDraftFilters, options?: { signal?: AbortSignal }): Promise<WorkDraftList> {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(filters)) {

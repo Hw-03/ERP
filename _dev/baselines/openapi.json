@@ -16050,6 +16050,29 @@
         "title": "WeeklyWarning",
         "type": "object"
       },
+      "WorkDraftCount": {
+        "properties": {
+          "io_count": {
+            "title": "Io Count",
+            "type": "integer"
+          },
+          "stock_request_count": {
+            "title": "Stock Request Count",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "io_count",
+          "stock_request_count",
+          "total"
+        ],
+        "title": "WorkDraftCount",
+        "type": "object"
+      },
       "WorkDraftDetail": {
         "properties": {
           "created_at": {
@@ -16112,6 +16135,17 @@
                 "type": "null"
               }
             ]
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
           },
           "request_type": {
             "anyOf": [
@@ -16225,6 +16259,7 @@
           "work_type",
           "sub_type",
           "request_type",
+          "notes",
           "targets",
           "movement_summary",
           "history_operation",
@@ -16357,6 +16392,17 @@
               }
             ]
           },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
           "request_type": {
             "anyOf": [
               {
@@ -16429,6 +16475,7 @@
           "work_type",
           "sub_type",
           "request_type",
+          "notes",
           "targets",
           "movement_summary",
           "history_operation",
@@ -35442,6 +35489,116 @@
           }
         },
         "summary": "List Work Drafts",
+        "tags": [
+          "Inventory IO"
+        ]
+      }
+    },
+    "/api/work-drafts/count": {
+      "get": {
+        "description": "현재 로그인한 직원의 저장 작업은 상세를 만들지 않고 집계한다.",
+        "operationId": "count_work_drafts_api_work_drafts_count_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkDraftCount"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Count Work Drafts",
+        "tags": [
+          "Inventory IO"
+        ]
+      }
+    },
+    "/api/work-drafts/owned-io/{batch_id}": {
+      "get": {
+        "description": "복원 직전에 소유자와 작성 상태를 확인하고 현재 재고로 조회한다.",
+        "operationId": "get_owned_io_draft_api_work_drafts_owned_io__batch_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Batch Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IoBatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Owned Io Draft",
         "tags": [
           "Inventory IO"
         ]

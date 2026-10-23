@@ -8,10 +8,36 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.routers.operator_sessions import require_operator_session
 from app.schemas.work_drafts import WorkDraftDetail, WorkDraftList
+from app.schemas.work_drafts import WorkDraftCount
+from app.schemas.io import IoBatchResponse
+from app.services import io_draft
+from app.models import Employee, OperatorSession
 from app.services import work_drafts
 
 
 router = APIRouter(dependencies=[Depends(require_operator_session)])
+
+
+@router.get("/count", response_model=WorkDraftCount)
+def count_work_drafts(
+    actor: tuple[Employee, OperatorSession] = Depends(require_operator_session),
+    db: Session = Depends(get_db),
+) -> dict:
+    """현재 로그인한 직원의 저장 작업은 상세를 만들지 않고 집계한다."""
+    return work_drafts.count_work_drafts(db, actor[0].employee_id)
+
+
+@router.get("/owned-io/{batch_id}", response_model=IoBatchResponse)
+def get_owned_io_draft(
+    batch_id: uuid.UUID,
+    actor: tuple[Employee, OperatorSession] = Depends(require_operator_session),
+    db: Session = Depends(get_db),
+) -> dict:
+    """복원 직전에 소유자와 작성 상태를 확인하고 현재 재고로 조회한다."""
+    draft = io_draft.get_owned_draft(db, batch_id=batch_id, requester_employee_id=actor[0].employee_id)
+    if draft is None:
+        raise HTTPException(status_code=404, detail="저장한 작업을 찾을 수 없습니다.")
+    return draft
 
 
 @router.get("", response_model=WorkDraftList)

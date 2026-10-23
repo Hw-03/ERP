@@ -401,9 +401,9 @@ def _stock_request_summary(request: StockRequest) -> dict:
     }
 
 
-def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None) -> dict:
-    linked_requests: list[StockRequest] = []
-    if db is not None:
+def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None,
+                      *, linked_requests: list[StockRequest] | None = None) -> dict:
+    if linked_requests is None and db is not None:
         linked_requests = (
             db.query(StockRequest)
             .filter(StockRequest.operation_batch_id == batch.batch_id)
@@ -418,6 +418,7 @@ def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None) -> dict:
             )
             if legacy_request is not None:
                 linked_requests = [legacy_request]
+    linked_requests = linked_requests or []
     approval_by_line_id: dict[uuid.UUID, tuple[str, str | None]] = {}
     for request in linked_requests:
         summary = _stock_request_summary(request)

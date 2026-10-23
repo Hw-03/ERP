@@ -145,6 +145,15 @@ def _stock_query(db: Session) -> Any:
         selectinload(StockRequest.lines).joinedload(StockRequestLine.item))
 
 
+def count_work_drafts(db: Session, employee_id: uuid.UUID) -> dict[str, int]:
+    """건수 조회는 묶음·라인·재고를 읽지 않는 두 집계만 실행한다."""
+    io_count = db.scalar(select(func.count()).select_from(IoBatch).where(
+        IoBatch.requester_employee_id == employee_id, IoBatch.status == "draft")) or 0
+    stock_count = db.scalar(select(func.count()).select_from(StockRequest).where(
+        StockRequest.requester_employee_id == employee_id, StockRequest.status == StockRequestStatusEnum.DRAFT)) or 0
+    return {"io_count": io_count, "stock_request_count": stock_count, "total": io_count + stock_count}
+
+
 def list_work_drafts(
     db: Session, *, search: str | None = None, requester_department: str | None = None,
     requester_employee_id: uuid.UUID | None = None, skip: int = 0, limit: int = 30,

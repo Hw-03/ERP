@@ -74,9 +74,10 @@ export const ioApi = {
     return fetcher<IoBatch | null>(toApiUrl(`/api/io/draft?${query.toString()}`));
   },
 
-  listDrafts: (employeeId: string) =>
+  listDrafts: (employeeId: string, options?: { signal?: AbortSignal }) =>
     fetcher<IoBatch[]>(
       toApiUrl(`/api/io/drafts?requester_employee_id=${encodeURIComponent(employeeId)}`),
+      options?.signal,
     ),
 
   deleteDraft: (batchId: string, employeeId: string, expectedRevision?: number) =>
