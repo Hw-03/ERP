@@ -13,6 +13,12 @@ const supplierApi = vi.hoisted(() => ({ listSuppliers: vi.fn(), getItem: vi.fn()
 vi.mock("@/lib/api", () => ({ api: supplierApi }));
 beforeEach(() => supplierApi.listSuppliers.mockResolvedValue([{ supplier_id: "supplier-1", name: "현재 업체", is_active: true }]));
 
+it("일시중지된 사용출고의 수동 수정 수량을 BOM 기대량으로 되돌리지 않는다", () => {
+  const bundles = [{ source_kind: "bom_parent", quantity: 5, lines: [{ origin: "bom_auto", quantity: 3, bom_expected: 10, included: true, edited: true }] }] as IoBatch["bundles"];
+  const batch = { work_type: "internal_use", sub_type: "internal_use_out", stocktake_pause: { state: "ready" }, bundles } as IoBatch;
+  expect(restoreInternalUseBundles(batch)).toEqual(bundles);
+});
+
 function makeDraft(subType: IoSubType): IoBatch {
   return {
     batch_id: `draft-${subType}`,

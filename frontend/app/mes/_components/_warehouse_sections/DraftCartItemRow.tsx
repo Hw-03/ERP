@@ -5,6 +5,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { formatKstDateTime, formatQty } from "@/lib/mes/format";
 import { REQUEST_TYPE_LABEL, formatRequestNotes } from "./ioRequestLabels";
+import { StocktakePauseNotice } from "../common/StocktakePauseNotice";
 
 /**
  * Round-13 (#7) 추출 — DraftCartPanel 의 단일 draft 카드.
@@ -82,6 +83,7 @@ export function DraftCartItemRow({
           )}
         </div>
       )}
+      <StocktakePauseNotice pause={draft.stocktake_pause} />
 
       {draft.reference_no && (
         <div className="mt-2 text-xs" style={{ color: LEGACY_COLORS.muted }}>
@@ -98,8 +100,8 @@ export function DraftCartItemRow({
         <button
           type="button"
           onClick={onContinue}
-          disabled={isBusy}
-          className="rounded-[10px] border px-3 py-1.5 text-xs"
+          disabled={isBusy || draft.stocktake_pause?.state === "blocked"}
+          className="min-h-11 rounded-[10px] border px-3 py-1.5 text-sm"
           style={{
             borderColor: LEGACY_COLORS.borderStrong,
             color: LEGACY_COLORS.text,

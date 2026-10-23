@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import { MobileIoComposeWizard } from "../MobileIoComposeWizard";
@@ -74,6 +74,23 @@ beforeEach(() => {
 });
 
 describe("MobileIoComposeWizard 빠른 원자재 입고", () => {
+  it("모바일도 조사 반영 후 추가 확인 없이 기존 저장으로 재개한다", async () => {
+    const draft = { batch_id: "paused-mobile", revision: 3, work_type: "process", sub_type: "adjust_in", status: "draft",
+      requester_employee_id: "warehouse-1", from_department: "조립", to_department: "조립", notes: "보존 메모",
+      stocktake_pause: { token: "pause", round_id: "round", state: "ready", paused_at: "now", pending_target_count: 0, missing_target_count: 0 },
+      bundles: [{ bundle_id: "bundle", source_kind: "manual", source_item_id: item.item_id, quantity: 2, title: item.item_name, expanded_level: 0,
+        lines: [{ line_id: "line", item_id: item.item_id, item_name: item.item_name, mes_code: item.mes_code, unit: "EA", quantity: 2,
+          direction: "adjust", from_bucket: "none", to_bucket: "production", to_department: "조립", included: true, origin: "manual", shortage: 0 }] }],
+    };
+    vi.mocked(api.saveDraft).mockResolvedValue({ ...draft, revision: 4, stocktake_pause: null } as never);
+    const flushDraftRef = { current: null as (() => Promise<void>) | null };
+    render(<MobileIoComposeWizard globalSearch="" operator={{ employee_id: "warehouse-1", name: "작업자", department: "조립", warehouse_role: "primary" }}
+      items={[item]} setItems={vi.fn()} onStatusChange={vi.fn()} restoreDraft={draft as never} restoreStep={4} flushDraftRef={flushDraftRef} />);
+    expect(screen.queryByRole("checkbox", { name: /실사에 포함/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "작업 재개" })).not.toBeInTheDocument();
+    await act(async () => { await flushDraftRef.current!(); });
+    await waitFor(() => expect(api.saveDraft).toHaveBeenCalledWith(expect.objectContaining({ stocktake_resume_token: "pause", expected_revision: 3, notes: "보존 메모" })));
+  });
   it("튜브 전용 업체를 선택한 뒤 TR만 직접 추가한다", async () => {
     vi.mocked(api.listSuppliers).mockResolvedValue([{ ...supplier, scope: "tube" }]);
     render(<MobileIoComposeWizard globalSearch="" operator={{ employee_id: "tube-1", name: "튜브 작업자", department: "튜브", warehouse_role: "none" }} items={[{ ...item, process_type_code: "TR" }]} productModels={[]} setItems={() => {}} onStatusChange={() => {}} entryIntent={{ workType: "tube_material", subType: "tube_receive_supplier" }} preselectedItem={{ ...item, process_type_code: "TR" }} />);

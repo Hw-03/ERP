@@ -12,6 +12,7 @@ import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { Button } from "@/lib/ui/Button";
 import { AllWorkDraftsPanel } from "./AllWorkDraftsPanel";
 import { DraftCartItemRow } from "./DraftCartItemRow";
+import { LegacyDraftResumeDialog } from "./LegacyDraftResumeDialog";
 import { IoDraftWorkCard } from "./IoDraftWorkCard";
 import { IoDraftWorkTable } from "./IoDraftWorkTable";
 import { WarehouseEmptyWorkArea } from "./WarehouseEmptyWorkArea";
@@ -48,7 +49,6 @@ function DraftCartPanelContent({
   layout,
   employeeId,
   refreshNonce,
-  onContinue,
   onContinueIo,
   onChanged,
   onCountChange,
@@ -69,6 +69,7 @@ function DraftCartPanelContent({
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [opError, setOpError] = useState<string | null>(null);
   const [scope, setScope] = useState<"mine" | "all">("mine");
+  const [legacyDraft, setLegacyDraft] = useState<StockRequest | null>(null);
   const empty = Boolean(employeeId) && !loading && drafts.length === 0 && ioDrafts.length === 0 && (data !== undefined || !loadError);
 
   useEffect(() => {
@@ -181,7 +182,7 @@ function DraftCartPanelContent({
           key={draft.request_id}
           draft={draft}
           isBusy={busyId === draft.request_id}
-          onContinue={() => onContinue(draft)}
+          onContinue={() => setLegacyDraft(draft)}
           onRequestDelete={() => setDeleteTarget({ kind: "stock", draft })}
         />
       ))}
@@ -189,6 +190,7 @@ function DraftCartPanelContent({
       </>}
       </div>
 
+      {legacyDraft && <LegacyDraftResumeDialog key={legacyDraft.request_id} draft={drafts.find((draft) => draft.request_id === legacyDraft.request_id) ?? legacyDraft} onClose={() => setLegacyDraft(null)} onChanged={() => { void refetch(); onChanged(); }} />}
       <ConfirmModal
         className={layout === "mobile" ? panelStyles.touchScope : undefined}
         open={deleteTarget !== null}

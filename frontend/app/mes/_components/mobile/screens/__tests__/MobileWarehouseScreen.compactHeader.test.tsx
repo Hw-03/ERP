@@ -98,7 +98,7 @@ vi.mock("../../../_warehouse_sections/WarehouseDraftPanelTabs", () => ({
     <div data-testid="draft-panels" data-section-tab={sectionTab} data-target-request-id={targetRequestId ?? ""}>
       <button
         type="button"
-        onClick={() => onContinueIoDraft?.({ batch_id: "adjust-draft", sub_type: "adjust_out" } as never)}
+        onClick={() => onContinueIoDraft?.({ batch_id: "adjust-draft", sub_type: "adjust_out", stocktake_resumed: true } as never)}
       >
         continue adjust draft
       </button>
@@ -324,6 +324,15 @@ describe("MobileWarehouseScreen compact step header", () => {
     expect(params.get("section")).toBe("compose");
     expect(params.get("step")).toBe("4");
     expect(params.get("draftId")).toBe("adjust-draft");
+  });
+
+  it("목록에서 재개한 수량 보존 정보가 URL 재조회로 사라지지 않는다", async () => {
+    window.history.replaceState({}, "", "/mes?tab=warehouse&section=mine");
+    apiMocks.listDrafts.mockResolvedValue([{ batch_id: "adjust-draft", sub_type: "adjust_out" }]);
+    render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "mine" }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "continue adjust draft" })); });
+    expect(currentWizardProps.value?.restoreDraft).toMatchObject({ batch_id: "adjust-draft", stocktake_resumed: true });
   });
 
   it("늦게 끝난 A 전환은 현재 B draftId와 복원 상태를 지우지 않는다", async () => {

@@ -30,6 +30,14 @@ function makeDraft(): IoBatch {
 }
 
 describe("IoDraftWorkCard timestamp", () => {
+  it("관련 조사 반영 후 이어서 작업으로 진입할 수 있다", () => {
+    const draft: IoBatch = { ...makeDraft(), stocktake_pause: { token: "pause", round_id: "round", state: "ready", paused_at: "now", pending_target_count: 0, missing_target_count: 0 } };
+    const onContinue = vi.fn();
+    render(<IoDraftWorkCard draft={draft} isBusy={false} onContinue={onContinue} onRequestDelete={vi.fn()} />);
+    expect(screen.getByText("이어서 작업 가능")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "이어서 작업" }));
+    expect(onContinue).toHaveBeenCalledOnce();
+  });
   it("내역의 작업 분류는 배지에 한 번 표시하고 세부 작업명은 별도로 보존한다", () => {
     const draft = { ...makeDraft(), work_type: "warehouse_io", sub_type: "dept_to_warehouse" } as IoBatch;
     render(<IoDraftWorkCard draft={draft} isBusy={false} onContinue={vi.fn()} onRequestDelete={vi.fn()} />);

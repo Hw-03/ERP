@@ -87,6 +87,14 @@ describe("공유 작업함", () => {
     expect(screen.queryByText("생산", { exact: true })).not.toBeInTheDocument();
   });
 
+  it.each(["desktop", "mobile"] as const)("%s 전체 작업은 조사 상태만 보여주고 재개 동작을 제공하지 않는다", (layout) => {
+    state.list.data = { items: [{ ...other, stocktake_pause: { token: "pause", round_id: "round", state: "blocked", paused_at: "now", pending_target_count: 1, missing_target_count: 1 } }], total: 1, skip: 0, limit: 30 };
+    render(<DraftCartPanel {...props} layout={layout} />);
+    openAll();
+    expect(screen.getByText("조사 대상 확인 필요")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /작업 재개|남은 수량 확인/ })).not.toBeInTheDocument();
+  });
+
   it.each(["desktop", "mobile"] as const)("%s 작업명은 완료 내역의 분류를 사용한다", (layout) => {
     state.list.data = { items: [
       { ...other, history_operation: { transaction_type: "PRODUCE", department: "조립" } },

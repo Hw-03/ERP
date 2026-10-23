@@ -483,6 +483,7 @@ export function MobileWarehouseScreen({
               setItems={setItems}
               onContinueDraft={handleLegacyDraftContinue}
               onContinueIoDraft={(draft) => {
+                restoredUrlDraftRef.current = draft.batch_id;
                 setRestoreIoDraft(draft);
                 setRestoreNonce((n) => n + 1);
                 setSectionTab("compose");
