@@ -553,6 +553,21 @@ describe("DesktopShippingView", () => {
     expect(workHeader.querySelector(":scope > span")).not.toHaveClass("min-h-[64px]", "min-w-[96px]", "rounded-[14px]");
   });
 
+  it("shows request-detail loading until a directly linked request arrives without empty guidance", async () => {
+    const pendingRequests = deferred<ShippingRequest[]>();
+    navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=linked-detail";
+    vi.mocked(api.getShippingRequests).mockReturnValue(pendingRequests.promise);
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    expect(screen.getByRole("status", { name: "출하 요청 상세를 불러오는 중입니다" })).toBeInTheDocument();
+    expect(screen.queryByText("선택된 요청 없음")).not.toBeInTheDocument();
+    expect(container.querySelector('[data-shipping-hub-card="request"]')).not.toBeInTheDocument();
+
+    await act(async () => { pendingRequests.resolve([request({ request_id: "linked-detail" })]); });
+    expect(await screen.findByTestId("shipping-request-detail")).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "출하 요청 상세를 불러오는 중입니다" })).not.toBeInTheDocument();
+  });
+
   it("keeps the empty request-detail guidance panel inside the shared root surface", async () => {
     navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=missing-detail";
     vi.mocked(api.getShippingRequests).mockResolvedValue([]);

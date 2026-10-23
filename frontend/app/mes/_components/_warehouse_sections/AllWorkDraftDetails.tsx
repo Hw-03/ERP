@@ -1,4 +1,5 @@
 import type { JSX, ReactNode } from "react";
+import Link from "next/link";
 import { ArrowUpRight, Package } from "lucide-react";
 import type { WorkDraftDetail } from "@/lib/api/types/work-drafts";
 import { LEGACY_COLORS as C } from "@/lib/mes/color";
@@ -26,6 +27,7 @@ export function AllWorkDraftDetails({ work, layout, columns }: {
   layout: "desktop" | "mobile";
   columns: ReactNode;
 }): JSX.Element {
+  const ShippingLink = layout === "desktop" ? Link : "a";
   const effects: DetailLine[] = (work.expected_effects ?? []).map((effect) => ({
     key: effect.effect_id, name: effect.item_name, code: effect.mes_code, quantity: effect.quantity, unit: effect.unit,
     tag: effect.kind === "in" ? "입고 예약" : effect.kind === "out" ? "출고 예약" : "이동 예약",
@@ -79,12 +81,13 @@ export function AllWorkDraftDetails({ work, layout, columns }: {
   }
 
   if (work.kind === "shipping") return <div>
-    <div className="flex flex-wrap items-center justify-between gap-3 p-4">
-      <dl className="flex min-w-0 flex-wrap gap-x-8 gap-y-2">
+    <div className={`grid items-center gap-3 p-4 ${layout === "desktop" ? "grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]" : "grid-cols-1"}`}>
+      <dl className={`flex min-w-0 flex-wrap justify-center gap-x-8 gap-y-2 text-center ${layout === "desktop" ? "col-start-2 row-start-1" : ""}`}>
         <div className="min-w-0"><dt className="text-xs" style={{ color: C.muted2 }}>요청자</dt><dd className="break-keep font-bold [overflow-wrap:anywhere]">{work.requester_name || "요청자 미입력"}</dd></div>
         <div className="min-w-0"><dt className="text-xs" style={{ color: C.muted2 }}>인보이스</dt><dd className="break-keep font-bold [overflow-wrap:anywhere]">{work.shipping_summary?.invoice_number || "인보이스 미입력"}</dd></div>
       </dl>
-      <a href={`/mes?tab=shipping&shippingView=requestDetail&shippingRequestId=${encodeURIComponent(work.id)}`} className="inline-flex min-h-11 items-center gap-1 rounded-[12px] px-3 font-bold hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]" style={{ color: C.blue, background: tint(C.blue, 10) }}>출하에서 열기<ArrowUpRight size={16} aria-hidden /></a>
+      {/* Keep the desktop app mounted; MobileShell resolves its initial tab on document navigation. */}
+      <ShippingLink href={`/mes?tab=shipping&shippingView=requestDetail&shippingRequestId=${encodeURIComponent(work.id)}`} className={`inline-flex min-h-11 items-center justify-self-end gap-1 rounded-[12px] px-3 font-bold hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] ${layout === "desktop" ? "col-start-3 row-start-1" : ""}`} style={{ color: C.blue, background: tint(C.blue, 10) }}>출하에서 열기<ArrowUpRight size={16} aria-hidden /></ShippingLink>
     </div>
     {section("동반 출하품", (work.shipping_summary?.companion_lines ?? []).map((line, index) => ({
       key: `${line.item_id}:${index}`, name: line.item_name, code: line.mes_code, quantity: line.quantity, unit: line.unit,

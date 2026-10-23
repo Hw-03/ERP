@@ -255,7 +255,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     requestWizardPushStackRef.current = [];
     requestWizardForwardStackRef.current = [];
   }
-  const [view, setView] = useState<ViewMode>("hub");
+  const [view, setView] = useState<ViewMode>(() => searchParams.get("shippingView") === "requestDetail" ? "requestDetail" : "hub");
   const [hubEntryAnimationView, setHubEntryAnimationView] = useState<ViewMode | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [pfItems, setPfItems] = useState<Item[]>([]);
@@ -288,7 +288,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   const [pending, setPending] = useState<PendingAction>(null);
   const [requestWizardStep, setRequestWizardStep] = useState<RequestWizardStep>(1);
 
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(() => searchParams.get("shippingView") === "requestDetail" ? searchParams.get("shippingRequestId") : null);
   const [originalRequest, setOriginalRequest] = useState<ShippingRequest | null>(null);
   const [savedInputSignature, setSavedInputSignature] = useState<string | null>(null);
   const [selectedPrepId, setSelectedPrepId] = useState<string | null>(null);
@@ -1683,6 +1683,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         <div className="animate-desktop-navigation-enter">
         <RequestDetailEntry
           request={selectedRequest}
+          loading={loading}
           onBack={() => confirmNavigation(() => navigateView("requestList"))}
           onEdit={(req) => confirmNavigation(() => loadRequestIntoDraft(queryClient.getQueryData<ShippingRequest[]>(queryKeys.shipping.requests())?.find((row) => row.request_id === req.request_id) ?? req, "requestWork"))}
           onDelete={deleteRequest}
@@ -2052,7 +2053,7 @@ function RequestListEntry({ requests, onBack, onNew, onOpen, loading = false }: 
 }
 
 
-function RequestDetailEntry({ request, onBack, onEdit, onDelete, onPrepareComplete, onPrepareCancel, onPickup, onInvoiceSaved, pending }: { request: ShippingRequest | null; onBack: () => void; onEdit: (request: ShippingRequest) => void; onDelete: (request: ShippingRequest) => void; onPrepareComplete: (request: ShippingRequest) => void; onPrepareCancel: (request: ShippingRequest) => void; onPickup: (request: ShippingRequest) => void; onInvoiceSaved: (request: ShippingRequest) => void; pending: PendingAction }) {
+function RequestDetailEntry({ request, loading = false, onBack, onEdit, onDelete, onPrepareComplete, onPrepareCancel, onPickup, onInvoiceSaved, pending }: { request: ShippingRequest | null; loading?: boolean; onBack: () => void; onEdit: (request: ShippingRequest) => void; onDelete: (request: ShippingRequest) => void; onPrepareComplete: (request: ShippingRequest) => void; onPrepareCancel: (request: ShippingRequest) => void; onPickup: (request: ShippingRequest) => void; onInvoiceSaved: (request: ShippingRequest) => void; pending: PendingAction }) {
   if (!request) {
     return (
       <div className={SHIPPING_FLEX_COL_CLASS}>
@@ -2061,10 +2062,11 @@ function RequestDetailEntry({ request, onBack, onEdit, onDelete, onPrepareComple
             <button type="button" aria-label="요청 목록으로 돌아가기" onClick={onBack} className={SHIPPING_ICON_BOX_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
               <ArrowLeft className="h-4 w-4" />
             </button>
-            <PanelTitle icon={PackageCheck} title="요청 상세" subtitle="목록에서 출하 요청을 선택하세요." />
+            <PanelTitle icon={PackageCheck} title="요청 상세" subtitle={loading ? "출하 요청을 불러오고 있습니다." : "목록에서 출하 요청을 선택하세요."} />
           </div>
           <div className="mt-4 flex min-h-0 flex-1 flex-col items-center justify-center">
-            <EmptyState illustrated title="선택된 요청 없음" body="목록에서 출하 요청을 선택하세요." />
+            {loading ? <div className="w-full"><ReadLoading label="출하 요청 상세를 불러오는 중입니다" variant="card" /></div>
+              : <EmptyState illustrated title="선택된 요청 없음" body="목록에서 출하 요청을 선택하세요." />}
           </div>
         </Panel>
       </div>
