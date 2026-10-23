@@ -39,6 +39,7 @@ class WorkDraftSummary(BaseModel):
     work_type: str | None
     sub_type: str | None
     request_type: str | None
+    notes: str | None
     targets: list[WorkDraftTarget]
     movement_summary: WorkDraftMovementSummary | None
     history_operation: WorkDraftHistoryOperation | None

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { IoBundle, Item } from "@/lib/api";
 import { IoBundleCart } from "../IoBundleCart";
@@ -49,6 +49,22 @@ const item = {
 } as unknown as Item;
 
 describe("IoBundleCart layout", () => {
+  it.each([false, true])("수량 조정의 메모는 전달된 상태를 수정하고 삭제한다 (mobile=%s)", (mobilePresentation) => {
+    const onNotesChange = vi.fn();
+    const props = { mobilePresentation, bundles: [bundle], workType: "warehouse_io" as const, subType: "warehouse_to_dept" as const,
+      notes: "기존 메모", onNotesChange, itemMap: new Map([[item.item_id, item]]), getAvailable: () => 10,
+      onToggleLine: vi.fn(), onQuantityChange: vi.fn(), onRemoveLine: vi.fn(), onRemoveBundle: vi.fn(), onAdvance: vi.fn(), canAdvance: true };
+    const { rerender, container } = render(<IoBundleCart {...props} />);
+    const memo = screen.getByRole("textbox", { name: "메모 (선택)" });
+    expect(memo).toHaveValue("기존 메모");
+    expect(container.querySelector("[data-io-cart-list]")).not.toContainElement(memo);
+    fireEvent.change(memo, { target: { value: "변경 메모" } });
+    expect(onNotesChange).toHaveBeenLastCalledWith("변경 메모");
+    rerender(<IoBundleCart {...props} notes="변경 메모" />);
+    expect(memo).toHaveValue("변경 메모");
+    fireEvent.change(memo, { target: { value: "" } });
+    expect(onNotesChange).toHaveBeenLastCalledWith("");
+  });
   it.each(["receive_supplier", "warehouse_to_dept", "adjust_in", "internal_use_out", "warehouse_adjust_in"] as const)(
     "%s 모바일 수량 목록은 카드 밖 레일과 고정 프레임을 사용한다",
     (subType) => {

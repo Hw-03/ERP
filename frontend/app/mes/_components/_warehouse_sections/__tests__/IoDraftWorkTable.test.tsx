@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { IoBatch, IoBundle, IoLine } from "@/lib/api";
+import type { IoBatch, IoBundle, IoLine, StockRequest } from "@/lib/api";
 import { IoDraftWorkTable } from "../IoDraftWorkTable";
+import { IoDraftWorkCard } from "../IoDraftWorkCard";
+import { DraftCartItemRow } from "../DraftCartItemRow";
 
 function makeLine(overrides: Partial<IoLine> = {}): IoLine {
   return {
@@ -86,6 +88,38 @@ function makeDraft(overrides: Partial<IoBatch> = {}): IoBatch {
 }
 
 describe("IoDraftWorkTable hierarchy", () => {
+  it("모바일 대표 품목은 묶음 개수 대신 실제 저장한 직접 라인 수량을 표시한다", () => {
+    const draft = makeDraft({ bundles: [makeBundle({ source_kind: "manual", quantity: 1, lines: [makeLine({ quantity: 500, unit: "BOX" })] })] });
+    render(<IoDraftWorkCard draft={draft} isBusy={false} onContinue={vi.fn()} onRequestDelete={vi.fn()} />);
+    expect(screen.getByText("500")).toBeVisible();
+    expect(screen.getByText("BOX")).toBeVisible();
+    expect(screen.queryByText(/총 1개/)).not.toBeInTheDocument();
+  });
+  it.each(["desktop", "mobile"] as const)("%s 내 작업은 첫 품목과 메모를 요약하고 펼치면 전체를 표시한다", (layout) => {
+    const draft = makeDraft({ notes: "첫 줄 메모\n둘째 줄 메모\n셋째 줄 메모", bundles: [makeBundle(), makeBundle({ bundle_id: "second", title: "두번째 작업 품목", quantity: 7 })] });
+    const actions = { onContinue: vi.fn(), onRequestDelete: vi.fn() };
+    render(layout === "desktop" ? <IoDraftWorkTable drafts={[draft]} busyId={null} {...actions} /> : <IoDraftWorkCard draft={draft} isBusy={false} {...actions} />);
+    expect(screen.queryByText("두번째 작업 품목")).not.toBeInTheDocument();
+    expect(screen.getByText(/외 1개 품목/)).toBeVisible();
+    expect(screen.getByLabelText("작업 메모")).toHaveClass("line-clamp-2");
+    fireEvent.click(screen.getByRole("button", { name: layout === "desktop" ? "작업 상세 펼치기" : "자재 목록 펼치기" }));
+    expect(screen.getByText("두번째 작업 품목")).toBeVisible();
+    expect(screen.getAllByLabelText("작업 메모").some((memo) => !memo.classList.contains("line-clamp-2"))).toBe(true);
+  });
+
+  it("구형 내 작업도 대표 품목과 메모를 접고 펼친다", () => {
+    const draft = { request_id: "legacy", request_type: "raw_receive", notes: "구형 메모\n둘째 줄", updated_at: "2026-10-23T00:00:00Z", lines: [
+      { line_id: "first", item_name_snapshot: "첫 구형 품목", quantity: 2 },
+      { line_id: "second", item_name_snapshot: "둘째 구형 품목", quantity: 3 },
+    ] } as StockRequest;
+    render(<DraftCartItemRow draft={draft} isBusy={false} onContinue={vi.fn()} onRequestDelete={vi.fn()} />);
+    expect(screen.queryByText("둘째 구형 품목")).not.toBeInTheDocument();
+    expect(screen.getByText("외 1개 품목")).toBeVisible();
+    expect(screen.getByLabelText("작업 메모")).toHaveClass("line-clamp-2");
+    fireEvent.click(screen.getByRole("button", { name: "상세 펼치기" }));
+    expect(screen.getByText("둘째 구형 품목")).toBeVisible();
+    expect(screen.getByLabelText("작업 메모")).not.toHaveClass("line-clamp-2");
+  });
   it.each([
     ["receive", "receive_supplier", "창고", "원자재 입고"],
     ["receive", "outbound_supplier", "창고", "원자재 출고"],

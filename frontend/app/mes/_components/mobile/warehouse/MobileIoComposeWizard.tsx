@@ -883,6 +883,13 @@ export function MobileIoComposeWizard({
         {step === 4 && (
           <div className={`min-h-0 flex-1 ${quantityStyles.cart}`}>
           <IoBundleCart
+            workType={state.workType}
+            notes={state.notes}
+            onNotesChange={state.setNotes}
+            employeeId={employeeId}
+            reasonCategory={state.reasonCategory}
+            reasonCategoryId={state.reasonCategoryId}
+            onReasonCategoryChange={state.setReasonCategory}
             mobilePresentation
             bundles={state.bundles}
             subType={state.subType}

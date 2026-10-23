@@ -11,6 +11,7 @@ import { formatQty } from "@/lib/mes/format";
 import { FlowBadge } from "../_history_sections/historyTableHelpers";
 import { StatusPill } from "../common/StatusPill";
 import { Button } from "@/lib/ui/Button";
+import { WorkDraftMemo } from "../common/WorkDraftMemo";
 import { formatWorkTimestamp, getIoDraftOperationColor, getIoDraftOperationLabel, getIoDraftTransactionType, WORK_ITEM_CODE_CLASS, WORK_TIMESTAMP_CLASS, WORK_TYPE_BADGE_CLASS, WorkExpandButton, WorkMovementSummary } from "../common/WorkDraftTableParts";
 import type { WorkDraftMovementSummary } from "@/lib/api/types/work-drafts";
 import {
@@ -125,13 +126,14 @@ export function IoDraftWorkTable({
       data-scrollbar-rail-viewport
       className="sg absolute inset-y-0 left-0 -right-2.5 overflow-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
     >
-      <div className="min-h-full min-w-[1040px]" style={{ background: LEGACY_COLORS.s1 }}>
-      <table className="w-full min-w-[1040px] table-fixed border-collapse text-sm">
+      <div className="min-h-full min-w-[1240px]" style={{ background: LEGACY_COLORS.s1 }}>
+      <table className="w-full min-w-[1240px] table-fixed border-collapse text-sm">
         <colgroup>
           <col className="w-[52px]" />
           <col className="w-[104px]" />
           <col className="w-48" />
           <col />
+          <col className="w-[200px]" />
           <col className="w-[112px]" />
           <col className="w-[156px]" />
           <col className="w-[176px]" />
@@ -148,6 +150,7 @@ export function IoDraftWorkTable({
               ["작업 시작", "text-center"],
               ["작업", "text-center"],
               ["대상", "text-left"],
+              ["메모", "text-center"],
               ["품목코드", "text-center"],
               ["예정 변동", "text-center"],
               ["관리", "text-center"],
@@ -168,7 +171,7 @@ export function IoDraftWorkTable({
             const expanded = expandedBatchId === draft.batch_id;
             const controlsId = `io-draft-detail-${draft.batch_id}`;
             const firstBundle = draft.bundles[0];
-            const totalQty = draft.bundles.reduce((sum, bundle) => sum + bundleDisplayQty(bundle), 0);
+            const primaryQty = firstBundle ? bundleDisplayQty(firstBundle) : 0;
             const rejection = latestRejection(draft);
             const busy = busyId === draft.batch_id;
             return (
@@ -178,7 +181,7 @@ export function IoDraftWorkTable({
                 expanded={expanded}
                 controlsId={controlsId}
                 firstBundle={firstBundle}
-                totalQty={totalQty}
+                primaryQty={primaryQty}
                 rejection={rejection}
                 busy={busy}
                 onToggle={() => setExpandedBatchId((current) => current === draft.batch_id ? null : draft.batch_id)}
@@ -205,7 +208,7 @@ function DraftRows({
   expanded,
   controlsId,
   firstBundle,
-  totalQty,
+  primaryQty,
   rejection,
   busy,
   onToggle,
@@ -216,7 +219,7 @@ function DraftRows({
   expanded: boolean;
   controlsId: string;
   firstBundle: IoBundle | undefined;
-  totalQty: number;
+  primaryQty: number;
   rejection: ReturnType<typeof latestRejection>;
   busy: boolean;
   onToggle: () => void;
@@ -254,9 +257,9 @@ function DraftRows({
           <div className="min-w-0">
             <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
             <p className="min-w-0 break-keep font-bold leading-6 [overflow-wrap:anywhere]" style={{ color: LEGACY_COLORS.text }}>
-              {firstBundle?.title ?? "대상 없음"}{draft.bundles.length > 1 ? ` 외 ${draft.bundles.length - 1}건` : ""}
+              {firstBundle?.title ?? "대상 없음"}{draft.bundles.length > 1 ? ` 외 ${draft.bundles.length - 1}개 품목` : ""}
             </p>
-            <span className="shrink-0 whitespace-nowrap font-semibold tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>{formatQty(totalQty, { maximumFractionDigits: 4, trimTrailingZeros: true })} EA</span>
+            <span className="shrink-0 whitespace-nowrap font-semibold tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>{formatQty(primaryQty, { maximumFractionDigits: 4, trimTrailingZeros: true })} {firstBundle ? bundlePrimaryLine(firstBundle)?.unit || firstBundle.lines[0]?.unit || "EA" : "EA"}</span>
             </div>
             {["반려됨", "예약 상태 확인 필요"].includes(reservationStatusLabel(draft)) && <StatusPill label={reservationStatusLabel(draft)} tone="warning" showDot={false} className="mt-1 !px-2.5 !py-1" />}
             {draft.reservation_issue && <p className="mt-1 break-keep text-xs leading-5 [overflow-wrap:anywhere]" style={{ color: LEGACY_COLORS.yellow }}>{reservationIssueMessage(draft.reservation_issue)}</p>}
@@ -267,8 +270,9 @@ function DraftRows({
             )}
           </div>
         </td>
+        <td className="border-b px-3 py-2 text-left" style={{ borderColor: LEGACY_COLORS.border }}><WorkDraftMemo notes={draft.notes} showEmpty /></td>
         <td className={`border-b ${WORK_ITEM_CODE_CLASS}`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-          {draft.bundles.length === 1 ? firstBundle?.source_mes_code ?? "—" : "—"}
+          {firstBundle?.source_mes_code ?? "—"}
         </td>
         <td className="border-b px-2 py-2 text-center text-xs" style={{ borderColor: LEGACY_COLORS.border }}>
           <DraftMovementSummary draft={draft} />
@@ -299,6 +303,7 @@ function DraftRows({
           </div>
         </td>
       </tr>
+      {expanded && draft.notes?.trim() && <tr><td colSpan={8} className="border-b px-4 py-3 text-left" style={{ borderColor: LEGACY_COLORS.border }}><WorkDraftMemo notes={draft.notes} expanded /></td></tr>}
       {expanded && draft.bundles.map((bundle, index) => (
         <BundleRows
           key={bundle.bundle_id}
@@ -339,6 +344,7 @@ function BundleRows({ bundle, subType, controlsId }: { bundle: IoBundle; subType
             <span className="min-w-0 break-keep leading-6 [overflow-wrap:anywhere]">{bundle.title}</span>
           </div>
         </td>
+        <td className="border-b" style={{ borderColor: LEGACY_COLORS.border }} />
         <td className={`border-b ${WORK_ITEM_CODE_CLASS}`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>{bundle.source_mes_code ?? primary?.mes_code ?? "—"}</td>
         <td className="border-b px-3 py-2 text-center font-bold tabular-nums" style={{ borderColor: LEGACY_COLORS.border, color: movement?.color ?? LEGACY_COLORS.muted2 }}>{movement?.label ?? (primary ? "변동 없음" : "—")}</td>
         <td className="border-b" style={{ borderColor: LEGACY_COLORS.border }} />
@@ -371,6 +377,7 @@ function DraftLineRow({ bundle, line, subType }: { bundle: IoBundle; line: IoLin
           {shortage && <span className="shrink-0 text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>부족 {formatQty(line.shortage)}</span>}
         </div>
       </td>
+      <td className="border-b" style={{ borderColor: LEGACY_COLORS.border }} />
       <td className={`border-b ${WORK_ITEM_CODE_CLASS}`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>{line.mes_code ?? "—"}</td>
       <td className="border-b px-3 py-2 text-center font-bold tabular-nums" style={{ borderColor: LEGACY_COLORS.border, color: movement.color }}>{movement.label}</td>
       <td className="border-b" style={{ borderColor: LEGACY_COLORS.border }} />

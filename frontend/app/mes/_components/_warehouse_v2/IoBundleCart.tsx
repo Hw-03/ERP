@@ -5,13 +5,21 @@ import type { ReactNode } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { EmptyState } from "../common";
-import type { IoBundle, IoInternalUseBomMode, IoLine, IoSubType, Item } from "./types";
+import type { IoBundle, IoInternalUseBomMode, IoLine, IoSubType, IoWorkType, Item } from "./types";
+import { IoWorkMemo } from "./IoWorkMemo";
 import { IoBundleCard } from "./IoBundleCard";
 import { hasUnselectedInternalUseBomMode } from "./internalUseBom";
 import { ioDirectionTone } from "./ioVisualTheme";
 import scrollStyles from "../mobile/primitives/MobileScrollFrame.module.css";
 
 interface Props {
+  workType?: IoWorkType;
+  notes?: string;
+  onNotesChange?: (value: string) => void;
+  employeeId?: string;
+  reasonCategory?: string;
+  reasonCategoryId?: string | null;
+  onReasonCategoryChange?: (name: string, categoryId?: string | null) => void;
   bundles: IoBundle[];
   subType: IoSubType;
   itemMap: Map<string, Item>;
@@ -49,6 +57,7 @@ interface Props {
 }
 
 export function IoBundleCart({
+  workType, notes = "", onNotesChange, employeeId, reasonCategory, reasonCategoryId, onReasonCategoryChange,
   bundles,
   subType,
   itemMap,
@@ -139,6 +148,8 @@ export function IoBundleCart({
         </div>
       )}
 
+      {bundles.length > 0 && onNotesChange && <IoWorkMemo workType={workType} subType={subType} bundles={bundles} notes={notes} onNotesChange={onNotesChange}
+        employeeId={employeeId} reasonCategory={reasonCategory} reasonCategoryId={reasonCategoryId} onReasonCategoryChange={onReasonCategoryChange} mobilePresentation={mobilePresentation} />}
       {bundles.length === 0 && footerNotice}
       {bundles.length > 0 && (
         // 항목 13 — 모바일은 하단 고정(sticky), 데스크톱(lg)은 기존 mt-auto 정적 배치 그대로.

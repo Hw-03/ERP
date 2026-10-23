@@ -24,6 +24,7 @@ export interface WorkDraftSummary extends WorkDraftSelection {
   work_type: IoWorkType | null;
   sub_type: IoSubType | null;
   request_type: string | null;
+  notes: string | null;
   /** 완료 내역과 같은 분류를 위한 공개 정보. 구 응답에서는 없을 수 있다. */
   history_operation?: { transaction_type: TransactionType; department: string | null } | null;
   targets: WorkDraftTarget[];

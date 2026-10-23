@@ -104,7 +104,7 @@ def _io_summary(summary: dict[str, Any], batch: IoBatch) -> dict[str, Any]:
         "move": sum(effect["kind"] == "move" for effect in effects),
     }
     return {"kind": "io", "id": summary["batch_id"], "request_type": None,
-        "movement_summary": movement_summary,
+        "movement_summary": movement_summary, "notes": batch.notes,
         "history_operation": _history_operation(batch, effects),
         **{field: summary[field] for field in PUBLIC_SUMMARY_FIELDS}}
 
@@ -117,7 +117,7 @@ def _stock_summary(request: StockRequest, owners: dict[uuid.UUID, Employee]) -> 
         "requester_employee_id": str(request.requester_employee_id), "requester_name": request.requester_name,
         "requester_department": request.requester_department, "requester_active": bool(owner and owner.is_active),
         "work_type": None, "sub_type": None, "request_type": _value(request.request_type),
-        "movement_summary": None,
+        "movement_summary": None, "notes": request.notes,
         "history_operation": _stock_history_operation(request),
         "targets": [{"item_id": str(line.item_id) if line.item_id else None,
             "item_name": line.item_name_snapshot, "mes_code": line.mes_code_snapshot,
@@ -141,7 +141,7 @@ def _stock_history_operation(request: StockRequest) -> dict[str, Any] | None:
 def _stock_query(db: Session) -> Any:
     """Load line identities in one bounded eager query, including optional item masters."""
     return db.query(StockRequest).options(
-        defer(StockRequest.notes), defer(StockRequest.reason_memo),
+        defer(StockRequest.reason_memo),
         selectinload(StockRequest.lines).joinedload(StockRequestLine.item))
 
 
@@ -188,7 +188,7 @@ def list_work_drafts(
             return {"items": [], "total": total, "skip": skip, "limit": limit}
         io_ids = [row.id for row in page if row.kind == "io"]
         stock_ids = [row.id for row in page if row.kind == "stock_request"]
-        batches = _load_batches(db, db.query(IoBatch).options(defer(IoBatch.notes)).filter(IoBatch.batch_id.in_(io_ids))) if io_ids else []
+        batches = _load_batches(db, db.query(IoBatch).filter(IoBatch.batch_id.in_(io_ids))) if io_ids else []
         requests = _stock_query(db).filter(StockRequest.request_id.in_(stock_ids)).all() if stock_ids else []
         owner_ids = {work.requester_employee_id for work in [*batches, *requests]}
         owners = {owner.employee_id: owner for owner in db.query(Employee).filter(Employee.employee_id.in_(owner_ids)).all()}

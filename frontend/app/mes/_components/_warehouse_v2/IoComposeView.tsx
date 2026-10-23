@@ -1468,6 +1468,13 @@ export function IoComposeView({
             fill
           >
             <IoBundleCart
+              workType={state.workType}
+              notes={state.notes}
+              onNotesChange={state.setNotes}
+              employeeId={employeeId}
+              reasonCategory={state.reasonCategory}
+              reasonCategoryId={state.reasonCategoryId}
+              onReasonCategoryChange={state.setReasonCategory}
               bundles={state.bundles}
               subType={state.subType}
               itemMap={itemMap}
