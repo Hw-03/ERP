@@ -63,6 +63,6 @@ def test_ensure_schema_upgrades_supplier_scope(tmp_path):
     command.upgrade(config, "20261007_0040")
     engine = create_engine(f"sqlite:///{path.as_posix()}")
     try:
-        assert ensure_schema(engine=engine).revision == "20261021_0048"
+        assert ensure_schema(engine=engine).revision == "20261023_0049"
     finally:
         engine.dispose()
