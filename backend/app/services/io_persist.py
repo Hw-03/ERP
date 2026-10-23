@@ -402,7 +402,13 @@ def _stock_request_summary(request: StockRequest) -> dict:
 
 
 def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None,
-                      *, linked_requests: list[StockRequest] | None = None) -> dict:
+                      *, linked_requests: list[StockRequest] | None = None,
+                      pause_payloads: dict[tuple[str, uuid.UUID], dict] | None = None) -> dict:
+    """Reuse request-local projections when available; direct callers read current state."""
+    from app.services.work_stocktake_pause import pause_payload
+    from sqlalchemy.orm import object_session
+    pause_db = db if db is not None else object_session(batch)
+
     if linked_requests is None and db is not None:
         linked_requests = (
             db.query(StockRequest)
@@ -480,6 +486,8 @@ def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None,
             approver_name = summary["approver_name"] or batch.requester_name
     return {
         "batch_id": batch.batch_id,
+        "stocktake_pause": (pause_payloads.get(("io", batch.batch_id)) if pause_payloads is not None
+            else pause_payload(pause_db, "io", batch.batch_id) if pause_db is not None and batch.status == "draft" else None),
         "revision": batch.revision,
         "reservation_status": batch.reservation_status,
         "reservation_issue": batch.reservation_issue,
@@ -873,6 +881,9 @@ def sync_batch_from_stock_requests(
                 batch.bundles
             )
     batch.updated_at = datetime.utcnow()
+    if batch.status == "draft":
+        from app.services.work_stocktake_pause import pause_returned_draft
+        pause_returned_draft(db, batch)
     db.flush()
 
 

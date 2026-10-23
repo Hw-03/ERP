@@ -16,6 +16,10 @@ from app.services.work_reservation_errors import WorkReservationError
 def cancel_work_reservation(db: Session, *, batch_id: uuid.UUID, expected_revision: int,
                             reason: str, request: Request) -> IoBatch:
     """After PIN authentication, cancel one draft; the router owns commit/rollback."""
+    from app.services import stocktake_guard
+    from app.services.work_stocktake_pause import remove_pause
+
+    stocktake_guard.lock_control(db)
     batch = db.query(IoBatch).filter_by(batch_id=batch_id).populate_existing().with_for_update().first()
     if batch is None:
         raise WorkReservationError("NOT_FOUND", "작업을 찾을 수 없습니다.", 404)
@@ -36,6 +40,7 @@ def cancel_work_reservation(db: Session, *, batch_id: uuid.UUID, expected_revisi
     reservations.replace_reservations(db, batch, None)
     batch.effective_plan = snapshot
     batch.status = "cancelled"
+    remove_pause(db, "io", batch.batch_id)
     actor_code = get_verified_audit_actor_code(request)
     tab_employee_code = (request.headers.get("X-MES-Employee-Code") or "").strip()
     # A tab hint can disqualify a shared cookie, but cannot authenticate its own actor.

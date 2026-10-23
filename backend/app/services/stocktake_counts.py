@@ -63,10 +63,14 @@ def progress(db: Session, round_id: uuid.UUID, scope_key: str) -> None:
 
 def start(db: Session, actor: Employee, payload: dict) -> dict:
     """Acquire a fresh fence and blank attempt while retaining all older observations."""
+    stocktake_guard.lock_control(db, exclusive=True)
     target, round_ = lock_target(db, uuid.UUID(payload["target_id"]))
     if target.version != payload["expected_target_version"] or round_.epoch != payload["round_epoch"]:
         raise InventoryConflict("COUNT_VERSION_CONFLICT", "조사 대상 버전이 변경되었습니다.")
-    stocktake_guard.prepare_items(db, [target.item_id])
+    from app.services.work_stocktake_pause import pause_drafts
+    pause_drafts(db, round_.round_id,
+        affected_cells=[{"item_id": str(target.item_id), "scope_key": target.scope_key}],
+        extra_item_ids=[target.item_id])
     gate = db.info[stocktake_guard.STATE_KEY]["gates"][(target.item_id, target.scope_key)]
     if gate.round_id == round_.round_id and gate.round_epoch == round_.epoch and gate.active_count_id:
         raise InventoryConflict("STOCKTAKE_CELL_LOCKED", "다른 계수가 진행 중입니다.", status_code=423)

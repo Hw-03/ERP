@@ -1,5 +1,5 @@
 /** CP1 계약. 새 엔드포인트는 CP4에서 제공하며 수량은 서버가 계산한 정수다. */
-import type { IoBatch, IoSubType, IoWorkType } from "./io";
+import type { IoBatch, IoSubType, IoWorkType, StocktakeWorkPause } from "./io";
 import type { InventoryReservationSummary } from "./inventory";
 
 export type WorkReservationStatus = "reserved" | "not_required" | "inactive";
@@ -64,6 +64,7 @@ export interface WorkTarget extends WorkItemIdentity {
 }
 
 export interface WorkReservationSummary {
+  stocktake_pause?: StocktakeWorkPause | null;
   batch_id: string;
   revision: number;
   status: IoBatch["status"];
@@ -96,7 +97,7 @@ export interface InventoryWorkStatus {
 
 export interface WorkReservationEvent {
   event_id: string;
-  action: "saved" | "submitted" | "returned" | "backfilled" | "admin_cancelled" | "owner_deleted" | "approval_changed" | "settlement_failed";
+  action: "saved" | "submitted" | "returned" | "backfilled" | "admin_cancelled" | "owner_deleted" | "approval_changed" | "settlement_failed" | "stocktake_paused" | "stocktake_resumed";
   revision: number;
   occurred_at: string;
   actor_employee_id: string | null;

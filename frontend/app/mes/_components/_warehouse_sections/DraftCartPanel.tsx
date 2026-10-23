@@ -14,6 +14,7 @@ import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { Button } from "@/lib/ui/Button";
 import { AllWorkDraftsPanel } from "./AllWorkDraftsPanel";
 import { DraftCartItemRow } from "./DraftCartItemRow";
+import { LegacyDraftResumeDialog } from "./LegacyDraftResumeDialog";
 import { IoDraftWorkCard } from "./IoDraftWorkCard";
 import { IoDraftWorkTable } from "./IoDraftWorkTable";
 import { WarehouseEmptyWorkArea } from "./WarehouseEmptyWorkArea";
@@ -52,7 +53,6 @@ function DraftCartPanelContent({
   employeeId,
   defaultScope = "mine",
   refreshNonce,
-  onContinue,
   onContinueIo,
   onChanged,
   onCountChange,
@@ -73,6 +73,7 @@ function DraftCartPanelContent({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [opError, setOpError] = useState<string | null>(null);
+  const [legacyDraft, setLegacyDraft] = useState<StockRequest | null>(null);
   const active = useRef(true);
   const reads = useRef(new Set<AbortController>());
   useEffect(() => {
@@ -127,7 +128,7 @@ function DraftCartPanelContent({
       if (result.error) throw result.error;
       const current = result.data?.stockDrafts.find((row) => row.request_id === draft.request_id);
       if (!current) throw new Error("저장한 작업을 찾을 수 없습니다. 최신 목록을 확인해 주세요.");
-      onContinue(current);
+      setLegacyDraft(current);
     } catch (error) { if (active.current) setOpError(error instanceof Error ? error.message : "저장한 작업을 불러오지 못했습니다."); }
     finally { if (active.current) setBusyId(null); }
   }
@@ -234,6 +235,7 @@ function DraftCartPanelContent({
       </>}
       </div>
 
+      {legacyDraft && <LegacyDraftResumeDialog key={legacyDraft.request_id} draft={legacyDraft} onClose={() => setLegacyDraft(null)} onChanged={() => { void refetch(); onChanged(); }} />}
       <ConfirmModal
         className={layout === "mobile" ? panelStyles.touchScope : undefined}
         open={deleteTarget !== null}

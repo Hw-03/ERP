@@ -1,4 +1,5 @@
 "use client";
+import { StocktakePauseNotice } from "../common/StocktakePauseNotice";
 
 import { Fragment, useEffect, useRef, useState, type CSSProperties, type JSX } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ClipboardList, Sparkles } from "lucide-react";
@@ -181,7 +182,7 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
                 <td className="p-1 text-center"><WorkExpandButton expanded={expanded} controlsId={controlsId} label={`${row.requester_name} 작업 상세`} onToggle={() => toggle(row)} /></td>
                 <td className={WORK_TIMESTAMP_CLASS} style={{ color: C.muted2 }}><time dateTime={row.updated_at} title={workDate(row.updated_at)}>{formatWorkTimestamp(row.updated_at)}</time></td>
                 <td className="px-4 py-2 text-center">{owner(row)}</td>
-                <td className="px-3 py-2 text-center"><div className="flex justify-center">{kind(row)}</div></td>
+                <td className="px-3 py-2 text-center"><div className="flex justify-center">{kind(row)}</div><StocktakePauseNotice pause={row.stocktake_pause} /></td>
               <td className="px-4 py-2">
                 {target ? <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1"><p className={ITEM_CLASS}>{target.item_name}</p><span className="shrink-0 whitespace-nowrap font-semibold tabular-nums" style={{ color: C.muted2 }}>{formatQty(target.quantity)} {target.unit}</span>{row.targets.length > 1 && <span className="shrink-0 whitespace-nowrap text-xs font-normal" style={{ color: C.muted2 }}>외 {row.targets.length - 1}개 품목</span>}</div> : <p style={{ color: C.muted2 }}>등록된 목적 품목이 없습니다.</p>}
               </td>
@@ -207,7 +208,7 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
       <div className="col-start-1 row-start-1" aria-hidden={pending || undefined} inert={pending || undefined}>
       {failure}
       {emptyState}
-      {rows.length > 0 && <div className="space-y-3">{rows.map((row) => <article key={`${row.kind}:${row.id}`} aria-label={`${row.requester_name} 작업`} className="overflow-hidden rounded-[20px] border" style={{ borderColor: C.border, background: C.s1 }}><div className="space-y-3 p-4">{owner(row)}{kind(row)}{targets(row)}<WorkMovementSummary counts={row.movement_summary} /><p className="text-xs tabular-nums" style={{ color: C.muted2 }}>저장 <time dateTime={row.updated_at}>{workDate(row.updated_at)}</time></p>{actions(row)}</div>{expandedDetail(row)}</article>)}</div>}
+      {rows.length > 0 && <div className="space-y-3">{rows.map((row) => <article key={`${row.kind}:${row.id}`} aria-label={`${row.requester_name} 작업`} className="overflow-hidden rounded-[20px] border" style={{ borderColor: C.border, background: C.s1 }}><div className="space-y-3 p-4">{owner(row)}{kind(row)}<StocktakePauseNotice pause={row.stocktake_pause} />{targets(row)}<WorkMovementSummary counts={row.movement_summary} /><p className="text-xs tabular-nums" style={{ color: C.muted2 }}>저장 <time dateTime={row.updated_at}>{workDate(row.updated_at)}</time></p>{actions(row)}</div>{expandedDetail(row)}</article>)}</div>}
       </div>
       <WorkContentCover pending={pending} failed={list.isError} />
     </div>}

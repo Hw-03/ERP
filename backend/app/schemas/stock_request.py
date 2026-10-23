@@ -12,6 +12,7 @@ from app.models import (
 )
 
 from app.schemas.common import UtcDatetime
+from app.schemas.work_stocktake_pause import WorkStocktakePause
 
 
 class StockRequestLineCreate(BaseModel):
@@ -55,6 +56,7 @@ class StockRequestCreate(BaseModel):
 class StockRequestDraftUpsert(BaseModel):
     """장바구니(DRAFT) upsert 페이로드. lines 는 빈 리스트 허용 — 저장 도중 단계."""
     requester_employee_id: uuid.UUID
+    stocktake_resume_token: Optional[uuid.UUID] = None
     submission_id: Optional[uuid.UUID] = None
     request_type: StockRequestTypeEnum
     reference_no: Optional[str] = Field(None, max_length=100)
@@ -105,6 +107,8 @@ class StockRequestLineResponse(BaseModel):
 
 class StockRequestResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
+    stocktake_pause: Optional[WorkStocktakePause] = None
 
     request_id: uuid.UUID
     submission_id: Optional[uuid.UUID] = None

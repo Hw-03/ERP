@@ -120,6 +120,15 @@ describe("IoDraftWorkTable hierarchy", () => {
     expect(screen.getByText("둘째 구형 품목")).toBeVisible();
     expect(screen.getByLabelText("작업 메모")).not.toHaveClass("line-clamp-2");
   });
+  it("조사 중에는 이어하기만 잠그고 상세와 삭제는 유지한다", () => {
+    const draft = makeDraft({ stocktake_pause: { token: "pause", round_id: "round", state: "blocked", paused_at: "now", pending_target_count: 1, missing_target_count: 1 } });
+    render(<IoDraftWorkTable drafts={[draft]} busyId={null} onContinue={vi.fn()} onRequestDelete={vi.fn()} />);
+    expect(screen.getByText("조사 대상 확인 필요")).toBeVisible();
+    expect(screen.getByRole("button", { name: "이어서 작업" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "작업 삭제" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: /상세.*펼치기/ }));
+    expect(screen.getByText("DX3000 POWER BUTTON")).toBeVisible();
+  });
   it.each([
     ["receive", "receive_supplier", "창고", "원자재 입고"],
     ["receive", "outbound_supplier", "창고", "원자재 출고"],

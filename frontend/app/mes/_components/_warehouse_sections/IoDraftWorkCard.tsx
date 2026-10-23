@@ -11,6 +11,7 @@ import { formatKstDateTime } from "@/lib/mes/format";
 import { Button } from "@/lib/ui/Button";
 import { WorkDraftMemo } from "../common/WorkDraftMemo";
 import { StatusPill } from "../common/StatusPill";
+import { StocktakePauseNotice } from "../common/StocktakePauseNotice";
 import { FlowBadge } from "../_history_sections/historyTableHelpers";
 import { getIoDraftOperationColor, getIoDraftOperationLabel, getIoDraftTransactionType } from "../common/WorkDraftTableParts";
 import { reservationStatusLabel } from "../_warehouse_v2/WorkReservationNotice";
@@ -155,6 +156,7 @@ export function IoDraftWorkCard({
       </div>
 
       {/* 대표 품목과 나머지 개수는 접힌 상태에서도 확인한다. */}
+      <StocktakePauseNotice pause={draft.stocktake_pause} />
       {["반려됨", "예약 상태 확인 필요"].includes(reservationStatusLabel(draft)) && <StatusPill label={reservationStatusLabel(draft)} tone="warning" showDot={false} className="mt-2 !px-2.5 !py-1" />}
       {draft.reservation_issue && <p className="mt-2 rounded-[12px] px-3 py-2 text-sm leading-6" style={{ color: LEGACY_COLORS.yellow, background: LEGACY_COLORS.warningBg }}>{reservationIssueMessage(draft.reservation_issue)}</p>}
       <ul className="mt-3 space-y-2">
@@ -274,7 +276,7 @@ export function IoDraftWorkCard({
           variant="secondary"
           type="button"
           aria-label="이어서 작업"
-          disabled={isBusy}
+          disabled={isBusy || draft.stocktake_pause?.state === "blocked"}
           onClick={onContinue}
           className="min-h-11 rounded-[12px] border px-4 text-sm font-semibold transition active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--c-blue)] disabled:opacity-50"
           style={{

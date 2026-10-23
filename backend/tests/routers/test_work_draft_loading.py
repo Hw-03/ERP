@@ -76,6 +76,45 @@ def test_legacy_draft_projection_preserves_normalization(db_session, make_item, 
     assert io_draft.list_drafts(db_session, requester_employee_id=actor_id) == [expected]
 
 
+@pytest.mark.parametrize("size", [1, 12])
+@pytest.mark.parametrize("state", ["blocked", "ready"])
+def test_paused_draft_list_keeps_bounded_read_only_queries(db_session, make_item, owner, size, state):
+    from app.models import Department, InventoryScope
+    from tests.services.test_stocktake_counts import setup_round
+    from tests.services.test_work_stocktake_pause import mark_applied
+
+    item = make_item(process_type_code="AR", warehouse_qty=100)
+    actor_id = owner.employee_id
+    item_id = item.item_id
+    for _ in range(size):
+        io_draft.save_draft(db_session, IoDraftUpsert.model_validate(draft_payload(owner, item)))
+    db_session.add(Department(name="조립", is_active=True))
+    db_session.add(InventoryScope(scope_key="assembly", physical_department="조립"))
+    db_session.commit()
+    _, _, _, round_, _ = setup_round(db_session, make_item)
+    if state == "ready":
+        mark_applied(db_session, round_["round_id"], item_id)
+    batches = db_session.query(IoBatch).order_by(IoBatch.updated_at.desc()).all()
+    expected = [deepcopy(io_draft._draft_to_current_stock_payload(db_session, batch)) for batch in batches]
+    db_session.expire_all()
+    statements = []
+
+    def record(conn, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+
+    engine = db_session.get_bind()
+    event.listen(engine, "before_cursor_execute", record)
+    try:
+        actual = io_draft.list_drafts(db_session, requester_employee_id=actor_id)
+    finally:
+        event.remove(engine, "before_cursor_execute", record)
+    assert actual == expected
+    assert len(actual) == size
+    assert all(row["stocktake_pause"]["state"] == state for row in actual)
+    assert len(statements) <= 24, f"executed {len(statements)} SQL statements for {size} drafts"
+    assert not any(sql.lstrip().upper().startswith(("UPDATE", "INSERT", "DELETE")) for sql in statements)
+
+
 @pytest.mark.parametrize("bucket", ["warehouse", "production"])
 def test_bulk_shortages_match_owner_credit_shipping_and_shared_cell(db_session, make_item, make_location, owner, bucket):
     item = make_item(process_type_code="AR", warehouse_qty=Decimal(10))

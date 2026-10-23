@@ -5,8 +5,10 @@ import { reservationIssueMessage } from "@/lib/io/reservation-message";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { Button } from "@/lib/ui/Button";
 import { StatusPill } from "../common/StatusPill";
+import { stocktakePauseLabel } from "../common/StocktakePauseNotice";
 
 export function reservationStatusLabel(batch: IoBatch | null | undefined): string {
+  if (batch?.stocktake_pause) return stocktakePauseLabel(batch.stocktake_pause);
   switch (batch?.reservation_status) {
     case "reserved": return batchStatusLabel(batch.status);
     case "not_required": return batchStatusLabel(batch.status);
@@ -37,7 +39,7 @@ export function WorkReservationNotice({ batch, latestBatch, onReturn, busy = fal
   const currentBatch = latestBatch ?? batch;
   return <>
     <div className="shrink-0 space-y-3 rounded-[20px] border px-4 py-3 text-sm leading-6" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}>
-      {currentBatch && <div><p className="flex flex-wrap items-center gap-x-2 gap-y-1"><StatusPill label={reservationStatusLabel(currentBatch)} tone={currentBatch.reservation_status === "reserved" ? "success" : "neutral"} showDot={false} className="!px-2.5 !py-1" />{currentBatch.reservation_status === "reserved" && <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>자재 예약 완료</span>}{currentBatch.reservation_status === "not_required" && <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>예약 대상 없음</span>}</p>{currentBatch.status === "draft" && <p className="mt-1" style={{ color: LEGACY_COLORS.muted2 }}>변경한 내용은 ‘작업 내용 반영’을 눌러 적용하세요.</p>}</div>}
+      {currentBatch && <div><p className="flex flex-wrap items-center gap-x-2 gap-y-1"><StatusPill label={reservationStatusLabel(currentBatch)} tone={currentBatch.reservation_status === "reserved" ? "success" : "neutral"} showDot={false} className="!px-2.5 !py-1" />{!currentBatch.stocktake_pause && currentBatch.reservation_status === "reserved" && <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>자재 예약 완료</span>}{!currentBatch.stocktake_pause && currentBatch.reservation_status === "not_required" && <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>예약 대상 없음</span>}</p>{currentBatch.status === "draft" && !currentBatch.stocktake_pause && <p className="mt-1" style={{ color: LEGACY_COLORS.muted2 }}>변경한 내용은 ‘작업 내용 반영’을 눌러 적용하세요.</p>}</div>}
       {currentBatch?.reservation_issue && <p className="rounded-[12px] px-3 py-2" style={{ color: LEGACY_COLORS.yellow, background: LEGACY_COLORS.warningBg }}>{reservationIssueMessage(currentBatch.reservation_issue)}</p>}
       {latestBatch && <p role="status">현재 상태: {batchStatusLabel(latestBatch.status)}. 입력한 내용은 남아 있습니다. 작업 중 목록에서 최신 상태를 확인해 주세요.</p>}
       {onReturn && <div className={currentBatch ? "border-t pt-3" : ""} style={{ borderColor: LEGACY_COLORS.border }}>

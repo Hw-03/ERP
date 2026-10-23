@@ -66,7 +66,10 @@ def prepare_items(db: Session, item_ids: Iterable[uuid.UUID]) -> None:
     items = db.query(Item).filter(Item.item_id.in_(ordered)).order_by(Item.item_id)
     parents = db.query(Inventory).filter(Inventory.item_id.in_(ordered)).order_by(Inventory.item_id)
     if not sqlite:
-        items, parents = items.with_for_update(), parents.with_for_update()
+        # Keep writers/deletes serialized without upgrading the KEY SHARE locks
+        # already held by draft-line FKs before stocktake target acquisition.
+        items = items.with_for_update(key_share=True)
+        parents = parents.with_for_update()
     if len(items.populate_existing().all()) != len(ids):
         raise InventoryConflict("INVENTORY_PLAN_CHANGED", "업무 대상 품목을 다시 확인해 주세요.")
     existing = {row.item_id for row in parents.populate_existing().all()}

@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { workDraftsApi } from "@/lib/api/work-drafts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { IoBatch } from "@/lib/api";
+import type { IoBatch, StockRequest } from "@/lib/api";
 import { DraftCartPanel } from "../DraftCartPanel";
 
 const mockDraftData = vi.hoisted(() => ({
@@ -11,6 +11,11 @@ const mockDraftData = vi.hoisted(() => ({
 const mockFailure = vi.hoisted(() => ({ error: null as Error | null, refetch: vi.fn() }));
 const mockDeleteIoDraft = vi.hoisted(() => vi.fn());
 const mockDeleteStockRequestDraft = vi.hoisted(() => vi.fn());
+const operator = vi.hoisted(() => ({ token: "operator-token" }));
+vi.mock("@/lib/auth/operator-session", () => ({ restoreOperatorSession: () => ({ token: operator.token }) }));
+vi.mock("../LegacyDraftResumeDialog", () => ({
+  LegacyDraftResumeDialog: ({ draft }: { draft: StockRequest }) => <div role="dialog" aria-label="구형 작업 이어가기">{draft.notes}</div>,
+}));
 
 vi.mock("@/lib/queries/useDraftCartQuery", () => ({
   useDraftCartQuery: () => ({
@@ -57,7 +62,8 @@ describe("DraftCartPanel empty state", () => {
     mockDraftData.stockDrafts = [];
     mockDraftData.ioDrafts = [];
     mockFailure.error = null;
-    mockFailure.refetch.mockClear();
+    mockFailure.refetch.mockReset();
+    operator.token = "operator-token";
     mockDeleteIoDraft.mockClear();
     mockDeleteStockRequestDraft.mockClear();
   });
@@ -157,5 +163,31 @@ describe("DraftCartPanel empty state", () => {
     await act(async () => { complete(makeIoDraft()); });
     expect(get.mock.calls[0][2]?.signal?.aborted).toBe(true);
     expect(onContinueIo).not.toHaveBeenCalled();
+  });
+
+  it("구형 이어하기도 최신 조회가 끝난 뒤 최신 내용으로 편집기를 연다", async () => {
+    const draft = { request_id: "legacy-1", request_type: "raw_receive", lines: [], notes: "이전 메모" } as unknown as StockRequest;
+    mockDraftData.stockDrafts = [draft];
+    let complete!: (value: unknown) => void;
+    mockFailure.refetch.mockImplementation(() => new Promise((resolve) => { complete = resolve; }));
+    const onContinue = vi.fn();
+    render(<DraftCartPanel layout="desktop" employeeId="emp-1" refreshNonce={0} onContinue={onContinue} onChanged={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "이어서 작업" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await act(async () => { complete({ data: { stockDrafts: [{ ...draft, notes: "최신 메모" }], ioDrafts: [] } }); });
+    expect(screen.getByRole("dialog", { name: "구형 작업 이어가기" })).toHaveTextContent("최신 메모");
+    expect(onContinue).not.toHaveBeenCalled();
+  });
+
+  it("다른 로그인 뒤 도착한 구형 이어하기 응답은 편집기를 열지 않는다", async () => {
+    const draft = { request_id: "legacy-1", request_type: "raw_receive", lines: [], notes: "이전 메모" } as unknown as StockRequest;
+    mockDraftData.stockDrafts = [draft];
+    let complete!: (value: unknown) => void;
+    mockFailure.refetch.mockImplementation(() => new Promise((resolve) => { complete = resolve; }));
+    render(<DraftCartPanel layout="desktop" employeeId="emp-1" refreshNonce={0} onContinue={vi.fn()} onChanged={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "이어서 작업" }));
+    operator.token = "new-login";
+    await act(async () => { complete({ data: { stockDrafts: [draft], ioDrafts: [] } }); });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

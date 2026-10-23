@@ -17,6 +17,7 @@ class DraftReadContext:
     requests: dict[uuid.UUID, list[StockRequest]]
     credits: dict[uuid.UUID, dict[AvailabilityCell, Decimal]]
     available: dict[AvailabilityCell, Decimal]
+    pauses: dict[tuple[str, uuid.UUID], dict]
 
 
 def load_draft_graph(query: Query[IoBatch]) -> list[IoBatch]:
@@ -29,11 +30,13 @@ def load_draft_graph(query: Query[IoBatch]) -> list[IoBatch]:
 
 def draft_read_context(db: Session, batches: list[IoBatch]) -> DraftReadContext:
     """Read all physical cells, reservations and approval links in bounded queries."""
+    from app.services.work_stocktake_pause import batch_pause_payloads
+
     ids = [batch.batch_id for batch in batches]
     requests: dict[uuid.UUID, list[StockRequest]] = {key: [] for key in ids}
     credits: dict[uuid.UUID, dict[AvailabilityCell, Decimal]] = {key: {} for key in ids}
     if not ids:
-        return DraftReadContext(requests, credits, {})
+        return DraftReadContext(requests, credits, {}, {})
     linked = db.query(StockRequest).filter(or_(
         StockRequest.operation_batch_id.in_(ids),
         StockRequest.request_id.in_([batch.stock_request_id for batch in batches if batch.stock_request_id]),
@@ -69,4 +72,5 @@ def draft_read_context(db: Session, batches: list[IoBatch]) -> DraftReadContext:
     for row in db.query(InventoryLocation).filter(InventoryLocation.item_id.in_(item_ids)).all():
         cell = AvailabilityCell.location(row.item_id, row.department, row.status)
         available[cell] = calculate_available(Decimal(row.quantity or 0), Decimal(row.pending_quantity or 0), reserved.get(cell, Decimal(0)))
-    return DraftReadContext(requests, credits, available)
+    pauses = batch_pause_payloads(db, [("io", batch.batch_id) for batch in batches if batch.status == "draft"])
+    return DraftReadContext(requests, credits, available, pauses)

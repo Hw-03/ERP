@@ -62,8 +62,8 @@ def test_canonical_bootstrap_records_schema_readiness(tmp_path):
 
     assert result.changed is True
     assert checked.ready is True
-    assert checked.revision == "20261021_0048"
+    assert checked.revision == "20261023_0049"
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT revision FROM alembic_schema_state WHERE id=1")).scalar_one() == "20261021_0048"
+        assert connection.execute(text("SELECT revision FROM alembic_schema_state WHERE id=1")).scalar_one() == "20261023_0049"
         assert connection.execute(text("SELECT inventory_mode FROM stocktake_control WHERE id=1")).scalar_one() == "LEGACY"
     engine.dispose()

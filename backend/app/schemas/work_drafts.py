@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from app.schemas.common import UtcDatetime
+from app.schemas.work_stocktake_pause import WorkStocktakePause
 from app.schemas.work_reservations import (
     WorkForecastIssue, WorkInventoryEffect, WorkReservationIssue,
     WorkReservationStatus, WorkReservedInput,
@@ -30,6 +31,7 @@ class WorkDraftHistoryOperation(BaseModel):
 
 
 class WorkDraftSummary(BaseModel):
+    stocktake_pause: WorkStocktakePause | None = None
     kind: Literal["io", "stock_request"]
     id: str
     requester_employee_id: str

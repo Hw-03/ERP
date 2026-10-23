@@ -313,6 +313,21 @@ beforeEach(() => {
 });
 
 describe("IoComposeView navigation chrome", () => {
+  it("조사 반영 후에는 추가 확인 없이 기존 저장으로 작업을 이어간다", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const draft = autoRouteDraft("produce", ["조립"]) as IoBatch;
+    draft.revision = 3;
+    draft.stocktake_pause = { token: "pause", round_id: "round", state: "ready", paused_at: "now", pending_target_count: 0, missing_target_count: 0 };
+    render(<IoComposeView globalSearch="" operator={operator} employees={[]} items={[]} setItems={vi.fn()} onStatusChange={vi.fn()} restoreDraft={draft} restoreStep={5} />);
+    fireEvent.change(screen.getByRole("textbox", { name: "작업 메모" }), { target: { value: "입력 유지" } });
+    fireEvent.click(screen.getByTestId("draft-save"));
+    await waitFor(() => expect(api.saveDraft).toHaveBeenCalledWith(expect.objectContaining({ stocktake_resume_token: "pause", expected_revision: 3, notes: "입력 유지" })));
+    expect(screen.queryByRole("checkbox", { name: /실사에 포함/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "작업 재개" })).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "작업 메모" })).toHaveValue("입력 유지");
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
   it("화면 전환용 저장이 성공하면 조회 갱신 실패에도 dirty를 해제하고 전환한다", async () => {
     const { changeShell, failure, onReservationChanged } = renderViewportDraft();
     fireEvent.click(await screen.findByRole("button", { name: "반환 기준수량 변경" }));

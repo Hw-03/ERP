@@ -16,7 +16,7 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import object_session, relationship
 
 from app.models.base import Base, IntQuantity, UUIDString
 
@@ -174,6 +174,18 @@ class StockRequest(Base):
         cascade="all, delete-orphan",
         order_by="StockRequestLine.created_at",
     )
+
+    @property
+    def stocktake_pause(self) -> dict | None:
+        """Expose the current legacy draft fence while keeping ORM response callers intact."""
+        if self.status != StockRequestStatusEnum.DRAFT or self.operation_batch_id is not None:
+            return None
+        db = object_session(self)
+        if db is None:
+            return None
+        from app.services.work_stocktake_pause import pause_payload
+
+        return pause_payload(db, "stock_request", self.request_id)
 
 
 class StockRequestLine(Base):

@@ -44,6 +44,12 @@ def create_request(
 ) -> StockRequest:
     """요청·라인·점유·도착 알림을 한 번에 확정한다."""
     with transactional(db):
+        from types import SimpleNamespace
+        from app.services.work_stocktake_legacy import required_cells
+        from app.services.work_stocktake_pause import ensure_work_submit
+
+        intent = SimpleNamespace(request_type=request_type, lines=lines_input, notes=notes)
+        ensure_work_submit(db, "stock_request", uuid.uuid4(), required_cells(db, intent))
         request = stock_request_svc.create_request(
             db,
             requester=requester,
@@ -536,6 +542,8 @@ def revert_to_draft(
 ) -> IoBatch:
     """연결 batch의 미결 요청을 모두 취소하고 하나의 draft로 되돌린다."""
     with transactional(db):
+        from app.services import stocktake_guard, work_stocktake_pause
+        stocktake_guard.lock_control(db)
         batch_id = request.operation_batch_id
         if batch_id is None:
             raise ValueError("연결된 입출고 작업 묶음이 없습니다.")
@@ -590,6 +598,11 @@ def revert_to_draft(
         from app.services.io_effective_plan import build_effective_plan
 
         plan = build_effective_plan(db, batch)
+        from app.services.work_stocktake_legacy import required_cells
+        cells = work_stocktake_pause.io_required_cells(db, batch) + work_stocktake_pause.io_required_cells(db, batch, plan)
+        for linked in linked_requests:
+            cells.extend(required_cells(db, linked))
+        can_reserve = work_stocktake_pause.ensure_work_save(db, "io", batch.batch_id, cells)
         # Lock old approval sources and newly computed sources before releasing either.
         internal_use_approval.prelock_reservation_sources(db, linked_requests, extra_plan=plan)
         for linked_request in linked_requests:
@@ -611,7 +624,8 @@ def revert_to_draft(
         batch.status = "draft"
         batch.completed_at = None
         batch.updated_at = datetime.utcnow()
-        io_reservations.replace_reservations(db, batch, plan)
+        io_reservations.replace_reservations(db, batch, plan if can_reserve else None)
+        batch.effective_plan = plan
         lifecycle.advance_command(db, batch, actor=requester, previous_revision=expected_revision, action="returned")
         db.flush()
     return batch

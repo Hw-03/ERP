@@ -147,7 +147,7 @@ def test_department_and_employee_filters_apply_to_both_kinds(client, authenticat
 def test_public_projection_preserves_units_and_legacy_unknown_reservation(client, authenticated, drafts):
     batch, legacy, item = drafts
     summary_fields = {"kind", "id", "requester_employee_id", "requester_name", "requester_department",
-        "requester_active", "work_type", "sub_type", "request_type", "targets", "movement_summary", "history_operation", "notes", "created_at", "updated_at"}
+        "requester_active", "work_type", "sub_type", "request_type", "targets", "movement_summary", "history_operation", "notes", "created_at", "updated_at", "stocktake_pause"}
     detail_fields = summary_fields | {"reservation_status", "reservation_issue", "reserved_inputs", "expected_effects", "forecast_issue"}
     rows = client.get("/api/work-drafts", headers=authenticated[0]).json()["items"]
     assert all(set(row) == summary_fields for row in rows)
@@ -305,7 +305,8 @@ def test_list_loads_only_page_graphs_with_fixed_query_count(client, db_session, 
         assert "io_batches.batch_id IN" in plan_reads[0]
         assert all(row["movement_summary"] == {"increase": 0, "decrease": 0, "move": 1}
             for row in response.json()["items"] if row["kind"] == "io")
-    assert query_counts[0] == query_counts[1] == 10
+    # One additional batched pause lookup stays independent of page size.
+    assert query_counts[0] == query_counts[1] == 11
 
 
 @pytest.mark.parametrize("sort", ["updated_desc", "updated_asc", "department"])

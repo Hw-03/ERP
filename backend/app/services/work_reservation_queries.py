@@ -15,6 +15,7 @@ from app.models import (
 )
 from app.schemas.work_reservations import WorkEffectivePlan
 from app.services.work_reservation_errors import WorkReservationError
+from app.services.work_stocktake_pause import batch_pause_payloads, pause_payload
 
 
 OPEN_STATUSES = {"submitted", "reserved"}
@@ -95,6 +96,7 @@ def _summary(batch: IoBatch, owners: dict[uuid.UUID, Employee]) -> dict[str, Any
             targets.append({**_identity(bundle.source_item), "quantity": int(quantity)})
     return {
         "batch_id": str(batch.batch_id), "revision": batch.revision, "status": batch.status,
+        "stocktake_pause": None,
         "reservation_status": batch.reservation_status, "reservation_issue": batch.reservation_issue,
         "work_type": batch.work_type, "sub_type": batch.sub_type, "reference_no": batch.reference_no,
         "requester_employee_id": str(batch.requester_employee_id), "requester_name": batch.requester_name,
@@ -341,8 +343,10 @@ def bulk_inventory_work_status(db: Session, item_ids: Iterable[uuid.UUID]) -> di
             add(row.item_id, _location("production" if row.department else "warehouse", row.department), "shipping_reserved_quantity", int(row.quantity))
             # Shipping stores a stock department, but no reserving employee department snapshot.
             add_requester(row.item_id, None, "shipping_reserved_quantity", int(row.quantity))
+        pauses = batch_pause_payloads(db, [("io", batch.batch_id) for batch in batches if batch.status == "draft"])
         for batch in batches:
             work = _related_work(db, batch, owners, by_batch_ledger[batch.batch_id], by_batch_request[batch.batch_id], items)
+            work["stocktake_pause"] = pauses.get(("io", batch.batch_id))
             related_ids = {str(line.item_id) for bundle in batch.bundles for line in bundle.lines}
             related_ids.update(target["item_id"] for target in work["targets"])
             related_ids.update(effect["item_id"] for effect in work["expected_effects"])
@@ -375,6 +379,8 @@ def batch_detail(db: Session, batch: IoBatch, include_history: bool = False) -> 
         _load_batches(db, db.query(IoBatch).filter(IoBatch.batch_id == batch.batch_id))
         owners, ledger, requests, items, _ = _context(db, [batch])
         result = _related_work(db, batch, owners, ledger, requests, items)
+        if batch.status == "draft":
+            result["stocktake_pause"] = pause_payload(db, "io", batch.batch_id)
         if include_history:
             events = db.query(IoWorkReservationEvent).filter_by(batch_id=batch.batch_id).order_by(
                 IoWorkReservationEvent.created_at, IoWorkReservationEvent.event_id).all()
@@ -411,4 +417,6 @@ def list_admin_work_reservations(db: Session, **filters: Any) -> dict[str, Any]:
         total = query.count()
         batches = _load_batches(db, query.order_by(IoBatch.updated_at.asc(), IoBatch.batch_id.asc()).offset(skip).limit(limit))
         owners = {row.employee_id: row for row in db.query(Employee).filter(Employee.employee_id.in_({batch.requester_employee_id for batch in batches})).all()}
-        return {"items": [_summary(batch, owners) for batch in batches], "total": total, "skip": skip, "limit": limit}
+        pauses = batch_pause_payloads(db, [("io", batch.batch_id) for batch in batches])
+        return {"items": [{**_summary(batch, owners), "stocktake_pause": pauses.get(("io", batch.batch_id))}
+            for batch in batches], "total": total, "skip": skip, "limit": limit}

@@ -502,6 +502,16 @@
             "title": "Status",
             "type": "string"
           },
+          "stocktake_pause": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkStocktakePause"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sub_type": {
             "title": "Sub Type",
             "type": "string"
@@ -5810,6 +5820,16 @@
             "title": "Status",
             "type": "string"
           },
+          "stocktake_pause": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkStocktakePause"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sub_type": {
             "title": "Sub Type",
             "type": "string"
@@ -6307,6 +6327,16 @@
             "title": "Stock Requests",
             "type": "array"
           },
+          "stocktake_pause": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkStocktakePause"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sub_type": {
             "title": "Sub Type",
             "type": "string"
@@ -6618,6 +6648,18 @@
             "format": "uuid",
             "title": "Requester Employee Id",
             "type": "string"
+          },
+          "stocktake_resume_token": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stocktake Resume Token"
           },
           "sub_type": {
             "title": "Sub Type",
@@ -7274,6 +7316,18 @@
             "format": "uuid",
             "title": "Requester Employee Id",
             "type": "string"
+          },
+          "stocktake_resume_token": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stocktake Resume Token"
           },
           "sub_type": {
             "title": "Sub Type",
@@ -12705,6 +12759,18 @@
             "title": "Requester Employee Id",
             "type": "string"
           },
+          "stocktake_resume_token": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stocktake Resume Token"
+          },
           "submission_id": {
             "anyOf": [
               {
@@ -13263,6 +13329,16 @@
           },
           "status": {
             "$ref": "#/components/schemas/StockRequestStatusEnum"
+          },
+          "stocktake_pause": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkStocktakePause"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "submission_id": {
             "anyOf": [
@@ -16214,6 +16290,16 @@
             ],
             "title": "Reserved Inputs"
           },
+          "stocktake_pause": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkStocktakePause"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sub_type": {
             "anyOf": [
               {
@@ -16429,6 +16515,16 @@
           "requester_name": {
             "title": "Requester Name",
             "type": "string"
+          },
+          "stocktake_pause": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkStocktakePause"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "sub_type": {
             "anyOf": [
@@ -16735,7 +16831,9 @@
               "admin_cancelled",
               "owner_deleted",
               "approval_changed",
-              "settlement_failed"
+              "settlement_failed",
+              "stocktake_paused",
+              "stocktake_resumed"
             ],
             "title": "Action",
             "type": "string"
@@ -16959,6 +17057,16 @@
             "title": "Status",
             "type": "string"
           },
+          "stocktake_pause": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkStocktakePause"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sub_type": {
             "title": "Sub Type",
             "type": "string"
@@ -17086,6 +17194,53 @@
           "operation_line_ids"
         ],
         "title": "WorkReservedInput",
+        "type": "object"
+      },
+      "WorkStocktakePause": {
+        "properties": {
+          "missing_target_count": {
+            "minimum": 0.0,
+            "title": "Missing Target Count",
+            "type": "integer"
+          },
+          "paused_at": {
+            "format": "date-time",
+            "title": "Paused At",
+            "type": "string"
+          },
+          "pending_target_count": {
+            "minimum": 0.0,
+            "title": "Pending Target Count",
+            "type": "integer"
+          },
+          "round_id": {
+            "format": "uuid",
+            "title": "Round Id",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "blocked",
+              "ready"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "token": {
+            "format": "uuid",
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "round_id",
+          "state",
+          "paused_at",
+          "pending_target_count",
+          "missing_target_count"
+        ],
+        "title": "WorkStocktakePause",
         "type": "object"
       },
       "WorkTarget": {

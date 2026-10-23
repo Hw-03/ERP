@@ -10,6 +10,7 @@ import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import { FlowBadge } from "../_history_sections/historyTableHelpers";
 import { StatusPill } from "../common/StatusPill";
+import { StocktakePauseNotice } from "../common/StocktakePauseNotice";
 import { Button } from "@/lib/ui/Button";
 import { WorkDraftMemo } from "../common/WorkDraftMemo";
 import { formatWorkTimestamp, getIoDraftOperationColor, getIoDraftOperationLabel, getIoDraftTransactionType, WORK_ITEM_CODE_CLASS, WORK_TIMESTAMP_CLASS, WORK_TYPE_BADGE_CLASS, WorkExpandButton, WorkMovementSummary } from "../common/WorkDraftTableParts";
@@ -263,6 +264,7 @@ function DraftRows({
             </div>
             {["반려됨", "예약 상태 확인 필요"].includes(reservationStatusLabel(draft)) && <StatusPill label={reservationStatusLabel(draft)} tone="warning" showDot={false} className="mt-1 !px-2.5 !py-1" />}
             {draft.reservation_issue && <p className="mt-1 break-keep text-xs leading-5 [overflow-wrap:anywhere]" style={{ color: LEGACY_COLORS.yellow }}>{reservationIssueMessage(draft.reservation_issue)}</p>}
+            <StocktakePauseNotice pause={draft.stocktake_pause} />
             {rejection?.rejected_reason && (
               <p className="mt-1 truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.red }}>
                 반려: {rejection.rejected_reason}
@@ -282,7 +284,7 @@ function DraftRows({
             <Button
               variant="secondary"
               type="button"
-              disabled={busy}
+              disabled={busy || draft.stocktake_pause?.state === "blocked"}
               onClick={(event) => { event.stopPropagation(); onContinue(); }}
               className="min-h-11 whitespace-nowrap rounded-[12px] border px-3 text-xs font-bold transition hover:brightness-110 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--c-blue)] disabled:opacity-50"
               style={{ background: tint(LEGACY_COLORS.blue, 10), borderColor: LEGACY_COLORS.borderStrong, color: LEGACY_COLORS.blue }}

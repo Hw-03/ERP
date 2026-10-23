@@ -92,7 +92,7 @@ vi.mock("@/app/mes/_components/_warehouse_sections/WarehouseDraftPanelTabs", () 
       <>
         <button
           type="button"
-          onClick={() => onContinueIoDraft?.({ batch_id: "draft-2", sub_type: "adjust_out" } as never)}
+          onClick={() => onContinueIoDraft?.({ batch_id: "draft-2", sub_type: "adjust_out", stocktake_resumed: true } as never)}
         >
           continue draft
         </button>
@@ -425,6 +425,15 @@ describe("DesktopWarehouseView", () => {
     expect(params.get("section")).toBe("compose");
     expect(params.get("step")).toBe("4");
     expect(params.get("draftId")).toBe("draft-2");
+  });
+
+  it("목록에서 재개한 수량 보존 정보가 URL 재조회로 사라지지 않는다", async () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=cart");
+    apiMocks.ownedDraftRows.mockResolvedValue([{ batch_id: "draft-2", sub_type: "adjust_out" }]);
+    render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "continue draft" })); });
+    expect(currentComposeProps.value?.restoreDraft).toMatchObject({ batch_id: "draft-2", stocktake_resumed: true });
+    expect(apiMocks.ownedDraftRows).not.toHaveBeenCalled();
   });
 
   it("새 작업 전환용 원 초안 저장은 URL draftId를 남기지 않는다", async () => {
