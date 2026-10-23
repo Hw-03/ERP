@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState, type CSSProperties, type JSX } from "react";
+import { Fragment, useEffect, useRef, useState, type CSSProperties, type JSX } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ClipboardList, Sparkles } from "lucide-react";
 import { ApiError } from "@/lib/api-core";
 import type { WorkDraftFilters, WorkDraftSelection, WorkDraftSummary } from "@/lib/api/types/work-drafts";
@@ -52,8 +52,10 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
   const pending = !list.isError && (list.isPending || pageOutOfRange);
   const work = detail.data?.kind === selected?.kind && detail.data?.id === selected?.id ? detail.data : undefined;
 
+  const previousRefresh = useRef(refreshNonce);
   useEffect(() => {
-    if (refreshNonce !== 0) void list.refetch();
+    if (previousRefresh.current !== refreshNonce) void list.refetch({ cancelRefetch: false });
+    previousRefresh.current = refreshNonce;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshNonce]);
   useEffect(() => {

@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { workDraftsApi } from "@/lib/api/work-drafts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { IoBatch } from "@/lib/api";
 import { DraftCartPanel } from "../DraftCartPanel";
@@ -50,7 +51,7 @@ function makeIoDraft(): IoBatch {
 }
 
 describe("DraftCartPanel empty state", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
   beforeEach(() => {
     vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
     mockDraftData.stockDrafts = [];
@@ -131,5 +132,30 @@ describe("DraftCartPanel empty state", () => {
     expect(mockDeleteIoDraft).toHaveBeenCalledOnce();
     expect(mockDeleteIoDraft).toHaveBeenCalledWith({ batchId: "batch-1", employeeId: "emp-1", expectedRevision: 6 }, expect.any(Object));
     expect(screen.getByRole("button", { name: "삭제 중..." })).toBeDisabled();
+  });
+
+  it("이어서 하기는 클릭한 목록 대신 최신 단건을 복원한다", async () => {
+    mockDraftData.ioDrafts = [makeIoDraft()];
+    const latest = { ...makeIoDraft(), revision: 8 };
+    const get = vi.spyOn(workDraftsApi, "getOwnedIo").mockResolvedValue(latest);
+    const onContinueIo = vi.fn();
+    render(<DraftCartPanel layout="desktop" employeeId="emp-1" refreshNonce={0} onContinue={vi.fn()} onContinueIo={onContinueIo} onChanged={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "이어서 작업" }));
+    await waitFor(() => expect(onContinueIo).toHaveBeenCalledWith(latest));
+    expect(get).toHaveBeenCalledWith("emp-1", "batch-1", expect.objectContaining({ signal: expect.any(AbortSignal) }));
+    expect(mockFailure.refetch).not.toHaveBeenCalled();
+  });
+
+  it("퇴장 뒤 도착한 이어하기 응답으로 화면을 다시 열지 않는다", async () => {
+    mockDraftData.ioDrafts = [makeIoDraft()];
+    let complete!: (draft: IoBatch) => void;
+    const get = vi.spyOn(workDraftsApi, "getOwnedIo").mockImplementation(() => new Promise((resolve) => { complete = resolve; }));
+    const onContinueIo = vi.fn();
+    const view = render(<DraftCartPanel layout="desktop" employeeId="emp-1" refreshNonce={0} onContinue={vi.fn()} onContinueIo={onContinueIo} onChanged={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "이어서 작업" }));
+    view.unmount();
+    await act(async () => { complete(makeIoDraft()); });
+    expect(get.mock.calls[0][2]?.signal?.aborted).toBe(true);
+    expect(onContinueIo).not.toHaveBeenCalled();
   });
 });

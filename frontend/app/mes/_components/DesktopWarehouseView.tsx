@@ -1,5 +1,8 @@
 "use client";
 import { useQueryClient } from "@tanstack/react-query";
+import { useWorkDraftCount } from "@/lib/queries/useWorkDraftCount";
+import { workDraftsApi } from "@/lib/api/work-drafts";
+import { ApiError } from "@/lib/api-core";
 import { invalidateWorkReservationQueries } from "@/lib/queries/workReservationInvalidation";
 import { ReadLoading } from "./common/ReadState";
 import { useDesktopTabHome } from "./DesktopTabHome";
@@ -25,7 +28,6 @@ import { LoadFailureCard } from "./common/LoadFailureCard";
 
 // 탭 전환 remount 사이 직전 카운트 보존 (세션 내 메모리 캐시).
 // 새로고침 시 휘발 — 첫 진입은 항상 fresh fetch.
-const cartCountCache = new Map<string, number>();
 const warehouseQueueCountCache = { value: 0, loaded: false };
 const deptQueueCountCache = new Map<string, number>();
 const asResearchQueueCountCache = new Map<string, number>();
@@ -86,10 +88,8 @@ export function DesktopWarehouseView({
     return s as WarehouseSectionTab;
   });
   const [panelRefreshNonce, setPanelRefreshNonce] = useState(0);
-  const [cartCount, setCartCount] = useState(() => {
-    const eid = operator?.employee_id ?? "";
-    return eid ? cartCountCache.get(eid) ?? 0 : 0;
-  });
+  const draftCounts = useWorkDraftCount(operator?.employee_id ?? employeeId ?? null, panelRefreshNonce);
+  const cartCount = draftCounts.data?.total ?? 0;
   const [warehouseQueueCount, setWarehouseQueueCount] = useState(
     () => warehouseQueueCountCache.value,
   );
@@ -128,7 +128,6 @@ export function DesktopWarehouseView({
   const [loadingCounts, setLoadingCounts] = useState<WarehouseSectionTab[]>(() => {
     const id = operator?.employee_id ?? "";
     const pending: WarehouseSectionTab[] = [];
-    if (!cartCountCache.has(id)) pending.push("cart");
     if (!warehouseQueueCountCache.loaded) pending.push("queue");
     if (!deptQueueCountCache.has(id)) pending.push("dept-queue");
     if (!asResearchQueueCountCache.has(id)) pending.push("as-research-queue");
@@ -181,20 +180,6 @@ export function DesktopWarehouseView({
   useEffect(() => {
     if (!operatorEmployeeId) return;
     let cancelled = false;
-    const legacyDraftsPromise = api.listStockRequestDrafts(operatorEmployeeId);
-    const ioDraftsPromise = api.listDrafts(operatorEmployeeId);
-
-    void Promise.allSettled([legacyDraftsPromise, ioDraftsPromise])
-      .then(([legacyResult, ioResult]) => {
-        if (cancelled) return;
-        const legacyCount = legacyResult.status === "fulfilled" ? legacyResult.value.length : 0;
-        const ioCount = ioResult.status === "fulfilled" ? ioResult.value.length : 0;
-        const n = legacyCount + ioCount;
-        setCartCount(n);
-        cartCountCache.set(operatorEmployeeId, n);
-        finishCountLoading("cart");
-      });
-
     if (!urlDraftId || restoredUrlDraftRef.current === urlDraftId) {
       setUrlDraftPending(false);
       setUrlDraftRestoreError(null);
@@ -205,11 +190,11 @@ export function DesktopWarehouseView({
 
     setUrlDraftPending(true);
     setUrlDraftRestoreError(null);
-    void ioDraftsPromise
-      .then((ioRows) => {
+    const controller = new AbortController();
+    void workDraftsApi.getOwnedIo(operatorEmployeeId, urlDraftId, { signal: controller.signal })
+      .then((matchingDraft) => {
         if (cancelled) return;
         if (new URLSearchParams(window.location.search).get("draftId") !== urlDraftId) return;
-        const matchingDraft = ioRows.find((draft) => draft.batch_id === urlDraftId);
         if (!matchingDraft) {
           setUrlDraftRestoreError("저장한 작업을 찾을 수 없습니다.");
           setUrlDraftPending(false);
@@ -221,16 +206,17 @@ export function DesktopWarehouseView({
         setSectionTab("compose");
         setUrlDraftPending(false);
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (cancelled) return;
-        setUrlDraftRestoreError("저장한 작업을 불러오지 못했습니다.");
+        setUrlDraftRestoreError(error instanceof ApiError && error.status === 404 ? "저장한 작업을 찾을 수 없습니다." : "저장한 작업을 불러오지 못했습니다.");
         setUrlDraftPending(false);
       });
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, [operatorEmployeeId, panelRefreshNonce, revision, urlDraftId, urlDraftRestoreNonce, finishCountLoading]);
+  }, [operatorEmployeeId, urlDraftId, urlDraftRestoreNonce, finishCountLoading]);
 
   useEffect(() => {
     if (!canSeeQueue) return;
@@ -357,7 +343,8 @@ export function DesktopWarehouseView({
               deptQueueCount={deptQueueCount}
               asResearchQueueCount={asResearchQueueCount}
               handoverInboxCount={handoverInboxCount}
-              loadingCounts={loadingCounts}
+              loadingCounts={[...loadingCounts, ...(draftCounts.isPending && !draftCounts.isError ? ["cart" as const] : [])]}
+              unavailableCounts={draftCounts.isError && !draftCounts.data ? ["cart"] : []}
             />
           </div>
         )}
@@ -395,10 +382,7 @@ export function DesktopWarehouseView({
               bumpRefresh={() => setPanelRefreshNonce((n) => n + 1)}
               onSubmitSuccess={onSubmitSuccess}
               resetDraftTracking={() => {}}
-              onCartCountChange={(n) => {
-                setCartCount(n);
-                if (operatorEmployeeId) cartCountCache.set(operatorEmployeeId, n);
-              }}
+
               onEmptyStateChange={setWorkAreaEmpty}
               onStartCompose={() => handleSectionTabChange("compose")}
               targetRequestId={targetRequestId}
