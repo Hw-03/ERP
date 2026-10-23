@@ -5,7 +5,7 @@ import { Check, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { api, type Item, type ShippingBomMatchResponse, type ShippingFinalizationMode, type ShippingRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import {
-  buildShippingPayload, isValidPositiveInt, lineKey, requestBomLines,
+  buildShippingPayload, isOnlyWorkerNamesChange, isValidPositiveInt, lineKey, requestBomLines,
   requestCompanionDraft, sortShippingDraftLines, validateShippingFinalization,
   type CompanionDraftLine, type DraftLine,
 } from "@/lib/shipping/request-draft";
@@ -15,12 +15,14 @@ import { useItemSearch } from "@/lib/queries/useItemSearch";
 import type { Operator } from "../../login/useCurrentOperator";
 import { InlineSearch, PrimaryActionButton, StickyFooter } from "../primitives";
 import { ShippingAccordion, ShippingHeader, ShippingItemName } from "./ShippingPresentation";
+import { ShippingWorkersInput } from "../../ShippingWorkersEditor";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 type AddStage = "PA" | "PF" | "COMPANION";
 type Draft = {
   basePfId: string;
   invoiceNumber: string;
+  workerNames: string;
   requestQuantity: string;
   requestedBy: string;
   notes: string;
@@ -56,6 +58,7 @@ function initialDraft(request: ShippingRequest | null, operator: Operator | null
   return {
     basePfId: request?.base_pf_item_id ?? "",
     invoiceNumber: request?.invoice_number ?? "",
+    workerNames: request?.worker_names ?? "",
     requestQuantity: String(request?.request_quantity ?? 1),
     requestedBy: request?.requested_by_name ?? operator?.name ?? "",
     notes: request?.notes ?? "",
@@ -71,6 +74,7 @@ function initialDraft(request: ShippingRequest | null, operator: Operator | null
 function signature(draft: Draft): string {
   return JSON.stringify({
     basePfId: draft.basePfId, invoiceNumber: draft.invoiceNumber,
+    workerNames: draft.workerNames,
     requestQuantity: draft.requestQuantity, requestedBy: draft.requestedBy,
     notes: draft.notes, customPaName: draft.customPaName, customPfName: draft.customPfName,
     finalizationMode: draft.finalizationMode, reusePfItemId: draft.reusePfItemId,
@@ -158,6 +162,7 @@ export function MobileShippingRequestWizard({ operator, request, step, onStepCha
 
   const payload = useMemo(() => buildShippingPayload({
     requestQuantity: draft.requestQuantity, invoiceNumber: draft.invoiceNumber,
+    workerNames: draft.workerNames,
     requestedBy: draft.requestedBy, operatorName: operator?.name,
     isEditing: Boolean(requestIdRef.current), customPaName: draft.customPaName,
     customPfName: draft.customPfName, notes: draft.notes,
@@ -291,6 +296,14 @@ export function MobileShippingRequestWizard({ operator, request, step, onStepCha
     const expectedSignature = bomSignature;
     savingRef.current = true; setPending("save"); setError(null);
     try {
+      if (request && isOnlyWorkerNamesChange(payload, request, itemById)) {
+        const saved = await api.updateShippingWorkers(request.request_id, payload.worker_names ?? null);
+        if (!mountedRef.current || generation !== generationRef.current) return;
+        setBaseline(signature(draft));
+        onDirtyChange?.(false);
+        onSaved(saved);
+        return;
+      }
       // The final decision always uses a fresh match for exactly the submitted BOM.
       const result = await api.matchShippingBom({ base_pf_item_id: draft.basePfId, bom_lines: payload.bom_lines ?? [] });
       if (!mountedRef.current || generation !== generationRef.current || expectedSignature !== currentSignatureRef.current) return;
@@ -352,6 +365,7 @@ export function MobileShippingRequestWizard({ operator, request, step, onStepCha
           <div className="space-y-3">
             <Field label="인보이스 번호"><input aria-label="인보이스 번호" className={INPUT} style={CARD} value={draft.invoiceNumber} disabled={locked} onChange={(event) => update({ invoiceNumber: event.target.value })} placeholder="인보이스 번호 입력" /></Field>
             <Field label="출하 수량"><input aria-label="출하 수량" type="number" min="1" step="1" inputMode="numeric" className={INPUT} style={CARD} value={draft.requestQuantity} disabled={locked} onChange={(event) => update({ requestQuantity: event.target.value })} /></Field>
+            <Field label="작업자 (선택)"><ShippingWorkersInput aria-label="작업자" maxLength={200} className={INPUT} style={CARD} value={draft.workerNames} disabled={locked} onValueChange={(workerNames) => update({ workerNames })} placeholder="이름 입력 (여러 명 가능)" /></Field>
           </div>
         </Section>
         <Section title="기준 PF">
@@ -405,7 +419,7 @@ export function MobileShippingRequestWizard({ operator, request, step, onStepCha
         {changedLines.length > 0 && <ShippingAccordion title="변경된 구성품" summary={`${changedLines.length}개`}><ul className="space-y-2 text-sm">{changedLines.map((line) => <li key={line.key}><ShippingItemName name={itemById.get(line.child_item_id)?.item_name ?? "품목"} /><span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{changeLabel(line)}</span></li>)}</ul></ShippingAccordion>}
       </>}
       {step === 4 && <>
-        <Section title="작업자"><p className="text-sm font-bold">{draft.requestedBy || "로그인 사용자 없음"}</p><p className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{request ? "기존 요청자 유지" : "로그인 사용자 자동 반영"}</p></Section>
+        <Section title="요청자"><p className="text-sm font-bold">{draft.requestedBy || "로그인 사용자 없음"}</p><p className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{request ? "기존 요청자 유지" : "로그인 사용자 자동 반영"}</p></Section>
         <Section title="요청 메모"><Field label="출하 준비 참고사항"><textarea aria-label="요청 메모" className="min-h-36 w-full rounded-[12px] border p-3 text-base outline-none focus-visible:ring-2" style={CARD} value={draft.notes} disabled={locked} onChange={(event) => update({ notes: event.target.value })} placeholder="출하 준비자가 알아야 할 변경 사항" /></Field></Section>
       </>}
       {step === 5 && <>

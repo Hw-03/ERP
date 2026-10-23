@@ -47,6 +47,7 @@ from app.schemas.shipping import (
     ShippingRequestCreate,
     ShippingRequestResponse,
     ShippingRequestUpdate,
+    ShippingWorkersUpdate,
     ShippingStockShortageResponse,
     ShippingTransactionLogResponse,
 )
@@ -191,6 +192,7 @@ def _to_response(
         finalization_mode=req.finalization_mode,
         reuse_pf_item_id=req.reuse_pf_item_id,
         requested_by_name=req.requested_by_name,
+        worker_names=req.worker_names,
         custom_pa_name=req.custom_pa_name,
         custom_pf_name=req.custom_pf_name,
         notes=req.notes,
@@ -436,6 +438,7 @@ def create_request(
             "finalization_mode": payload.finalization_mode,
             "reuse_pf_item_id": payload.reuse_pf_item_id,
             "requested_by_name": payload.requested_by_name,
+            "worker_names": payload.worker_names,
             "request_quantity": payload.request_quantity,
             "custom_pa_name": payload.custom_pa_name,
             "custom_pf_name": payload.custom_pf_name,
@@ -470,6 +473,19 @@ def delete_request(request_id: uuid.UUID, http_request: Request, db: Session = D
     actor = _load_shipping_actor(http_request, db)
     _action_or_422(db, shipping_actions_svc.delete_request, request_id, actor)
     return None
+
+
+@router.patch("/requests/{request_id}/workers", response_model=ShippingRequestResponse)
+def update_workers(
+    request_id: uuid.UUID,
+    payload: ShippingWorkersUpdate,
+    http_request: Request,
+    db: Session = Depends(get_db),
+) -> ShippingRequestResponse:
+    """Update optional worker names using the authenticated editing actor."""
+    actor = _load_shipping_actor(http_request, db)
+    req = _action_or_422(db, shipping_actions_svc.update_workers, request_id, payload.worker_names, actor)
+    return _to_response(db, req)
 
 
 @router.patch("/requests/{request_id}/invoice", response_model=ShippingRequestResponse)

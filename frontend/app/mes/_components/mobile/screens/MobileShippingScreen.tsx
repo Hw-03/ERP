@@ -70,6 +70,7 @@ export function MobileShippingScreen({ operator = null, onGoToWarehouse, onNavig
     client.setQueryData(["shipping", "detail", next.request_id], next);
     client.setQueryData<ShippingRequest[]>(queryKeys.shipping.requests(), (previous = []) => [next, ...previous.filter((row) => row.request_id !== next.request_id)]);
     void client.invalidateQueries({ queryKey: ["shipping", "historyMonths"] });
+    void client.invalidateQueries({ queryKey: queryKeys.stockRequests.all });
   }, [client]);
   const open = (view: MobileShippingView, requestId: string | null = null, extra: Partial<ShippingRoute> = {}) => navigate({ ...route, view, requestId, step: 1, managementStatus: view === "hub" || view.startsWith("history") ? null : route.managementStatus, ...extra });
   const managed = (requests.data ?? []).filter((row) => row.status === "PREPARING" || row.status === "PREPARED");

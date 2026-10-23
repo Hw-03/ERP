@@ -38,6 +38,17 @@ def delete_request(
         shipping_svc.delete_request(db, request_id, actor)
 
 
+def update_workers(
+    db: Session,
+    request_id: uuid.UUID,
+    worker_names: str | None,
+    actor: Employee,
+) -> ShippingRequest:
+    """Commit worker metadata and its audit together."""
+    with transactional(db):
+        return shipping_svc.update_workers(db, request_id, worker_names, actor)
+
+
 def update_invoice(
     db: Session,
     request_id: uuid.UUID,

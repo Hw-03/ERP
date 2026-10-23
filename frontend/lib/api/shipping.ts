@@ -71,6 +71,11 @@ export const shippingApi = {
       invoice_number: invoiceNumber,
     }),
 
+  updateShippingWorkers: (requestId: string, workerNames: string | null) =>
+    patchJson<ShippingRequest>(toApiUrl(`/api/shipping/requests/${requestId}/workers`), {
+      worker_names: workerNames,
+    }),
+
   getShippingRevisions: (requestId: string, opts?: { signal?: AbortSignal }) =>
     fetcher<ShippingRequestRevision[]>(
       toApiUrl(`/api/shipping/requests/${requestId}/revisions`),

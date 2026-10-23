@@ -1,5 +1,5 @@
 import type { JSX, ReactNode } from "react";
-import { Package } from "lucide-react";
+import { ArrowUpRight, Package } from "lucide-react";
 import type { WorkDraftDetail } from "@/lib/api/types/work-drafts";
 import { LEGACY_COLORS as C } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
@@ -77,6 +77,20 @@ export function AllWorkDraftDetails({ work, layout, columns }: {
       </ul> : <p className="px-4 py-3 text-xs leading-6" style={{ color: C.muted2 }}>{empty}</p>}
     </section>;
   }
+
+  if (work.kind === "shipping") return <div>
+    <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+      <dl className="flex min-w-0 flex-wrap gap-x-8 gap-y-2">
+        <div className="min-w-0"><dt className="text-xs" style={{ color: C.muted2 }}>요청자</dt><dd className="break-keep font-bold [overflow-wrap:anywhere]">{work.requester_name || "요청자 미입력"}</dd></div>
+        <div className="min-w-0"><dt className="text-xs" style={{ color: C.muted2 }}>인보이스</dt><dd className="break-keep font-bold [overflow-wrap:anywhere]">{work.shipping_summary?.invoice_number || "인보이스 미입력"}</dd></div>
+      </dl>
+      <a href={`/mes?tab=shipping&shippingView=requestDetail&shippingRequestId=${encodeURIComponent(work.id)}`} className="inline-flex min-h-11 items-center gap-1 rounded-[12px] px-3 font-bold hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]" style={{ color: C.blue, background: tint(C.blue, 10) }}>출하에서 열기<ArrowUpRight size={16} aria-hidden /></a>
+    </div>
+    {section("동반 출하품", (work.shipping_summary?.companion_lines ?? []).map((line, index) => ({
+      key: `${line.item_id}:${index}`, name: line.item_name, code: line.mes_code, quantity: line.quantity, unit: line.unit,
+      tag: "동반 출하품", color: C.blue,
+    })), "동반 출하품이 없습니다.")}
+  </div>;
 
   return <div>
     {work.reservation_issue && <p role="status" className="m-3 rounded-[12px] p-3" style={{ background: C.warningBg, color: C.yellow }}>{reservationIssueMessage(work.reservation_issue)}</p>}

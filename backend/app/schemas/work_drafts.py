@@ -30,12 +30,13 @@ class WorkDraftHistoryOperation(BaseModel):
 
 
 class WorkDraftSummary(BaseModel):
-    kind: Literal["io", "stock_request"]
+    kind: Literal["io", "stock_request", "shipping"]
     id: str
-    requester_employee_id: str
+    requester_employee_id: str | None
     requester_name: str
     requester_department: str
     requester_active: bool
+    worker_names: str | None = None
     work_type: str | None
     sub_type: str | None
     request_type: str | None
@@ -53,9 +54,15 @@ class WorkDraftList(BaseModel):
     limit: int
 
 
+class WorkDraftShippingSummary(BaseModel):
+    invoice_number: str | None
+    companion_lines: list[WorkDraftTarget]
+
+
 class WorkDraftDetail(WorkDraftSummary):
     reservation_status: WorkReservationStatus | None
     reservation_issue: WorkReservationIssue | None
     reserved_inputs: list[WorkReservedInput] | None
     expected_effects: list[WorkInventoryEffect] | None
     forecast_issue: WorkForecastIssue | None
+    shipping_summary: WorkDraftShippingSummary | None = None

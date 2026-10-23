@@ -11623,6 +11623,18 @@
               }
             ],
             "title": "Reuse Pf Item Id"
+          },
+          "worker_names": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worker Names"
           }
         },
         "required": [
@@ -11977,6 +11989,17 @@
             "format": "date-time",
             "title": "Updated At",
             "type": "string"
+          },
+          "worker_names": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worker Names"
           }
         },
         "required": [
@@ -12197,6 +12220,18 @@
               }
             ],
             "title": "Reuse Pf Item Id"
+          },
+          "worker_names": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worker Names"
           }
         },
         "title": "ShippingRequestUpdate",
@@ -12475,6 +12510,27 @@
           "created_at"
         ],
         "title": "ShippingTransactionLogResponse",
+        "type": "object"
+      },
+      "ShippingWorkersUpdate": {
+        "properties": {
+          "worker_names": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worker Names"
+          }
+        },
+        "required": [
+          "worker_names"
+        ],
+        "title": "ShippingWorkersUpdate",
         "type": "object"
       },
       "StockRequestActionRequest": {
@@ -16098,7 +16154,8 @@
           "kind": {
             "enum": [
               "io",
-              "stock_request"
+              "stock_request",
+              "shipping"
             ],
             "title": "Kind",
             "type": "string"
@@ -16133,8 +16190,15 @@
             "type": "string"
           },
           "requester_employee_id": {
-            "title": "Requester Employee Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requester Employee Id"
           },
           "requester_name": {
             "title": "Requester Name",
@@ -16180,6 +16244,16 @@
             ],
             "title": "Reserved Inputs"
           },
+          "shipping_summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkDraftShippingSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sub_type": {
             "anyOf": [
               {
@@ -16213,6 +16287,17 @@
               }
             ],
             "title": "Work Type"
+          },
+          "worker_names": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worker Names"
           }
         },
         "required": [
@@ -16318,6 +16403,34 @@
         "title": "WorkDraftMovementSummary",
         "type": "object"
       },
+      "WorkDraftShippingSummary": {
+        "properties": {
+          "companion_lines": {
+            "items": {
+              "$ref": "#/components/schemas/WorkDraftTarget"
+            },
+            "title": "Companion Lines",
+            "type": "array"
+          },
+          "invoice_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Number"
+          }
+        },
+        "required": [
+          "invoice_number",
+          "companion_lines"
+        ],
+        "title": "WorkDraftShippingSummary",
+        "type": "object"
+      },
       "WorkDraftSummary": {
         "properties": {
           "created_at": {
@@ -16342,7 +16455,8 @@
           "kind": {
             "enum": [
               "io",
-              "stock_request"
+              "stock_request",
+              "shipping"
             ],
             "title": "Kind",
             "type": "string"
@@ -16377,8 +16491,15 @@
             "type": "string"
           },
           "requester_employee_id": {
-            "title": "Requester Employee Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requester Employee Id"
           },
           "requester_name": {
             "title": "Requester Name",
@@ -16417,6 +16538,17 @@
               }
             ],
             "title": "Work Type"
+          },
+          "worker_names": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worker Names"
           }
         },
         "required": [
@@ -29919,6 +30051,60 @@
         ]
       }
     },
+    "/api/shipping/requests/{request_id}/workers": {
+      "patch": {
+        "description": "Update optional worker names using the authenticated editing actor.",
+        "operationId": "update_workers_api_shipping_requests__request_id__workers_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShippingWorkersUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingRequestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Workers",
+        "tags": [
+          "Shipping"
+        ]
+      }
+    },
     "/api/stock-requests": {
       "get": {
         "operationId": "list_stock_requests_api_stock_requests_get",
@@ -35459,7 +35645,8 @@
             "schema": {
               "enum": [
                 "io",
-                "stock_request"
+                "stock_request",
+                "shipping"
               ],
               "title": "Kind",
               "type": "string"

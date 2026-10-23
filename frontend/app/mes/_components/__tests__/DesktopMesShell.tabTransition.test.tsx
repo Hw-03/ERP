@@ -27,6 +27,7 @@ const queryClientMock = vi.hoisted(() => ({
   prefetchQuery: vi.fn(),
 }));
 const shippingViewProps = vi.hoisted(() => vi.fn());
+const shippingWorkersSave = vi.hoisted(() => vi.fn(async (_workers: string) => {}));
 const adminViewMounts = vi.hoisted(() => vi.fn());
 const defectViewStates = vi.hoisted(() => vi.fn());
 const slowDashboard = vi.hoisted(() => ({ pending: false, promise: new Promise<void>(() => {}) }));
@@ -208,9 +209,11 @@ vi.mock("../DesktopWarehouseView", () => ({
 vi.mock("../DesktopShippingView", () => ({
   DesktopShippingView: (props: Record<string, unknown>) => {
     const [home, setHome] = useState(true);
+    const [workers, setWorkers] = useState("");
+    useRegisterDirty("shipping-workers-test", Boolean(workers), async () => { await shippingWorkersSave(workers); setWorkers(""); });
     useDesktopTabHome("shipping-test", { isHome: home, returnHome: () => setHome(true) });
     shippingViewProps(props);
-    return <main>shipping content<button onClick={() => setHome(false)}>shipping detail entry</button></main>;
+    return <main>shipping content<input aria-label="출하 작업자 입력" value={workers} onChange={(event) => setWorkers(event.target.value)} /><button onClick={() => setHome(false)}>shipping detail entry</button></main>;
   },
 }));
 vi.mock("../DesktopDefectView", () => ({
@@ -424,6 +427,7 @@ describe("DesktopMesShell tab transition", () => {
     routerReplace.mockClear();
     queryClientMock.prefetchQuery.mockClear();
     shippingViewProps.mockClear();
+    shippingWorkersSave.mockReset().mockResolvedValue(undefined);
     adminViewMounts.mockClear();
     defectViewStates.mockClear();
     vi.mocked(sendClientEvent).mockClear();
@@ -433,6 +437,35 @@ describe("DesktopMesShell tab transition", () => {
   afterEach(() => {
     document.startViewTransition = originalStartViewTransition;
     vi.unstubAllGlobals();
+  });
+
+  it.each(["stay", "save", "discard", "failure"] as const)("출하 작업자 미저장 중 다른 탭으로 브라우저 이력 이동을 보호한다: %s", async (decision) => {
+    const { rerender } = render(<DesktopMesShell />);
+    fireEvent.click(screen.getByRole("button", { name: "shipping", exact: true }));
+    const detailSearch = "?tab=shipping&shippingView=requestDetail&shippingRequestId=req-1";
+    window.history.replaceState({}, "", `/mes${detailSearch}`);
+    rerender(<DesktopMesShell />);
+    fireEvent.change(screen.getByLabelText("출하 작업자 입력"), { target: { value: "미저장 작업자" } });
+    if (decision === "failure") shippingWorkersSave.mockRejectedValueOnce(new Error("작업자 저장 실패"));
+    window.history.replaceState({}, "", "/mes?tab=history");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    rerender(<DesktopMesShell />);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByLabelText("출하 작업자 입력")).toHaveValue("미저장 작업자");
+    if (decision === "stay") {
+      fireEvent.click(screen.getByText("계속 작성"));
+      expect(routerReplace).toHaveBeenLastCalledWith(detailSearch, { scroll: false });
+      expect(screen.getByLabelText("출하 작업자 입력")).toHaveValue("미저장 작업자");
+    } else if (decision === "discard") {
+      fireEvent.click(screen.getByText("저장 안 하고 나가기"));
+      await screen.findByText("history content");
+      expect(shippingWorkersSave).not.toHaveBeenCalled();
+    } else {
+      fireEvent.click(screen.getByText("저장하고 이동"));
+      await waitFor(() => expect(shippingWorkersSave).toHaveBeenCalledWith("미저장 작업자"));
+      if (decision === "failure") expect(screen.getByLabelText("출하 작업자 입력")).toHaveValue("미저장 작업자");
+      else await screen.findByText("history content");
+    }
   });
 
   it("허용 메뉴가 전부 회수되면 설정으로 이동한다", async () => {

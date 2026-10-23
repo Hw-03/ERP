@@ -45,6 +45,7 @@ from app.services.bom_stock_policy import should_skip_bom_inventory
 from app.services.inv_calc import _sync_total
 from app.services.item_write_validation import validate_active_items
 from app.utils.mes_code import make_mes_code, next_serial_no
+from app.schemas.shipping import normalize_worker_names
 
 PREPARE_PHASE = "PREPARE"
 PICKUP_PHASE = "PICKUP"
@@ -195,6 +196,7 @@ def _revision_snapshot(req: ShippingRequest) -> dict:
     return {
         "request_quantity": int(req.request_quantity or 1),
         "requested_by_name": req.requested_by_name,
+        "worker_names": req.worker_names,
         "custom_pa_name": req.custom_pa_name,
         "custom_pf_name": req.custom_pf_name,
         "notes": req.notes,
@@ -558,6 +560,7 @@ def create_request(db: Session, payload: dict) -> ShippingRequest:
         base_pf_item_id=base_pf.item_id,
         request_quantity=_payload_request_quantity(payload),
         requested_by_name=payload.get("requested_by_name"),
+        worker_names=normalize_worker_names(payload.get("worker_names")),
         custom_pa_name=payload.get("custom_pa_name"),
         custom_pf_name=payload.get("custom_pf_name"),
         notes=payload.get("notes"),
@@ -585,6 +588,8 @@ def update_request(
     payload: dict,
     actor: Employee,
 ) -> ShippingRequest:
+    if payload.keys() == {"worker_names"}:
+        return update_workers(db, request_id, payload.get("worker_names"), actor)
     actor = _require_actor(actor)
     req = _lock_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARING:
@@ -595,6 +600,8 @@ def update_request(
         req.request_quantity = _payload_request_quantity(payload)
     if "requested_by_name" in payload:
         req.requested_by_name = payload.get("requested_by_name")
+    if "worker_names" in payload:
+        req.worker_names = normalize_worker_names(payload.get("worker_names"))
     if "custom_pa_name" in payload:
         req.custom_pa_name = payload.get("custom_pa_name")
     if "custom_pf_name" in payload:
@@ -650,6 +657,29 @@ def delete_request(
     req.updated_at = datetime.utcnow()
     _record_event(db, req, "CANCELLED", "출하 요청 취소")
     db.flush()
+
+
+def update_workers(
+    db: Session,
+    request_id: uuid.UUID,
+    worker_names: str | None,
+    actor: Employee,
+) -> ShippingRequest:
+    """Change worker metadata after locking, without resolving or executing the BOM."""
+    actor = _require_actor(actor)
+    req = _lock_request(db, request_id)
+    if req.status != ShippingRequestStatusEnum.PREPARING:
+        raise ShippingError("준비 중 상태에서만 작업자를 수정할 수 있습니다.")
+    normalized = normalize_worker_names(worker_names)
+    if req.worker_names == normalized:
+        return req
+    changes = [{"field": "worker_names", "before": req.worker_names, "after": normalized}]
+    req.worker_names = normalized
+    req.updated_at = datetime.utcnow()
+    _record_revision(db, req, actor, changes)
+    _record_event(db, req, "WORKERS_UPDATED", "출하 작업자 수정")
+    db.flush()
+    return req
 
 
 def update_invoice(

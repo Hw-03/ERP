@@ -147,8 +147,8 @@ def test_department_and_employee_filters_apply_to_both_kinds(client, authenticat
 def test_public_projection_preserves_units_and_legacy_unknown_reservation(client, authenticated, drafts):
     batch, legacy, item = drafts
     summary_fields = {"kind", "id", "requester_employee_id", "requester_name", "requester_department",
-        "requester_active", "work_type", "sub_type", "request_type", "targets", "movement_summary", "history_operation", "created_at", "updated_at"}
-    detail_fields = summary_fields | {"reservation_status", "reservation_issue", "reserved_inputs", "expected_effects", "forecast_issue"}
+        "requester_active", "worker_names", "work_type", "sub_type", "request_type", "targets", "movement_summary", "history_operation", "created_at", "updated_at"}
+    detail_fields = summary_fields | {"reservation_status", "reservation_issue", "reserved_inputs", "expected_effects", "forecast_issue", "shipping_summary"}
     rows = client.get("/api/work-drafts", headers=authenticated[0]).json()["items"]
     assert all(set(row) == summary_fields for row in rows)
     for kind, work_id in (("io", batch.batch_id), ("stock_request", legacy.request_id)):

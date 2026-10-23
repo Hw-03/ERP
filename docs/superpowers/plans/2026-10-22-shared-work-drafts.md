@@ -32,13 +32,15 @@
 
 ## 조회 계약
 
-- `GET /api/work-drafts`: 유효한 `X-Operator-Session` 필수. 검색, 담당 부서·직원, sort(`updated_desc` 기본 / `updated_asc` / `department`), skip, limit(기본 30, 최대 100). 두 저장 형식을 합쳐 필터·정렬한 뒤 페이지를 나눈다.
-- `GET /api/work-drafts/{kind}/{id}`: 현재 draft만 반환하며 없거나 제출·삭제된 작업은 404.
-- 목록은 `{items,total,skip,limit}`. `kind=io|stock_request`와 `id`를 함께 식별자로 쓴다.
+- 2026-10-23 출하 확장: 전체 작업에 준비 중 출하 요청을 추가한다. 출하 행의 담당자는 선택 입력한 작업자 텍스트, 부서는 `출하`이며 기존 입출고 담당자의 부서는 유지한다. 작업자가 없으면 `작업자 미입력`으로 표시한다. 긴 이름은 줄바꿈하고 해당 행만 늘어난다. 펼침 상세는 요청자·인보이스·동반 출하품과 출하 상세 링크를 제공한다. 준비 중에는 아직 재고 예약이 없으므로 예정 변동은 `픽업 시 출고`로 표시한다.
+- `GET /api/work-drafts`: 유효한 `X-Operator-Session` 필수. 검색, 담당 부서·직원, sort(`updated_desc` 기본 / `updated_asc` / `department`), skip, limit(기본 30, 최대 100). 저장된 입출고·요청과 준비 중 출하를 합쳐 필터·정렬한 뒤 페이지를 나눈다. 직원 ID 필터가 있으면 자유 입력 작업자인 출하는 제외한다.
+- `GET /api/work-drafts/{kind}/{id}`: 입출고·요청은 현재 draft, 출하는 현재 PREPARING만 반환하며 해당 상태가 아니거나 없으면 404.
+- 목록은 `{items,total,skip,limit}`. `kind=io|stock_request|shipping`과 `id`를 함께 식별자로 쓴다. 출하의 `requester_employee_id`는 null, `requester_name`은 실제 요청자, `worker_names`는 별도 자유 입력값이다.
 - `history_operation`은 완료 내역과 같은 대표 거래 유형·부서만 공개한다. IO는 저장된 최종 효과의 경로로 계산하고 구형 요청은 기존 실행 분류를 재사용한다. 근거가 부족한 작업은 null로 남긴다. 상세 효과는 완료 거래 표시 순서로 정렬하며 저장 계획·fingerprint와 원본 라인을 수정하지 않는다. 추가 조회 없이 이미 불러온 현재 페이지 그래프를 사용한다.
 - 공통 요약은 담당자·활성 여부·부서, 종류별 식별값, 목적 품목·수량·단위, 생성·저장 시각과 `movement_summary`를 담는다. `movement_summary`는 저장 계획의 증가·감소·이동 효과 종수이며 품목별 수량을 합산하지 않는다. 구형 요청·계획 누락·잘못된 계획은 null, 정상 빈 계획은 각 0이다. 현재 페이지 계획만 일괄 조회한다.
-- 내 작업이 조회하는 IoBatch와 기존 StockRequest draft를 합친 집합을 대상으로 필터·정렬·건수·페이지를 계산한다. 임의 중복 제거는 하지 않는다.
+- IoBatch와 기존 StockRequest draft, 준비 중 ShippingRequest를 합친 집합을 대상으로 필터·정렬·건수·페이지를 계산한다. 출하는 전체 작업에만 표시하며 내 작업 조회는 유지한다. 임의 중복 제거는 하지 않는다.
 - IO 상세는 기존 공개 예약·예정 투영을 재사용한다. 기존 StockRequest 상세의 예약·예정 정보는 null로 표시하며 수량을 추정하지 않는다.
+- 출하 상세의 예약·예정 정보도 null이다. `shipping_summary`는 인보이스와 동반 출하품 요약만 제공한다. 작업자 수정은 출하 화면에서 준비 중일 때만 가능하며 별도 변경 이력을 남긴다.
 - 메모, 삭제 사유, 관리자 감사 이력, 원본 실행 계획과 서명 토큰은 공개 DTO에 넣지 않는다.
 - 새 읽기 API에만 세션 인증을 적용한다. 기존 변경 API의 인증 체계는 이번 변경 범위가 아니다.
 - 캐시는 기존 stockRequests 루트 아래 직원·필터·선택을 키로 둔다. 계정 변경·퇴장 시 취소·폐기하고 기존 SSE/변경 후 갱신을 재사용한다.

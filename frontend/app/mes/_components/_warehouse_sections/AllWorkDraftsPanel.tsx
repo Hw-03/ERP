@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useState, type CSSProperties, type JSX } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ClipboardList, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ClipboardList, Sparkles, Truck } from "lucide-react";
 import { ApiError } from "@/lib/api-core";
 import type { WorkDraftFilters, WorkDraftSelection, WorkDraftSummary } from "@/lib/api/types/work-drafts";
 import { useWorkDrafts } from "@/lib/queries/useWorkDrafts";
@@ -76,10 +76,14 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
   function toggle(row: WorkDraftSummary): void {
     setSelected((current) => current?.id === row.id && current.kind === row.kind ? null : { kind: row.kind, id: row.id });
   }
+  function workerLabel(row: WorkDraftSummary): string {
+    return row.kind === "shipping" ? row.worker_names?.trim() || "작업자 미입력" : row.requester_name;
+  }
   function owner(row: WorkDraftSummary): JSX.Element {
-    return <div className={`${ITEM_CLASS} flex items-center gap-1.5 ${layout === "desktop" ? "justify-center" : "justify-start"}`}><p className="min-w-0 font-bold">{row.requester_name}</p><p className="shrink-0 text-xs font-normal" style={{ color: C.muted2 }}>{row.requester_department}{!row.requester_active && " · 비활성 담당자"}</p></div>;
+    return <div className={`${ITEM_CLASS} flex items-center gap-1.5 ${layout === "desktop" ? "justify-center" : "justify-start"}`}><p className="min-w-0 font-bold">{workerLabel(row)}</p><p className="shrink-0 text-xs font-normal" style={{ color: C.muted2 }}>{row.requester_department}{row.kind !== "shipping" && !row.requester_active && " · 비활성 담당자"}</p></div>;
   }
   function kind(row: WorkDraftSummary): JSX.Element {
+    if (row.kind === "shipping") return <FlowBadge type={null} icon={Truck} label="출하 준비" color={getDeptColor("출하")} variant={layout === "mobile" ? "panel" : "table"} className={WORK_TYPE_BADGE_CLASS} />;
     const meta = IO_WORK_TYPES.find((candidate) => candidate.id === row.work_type);
     const processLabel = row.history_operation && row.work_type === "process"
       ? getHistoryProcessGroupLabel(row.history_operation.transaction_type) : null;
@@ -92,10 +96,13 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
   function targets(row: WorkDraftSummary): JSX.Element {
     return <div className="space-y-1">{row.targets.length ? row.targets.slice(0, 2).map((target, index) => <div key={`${target.item_id}:${index}`} className="flex items-start justify-between gap-3"><div className={ITEM_CLASS}><p className="font-bold">{target.item_name}</p>{target.mes_code && <p className="text-xs" style={{ color: C.muted2 }}>{target.mes_code}</p>}</div><p className="shrink-0 whitespace-nowrap font-bold tabular-nums">{formatQty(target.quantity)} {target.unit}</p></div>) : <p style={{ color: C.muted2 }}>등록된 목적 품목이 없습니다.</p>}{row.targets.length > 2 && <p className="text-xs" style={{ color: C.muted2 }}>외 {row.targets.length - 2}개 품목</p>}</div>;
   }
+  function movement(row: WorkDraftSummary): JSX.Element {
+    return row.kind === "shipping" ? <span className="text-xs font-normal" style={{ color: C.muted2 }}>픽업 시 출고</span> : <WorkMovementSummary counts={row.movement_summary} />;
+  }
   function actions(row: WorkDraftSummary): JSX.Element {
     const expanded = selected?.id === row.id && selected.kind === row.kind;
     return <div className={`flex items-center ${layout === "desktop" ? "justify-center" : "justify-end"}`}>
-      <Button variant="ghost" className={CONTROL_CLASS} aria-expanded={expanded} aria-controls={`work-draft-${row.kind}-${row.id}`} aria-label={`${row.requester_name} 작업 상세 ${expanded ? "접기" : "펼치기"}`} onClick={() => toggle(row)} iconRight={<ChevronDown size={16} aria-hidden className={expanded ? "rotate-180" : undefined} />}>상세</Button>
+      <Button variant="ghost" className={CONTROL_CLASS} aria-expanded={expanded} aria-controls={`work-draft-${row.kind}-${row.id}`} aria-label={`${workerLabel(row)} 작업 상세 ${expanded ? "접기" : "펼치기"}`} onClick={() => toggle(row)} iconRight={<ChevronDown size={16} aria-hidden className={expanded ? "rotate-180" : undefined} />}>상세</Button>
     </div>;
   }
   function expandedDetail(row: WorkDraftSummary): JSX.Element | null {
@@ -174,7 +181,7 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
               style={{ height: 72 / targetRows.length, borderColor: C.border, "--work-department-color": row.requester_department === "창고" ? C.green : getDeptColor(row.requester_department) } as CSSProperties} onClick={() => toggle(row)}
               onKeyDown={(event) => { if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return; event.preventDefault(); toggle(row); }}>
               {index === 0 && <>
-                <td rowSpan={targetRows.length} className="p-1 text-center"><WorkExpandButton expanded={expanded} controlsId={controlsId} label={`${row.requester_name} 작업 상세`} onToggle={() => toggle(row)} /></td>
+                <td rowSpan={targetRows.length} className="p-1 text-center"><WorkExpandButton expanded={expanded} controlsId={controlsId} label={`${workerLabel(row)} 작업 상세`} onToggle={() => toggle(row)} /></td>
                 <td rowSpan={targetRows.length} className={WORK_TIMESTAMP_CLASS} style={{ color: C.muted2 }}><time dateTime={row.updated_at} title={workDate(row.updated_at)}>{formatWorkTimestamp(row.updated_at)}</time></td>
                 <td rowSpan={targetRows.length} className="px-4 py-2 text-center">{owner(row)}</td>
                 <td rowSpan={targetRows.length} className="px-3 py-2 text-center"><div className="flex justify-center">{kind(row)}</div></td>
@@ -184,7 +191,7 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
                 {index === targetRows.length - 1 && row.targets.length > 2 && <p className="text-xs" style={{ color: C.muted2 }}>외 {row.targets.length - 2}개 품목</p>}
               </td>
               <td className={`whitespace-nowrap ${WORK_ITEM_CODE_CLASS}`} style={{ color: C.muted2 }}>{target?.mes_code ?? "—"}</td>
-              {index === 0 && <td rowSpan={targetRows.length} className="px-3 py-2 text-center"><WorkMovementSummary counts={row.movement_summary} /></td>}
+              {index === 0 && <td rowSpan={targetRows.length} className="px-3 py-2 text-center">{movement(row)}</td>}
             </tr>)}
             {expanded && <tr><td colSpan={7} className="p-0">{expandedDetail(row)}</td></tr>}
           </Fragment>;
@@ -204,7 +211,7 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
       <div className="col-start-1 row-start-1" aria-hidden={pending || undefined} inert={pending || undefined}>
       {failure}
       {emptyState}
-      {rows.length > 0 && <div className="space-y-3">{rows.map((row) => <article key={`${row.kind}:${row.id}`} aria-label={`${row.requester_name} 작업`} className="overflow-hidden rounded-[20px] border" style={{ borderColor: C.border, background: C.s1 }}><div className="space-y-3 p-4">{owner(row)}{kind(row)}{targets(row)}<WorkMovementSummary counts={row.movement_summary} /><p className="text-xs tabular-nums" style={{ color: C.muted2 }}>저장 <time dateTime={row.updated_at}>{workDate(row.updated_at)}</time></p>{actions(row)}</div>{expandedDetail(row)}</article>)}</div>}
+      {rows.length > 0 && <div className="space-y-3">{rows.map((row) => <article key={`${row.kind}:${row.id}`} aria-label={`${workerLabel(row)} 작업`} className="overflow-hidden rounded-[20px] border" style={{ borderColor: C.border, background: C.s1 }}><div className="space-y-3 p-4">{owner(row)}{kind(row)}{targets(row)}{movement(row)}<p className="text-xs tabular-nums" style={{ color: C.muted2 }}>저장 <time dateTime={row.updated_at}>{workDate(row.updated_at)}</time></p>{actions(row)}</div>{expandedDetail(row)}</article>)}</div>}
       </div>
       <WorkContentCover pending={pending} failed={list.isError} />
     </div>}

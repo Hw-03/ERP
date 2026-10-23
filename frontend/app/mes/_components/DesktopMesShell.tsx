@@ -161,6 +161,8 @@ function DesktopMesShellInner({
   const [dailyReportTopbarControls, setDailyReportTopbarControls] = useState<ReactNode>(null);
   const autoRevertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUrlTabRef = useRef<DesktopTabId | null>(null);
+  const shippingHistoryUrlRef = useRef("?tab=shipping");
+  const pendingShippingHistoryTabRef = useRef<DesktopTabId | null>(null);
 
   useEffect(() => {
     const meta = TAB_META[activeTab];
@@ -311,15 +313,32 @@ function DesktopMesShellInner({
     if (targetFromUrl) {
       const target = canOpenTab(targetFromUrl) ? targetFromUrl : fallbackTab;
       if (target !== activeTab) {
+        // URL-driven history changes must keep shipping editors mounted until their dirty guard settles.
+        if (activeTab === "shipping") {
+          if (pendingShippingHistoryTabRef.current === target) return;
+          pendingShippingHistoryTabRef.current = target;
+          confirmAdminNavigation(() => {
+            pendingShippingHistoryTabRef.current = null;
+            commitDesktopTab(target, { navigation: "none", closeWarehouseMapFullscreen: false });
+            if (target !== targetFromUrl) router.replace(`?tab=${target}`, { scroll: false });
+            setDefectDeptFilter(canOpenTab("defect") ? dept : null);
+          }, () => {
+            pendingShippingHistoryTabRef.current = null;
+            pendingUrlTabRef.current = "shipping";
+            router.replace(shippingHistoryUrlRef.current, { scroll: false });
+          });
+          return;
+        }
         commitDesktopTab(target, { navigation: "none", closeWarehouseMapFullscreen: false });
       }
+      if (target === "shipping") shippingHistoryUrlRef.current = window.location.search;
       if (target !== targetFromUrl) router.replace(`?tab=${target}`, { scroll: false });
     } else if (!canOpenTab(activeTab)) {
       commitDesktopTab(fallbackTab, { navigation: "replace" });
     }
 
     setDefectDeptFilter(canOpenTab("defect") ? dept : null);
-  }, [searchParams, activeTab, canOpenTab, fallbackTab, router, commitDesktopTab, operator, stocktakeAccessPending]);
+  }, [searchParams, activeTab, canOpenTab, fallbackTab, router, commitDesktopTab, operator, stocktakeAccessPending, confirmAdminNavigation]);
 
   useEffect(() => {
     if (activeTab !== "warehouseMap" && warehouseMapFullscreen) {

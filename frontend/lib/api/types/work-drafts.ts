@@ -2,7 +2,7 @@ import type { IoSubType, IoWorkType } from "./io";
 import type { TransactionType } from "./shared";
 import type { InventoryRelatedWork, WorkReservationIssue, WorkReservationStatus, WorkReservedInput, WorkInventoryEffect } from "./work-reservations";
 
-export type WorkDraftKind = "io" | "stock_request";
+export type WorkDraftKind = "io" | "stock_request" | "shipping";
 export interface WorkDraftSelection { kind: WorkDraftKind; id: string }
 
 export interface WorkDraftMovementSummary { increase: number; decrease: number; move: number }
@@ -17,10 +17,11 @@ export interface WorkDraftTarget {
 }
 
 export interface WorkDraftSummary extends WorkDraftSelection {
-  requester_employee_id: string;
+  requester_employee_id: string | null;
   requester_name: string;
   requester_department: string;
   requester_active: boolean;
+  worker_names?: string | null;
   work_type: IoWorkType | null;
   sub_type: IoSubType | null;
   request_type: string | null;
@@ -34,6 +35,7 @@ export interface WorkDraftSummary extends WorkDraftSelection {
 
 /** null은 이 저장 형식에서 예약·예정 정보를 확인할 수 없다는 뜻이다. */
 export interface WorkDraftDetail extends WorkDraftSummary {
+  shipping_summary?: { invoice_number: string | null; companion_lines: WorkDraftTarget[] } | null;
   reservation_status: WorkReservationStatus | null;
   reservation_issue: WorkReservationIssue | null;
   reserved_inputs: WorkReservedInput[] | null;

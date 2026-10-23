@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { Item, ShippingBomMatchResponse, ShippingRequest } from "@/lib/api";
 import {
   buildShippingPayload,
+  normalizeWorkerNames,
+  isOnlyWorkerNamesChange,
   companionPayload,
   isValidPositiveInt,
   requestBomLines,
@@ -35,6 +37,18 @@ const match = (overrides: Partial<ShippingBomMatchResponse> = {}): ShippingBomMa
 });
 
 describe("shipping request draft", () => {
+  it("detects worker-only edits against the original normalized payload", () => {
+    const original = { request_quantity: 2, invoice_number: "INV", requested_by_name: "requester", worker_names: "Kim", bom_lines: [], companion_lines: [] } as unknown as ShippingRequest;
+    const payload = buildShippingPayload({ requestQuantity: 2, invoiceNumber: "INV", requestedBy: "requester", workerNames: "Lee", isEditing: true, customPaName: "", customPfName: "", notes: "", finalizationMode: "KEEP_BASE", reusePfItemId: null, companionDraft: [], draftLines: [], itemById: new Map() });
+    expect(isOnlyWorkerNamesChange(payload, original, new Map())).toBe(true);
+    expect(isOnlyWorkerNamesChange({ ...payload, invoice_number: "NEW" }, original, new Map())).toBe(false);
+    expect(isOnlyWorkerNamesChange({ ...payload, worker_names: "Kim" }, original, new Map())).toBe(false);
+  });
+  it("normalizes optional workers without changing name delimiters", () => {
+    expect(normalizeWorkerNames("  Kim, Lee / Park\r\nChoi  ")).toBe("Kim, Lee / Park Choi");
+    expect(normalizeWorkerNames(" \n \r\n ")).toBeNull();
+    expect(normalizeWorkerNames(null)).toBeNull();
+  });
   it("hydrates saved BOM and companion lines with stable editing keys", () => {
     const request = {
       bom_lines: [{ line_id: "bom-1", parent_stage: "PA", child_item_id: "af-1", quantity: 2, unit: "EA", included: false, origin: "CUSTOM" }],

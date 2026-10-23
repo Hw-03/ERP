@@ -15,6 +15,7 @@ import type { IoEntryIntent } from "../../_warehouse_v2/types";
 import { PrimaryActionButton, StickyFooter } from "../primitives";
 import presentation from "../mobilePresentation.module.css";
 import { ShippingAccordion, ShippingHeader, ShippingItemName, ShippingStatus } from "./ShippingPresentation";
+import { ShippingWorkersEditor } from "../../ShippingWorkersEditor";
 
 type Action = "prepare" | "pickup" | "prepareCancel" | "pickupCancel" | "delete" | "clear";
 
@@ -33,6 +34,7 @@ const ACTION_LABEL: Record<Action, string> = {
   pickupCancel: "픽업 취소", delete: "요청 취소", clear: "전체 해제",
 };
 const FIELD_LABEL: Record<string, string> = {
+  worker_names: "작업자",
   request_quantity: "출하 수량", invoice_number: "인보이스 번호", custom_pa_name: "PA 품목명",
   custom_pf_name: "PF 품목명", notes: "메모", bom_lines: "BOM 구성", companion_lines: "동반 출하품",
 };
@@ -279,6 +281,7 @@ export function MobileShippingDetail({ request, onRequestChange, onEdit, onBack,
         </div>
       </Card>
       <Card title="인보이스·시리얼 번호">
+        <div className="mb-3"><ShippingWorkersEditor request={request} onSaved={onRequestChange} /></div>
         {editingInvoice ? <><div className="flex gap-2"><input aria-label="인보이스 번호" value={invoice} disabled={busy} onChange={(event) => setInvoice(event.target.value)} className="min-h-11 min-w-0 flex-1 rounded-[12px] border px-3 text-base focus-visible:ring-2" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }} /><button type="button" onClick={() => void saveInvoice()} disabled={busy || !invoiceDirty || cannotClearInvoice} aria-label="인보이스 저장" className="min-h-11 rounded-[12px] px-3 text-sm font-bold disabled:opacity-45" style={{ background: tint(LEGACY_COLORS.blue, 15), color: LEGACY_COLORS.blue }}>저장</button></div><button type="button" onClick={() => { setInvoice(request.invoice_number ?? ""); setInvoiceError(null); setEditingInvoice(false); }} disabled={busy} className="mt-1 min-h-11 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>인보이스 취소</button></>
           : <div className="flex items-center gap-2"><span className="min-w-0 flex-1 break-all text-sm">{request.invoice_number || "미입력"}</span><button type="button" onClick={() => setEditingInvoice(true)} disabled={busy} className="min-h-11 shrink-0 rounded-[12px] px-3 text-sm font-bold" style={{ background: tint(LEGACY_COLORS.blue, 15), color: LEGACY_COLORS.blue }}>인보이스 수정</button></div>}
         {cannotClearInvoice && editingInvoice && <p className="mt-2 text-sm" style={{ color: LEGACY_COLORS.red }}>준비 완료 이력이 있어 인보이스 번호를 비울 수 없습니다.</p>}

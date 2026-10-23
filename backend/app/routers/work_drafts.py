@@ -30,7 +30,7 @@ def list_work_drafts(
 
 
 @router.get("/{kind}/{id}", response_model=WorkDraftDetail)
-def get_work_draft(kind: Literal["io", "stock_request"], id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
+def get_work_draft(kind: Literal["io", "stock_request", "shipping"], id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
     """저장 상태 작업의 대상 품목과 공개 예약 정보만 조회한다."""
     detail = work_drafts.get_work_draft(db, kind, id)
     if detail is None:

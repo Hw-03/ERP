@@ -6,6 +6,7 @@ import { MobileShippingRequestWizard } from "../MobileShippingRequestWizard";
 const api = vi.hoisted(() => ({
   getItems: vi.fn(), getBOM: vi.fn(), matchShippingBom: vi.fn(),
   createShippingRequest: vi.fn(), updateShippingRequest: vi.fn(),
+  updateShippingWorkers: vi.fn(),
 }));
 vi.mock("@/lib/api", () => ({ api }));
 
@@ -58,6 +59,21 @@ beforeEach(() => {
 });
 
 describe("MobileShippingRequestWizard", () => {
+  it("작업자 입력을 첫 단계와 최종 저장에 유지하며 요청자와 구분한다", async () => {
+    const req = editableRequest();
+    const { setStep } = mount(1, req);
+    fireEvent.change(screen.getByLabelText("작업자"), { target: { value: " Kim, Lee / Park " } });
+    setStep(4);
+    expect(screen.getByRole("heading", { name: "요청자" })).toBeInTheDocument();
+    setStep(1, { ...req, worker_names: "remote" });
+    expect(screen.getByLabelText("작업자")).toHaveValue(" Kim, Lee / Park ");
+    setStep(5);
+    api.updateShippingWorkers.mockResolvedValue({ ...req, worker_names: "Kim, Lee / Park" });
+    await waitFor(() => expect(api.matchShippingBom).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: "수정 저장" }));
+    await waitFor(() => expect(api.updateShippingWorkers).toHaveBeenCalledWith(req.request_id, "Kim, Lee / Park"));
+    expect(api.updateShippingRequest).not.toHaveBeenCalled();
+  });
   it("기본 BOM 일치 시 다른 판매처의 동일 BOM 후보가 아니라 기준 PA·PF를 표시한다", async () => {
     api.matchShippingBom.mockResolvedValue({ ...matched, matched_pa_item_name: "다른 판매처 PA", matched_pf_item_name: "다른 판매처 PF" });
     mount(3, editableRequest());
@@ -69,6 +85,7 @@ describe("MobileShippingRequestWizard", () => {
   it("기준 PF 선택 시 PF와 연결 PA의 기본 BOM을 불러와 요청에 포함한다", async () => {
     const { onStepChange, onSaved, setStep } = mount();
     fireEvent.change(await screen.findByLabelText("인보이스 번호"), { target: { value: "INV-1" } });
+    fireEvent.paste(screen.getByLabelText("작업자"), { clipboardData: { getData: () => " Kim, Lee\nPark " } });
     fireEvent.click(screen.getByRole("button", { name: "기준 PF 선택" }));
     fireEvent.click(await within(screen.getByRole("dialog")).findByRole("button", { name: /PF pf-1/ }));
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
@@ -83,6 +100,7 @@ describe("MobileShippingRequestWizard", () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith(saved));
     expect(api.createShippingRequest).toHaveBeenCalledWith(expect.objectContaining({
       base_pf_item_id: "pf-1", invoice_number: "INV-1", request_quantity: 1,
+      worker_names: "Kim, Lee Park",
       bom_lines: expect.arrayContaining([
         expect.objectContaining({ parent_stage: "PF", child_item_id: "pa-1", quantity: 1 }),
         expect.objectContaining({ parent_stage: "PA", child_item_id: "child-1", quantity: 2 }),

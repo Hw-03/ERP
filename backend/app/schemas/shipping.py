@@ -3,12 +3,22 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, Optional
+from typing import Annotated, Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from app.models import ShippingFinalizationModeEnum, ShippingRequestStatusEnum, TransactionTypeEnum
 from app.schemas.common import UtcDatetime
+
+
+def normalize_worker_names(value: str | None) -> str | None:
+    """Keep user delimiters while storing multiline worker labels on one line."""
+    if not isinstance(value, str):
+        return value
+    return value.replace("\r\n", " ").replace("\r", " ").replace("\n", " ").strip() or None
+
+
+WorkerNames = Annotated[str | None, Field(max_length=200), BeforeValidator(normalize_worker_names)]
 
 
 class ShippingBomLineInput(BaseModel):
@@ -32,6 +42,7 @@ class ShippingRequestCreate(BaseModel):
     reuse_pf_item_id: Optional[uuid.UUID] = None
     request_quantity: int = Field(1, gt=0)
     requested_by_name: Optional[str] = Field(None, max_length=100)
+    worker_names: WorkerNames = None
     custom_pa_name: Optional[str] = Field(None, max_length=200)
     custom_pf_name: Optional[str] = Field(None, max_length=200)
     notes: Optional[str] = None
@@ -45,6 +56,7 @@ class ShippingRequestUpdate(BaseModel):
     reuse_pf_item_id: Optional[uuid.UUID] = None
     request_quantity: Optional[int] = Field(None, gt=0)
     requested_by_name: Optional[str] = Field(None, max_length=100)
+    worker_names: WorkerNames = None
     custom_pa_name: Optional[str] = Field(None, max_length=200)
     custom_pf_name: Optional[str] = Field(None, max_length=200)
     notes: Optional[str] = None
@@ -69,6 +81,10 @@ class ShippingPrepareCompleteRequest(BaseModel):
 
 class ShippingInvoiceUpdate(BaseModel):
     invoice_number: Optional[str] = Field(None, max_length=100)
+
+
+class ShippingWorkersUpdate(BaseModel):
+    worker_names: WorkerNames
 
 
 class ShippingPrepareCancelRequest(BaseModel):
@@ -299,6 +315,7 @@ class ShippingRequestResponse(BaseModel):
     finalization_mode: ShippingFinalizationModeEnum
     reuse_pf_item_id: Optional[uuid.UUID] = None
     requested_by_name: Optional[str] = None
+    worker_names: Optional[str] = None
     custom_pa_name: Optional[str] = None
     custom_pf_name: Optional[str] = None
     notes: Optional[str] = None

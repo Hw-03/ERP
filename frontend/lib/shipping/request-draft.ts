@@ -12,6 +12,7 @@ export type DraftLine = ShippingBomLineInput & { key: string; included: boolean;
 export type CompanionDraftLine = { key: string; item_id: string; quantity: number; unit: string };
 
 export interface ShippingPayloadInput {
+  workerNames?: string | null;
   requestQuantity: string | number;
   invoiceNumber: string;
   requestedBy: string;
@@ -133,8 +134,14 @@ export function companionPayload(lines: CompanionDraftLine[], itemById: Map<stri
     }));
 }
 
+/** Preserve user delimiters while storing a single optional line of worker names. */
+export function normalizeWorkerNames(value?: string | null): string | null {
+  return value?.replace(/[\r\n]+/g, " ").trim() || null;
+}
+
 export function buildShippingPayload(input: ShippingPayloadInput): ShippingDraftPayload {
   return {
+    ...(input.workerNames !== undefined ? { worker_names: normalizeWorkerNames(input.workerNames) } : {}),
     request_quantity: toPositiveInt(input.requestQuantity),
     invoice_number: input.invoiceNumber.trim() || null,
     requested_by_name: (input.isEditing ? input.requestedBy.trim() : input.operatorName?.trim() || input.requestedBy.trim()) || null,
@@ -155,6 +162,29 @@ export function buildShippingPayload(input: ShippingPayloadInput): ShippingDraft
         origin: line.origin,
       })),
   };
+}
+
+/** Worker-only edits must avoid rebuilding unchanged saved BOM and preparation data. */
+export function isOnlyWorkerNamesChange(payload: ShippingDraftPayload, original: ShippingRequest, itemById: Map<string, Item>): boolean {
+  const baseline = buildShippingPayload({
+    requestQuantity: original.request_quantity,
+    invoiceNumber: original.invoice_number ?? "",
+    workerNames: original.worker_names,
+    requestedBy: original.requested_by_name ?? "",
+    isEditing: true,
+    customPaName: original.custom_pa_name ?? "",
+    customPfName: original.custom_pf_name ?? "",
+    notes: original.notes ?? "",
+    finalizationMode: original.finalization_mode ?? "KEEP_BASE",
+    reusePfItemId: original.reuse_pf_item_id ?? null,
+    companionDraft: requestCompanionDraft(original),
+    draftLines: requestBomLines(original),
+    itemById,
+  });
+  const { worker_names: nextWorkers, ...next } = payload;
+  const { worker_names: priorWorkers, ...prior } = baseline;
+  return normalizeWorkerNames(nextWorkers) !== normalizeWorkerNames(priorWorkers)
+    && JSON.stringify(next) === JSON.stringify(prior);
 }
 
 export function validateShippingFinalization(input: ShippingFinalizationInput): ShippingFinalizationValidation {

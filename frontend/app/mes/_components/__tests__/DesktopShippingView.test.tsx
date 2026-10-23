@@ -58,6 +58,7 @@ vi.mock("@/lib/api", () => ({
     getShippingHistoryMonths: vi.fn(),
     getShippingRevisions: vi.fn(),
     updateShippingInvoice: vi.fn(),
+    updateShippingWorkers: vi.fn(),
     createShippingRequest: vi.fn(),
     updateShippingRequest: vi.fn(),
     deleteShippingRequest: vi.fn(),
@@ -230,7 +231,7 @@ function deferred<T>() {
 function render(ui: ReactElement) {
   const client = makeClient();
   function Wrapper({ children }: { children: ReactNode }) {
-    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    return <QueryClientProvider client={client}><DirtyGuardProvider>{children}</DirtyGuardProvider></QueryClientProvider>;
   }
   return rtlRender(ui, { wrapper: Wrapper });
 }
@@ -365,6 +366,96 @@ beforeEach(() => {
 });
 
 describe("DesktopShippingView", () => {
+  it("요청 수정 마법사에서도 작업자만 바뀌면 전용 저장을 사용한다", async () => {
+    navigationMock.search = "tab=shipping&shippingView=requestWork&shippingRequestId=req-1&shippingStep=1";
+    vi.mocked(api.matchShippingBom).mockResolvedValue({ base_pf_matches: true, requires_pa_name: false, requires_pf_name: false } as ShippingBomMatchResponse);
+    vi.mocked(api.updateShippingWorkers).mockResolvedValue(request({ worker_names: "ONLY WORKERS" }));
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+    fireEvent.change(await screen.findByLabelText("작업자"), { target: { value: "ONLY WORKERS" } });
+    nextStep(container);
+    await screen.findByTestId("shipping-wizard-step-2");
+    nextStep(container);
+    await waitFor(() => expect(api.matchShippingBom).toHaveBeenCalled());
+    nextStep(container);
+    await screen.findByTestId("shipping-wizard-step-4");
+    nextStep(container);
+    fireEvent.click(await screen.findByTestId("shipping-update-request"));
+    await waitFor(() => expect(api.updateShippingWorkers).toHaveBeenCalledWith("req-1", "ONLY WORKERS"));
+    expect(api.updateShippingRequest).not.toHaveBeenCalled();
+  });
+  it("브라우저 이력의 상세 이탈에서도 작업자 입력을 보호한다", async () => {
+    const detailSearch = "tab=shipping&shippingView=requestDetail&shippingRequestId=req-1";
+    navigationMock.search = detailSearch;
+    const { rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
+    fireEvent.change(await screen.findByLabelText("작업자"), { target: { value: "HISTORY DRAFT" } });
+    navigationMock.search = "tab=shipping&shippingView=requestList";
+    window.history.replaceState({}, "", `?${navigationMock.search}`);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByLabelText("작업자")).toHaveValue("HISTORY DRAFT");
+    fireEvent.click(screen.getByText("계속 작성"));
+    expect(navigationMock.replace).toHaveBeenLastCalledWith(`?${detailSearch}`, { scroll: false });
+    navigationMock.search = detailSearch;
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    expect(screen.getByLabelText("작업자")).toHaveValue("HISTORY DRAFT");
+  });
+
+  it("작업자를 저장하고 요청 수정으로 이동하면 최신 저장값을 불러온다", async () => {
+    navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=req-1";
+    vi.mocked(api.updateShippingWorkers).mockResolvedValueOnce(request({ worker_names: "SAVED WORKERS" }));
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+    fireEvent.change(await screen.findByLabelText("작업자"), { target: { value: "SAVED WORKERS" } });
+    fireEvent.click(screen.getByRole("button", { name: "수정", exact: true }));
+    fireEvent.click(screen.getByText("저장하고 이동"));
+    await screen.findByTestId("shipping-wizard-step-2");
+    fireEvent.click(screen.getByRole("button", { name: /기준 PF 선택/ }));
+    expect(await screen.findByLabelText("작업자")).toHaveValue("SAVED WORKERS");
+    expect(container.querySelector('[data-testid="shipping-wizard-step-1"]')).toBeInTheDocument();
+  });
+  it("상세 뒤로 이동에서 미저장 작업자 확인과 실패 입력을 보존한다", async () => {
+    vi.mocked(api.updateShippingWorkers).mockRejectedValueOnce(new Error("작업자 저장 실패"));
+    const { container } = render(shippingWithHome());
+    await openHubCard(container, "request");
+    await openRequestById(container, "req-1");
+    fireEvent.change(await screen.findByLabelText("작업자"), { target: { value: "UNSAVED WORKERS" } });
+    fireEvent.click(screen.getByRole("button", { name: "요청 목록으로 돌아가기" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("계속 작성"));
+    expect(screen.getByLabelText("작업자")).toHaveValue("UNSAVED WORKERS");
+    fireEvent.click(screen.getByRole("button", { name: "요청 목록으로 돌아가기" }));
+    fireEvent.click(screen.getByText("저장하고 이동"));
+    await waitFor(() => expect(api.updateShippingWorkers).toHaveBeenCalled());
+    expect(screen.getByLabelText("작업자")).toHaveValue("UNSAVED WORKERS");
+    expect(await screen.findByText("작업자 저장 실패")).toBeInTheDocument();
+  });
+  it("첫 단계 작업자를 단계 이동과 목록 새 응답에도 유지한다", async () => {
+    const { container, rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    fireEvent.change(await screen.findByLabelText("작업자"), { target: { value: "Kim, Lee" } });
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+    await screen.findByTestId("shipping-wizard-step-2");
+    fireEvent.click(screen.getByRole("button", { name: /기준 PF 선택/ }));
+    expect(await screen.findByLabelText("작업자")).toHaveValue("Kim, Lee");
+    realtimeMock.revision += 1;
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    expect(screen.getByLabelText("작업자")).toHaveValue("Kim, Lee");
+  });
+
+  it("상세에서 작업자를 별도 저장하고 다른 요청 정보를 유지한다", async () => {
+    navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=req-1";
+    vi.mocked(api.updateShippingWorkers).mockResolvedValueOnce(request({ worker_names: "Kim, Lee" }));
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+    fireEvent.change(await screen.findByLabelText("작업자"), { target: { value: " Kim, Lee " } });
+    fireEvent.click(screen.getByRole("button", { name: "작업자 저장" }));
+    await waitFor(() => expect(api.updateShippingWorkers).toHaveBeenCalledWith("req-1", "Kim, Lee"));
+    expect(api.updateShippingInvoice).not.toHaveBeenCalled();
+    expect(api.updateShippingRequest).not.toHaveBeenCalled();
+  });
+
   it.each([1, 2, 3, 4, 5])("같은 탭 클릭은 작성 %i단계에서 직접 허브로 돌아간다", async (step) => {
     window.history.replaceState({ preserved: true }, "", "/mes?tab=shipping");
     const { container } = render(shippingWithHome());
@@ -1079,7 +1170,7 @@ describe("DesktopShippingView", () => {
     const statusChange = vi.fn();
     const client = makeClient({ staleTime: 5 * 60_000 });
     const { container, rerender } = rtlRender(<DesktopShippingView onStatusChange={statusChange} />, {
-      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+      wrapper: ({ children }) => <QueryClientProvider client={client}><DirtyGuardProvider>{children}</DirtyGuardProvider></QueryClientProvider>,
     });
     await fillRichRequestDraft(container, "older", true);
     nextStep(container);
@@ -1127,7 +1218,7 @@ describe("DesktopShippingView", () => {
     const statusChange = vi.fn();
     const client = makeClient({ gcTime: 5 * 60_000, staleTime: 5 * 60_000 });
     const { container, rerender, unmount } = rtlRender(<DesktopShippingView onStatusChange={statusChange} />, {
-      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+      wrapper: ({ children }) => <QueryClientProvider client={client}><DirtyGuardProvider>{children}</DirtyGuardProvider></QueryClientProvider>,
     });
     await fillRichRequestDraft(container, "unmounted", true);
     nextStep(container);
@@ -1163,7 +1254,7 @@ describe("DesktopShippingView", () => {
     const statusChange = vi.fn();
     const client = makeClient({ staleTime: 5 * 60_000 });
     const { container, rerender } = rtlRender(<DesktopShippingView onStatusChange={statusChange} />, {
-      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+      wrapper: ({ children }) => <QueryClientProvider client={client}><DirtyGuardProvider>{children}</DirtyGuardProvider></QueryClientProvider>,
     });
     await fillRichRequestDraft(container, "older-flight", true);
     nextStep(container);
@@ -1232,7 +1323,7 @@ describe("DesktopShippingView", () => {
     const statusChange = vi.fn();
     const client = makeClient({ staleTime: 5 * 60_000 });
     const { rerender } = rtlRender(<DesktopShippingView onStatusChange={statusChange} />, {
-      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+      wrapper: ({ children }) => <QueryClientProvider client={client}><DirtyGuardProvider>{children}</DirtyGuardProvider></QueryClientProvider>,
     });
     await screen.findByTestId("shipping-wizard-step-5");
     expect(screen.getByTestId("shipping-final-request-summary")).toHaveTextContent("request-a-memo");
@@ -3675,7 +3766,7 @@ describe("DesktopShippingView", () => {
     client.setQueryData(queryKeys.shipping.revisions("req-1"), [oldRevision]);
     expect(client.getQueryData(queryKeys.shipping.revisions("req-1"))).toEqual([oldRevision]);
     const { container } = rtlRender(<DesktopShippingView onStatusChange={() => {}} />, {
-      wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+      wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}><DirtyGuardProvider>{children}</DirtyGuardProvider></QueryClientProvider>,
     });
 
     const revisionHistory = await screen.findByTestId("shipping-revision-history");
@@ -4147,7 +4238,7 @@ describe("DesktopShippingView", () => {
       request({ request_id: "cache-initial", status: "PREPARING" }),
     ]);
     const { container, rerender } = rtlRender(<DesktopShippingView onStatusChange={() => {}} />, {
-      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+      wrapper: ({ children }) => <QueryClientProvider client={client}><DirtyGuardProvider>{children}</DirtyGuardProvider></QueryClientProvider>,
     });
 
     const invoiceInput = await screen.findByRole("textbox", { name: "인보이스 번호" });
@@ -4197,7 +4288,7 @@ describe("DesktopShippingView", () => {
       request({ request_id: "stale-request", status: "PREPARING" }),
     ]);
     const { container, rerender } = rtlRender(<DesktopShippingView onStatusChange={() => {}} />, {
-      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+      wrapper: ({ children }) => <QueryClientProvider client={client}><DirtyGuardProvider>{children}</DirtyGuardProvider></QueryClientProvider>,
     });
 
     act(() => {
@@ -5150,7 +5241,7 @@ describe("DesktopShippingView", () => {
   it("탭 재마운트 시(같은 QueryClient) 캐시 히트로 재요청 없음 — flicker 회귀 방지", async () => {
     const client = makeClient({ gcTime: 5 * 60_000, staleTime: 5 * 60_000 });
     function Wrapper({ children }: { children: ReactNode }) {
-      return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+      return <QueryClientProvider client={client}><DirtyGuardProvider>{children}</DirtyGuardProvider></QueryClientProvider>;
     }
     const { container, unmount } = rtlRender(<DesktopShippingView onStatusChange={() => {}} />, { wrapper: Wrapper });
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());

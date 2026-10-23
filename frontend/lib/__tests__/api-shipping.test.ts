@@ -17,6 +17,15 @@ afterEach(() => {
 });
 
 describe("shippingApi", () => {
+  it("patches only worker names through the dedicated endpoint", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ request_id: "req-1" })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    await shippingApi.updateShippingWorkers("req-1", "Kim, Lee / Park");
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/shipping/requests/req-1/workers");
+    expect(fetchSpy.mock.calls[0][1]).toEqual(expect.objectContaining({ method: "PATCH", body: JSON.stringify({ worker_names: "Kim, Lee / Park" }) }));
+    await shippingApi.updateShippingWorkers("req-1", null);
+    expect(JSON.parse((fetchSpy.mock.calls[1][1] as RequestInit).body as string)).toEqual({ worker_names: null });
+  });
   it("creates a shipping request", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;

@@ -18,7 +18,7 @@ from test_work_reservations import _config, _seed
 
 
 PREVIOUS = "20261020_0047"
-REVISION = "20261021_0048"
+HEAD_REVISION = "20261023_0049"
 MIGRATION = Path(__file__).resolve().parents[2] / "alembic/versions/20261021_0048_remove_needs_reservation.py"
 LegacyDatabase = tuple[Config, sa.Engine]
 
@@ -85,7 +85,7 @@ def test_upgrade_removes_placeholder_preserving_data_and_foreign_keys(legacy_dat
         assert connection.exec_driver_sql("PRAGMA writable_schema").scalar_one() == 0
         assert connection.exec_driver_sql("PRAGMA integrity_check").all() == [("ok",)]
         assert connection.exec_driver_sql("PRAGMA foreign_key_check").all() == []
-        assert connection.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one() == REVISION
+        assert connection.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one() == HEAD_REVISION
         default = next(row[4] for row in connection.exec_driver_sql("PRAGMA table_info(io_batches)") if row[1] == "reservation_status")
         assert default == "'inactive'"
         with pytest.raises(sa.exc.IntegrityError):
@@ -133,7 +133,7 @@ def test_0046_work_upgrades_through_both_revisions_without_a_placeholder(tmp_pat
             assert connection.exec_driver_sql("SELECT revision,reservation_status,reservation_issue FROM io_batches").all() == [(0, "inactive", None)] * 4
             assert connection.exec_driver_sql("SELECT * FROM inventory").all() == inventory
             assert connection.exec_driver_sql("SELECT count(*) FROM io_draft_reservations").scalar_one() == 0
-            assert connection.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one() == REVISION
+            assert connection.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one() == HEAD_REVISION
     finally:
         engine.dispose()
 

@@ -5,9 +5,10 @@ from typing import Any, Literal
 import uuid
 
 from sqlalchemy import String, case, cast, func, literal, or_, select, union_all
-from sqlalchemy.orm import Session, defer, selectinload
+from sqlalchemy.orm import Session, defer, joinedload, selectinload
 
 from app.models import Employee, IoBatch, IoBundle, IoLine, Item, StockRequest, StockRequestLine, StockRequestStatusEnum
+from app.models import ShippingRequest, ShippingRequestCompanionLine, ShippingRequestStatusEnum
 from app.services.io_dispatch import _dept_for_line, _operation_role_for_line, _transaction_type_for_line
 from app.services.sr_validation import _TX_TYPE_BY_REQUEST
 from app.services.work_reservation_queries import (
@@ -145,15 +146,46 @@ def _stock_query(db: Session) -> Any:
         selectinload(StockRequest.lines).joinedload(StockRequestLine.item))
 
 
+def _shipping_query(db: Session) -> Any:
+    """Load only representative item masters for shipping rows on the selected page."""
+    return db.query(ShippingRequest).options(
+        defer(ShippingRequest.notes), defer(ShippingRequest.serial_numbers),
+        joinedload(ShippingRequest.base_pf_item), joinedload(ShippingRequest.final_pf_item))
+
+
+def _shipping_target(item: Item, quantity: int, unit: str) -> dict[str, Any]:
+    """Expose item identity in the same public shape as the other work kinds."""
+    return {"item_id": str(item.item_id), "item_name": item.item_name, "mes_code": item.mes_code,
+        "quantity": int(quantity), "unit": unit}
+
+
+def _shipping_summary(request: ShippingRequest) -> dict[str, Any]:
+    """Shipping worker text never invents an employee requester or active identity."""
+    target = request.final_pf_item or request.base_pf_item
+    return {
+        "kind": "shipping", "id": str(request.request_id), "requester_employee_id": None,
+        "requester_name": request.requested_by_name or "", "requester_department": "출하",
+        "requester_active": False, "worker_names": request.worker_names,
+        "work_type": None, "sub_type": None, "request_type": None,
+        "movement_summary": None, "history_operation": None,
+        "targets": [_shipping_target(target, request.request_quantity, target.unit)],
+        "created_at": request.created_at, "updated_at": request.updated_at,
+    }
+
+
 def list_work_drafts(
     db: Session, *, search: str | None = None, requester_department: str | None = None,
     requester_employee_id: uuid.UUID | None = None, skip: int = 0, limit: int = 30,
     sort: Literal["updated_desc", "updated_asc", "department"] = "updated_desc",
 ) -> dict[str, Any]:
-    """Filter/count/page both kinds together; load no off-page bundles, lines, or forecasts."""
+    """Filter/count/page all kinds together; load no off-page bundles, lines, or forecasts."""
     io = select(literal("io").label("kind"), IoBatch.batch_id.label("id"), IoBatch.updated_at, IoBatch.requester_department).where(IoBatch.status == "draft")
     stock = select(literal("stock_request").label("kind"), StockRequest.request_id.label("id"), StockRequest.updated_at, StockRequest.requester_department).where(
         StockRequest.status == StockRequestStatusEnum.DRAFT)
+    shipping = select(literal("shipping").label("kind"), ShippingRequest.request_id.label("id"), ShippingRequest.updated_at,
+        literal("출하").label("requester_department")).where(ShippingRequest.status == ShippingRequestStatusEnum.PREPARING)
+    if requester_department is not None:
+        shipping = shipping.where(literal("출하") == requester_department)
     for name, value in (("requester_department", requester_department), ("requester_employee_id", requester_employee_id)):
         if value is not None:
             io = io.where(getattr(IoBatch, name) == value)
@@ -175,8 +207,17 @@ def list_work_drafts(
             StockRequest.lines.any(or_(StockRequestLine.item_name_snapshot.ilike(pattern, escape="\\"),
                 StockRequestLine.mes_code_snapshot.ilike(pattern, escape="\\"))),
         ))
+        shipping = shipping.where(or_(
+            ShippingRequest.worker_names.ilike(pattern, escape="\\"),
+            ShippingRequest.requested_by_name.ilike(pattern, escape="\\"),
+            literal("출하").ilike(pattern, escape="\\"),
+            ShippingRequest.final_pf_item.has(or_(Item.item_name.ilike(pattern, escape="\\"), Item.mes_code.ilike(pattern, escape="\\"))),
+            ShippingRequest.base_pf_item.has(or_(Item.item_name.ilike(pattern, escape="\\"), Item.mes_code.ilike(pattern, escape="\\"))),
+            ShippingRequest.companion_lines.any(ShippingRequestCompanionLine.item.has(or_(
+                Item.item_name.ilike(pattern, escape="\\"), Item.mes_code.ilike(pattern, escape="\\")))),
+        ))
     with db.no_autoflush:
-        combined = union_all(io, stock).subquery()
+        combined = union_all(io, stock, *([shipping] if requester_employee_id is None else [])).subquery()
         total = db.scalar(select(func.count()).select_from(combined))
         order = [combined.c.updated_at.asc() if sort == "updated_asc" else combined.c.updated_at.desc()]
         if sort == "department":
@@ -188,18 +229,30 @@ def list_work_drafts(
             return {"items": [], "total": total, "skip": skip, "limit": limit}
         io_ids = [row.id for row in page if row.kind == "io"]
         stock_ids = [row.id for row in page if row.kind == "stock_request"]
+        shipping_ids = [row.id for row in page if row.kind == "shipping"]
         batches = _load_batches(db, db.query(IoBatch).options(defer(IoBatch.notes)).filter(IoBatch.batch_id.in_(io_ids))) if io_ids else []
         requests = _stock_query(db).filter(StockRequest.request_id.in_(stock_ids)).all() if stock_ids else []
+        shipping_requests = _shipping_query(db).filter(ShippingRequest.request_id.in_(shipping_ids)).all() if shipping_ids else []
         owner_ids = {work.requester_employee_id for work in [*batches, *requests]}
         owners = {owner.employee_id: owner for owner in db.query(Employee).filter(Employee.employee_id.in_(owner_ids)).all()}
         summaries = {("io", batch.batch_id): _io_summary(_summary(batch, owners), batch) for batch in batches}
         summaries.update({("stock_request", request.request_id): _stock_summary(request, owners) for request in requests})
+        summaries.update({("shipping", request.request_id): _shipping_summary(request) for request in shipping_requests})
         return {"items": [summaries[(row.kind, row.id)] for row in page], "total": total, "skip": skip, "limit": limit}
 
 
-def get_work_draft(db: Session, kind: Literal["io", "stock_request"], work_id: uuid.UUID) -> dict[str, Any] | None:
+def get_work_draft(db: Session, kind: Literal["io", "stock_request", "shipping"], work_id: uuid.UUID) -> dict[str, Any] | None:
     """Return public draft detail only; unavailable legacy reservations stay explicitly unknown."""
     with db.no_autoflush:
+        if kind == "shipping":
+            request = _shipping_query(db).options(selectinload(ShippingRequest.companion_lines).joinedload(
+                ShippingRequestCompanionLine.item)).filter(ShippingRequest.request_id == work_id,
+                    ShippingRequest.status == ShippingRequestStatusEnum.PREPARING).first()
+            if request is None:
+                return None
+            return {**_shipping_summary(request), **dict.fromkeys(PUBLIC_RESERVATION_FIELDS),
+                "shipping_summary": {"invoice_number": request.invoice_number, "companion_lines": [
+                    _shipping_target(line.item, line.quantity, line.unit) for line in request.companion_lines]}}
         if kind == "io":
             batch = db.query(IoBatch).filter(IoBatch.batch_id == work_id, IoBatch.status == "draft").first()
             if batch is None:

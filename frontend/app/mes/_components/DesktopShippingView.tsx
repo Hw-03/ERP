@@ -1,6 +1,7 @@
 "use client";
 import { ReadEmpty, ReadFailure, ReadLoading } from "./common/ReadState";
 import { EmptyState as IllustratedEmptyState } from "./common/EmptyState";
+import { ShippingWorkersEditor, ShippingWorkersInput } from "./ShippingWorkersEditor";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDesktopTabHome } from "./DesktopTabHome";
@@ -44,7 +45,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatBomQuantity } from "@/lib/mes/bomFormat";
 import { processTypeColor } from "@/lib/mes/process";
-import { useRegisterDirty } from "@/lib/ui/dirty-guard";
+import { useConfirmNavigation, useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { QuantityInput } from "./common/QuantityInput";
 import { StatusTargetNotice } from "./common/StatusTargetNotice";
 import { SearchInput } from "./common/SearchInput";
@@ -58,6 +59,7 @@ import { useItemSearch } from "@/lib/queries/useItemSearch";
 import { ApiError } from "@/lib/api-core";
 import {
   buildShippingPayload,
+  isOnlyWorkerNamesChange,
   isValidPositiveInt,
   lineKey,
   requestBomLines,
@@ -234,8 +236,11 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   onGoToWarehouse?: (item: Item, intent: IoEntryIntent) => void;
 }) {
   const router = useRouter();
+  const confirmNavigation = useConfirmNavigation();
   const searchParams = useSearchParams();
   const lastUrlSearchRef = useRef(searchParams.toString());
+  const detailHistoryNavigationRef = useRef<{ search: string; approved: boolean } | null>(null);
+  const [detailHistoryNavigationToken, setDetailHistoryNavigationToken] = useState(0);
   const pendingUrlSearchRef = useRef<PendingUrlSearch | null>(null);
   const postSaveRequestListSearchRef = useRef<string | null>(null);
   const requestWizardPushStackRef = useRef<RequestWizardPushEntry[]>([]);
@@ -290,6 +295,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   const [basePfId, setBasePfId] = useState("");
   const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [workerNames, setWorkerNames] = useState("");
   const [requestedBy, setRequestedBy] = useState("");
   const [requestQuantity, setRequestQuantity] = useState<number | "">(1);
   const [customPaName, setCustomPaName] = useState("");
@@ -398,11 +404,12 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     return view === "historyWork" && selectedHistoryId ? null : historyRows[0] ?? null;
   }, [historyRows, requests, selectedHistoryId, view]);
   const canEditDraft = !selectedRequest || selectedRequest.status === "PREPARING";
-  const inputSignature = JSON.stringify([basePfId, invoiceNumber, requestedBy, requestQuantity, customPaName,
+  const inputSignature = JSON.stringify([basePfId, invoiceNumber, workerNames, requestedBy, requestQuantity, customPaName,
     customPfName, notes, finalizationMode, reusePfItemId, draftLines, companionDraft]);
   const shippingWorkDirty = view === "requestWork" && (savedInputSignature !== null ? inputSignature !== savedInputSignature : (
     basePfId !== (originalRequest?.base_pf_item_id ?? "")
     || invoiceNumber !== (originalRequest?.invoice_number ?? "")
+    || workerNames !== (originalRequest?.worker_names ?? "")
     || requestedBy !== (originalRequest?.requested_by_name ?? operator?.name ?? "")
     || requestQuantity !== (originalRequest?.request_quantity ?? 1)
     || customPaName !== (originalRequest?.custom_pa_name ?? "")
@@ -427,6 +434,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       setSavedInputSignature(null);
       setBasePfId("");
       setInvoiceNumber("");
+      setWorkerNames("");
       setRequestedBy(operator?.name ?? "");
       setRequestQuantity(1);
       setCustomPaName("");
@@ -953,6 +961,29 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         clearRequestWizardHistory();
       }
     }
+    const detailRequestId = view === "requestDetail" ? editingId : view === "prepWork" ? selectedPrepId : view === "historyWork" ? selectedHistoryId : null;
+    const leavesDetail = detailRequestId !== null && (
+      searchParams.get("shippingView") !== view || searchParams.get("shippingRequestId") !== detailRequestId
+    );
+    if (!settledPendingNavigation && currentSearch !== lastUrlSearchRef.current && leavesDetail) {
+      const historyNavigation = detailHistoryNavigationRef.current;
+      if (historyNavigation?.search === currentSearch && historyNavigation.approved) {
+        detailHistoryNavigationRef.current = null;
+      } else {
+        if (historyNavigation && !historyNavigation.approved) return;
+        const previousSearch = lastUrlSearchRef.current;
+        detailHistoryNavigationRef.current = { search: currentSearch, approved: false };
+        confirmNavigation(() => {
+          detailHistoryNavigationRef.current = { search: currentSearch, approved: true };
+          setDetailHistoryNavigationToken((token) => token + 1);
+        }, () => {
+          detailHistoryNavigationRef.current = null;
+          pendingUrlSearchRef.current = { from: currentSearch, to: previousSearch };
+          router.replace(`?${previousSearch}`, { scroll: false });
+        });
+        return;
+      }
+    }
     const postSaveRequestListSearch = postSaveRequestListSearchRef.current;
     if (postSaveRequestListSearch && currentSearch === postSaveRequestListSearch) {
       postSaveRequestListSearchRef.current = null;
@@ -1108,6 +1139,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         setEditingId(found.request_id);
         setBasePfId(found.base_pf_item_id);
         setInvoiceNumber(found.invoice_number ?? "");
+        setWorkerNames(found.worker_names ?? "");
         setRequestedBy(found.requested_by_name ?? "");
         setCustomPaName(found.custom_pa_name ?? "");
         setCustomPfName(found.custom_pf_name ?? "");
@@ -1131,6 +1163,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setSavedInputSignature(null);
     setBasePfId("");
     setInvoiceNumber("");
+    setWorkerNames("");
     setRequestedBy(operator?.name ?? "");
     setRequestWizardStep(nextRequestStep);
     setRequestQuantity(1);
@@ -1148,7 +1181,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   // URL query drives browser back/forward for the shipping subview.
   // Router method identity is not part of the URL state being restored.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, requests, loading, view, historyStatus, editingId, basePfId, requestQuantity, requestWizardStep, matchResult, customPaName, customPfName, ensurePfItemsLoaded, ensureItemsLoaded]);
+  }, [searchParams, requests, loading, view, historyStatus, editingId, basePfId, requestQuantity, requestWizardStep, matchResult, customPaName, customPfName, ensurePfItemsLoaded, ensureItemsLoaded, detailHistoryNavigationToken]);
 
   function clearDraft() {
     setOriginalRequest(null);
@@ -1162,6 +1195,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setEditingId(null);
     setBasePfId("");
     setInvoiceNumber("");
+    setWorkerNames("");
     setRequestedBy(operator?.name ?? "");
     setRequestQuantity(1);
     setCompanionDraft([]);
@@ -1188,6 +1222,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setEditingId(req.request_id);
     setBasePfId(req.base_pf_item_id);
     setInvoiceNumber(req.invoice_number ?? "");
+    setWorkerNames(req.worker_names ?? "");
     setRequestedBy(req.requested_by_name ?? "");
     setCustomPaName(req.custom_pa_name ?? "");
     setCustomPfName(req.custom_pf_name ?? "");
@@ -1275,6 +1310,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     return buildShippingPayload({
       requestQuantity,
       invoiceNumber,
+      workerNames,
       requestedBy,
       operatorName: operator?.name,
       isEditing: Boolean(editingId),
@@ -1308,13 +1344,16 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       const wasNewDraft = editingRequestId === null;
       const payload = draftPayload();
       const saved = editingRequestId
-        ? await api.updateShippingRequest(editingRequestId, payload)
+        ? originalRequest && isOnlyWorkerNamesChange(payload, originalRequest, itemById)
+          ? await api.updateShippingWorkers(editingRequestId, payload.worker_names ?? null)
+          : await api.updateShippingRequest(editingRequestId, payload)
         : await api.createShippingRequest({ base_pf_item_id: basePfId, ...payload });
       await queryClient.cancelQueries({ queryKey: queryKeys.shipping.requests(), exact: true });
       upsertRequest(saved);
       if (editingRequestId) {
         await queryClient.invalidateQueries({ queryKey: queryKeys.shipping.revisions(saved.request_id) });
       }
+      void queryClient.invalidateQueries({ queryKey: queryKeys.stockRequests.all });
       if (!isCurrentRequestDraftGeneration(generation)) return saved;
       setSavedInputSignature(inputSignature);
       requestDraftIdentityRef.current = saved.request_id;
@@ -1356,6 +1395,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
 
   async function ensureRequestReady(generation = requestDraftGenerationRef.current) {
     if (!isCurrentRequestDraftGeneration(generation)) return false;
+    if (originalRequest && isOnlyWorkerNamesChange(draftPayload(), originalRequest, itemById)) return true;
     if (!basePfId) {
       onStatusChange("기준 PF를 먼저 선택하세요.");
       return false;
@@ -1643,8 +1683,8 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         <div className="animate-desktop-navigation-enter">
         <RequestDetailEntry
           request={selectedRequest}
-          onBack={() => navigateView("requestList")}
-          onEdit={(req) => loadRequestIntoDraft(req, "requestWork")}
+          onBack={() => confirmNavigation(() => navigateView("requestList"))}
+          onEdit={(req) => confirmNavigation(() => loadRequestIntoDraft(queryClient.getQueryData<ShippingRequest[]>(queryKeys.shipping.requests())?.find((row) => row.request_id === req.request_id) ?? req, "requestWork"))}
           onDelete={deleteRequest}
           onPrepareComplete={completePrepare}
           onPrepareCancel={cancelPrepare}
@@ -1672,6 +1712,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
             itemOptions={lineItemOptions}
             basePfId={basePfId}
             invoiceNumber={invoiceNumber}
+            workerNames={workerNames}
             requestedBy={editingId ? requestedBy : operator?.name ?? requestedBy}
             requestQuantity={requestQuantity}
             companionDraft={companionDraft}
@@ -1691,6 +1732,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
             onSelectRequest={(req) => loadRequestIntoDraft(req, "requestDetail")}
             onBasePfChange={(value) => void handleBasePfChange(value)}
             onInvoiceNumber={setInvoiceNumber}
+            onWorkerNames={setWorkerNames}
             onRequestedBy={setRequestedBy}
             onRequestQuantity={setRequestQuantity}
             onCustomPaName={setCustomPaName}
@@ -1741,7 +1783,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     if (view === "prepWork") {
       return (
         <div className="flex min-h-0 flex-1 flex-col gap-3">
-          <ViewHeader title="준비 체크" subtitle="구성품 체크 후 준비 완료와 픽업을 처리합니다." onBack={() => navigateView("requestList")} />
+          <ViewHeader title="준비 체크" subtitle="구성품 체크 후 준비 완료와 픽업을 처리합니다." onBack={() => confirmNavigation(() => navigateView("requestList"))} />
           <PrepSection
             showList={false}
             requests={prepRequests}
@@ -1806,7 +1848,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
           dataTestId="shipping-history-view-header"
           title="출하 상세 이력"
           subtitle="최종 PA/PF와 연결 입출고 로그를 확인합니다."
-          onBack={() => navigateView("historyList")}
+          onBack={() => confirmNavigation(() => navigateView("historyList"))}
           right={selectedHistory && (
             <>
               {hasPickedUpSerialNumbers && (
@@ -1818,6 +1860,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
                 </div>
               )}
               <InvoiceNumberEditor request={selectedHistory} onSaved={handleInvoiceSaved} />
+              <ShippingWorkersEditor request={selectedHistory} onSaved={handleInvoiceSaved} />
             </>
           )}
         />
@@ -2047,6 +2090,7 @@ function RequestDetailEntry({ request, onBack, onEdit, onDelete, onPrepareComple
             </button>
             <PanelTitle icon={PackageCheck} title={finalPfName} subtitle={titleSubtitle} />
             <InvoiceNumberEditor request={request} onSaved={onInvoiceSaved} />
+            <ShippingWorkersEditor request={request} onSaved={onInvoiceSaved} />
             <div data-testid="shipping-request-detail-quantity" className="flex min-h-[64px] min-w-[112px] basis-[112px] grow items-center rounded-[14px] border px-3 py-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
               <div className="min-w-0">
                 <div className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>출하 수량</div>
@@ -2190,6 +2234,7 @@ function InvoiceNumberEditor({ request, onSaved }: { request: ShippingRequest; o
 }
 
 const REVISION_FIELD_LABELS: Record<string, string> = {
+  worker_names: "작업자",
   invoice_number: "인보이스 번호",
   base_pf_item_id: "기준 PF",
   request_quantity: "출하 수량",
@@ -2748,6 +2793,7 @@ function RequestSection(props: {
   itemOptions: Item[];
   basePfId: string;
   invoiceNumber: string;
+  workerNames: string;
   requestedBy: string;
   requestQuantity: number | "";
   companionDraft: CompanionDraftLine[];
@@ -2767,6 +2813,7 @@ function RequestSection(props: {
   onSelectRequest: (req: ShippingRequest) => void;
   onBasePfChange: (value: string) => void;
   onInvoiceNumber: (value: string) => void;
+  onWorkerNames: (value: string) => void;
   onRequestedBy: (value: string) => void;
   onRequestQuantity: (value: number | "") => void;
   onCustomPaName: (value: string) => void;
@@ -2985,6 +3032,9 @@ function RequestSection(props: {
                     style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
                     placeholder="인보이스 번호 입력"
                   />
+                </Field>
+                <Field label="작업자 (선택)">
+                  <ShippingWorkersInput aria-label="작업자" maxLength={200} value={props.workerNames} disabled={locked || props.pending !== null} onValueChange={props.onWorkerNames} className={SHIPPING_TEXT_INPUT_CLASS} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }} placeholder="이름 입력 (여러 명 가능)" />
                 </Field>
                 <Field label="PF 검색">
                   <SearchInput
@@ -3359,6 +3409,7 @@ function PrepSection({
 
             <div className="grid gap-3 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
               <InvoiceNumberEditor request={selected} onSaved={onInvoiceSaved} />
+              <ShippingWorkersEditor request={selected} onSaved={onInvoiceSaved} />
               <RevisionHistory request={selected} />
             </div>
             {stockShortages.length > 0 && <StockShortageNotice shortages={stockShortages} kindByItemId={shortageKindByItemId} onPullFromWarehouse={onPullFromWarehouse} />}

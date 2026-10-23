@@ -34,6 +34,13 @@ const other = {
   created_at: "2026-10-22T00:00:00Z", updated_at: "2026-10-22T00:30:00Z",
 };
 const own = { ...other, id: "my-work", requester_employee_id: "emp-1", requester_name: "내 담당자" };
+const shipping = {
+  ...other, kind: "shipping", id: "shipping-work", requester_employee_id: null,
+  requester_name: "영업 요청자", requester_department: "출하", requester_active: false,
+  worker_names: "김철수, 이영희, 박민수", work_type: null, sub_type: null,
+  movement_summary: null,
+  targets: [{ item_id: "final-pf", item_name: "출하할 완제품", mes_code: "4-PF-0010", quantity: 24, unit: "EA" }],
+};
 const props = { layout: "desktop" as const, employeeId: "emp-1", refreshNonce: 0, onContinue: vi.fn(), onChanged: vi.fn() };
 function openAll(): void { fireEvent.click(screen.getByRole("button", { name: "전체 작업" })); }
 
@@ -77,6 +84,47 @@ describe("공유 작업함", () => {
     openAll();
     expect(screen.getByRole("textbox", { name: "전체 작업 검색" })).toHaveValue("");
     expect(state.query).toHaveBeenLastCalledWith("emp-3", { skip: 0, limit: 30 }, null);
+  });
+
+  it.each(["desktop", "mobile"] as const)("%s 출하는 전체 작업에서 작업자와 출하 부서를 표시하고 출하 상세로 연결한다", (layout) => {
+    state.list.data = { items: [shipping, other], total: 2, skip: 0, limit: 30 };
+    state.detail.data = {
+      ...shipping, reservation_status: null, reservation_issue: null, reserved_inputs: null, expected_effects: null, forecast_issue: null,
+      shipping_summary: { invoice_number: "DEXCO-TEST", companion_lines: [
+        { item_id: "battery", item_name: "동반 배터리", mes_code: "BAT-1", quantity: 30, unit: "EA" },
+      ] },
+    };
+    render(<DraftCartPanel {...props} layout={layout} />);
+    expect(screen.queryByText(shipping.worker_names)).not.toBeInTheDocument();
+    openAll();
+    expect(screen.getByText(shipping.worker_names)).toBeVisible();
+    expect(screen.getByText("출하", { exact: true, selector: "p" })).toBeVisible();
+    expect(screen.getByText("출하 준비", { exact: true })).toBeVisible();
+    expect(screen.getByText("픽업 시 출고")).toBeVisible();
+    expect(screen.queryByText(/비활성 담당자/)).not.toBeInTheDocument();
+    expect(screen.queryByText(shipping.requester_name)).not.toBeInTheDocument();
+    expect(screen.getByText(other.requester_name)).toBeVisible();
+    expect(screen.getByText(other.requester_department, { exact: true, selector: "p" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: `${shipping.worker_names} 작업 상세 펼치기` }));
+    expect(screen.getByText(shipping.requester_name)).toBeVisible();
+    expect(screen.getByText("DEXCO-TEST")).toBeVisible();
+    expect(screen.getByText("동반 배터리")).toBeVisible();
+    expect(screen.getByText("30 EA")).toBeVisible();
+    expect(screen.queryByText("이전 요청은 예정 변동 정보를 제공하지 않습니다.")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "출하에서 열기" })).toHaveAttribute("href", "/mes?tab=shipping&shippingView=requestDetail&shippingRequestId=shipping-work");
+  });
+
+  it.each(["desktop", "mobile"] as const)("%s 출하 작업자 미입력은 요청자로 대체하지 않고 표시한다", (layout) => {
+    state.list.data = { items: [{ ...shipping, worker_names: null }], total: 1, skip: 0, limit: 30 };
+    state.detail.data = { ...shipping, worker_names: null, shipping_summary: { invoice_number: null, companion_lines: [] } };
+    render(<DraftCartPanel {...props} layout={layout} />);
+    openAll();
+    expect(screen.getByText("작업자 미입력")).toBeVisible();
+    expect(screen.queryByText(shipping.requester_name)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "작업자 미입력 작업 상세 펼치기" }));
+    expect(screen.getByText(shipping.requester_name)).toBeVisible();
+    expect(screen.getByText("인보이스 미입력")).toBeVisible();
+    expect(screen.getByText("동반 출하품이 없습니다.")).toBeVisible();
   });
 
   it.each(["desktop", "mobile"] as const)("%s 전체 목록은 본인 작업에도 상세 조회만 제공한다", (layout) => {

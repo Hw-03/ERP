@@ -22,6 +22,7 @@ export interface ShippingCompanionLineInput {
 }
 
 export interface ShippingRequestCreatePayload {
+  worker_names?: string | null;
   base_pf_item_id: string;
   finalization_mode?: ShippingFinalizationMode;
   reuse_pf_item_id?: string | null;
@@ -36,6 +37,7 @@ export interface ShippingRequestCreatePayload {
 }
 
 export interface ShippingRequestUpdatePayload {
+  worker_names?: string | null;
   finalization_mode?: ShippingFinalizationMode;
   reuse_pf_item_id?: string | null;
   invoice_number?: string | null;
@@ -217,6 +219,7 @@ export interface ShippingTransactionLog {
   inventory_effect: Array<Record<string, unknown>> | null;
 }
 export interface ShippingRequest {
+  worker_names?: string | null;
   request_id: string;
   status: ShippingRequestStatus;
   base_pf_item_id: string;

@@ -6,7 +6,7 @@ import { MobileShippingDetail } from "../MobileShippingDetail";
 
 vi.mock("@/lib/api", () => ({ api: {
   updateShippingChecklist: vi.fn(), clearShippingChecklist: vi.fn(),
-  updateShippingInvoice: vi.fn(), prepareShippingComplete: vi.fn(),
+  updateShippingInvoice: vi.fn(), updateShippingWorkers: vi.fn(), prepareShippingComplete: vi.fn(),
   completeShippingPickup: vi.fn(), cancelShippingPrepare: vi.fn(),
   cancelShippingPickup: vi.fn(), deleteShippingRequest: vi.fn(),
   getShippingRevisions: vi.fn().mockResolvedValue([]), getItem: vi.fn(),
@@ -39,6 +39,15 @@ function mount(req = request()) {
 beforeEach(() => vi.clearAllMocks());
 
 describe("MobileShippingDetail", () => {
+  it("saves workers separately from the requester and invoice", async () => {
+    vi.mocked(api.updateShippingWorkers).mockResolvedValueOnce(request({ worker_names: "Kim, Lee" }));
+    const { onRequestChange } = mount();
+    fireEvent.change(screen.getByLabelText("작업자"), { target: { value: "Kim, Lee" } });
+    fireEvent.click(screen.getByRole("button", { name: "작업자 저장" }));
+    await waitFor(() => expect(onRequestChange).toHaveBeenCalledWith(expect.objectContaining({ worker_names: "Kim, Lee" })));
+    expect(api.updateShippingInvoice).not.toHaveBeenCalled();
+    expect(api.updateShippingWorkers).toHaveBeenCalledWith("req-1", "Kim, Lee");
+  });
   it("shows a compact status header and keeps extended item details collapsed", () => {
     mount();
     expect(screen.getByRole("heading", { name: "출하 상세" })).toBeInTheDocument();
