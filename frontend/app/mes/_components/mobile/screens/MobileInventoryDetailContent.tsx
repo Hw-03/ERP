@@ -12,12 +12,13 @@ const DETAIL_TABS = ["detail", "history", "aliases"] as const;
 type DetailTab = (typeof DETAIL_TABS)[number];
 
 /** 품목별로 마운트하여 닫기·품목 변경 후 상세 탭부터 시작한다. */
-export function MobileInventoryDetailContent({ item, headerBadge, onGoToWarehouse, canReceive, imageFilename, actionsDisabled }: {
+export function MobileInventoryDetailContent({ item, headerBadge, onGoToWarehouse, canReceive, imageFilename, actionsDisabled, refreshing }: {
   item: Item;
   headerBadge: ReactNode;
   onGoToWarehouse: (item: Item, intent?: IoEntryIntent) => void;
   canReceive?: boolean;
   actionsDisabled?: boolean;
+  refreshing?: boolean;
   imageFilename?: string;
 }): JSX.Element {
   const [active, setActive] = useState<DetailTab>("detail");
@@ -63,7 +64,7 @@ export function MobileInventoryDetailContent({ item, headerBadge, onGoToWarehous
         삭제된 품목입니다. 입출고 작업을 할 수 없습니다.
       </p>}
       <div id={`${id}-detail-panel`} role="tabpanel" aria-labelledby={`${id}-detail`} hidden={active !== "detail"}>
-        <InventoryDetailPanel item={item} onGoToWarehouse={onGoToWarehouse} canReceive={canReceive} actionsDisabled={actionsDisabled} quickActionVariant="mobile" imageFilename={imageFilename} />
+        <InventoryDetailPanel item={item} onGoToWarehouse={onGoToWarehouse} canReceive={canReceive} actionsDisabled={actionsDisabled} refreshing={refreshing} quickActionVariant="mobile" imageFilename={imageFilename} />
       </div>
       {historyVisited && <div id={`${id}-history-panel`} role="tabpanel" aria-labelledby={`${id}-history`} hidden={active !== "history"} className={styles.history}>
         <InventoryRecentHistoryPanel item={item} mobilePresentation />

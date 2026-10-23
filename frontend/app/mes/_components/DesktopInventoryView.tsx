@@ -59,7 +59,7 @@ export function DesktopInventoryView({
   canReceive?: boolean;
 }) {
   // R7-HOOK2: items/loading/error + loadItems 훅으로 분리
-  const { items, setItems, loading, error, refreshError, loadItems } = useInventoryData({
+  const { items, setItems, loading, refreshing, error, refreshError, loadItems } = useInventoryData({
     globalSearch,
     onStatusChange,
   });
@@ -277,6 +277,7 @@ export function DesktopInventoryView({
         onGoToWarehouse={onGoToWarehouse}
         canReceive={canReceive}
         detailLoading={detailOpen && detailStatus === "loading"}
+        refreshing={refreshing}
         detailError={detailError}
         onRetryDetail={() => void retryDetail()}
         actionsDisabled={actionsDisabled}

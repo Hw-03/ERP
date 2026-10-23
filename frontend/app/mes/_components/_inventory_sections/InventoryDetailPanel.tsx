@@ -22,6 +22,7 @@ type Props = {
   onGoToWarehouse: (item: Item, intent?: IoEntryIntent) => void;
   canReceive?: boolean;
   actionsDisabled?: boolean;
+  refreshing?: boolean;
   imageFilename?: string;
   // 항목 3 — 모바일 빠른작업: 출고 빨강 + 서브옵션 전폭. 기본 desktop(현행 유지)이라 데스크톱 호출처 무변경.
   quickActionVariant?: "mobile" | "desktop";
@@ -32,6 +33,7 @@ export function InventoryDetailPanel({
   onGoToWarehouse,
   canReceive = false,
   actionsDisabled = false,
+  refreshing = false,
   imageFilename,
   quickActionVariant = "desktop",
 }: Props) {
@@ -106,7 +108,7 @@ export function InventoryDetailPanel({
         />
       )}
       {/* 수량 현황 */}
-      <InventoryWorkStatusPanel key={item.item_id} item={item} mobile={mobile}>
+      <InventoryWorkStatusPanel key={item.item_id} item={item} mobile={mobile} refreshing={refreshing}>
         {item.supplier && <section data-panel-scroll-card={!mobile || undefined} className={mobile ? "rounded-[20px] border px-3 py-2" : "rounded-[28px] border p-4"}
           style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
           <p className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>공급처</p><p className="mt-1 break-words text-sm">{item.supplier}</p>

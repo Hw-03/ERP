@@ -26,9 +26,28 @@ const status: InventoryWorkStatus = {
   }],
 };
 
-beforeEach(() => { state.data = structuredClone(status); state.isPending = false; state.isError = false; state.refetch.mockReset(); });
+beforeEach(() => { state.data = structuredClone(status); item.work_reservations = state.data.summary; state.isPending = false; state.isError = false; state.refetch.mockReset(); });
 
 describe("대시보드 선택 품목 작업 현황", () => {
+  it("재고 갱신 중에도 이전 수량을 유지하며 진행 상태를 알린다", () => {
+    const { rerender } = render(<InventoryWorkStatusPanel item={item} refreshing />);
+    expect(screen.getByRole("group", { name: "수량 현황" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("status")).toHaveTextContent("재고 수량을 갱신하는 중");
+    expect(screen.getByText("예약 재고").parentElement).toHaveTextContent("7");
+    rerender(<InventoryWorkStatusPanel item={item} />);
+    expect(screen.queryByText("재고 수량을 갱신하는 중")).toBeNull();
+  });
+  it("작업 현황 응답이 먼저 갱신돼도 수량은 전달된 품목과 함께 바뀐다", () => {
+    const previous = { ...item, work_reservations: { ...status.summary, work_reserved_quantity: 1, approval_reserved_quantity: 0, shipping_reserved_quantity: 0, expected_in_quantity: 2 } };
+    const current = { ...item, available_quantity: 1, work_reservations: { ...status.summary, work_reserved_quantity: 3, approval_reserved_quantity: 0, shipping_reserved_quantity: 0, expected_in_quantity: 4 } };
+    const { rerender } = render(<InventoryWorkStatusPanel item={previous} />);
+    expect(screen.getByText("예약 재고").parentElement).toHaveTextContent("1");
+    expect(screen.getByText("입고 예정").parentElement).toHaveTextContent("2");
+    rerender(<InventoryWorkStatusPanel item={current} />);
+    expect(screen.getByText("사용 가능 재고").parentElement).toHaveTextContent("1");
+    expect(screen.getByText("예약 재고").parentElement).toHaveTextContent("3");
+    expect(screen.getByText("입고 예정").parentElement).toHaveTextContent("4");
+  });
   it.each([false, true])("선택 품목의 입출고·이동은 요약에만 표시하고 추가 품목은 상세에 둔다 (mobile=%s)", (mobile) => {
     const work = state.data!.works[0];
     work.reserved_inputs.push({ ...work.reserved_inputs[0], quantity: 2, source: "draft", location: { bucket: "production", department: "튜닝" } });
@@ -140,7 +159,7 @@ describe("대시보드 선택 품목 작업 현황", () => {
 
   it("미제공·실패를 0으로 단정하지 않고 재시도한다", () => {
     state.data = undefined; state.isError = true;
-    render(<InventoryWorkStatusPanel item={item} />);
+    render(<InventoryWorkStatusPanel item={{ ...item, work_reservations: undefined }} />);
     expect(screen.getByText(/예약·예정 정보를 확인할 수 없습니다/)).toBeInTheDocument();
     expect(screen.queryByText("0")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /다시/ }));
@@ -190,11 +209,11 @@ describe("대시보드 선택 품목 작업 현황", () => {
     expect(screen.getByRole("status")).toHaveTextContent("확인 가능한 예정량만 표시합니다.");
   });
 
-  it("다른 품목의 이전 응답을 수량과 관련 작업에 섞지 않는다", () => {
+  it("다른 품목의 이전 작업 응답이 있어도 현재 품목의 수량을 유지한다", () => {
     state.data!.item_id = "previous-item";
     render(<InventoryWorkStatusPanel item={item} />);
-    expect(screen.getByText("예약 재고").parentElement).toHaveTextContent("-");
-    expect(screen.getByText("입고 예정").parentElement).toHaveTextContent("-");
+    expect(screen.getByText("예약 재고").parentElement).toHaveTextContent("7");
+    expect(screen.getByText("입고 예정").parentElement).toHaveTextContent("8");
     expect(screen.queryByText("김담당")).toBeNull();
   });
 

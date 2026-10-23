@@ -69,7 +69,7 @@ export function MobileDashboardScreen({
   onCapacityClick?: () => void;
   canReceive?: boolean;
 }) {
-  const { items, loading, error, refreshError, loadItems } = useInventoryData({
+  const { items, loading, refreshing, error, refreshError, loadItems } = useInventoryData({
     globalSearch,
     onStatusChange,
   });
@@ -344,6 +344,7 @@ export function MobileDashboardScreen({
         {detailError && <ReadFailure message={detailError} onRetry={() => void retryDetail()} refresh={!!displayItem} />}
         {detailOpen && displayItem && (
           <MobileInventoryDetailContent
+            refreshing={refreshing}
             key={displayItem.item_id}
             item={displayItem}
             headerBadge={headerBadge}

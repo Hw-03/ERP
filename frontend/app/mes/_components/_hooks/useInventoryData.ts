@@ -31,6 +31,7 @@ export interface UseInventoryDataResult {
   items: Item[];
   setItems: React.Dispatch<React.SetStateAction<Item[]>>;
   loading: boolean;
+  refreshing: boolean;
   error: string | null;
   refreshError: string | null;
   loadItems: () => Promise<void>;
@@ -81,6 +82,7 @@ export function useInventoryData(opts: UseInventoryDataOptions): UseInventoryDat
     items,
     setItems,
     loading: query.isLoading,
+    refreshing: query.isFetching && query.data !== undefined,
     error: query.data === undefined ? error : null,
     refreshError,
     loadItems,

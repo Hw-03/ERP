@@ -21,6 +21,28 @@ const payload = { employeeId: "employee", workType: "process" as const, subType:
 beforeEach(() => { vi.resetAllMocks(); vi.mocked(api.getBatch).mockResolvedValue(draft); vi.mocked(api.saveDraft).mockResolvedValue(saved); });
 afterEach(() => { clients.splice(0).forEach((client) => client.clear()); });
 
+it.each([undefined, { throwOnError: true }])("예약 변경은 캐시 없는 최초 재고·작업 현황 요청도 새로 조회한다 (%j)", async (options) => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  clients.push(client);
+  const reads = [queryKeys.items.list({ limit: 2000 }), queryKeys.inventory.workStatus("material")].map((queryKey) => {
+    let finish!: (value: number) => void;
+    const queryFn = vi.fn<() => Promise<number>>().mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; })).mockResolvedValue(5);
+    const observer = new QueryObserver(client, { queryKey, queryFn });
+    return { queryKey, queryFn, finish: () => finish(3), unsubscribe: observer.subscribe(() => {}) };
+  });
+  try {
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const refresh = invalidateWorkReservationQueries(client, options);
+    await waitFor(() => expect(invalidate).toHaveBeenCalledTimes(4));
+    reads.forEach((read) => read.finish());
+    await refresh;
+    reads.forEach((read) => {
+      expect(read.queryFn).toHaveBeenCalledTimes(2);
+      expect(client.getQueryData(read.queryKey)).toBe(5);
+    });
+  } finally { reads.forEach((read) => read.unsubscribe()); }
+});
+
 it.each([false, true])("실제 QueryClient 재고 갱신 실패=%s: 확정 저장은 유지하고 실패한 옛 재고에는 새 예약을 가산하지 않는다", async (fails) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   clients.push(client);

@@ -59,13 +59,21 @@ export function useInventoryViewState(items: Item[]): InventoryViewResult {
   if (state !== storedState) setState(state);
   const stateRef = useRef(state);
   stateRef.current = state;
-  const lastItemRef = useRef<{ scopeKey: string; item: Item } | null>(null);
-  const query = useItemQuery(state.detailOpen ? state.selectedItemId : null, { refetchOnMount: "always" });
-  const queriedItem = query.data?.item_id === state.selectedItemId ? query.data : null;
+  const lastItemRef = useRef<{ scopeKey: string; item: Item; listedItem: Item | null; detailUpdatedAt: number } | null>(null);
   const listedItem = items.find((item) => item.item_id === state.selectedItemId) ?? null;
-  if (queriedItem) lastItemRef.current = { scopeKey, item: queriedItem };
-  const lastItem = lastItemRef.current?.scopeKey === scopeKey && lastItemRef.current.item.item_id === state.selectedItemId ? lastItemRef.current.item : null;
-  const displayItem = queriedItem ?? lastItem ?? listedItem;
+  const lastSnapshot = lastItemRef.current?.scopeKey === scopeKey && lastItemRef.current.item.item_id === state.selectedItemId ? lastItemRef.current : null;
+  const latestListRef = useRef<Item | null>(null);
+  const detailReadListRef = useRef<Item | null>(null);
+  latestListRef.current = listedItem ?? lastSnapshot?.listedItem ?? null;
+  const query = useItemQuery(state.detailOpen ? state.selectedItemId : null, {
+    refetchOnMount: "always",
+    onRead: () => { detailReadListRef.current = latestListRef.current; },
+  });
+  const queriedItem = query.data?.item_id === state.selectedItemId ? query.data : null;
+  const refreshedDetail = query.dataUpdatedAt !== lastSnapshot?.detailUpdatedAt && detailReadListRef.current === latestListRef.current ? queriedItem : null;
+  // 목록의 수량을 함께 표시하되 단건 삭제 판정과 목록 밖의 최신 상세는 유지한다.
+  const displayItem = queriedItem?.deleted_at ? queriedItem : listedItem ?? refreshedDetail ?? lastSnapshot?.item ?? queriedItem;
+  if (displayItem) lastItemRef.current = { scopeKey, item: displayItem, listedItem: latestListRef.current, detailUpdatedAt: query.dataUpdatedAt };
 
   const commit = useCallback((patch: Partial<Pick<InventoryViewSnapshot, "search" | "selectedItemId" | "detailOpen">>): void => {
     const next = { ...stateRef.current, ...patch };
@@ -85,7 +93,7 @@ export function useInventoryViewState(items: Item[]): InventoryViewResult {
       commit({ detailOpen: false });
       return;
     }
-    lastItemRef.current = { scopeKey: stateRef.current.scopeKey, item };
+    lastItemRef.current = { scopeKey: stateRef.current.scopeKey, item, listedItem: item, detailUpdatedAt: 0 };
     commit({ selectedItemId: item.item_id, detailOpen: true });
   }, [commit]);
   const closeDetail = useCallback((): void => commit({ detailOpen: false }), [commit]);
