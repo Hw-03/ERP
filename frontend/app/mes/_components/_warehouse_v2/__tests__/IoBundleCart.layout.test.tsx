@@ -92,7 +92,7 @@ describe("IoBundleCart layout", () => {
     },
   );
 
-  it("PC 수량 목록은 기존 스크롤 요소에 카드를 직접 배치한다", () => {
+  it("PC 수량 목록은 고정된 둥근 프레임 안에서 스크롤하고 메모와 버튼 간격을 통일한다", () => {
     const { container } = render(
       <IoBundleCart
         bundles={[bundle]}
@@ -108,7 +108,11 @@ describe("IoBundleCart layout", () => {
       />,
     );
 
-    expect(container.querySelector("[data-io-cart-shell]")).not.toBeInTheDocument();
+    expect(container.querySelector("[data-io-cart]")).toHaveClass("gap-2");
+    expect(container.querySelector("[data-io-cart-shell]")).toHaveClass("min-h-0", "flex-1", "overflow-hidden", "rounded-[20px]");
+    expect(container.querySelector("[data-io-cart-frame]")).toHaveClass("absolute", "inset-0", "rounded-[20px]");
+    expect(container.querySelector("[data-io-cart-list]")).toHaveClass("h-full", "overflow-y-auto");
+    expect(container.querySelector("[data-io-cart-actions]")).toHaveClass("gap-2", "lg:pt-0");
     expect(container.querySelector("[data-io-cart-list] [data-io-line]")).toBeInTheDocument();
   });
 

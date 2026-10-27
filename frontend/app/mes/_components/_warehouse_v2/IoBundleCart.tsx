@@ -117,7 +117,7 @@ export function IoBundleCart({
   ));
 
   return (
-    <div data-io-cart className="flex h-full min-h-0 flex-col gap-4">
+    <div data-io-cart className={`flex h-full min-h-0 flex-col ${mobilePresentation ? "gap-4" : "gap-2"}`}>
       {bundles.length === 0 ? (
         <EmptyState
           illustrated
@@ -143,8 +143,11 @@ export function IoBundleCart({
           </div>
         </div>
       ) : (
-        <div data-keep-scroll data-io-cart-list className="sg min-h-0 flex-1 space-y-3 overflow-y-auto pr-1" style={{ overscrollBehavior: "contain" }}>
-          {bundleCards}
+        <div data-io-cart-shell className="relative min-h-0 flex-1 overflow-hidden rounded-[20px]">
+          <div data-keep-scroll data-io-cart-list className="sg h-full space-y-3 overflow-y-auto pr-1" style={{ overscrollBehavior: "contain" }}>
+            {bundleCards}
+          </div>
+          <div data-io-cart-frame aria-hidden className="pointer-events-none absolute inset-0 z-20 rounded-[20px] border" style={{ borderColor: LEGACY_COLORS.border }} />
         </div>
       )}
 
@@ -154,7 +157,7 @@ export function IoBundleCart({
       {bundles.length > 0 && (
         // 항목 13 — 모바일은 하단 고정(sticky), 데스크톱(lg)은 기존 mt-auto 정적 배치 그대로.
         // 항목 4-7C — 모바일 띠 배경/상단선 제거(저장·제출확인 버튼만 떠 보이게).
-        <div data-io-cart-actions className="sticky bottom-0 z-20 -mx-3 mt-auto flex flex-col gap-2 bg-[var(--c-bg)] px-4 pb-0 pt-2 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-1">
+        <div data-io-cart-actions className="sticky bottom-0 z-20 -mx-3 mt-auto flex flex-col gap-2 bg-[var(--c-bg)] px-4 pb-0 pt-2 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-0">
           {footerNotice}
           {!canAdvance && hasShortage && !(pullEnabled && onPullFromWarehouse) && (
             <p className="text-center text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
