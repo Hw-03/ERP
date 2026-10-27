@@ -119,8 +119,28 @@ export function useHistoryGroups({
   const hasSuccessfulLoadRef = useRef(initialCached !== undefined);
   const loadedPageCountRef = useRef(1);
   const loadedTailGroupKeyRef = useRef(initialCached?.groups.at(-1)?.key ?? null);
+  const inFlightLoadRef = useRef<{ identity: string } | null>(null);
+  const pendingRevisionRef = useRef(false);
+
+  useEffect(() => () => {
+    generationRef.current += 1;
+    pendingRevisionRef.current = false;
+    inFlightLoadRef.current = null;
+  }, [queryIdentity, queryClient]);
 
   useEffect(() => {
+    // Complete one cursor chain before following the latest revision; repeated aborts
+    // otherwise restart a slow server read without ever publishing current rows.
+    if (inFlightLoadRef.current?.identity === queryIdentity
+      && retryQueryIdentityRef.current !== queryIdentity
+      && refreshRetryQueryIdentityRef.current !== queryIdentity
+      && refreshLoadedQueryIdentityRef.current !== queryIdentity) {
+      pendingRevisionRef.current = true;
+      return;
+    }
+    const load = { identity: queryIdentity };
+    inFlightLoadRef.current = load;
+    pendingRevisionRef.current = false;
     const generation = generationRef.current + 1;
     generationRef.current = generation;
     loadingRef.current = true;
@@ -159,11 +179,19 @@ export function useHistoryGroups({
       const refreshedPages: TransactionDisplayGroupPage[] = [];
       let nextParams = params;
       for (let pageIndex = 0; ; pageIndex += 1) {
+        if (generationRef.current !== generation) return [];
         const pageQueryKey = [...queryKeys.transactions.displayGroups(nextParams), ...(searchConfig.version ? [searchConfig.version] : [])];
         if (revisionChanged || isRefreshRetry || isExplicitRefresh) {
-          await queryClient.cancelQueries({ queryKey: pageQueryKey, exact: true });
+          // Another screen may share this read. Finish it before fetching fresh data;
+          // its failure must not prevent the requested refresh from being attempted.
+          const sharedRead = queryClient.getQueryCache().find({ queryKey: pageQueryKey, exact: true });
+          if (sharedRead && sharedRead.state.fetchStatus !== "idle") {
+            await sharedRead.promise?.catch(() => undefined);
+          }
+          if (generationRef.current !== generation) return [];
           await queryClient.invalidateQueries({ queryKey: pageQueryKey, exact: true, refetchType: "none" });
         }
+        if (generationRef.current !== generation) return [];
         const page = await queryClient.fetchQuery({
           queryKey: pageQueryKey,
           queryFn: ({ signal }) => productionApi.getTransactionDisplayGroups(nextParams, { signal }),
@@ -195,6 +223,7 @@ export function useHistoryGroups({
       setLoading(false);
     }).catch(async (caught: unknown) => {
       if (generationRef.current !== generation || queryIdentityRef.current !== queryIdentity) return;
+      if (pendingRevisionRef.current) return;
       if (caught instanceof ApiError && caught.code === "SEARCH_CONFIG_STALE") {
         cursorRef.current = null;
         loadedPageCountRef.current = 1;
@@ -213,6 +242,14 @@ export function useHistoryGroups({
       else setError(message);
       loadingRef.current = false;
       setLoading(false);
+    }).finally(() => {
+      if (inFlightLoadRef.current !== load) return;
+      inFlightLoadRef.current = null;
+      if (pendingRevisionRef.current) {
+        pendingRevisionRef.current = false;
+        refreshRetryQueryIdentityRef.current = queryIdentity;
+        setRefreshRetryNonce((value) => value + 1);
+      }
     });
     // queryIdentity contains every primitive query condition.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -250,8 +287,9 @@ export function useHistoryGroups({
     setLoadMoreError(null);
     try {
       const params = pageParams(cursor);
+      const pageQueryKey = [...queryKeys.transactions.displayGroups(params), ...(searchConfig.version ? [searchConfig.version] : [])];
       const page = await queryClient.fetchQuery({
-        queryKey: [...queryKeys.transactions.displayGroups(params), ...(searchConfig.version ? [searchConfig.version] : [])],
+        queryKey: pageQueryKey,
         queryFn: ({ signal }) => productionApi.getTransactionDisplayGroups(params, { signal }),
         staleTime: STALE_TIME.VOLATILE,
       });

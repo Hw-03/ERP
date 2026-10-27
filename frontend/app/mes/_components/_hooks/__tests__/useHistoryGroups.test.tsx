@@ -54,6 +54,211 @@ afterEach(() => {
 });
 
 describe("useHistoryGroups", () => {
+  it.each(["unmount", "filter"])("keeps a shared first-page read alive after another consumer's %s", async (change) => {
+    const sharedRequest = deferred<Response>();
+    let sharedSignal: AbortSignal | undefined;
+    const page = { groups: [makeGroup(1)], next_cursor: null, has_more: false };
+    const changedPage = { groups: [makeGroup(2)], next_cursor: null, has_more: false };
+    const fetchSpy = vi.fn()
+      .mockImplementationOnce((_input: RequestInfo | URL, init?: RequestInit) => {
+        sharedSignal = init?.signal ?? undefined;
+        return sharedRequest.promise;
+      })
+      .mockResolvedValue(makeResponse(changedPage));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = makeWrapper(client);
+    const first = renderHook(({ department }) => useHistoryGroups({ ...baseArgs, department }), {
+      initialProps: { department: "" }, wrapper,
+    });
+    const second = renderHook(() => useHistoryGroups(baseArgs), { wrapper });
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+
+    if (change === "unmount") first.unmount();
+    else first.rerender({ department: "assembly" });
+    expect(sharedSignal?.aborted).toBe(false);
+    await act(async () => sharedRequest.resolve(makeResponse(page)));
+    await waitFor(() => expect(second.result.current.groups).toEqual(page.groups));
+    expect(second.result.current.error).toBeNull();
+    expect(second.result.current.loading).toBe(false);
+    if (change === "filter") {
+      await waitFor(() => expect(first.result.current.groups).toEqual(changedPage.groups));
+    }
+    expect(fetchSpy).toHaveBeenCalledTimes(change === "unmount" ? 1 : 2);
+  });
+
+  it.each(["unmount", "filter"])("keeps a shared load-more read alive after another consumer's %s", async (change) => {
+    const sharedMore = deferred<Response>();
+    let moreSignal: AbortSignal | undefined;
+    const firstPage = { groups: [makeGroup(0)], next_cursor: "shared-tail", has_more: true };
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse(firstPage))
+      .mockImplementationOnce((_input: RequestInfo | URL, init?: RequestInit) => {
+        moreSignal = init?.signal ?? undefined;
+        return sharedMore.promise;
+      })
+      .mockResolvedValue(makeResponse({ groups: [makeGroup(2)], next_cursor: null, has_more: false }));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = makeWrapper(client);
+    const first = renderHook(({ department }) => useHistoryGroups({ ...baseArgs, department }), {
+      initialProps: { department: "" }, wrapper,
+    });
+    const second = renderHook(() => useHistoryGroups(baseArgs), { wrapper });
+    await waitFor(() => {
+      expect(first.result.current.loading).toBe(false);
+      expect(second.result.current.loading).toBe(false);
+    });
+    let firstMore!: Promise<void>;
+    let secondMore!: Promise<void>;
+    act(() => {
+      firstMore = first.result.current.loadMore();
+      secondMore = second.result.current.loadMore();
+    });
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+
+    if (change === "unmount") first.unmount();
+    else first.rerender({ department: "assembly" });
+    expect(moreSignal?.aborted).toBe(false);
+    await act(async () => {
+      sharedMore.resolve(makeResponse({ groups: [makeGroup(1)], next_cursor: null, has_more: false }));
+      await Promise.all([firstMore, secondMore]);
+    });
+    expect(second.result.current.groups).toEqual([makeGroup(0), makeGroup(1)]);
+    expect(second.result.current.loadMoreError).toBeNull();
+    expect(second.result.current.canLoadMore).toBe(false);
+    if (change === "filter") {
+      await waitFor(() => expect(first.result.current.groups).toEqual([makeGroup(2)]));
+    }
+  });
+
+  it.each(["manual", "revision", "both"])("waits for another consumer's read before a %s refresh", async (refresh) => {
+    const sharedRequest = deferred<Response>();
+    const freshRequest = deferred<Response>();
+    let sharedSignal: AbortSignal | undefined;
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse({ groups: [makeGroup(0)], next_cursor: null, has_more: false }))
+      .mockImplementationOnce((_input: RequestInfo | URL, init?: RequestInit) => {
+        sharedSignal = init?.signal ?? undefined;
+        return sharedRequest.promise;
+      })
+      .mockReturnValueOnce(freshRequest.promise);
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = makeWrapper(client);
+    const first = renderHook(({ realtimeRevision }) => useHistoryGroups({ ...baseArgs, realtimeRevision }), {
+      initialProps: { realtimeRevision: 1 }, wrapper,
+    });
+    await waitFor(() => expect(first.result.current.loading).toBe(false));
+    await client.invalidateQueries({ refetchType: "none" });
+    const second = renderHook(() => useHistoryGroups({ ...baseArgs, realtimeRevision: 1 }), { wrapper });
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+
+    if (refresh === "revision") first.rerender({ realtimeRevision: 2 });
+    else act(() => {
+      first.result.current.refreshLoaded();
+      if (refresh === "both") second.result.current.refreshLoaded();
+    });
+    await act(async () => {});
+    expect(sharedSignal?.aborted).toBe(false);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    await act(async () => sharedRequest.resolve(makeResponse({ groups: [makeGroup(1)], next_cursor: null, has_more: false })));
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(3));
+    if (refresh !== "both") {
+      await waitFor(() => expect(second.result.current.groups).toEqual([makeGroup(1)]));
+      expect(second.result.current.refreshError).toBeNull();
+    }
+    await act(async () => freshRequest.resolve(makeResponse({ groups: [makeGroup(2)], next_cursor: null, has_more: false })));
+    await waitFor(() => expect(first.result.current.groups).toEqual([makeGroup(2)]));
+    if (refresh === "both") {
+      await waitFor(() => expect(second.result.current.groups).toEqual([makeGroup(2)]));
+    }
+    expect(first.result.current.refreshError).toBeNull();
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([true, false])("performs the requested refresh after a shared read fails (fresh success: %s)", async (freshSuccess) => {
+    const failedRequest = deferred<Response>();
+    const fetchSpy = vi.fn()
+      .mockReturnValueOnce(failedRequest.promise)
+      .mockResolvedValueOnce(makeResponse(freshSuccess
+        ? { groups: [makeGroup(2)], next_cursor: null, has_more: false }
+        : { detail: "fresh read failed" }, freshSuccess));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = makeWrapper(client);
+    const first = renderHook(() => useHistoryGroups(baseArgs), { wrapper });
+    const second = renderHook(() => useHistoryGroups(baseArgs), { wrapper });
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+    act(() => first.result.current.refreshLoaded());
+    await act(async () => {});
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    await act(async () => failedRequest.resolve(makeResponse({ detail: "old read failed" }, false)));
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(first.result.current.loading).toBe(false));
+    expect(second.result.current.error).toContain("old read failed");
+    if (freshSuccess) {
+      expect(first.result.current.groups).toEqual([makeGroup(2)]);
+      expect(first.result.current.error).toBeNull();
+    } else expect(first.result.current.error).toContain("fresh read failed");
+  });
+
+  it.each(["unmount", "filter"])("abandons a waiting refresh after its consumer's %s", async (change) => {
+    const sharedRequest = deferred<Response>();
+    const fetchSpy = vi.fn()
+      .mockReturnValueOnce(sharedRequest.promise)
+      .mockResolvedValue(makeResponse({ groups: [makeGroup(2)], next_cursor: null, has_more: false }));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = makeWrapper(client);
+    const first = renderHook(({ department }) => useHistoryGroups({ ...baseArgs, department }), {
+      initialProps: { department: "" }, wrapper,
+    });
+    const second = renderHook(() => useHistoryGroups(baseArgs), { wrapper });
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+    act(() => first.result.current.refreshLoaded());
+    await act(async () => {});
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    if (change === "unmount") first.unmount();
+    else first.rerender({ department: "assembly" });
+
+    await act(async () => sharedRequest.resolve(makeResponse({ groups: [makeGroup(1)], next_cursor: "unused-tail", has_more: true })));
+    await waitFor(() => expect(second.result.current.groups).toEqual([makeGroup(1)]));
+    if (change === "filter") {
+      await waitFor(() => expect(first.result.current.groups).toEqual([makeGroup(2)]));
+    }
+    expect(fetchSpy).toHaveBeenCalledTimes(change === "unmount" ? 1 : 2);
+    expect(second.result.current.error).toBeNull();
+  });
+
+  it("caches a completed shared request even after all consumers unmount", async () => {
+    const sharedRequest = deferred<Response>();
+    let sharedSignal: AbortSignal | undefined;
+    const fetchSpy = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      sharedSignal = init?.signal ?? undefined;
+      return sharedRequest.promise;
+    });
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 60_000 } } });
+    const wrapper = makeWrapper(client);
+    const first = renderHook(() => useHistoryGroups(baseArgs), { wrapper });
+    const second = renderHook(() => useHistoryGroups(baseArgs), { wrapper });
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+    first.unmount();
+    second.unmount();
+    expect(sharedSignal?.aborted).toBe(false);
+    const page = { groups: [makeGroup(3)], next_cursor: null, has_more: false };
+    await act(async () => sharedRequest.resolve(makeResponse(page)));
+    await waitFor(() => expect(client.getQueryCache().getAll()[0].state.status).toBe("success"));
+
+    const remounted = renderHook(() => useHistoryGroups(baseArgs), { wrapper, reactStrictMode: true });
+    expect(remounted.result.current.groups).toEqual(page.groups);
+    expect(remounted.result.current.loading).toBe(false);
+    await act(async () => {});
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
   it("restores the current search-version cache immediately on remount", async () => {
     searchState.version = 4;
     const page = { groups: [makeGroup(4)], next_cursor: null, has_more: false };
@@ -215,7 +420,7 @@ describe("useHistoryGroups", () => {
     await act(async () => {});
   });
 
-  it("cancels an in-flight same-key group request before a realtime revision refresh", async () => {
+  it("coalesces revisions during a slow same-key read and refreshes once after it completes", async () => {
     const staleRequest = deferred<Response>();
     const freshRequest = deferred<Response>();
     let staleSignal: AbortSignal | null = null;
@@ -239,14 +444,137 @@ describe("useHistoryGroups", () => {
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
 
     rerender({ realtimeRevision: 2 });
+    rerender({ realtimeRevision: 3 });
+    rerender({ realtimeRevision: 4 });
 
+    await act(async () => {});
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(staleSignal?.aborted).toBe(false);
+    await act(async () => staleRequest.resolve(makeResponse(firstPage)));
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
-    expect(staleSignal?.aborted).toBe(true);
+    expect(result.current.groups).toEqual(firstPage.groups);
     await act(async () => freshRequest.resolve(makeResponse(refreshedPage)));
     await waitFor(() => expect(result.current.groups).toEqual(refreshedPage.groups));
-
-    await act(async () => staleRequest.resolve(makeResponse(firstPage)));
+    rerender({ realtimeRevision: 4 });
+    await act(async () => {});
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
     expect(result.current.groups).toEqual(refreshedPage.groups);
+  });
+
+  it("finishes the loaded cursor depth before catching up with the newest pending revision", async () => {
+    const slowTail = deferred<Response>();
+    const newestTail = deferred<Response>();
+    let slowSignal: AbortSignal | undefined;
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse({ groups: [makeGroup(0)], next_cursor: "initial-tail", has_more: true }))
+      .mockResolvedValueOnce(makeResponse({ groups: [makeGroup(1)], next_cursor: null, has_more: false }))
+      .mockResolvedValueOnce(makeResponse({ groups: [makeGroup(10)], next_cursor: "slow-tail", has_more: true }))
+      .mockImplementationOnce((_input: RequestInfo | URL, init?: RequestInit) => {
+        slowSignal = init?.signal ?? undefined;
+        return slowTail.promise;
+      })
+      .mockResolvedValueOnce(makeResponse({ groups: [makeGroup(20)], next_cursor: "newest-tail", has_more: true }))
+      .mockReturnValueOnce(newestTail.promise);
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    const { result, rerender } = renderHook(
+      ({ realtimeRevision }) => useHistoryGroups({ ...baseArgs, realtimeRevision }),
+      { initialProps: { realtimeRevision: 1 }, wrapper: makeWrapper(client) },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => result.current.loadMore());
+    rerender({ realtimeRevision: 2 });
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(4));
+    rerender({ realtimeRevision: 3 });
+    rerender({ realtimeRevision: 4 });
+    await act(async () => {});
+    expect(fetchSpy).toHaveBeenCalledTimes(4);
+    expect(slowSignal?.aborted).toBe(false);
+    expect(result.current.groups).toEqual([makeGroup(0), makeGroup(1)]);
+    await act(async () => slowTail.resolve(makeResponse({ groups: [makeGroup(1)], next_cursor: null, has_more: false })));
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(6));
+    expect(String(fetchSpy.mock.calls[5][0])).toContain("cursor=newest-tail");
+    expect(result.current.groups).toEqual([makeGroup(10), makeGroup(1)]);
+    await act(async () => newestTail.resolve(makeResponse({ groups: [makeGroup(1)], next_cursor: null, has_more: false })));
+    await waitFor(() => expect(result.current.groups).toEqual([makeGroup(20), makeGroup(1)]));
+    expect(result.current.refreshError).toBeNull();
+  });
+
+  it("drops a queued revision refresh without aborting reads on filter changes or unmount", async () => {
+    const oldRequest = deferred<Response>();
+    const changedRequest = deferred<Response>();
+    const signals: AbortSignal[] = [];
+    const fetchSpy = vi.fn()
+      .mockImplementationOnce((_input: RequestInfo | URL, init?: RequestInit) => {
+        signals.push(init?.signal as AbortSignal);
+        return oldRequest.promise;
+      })
+      .mockImplementationOnce((_input: RequestInfo | URL, init?: RequestInit) => {
+        signals.push(init?.signal as AbortSignal);
+        return changedRequest.promise;
+      });
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    const { rerender, unmount } = renderHook(
+      ({ department, realtimeRevision }) => useHistoryGroups({ ...baseArgs, department, realtimeRevision }),
+      { initialProps: { department: "", realtimeRevision: 1 }, wrapper: makeWrapper(client) },
+    );
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+    rerender({ department: "", realtimeRevision: 2 });
+    rerender({ department: "조립", realtimeRevision: 2 });
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+    expect(signals[0].aborted).toBe(false);
+    unmount();
+    expect(signals[1].aborted).toBe(false);
+    await act(async () => {
+      oldRequest.resolve(makeResponse({ groups: [makeGroup(1)], next_cursor: "obsolete-tail", has_more: true }));
+      changedRequest.resolve(makeResponse({ groups: [makeGroup(2)], next_cursor: null, has_more: false }));
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("follows the pending latest revision after a slow refresh fails", async () => {
+    const failedRefresh = deferred<Response>();
+    const newestRefresh = deferred<Response>();
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse({ groups: [makeGroup(0)], next_cursor: null, has_more: false }))
+      .mockReturnValueOnce(failedRefresh.promise)
+      .mockReturnValueOnce(newestRefresh.promise);
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    const { result, rerender } = renderHook(
+      ({ realtimeRevision }) => useHistoryGroups({ ...baseArgs, realtimeRevision }),
+      { initialProps: { realtimeRevision: 1 }, wrapper: makeWrapper(client) },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    rerender({ realtimeRevision: 2 });
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+    rerender({ realtimeRevision: 3 });
+    await act(async () => failedRefresh.resolve(makeResponse({ detail: "지난 revision 조회 실패" }, false)));
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(3));
+    expect(result.current.groups).toEqual([makeGroup(0)]);
+    expect(result.current.refreshError).toBeNull();
+    await act(async () => newestRefresh.resolve(makeResponse({ groups: [makeGroup(3)], next_cursor: null, has_more: false })));
+    await waitFor(() => expect(result.current.groups).toEqual([makeGroup(3)]));
+  });
+
+  it("still reads a fresh response when queued revisions return to the original revision", async () => {
+    const oldRequest = deferred<Response>();
+    const fetchSpy = vi.fn()
+      .mockReturnValueOnce(oldRequest.promise)
+      .mockResolvedValueOnce(makeResponse({ groups: [makeGroup(2)], next_cursor: null, has_more: false }));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000, gcTime: 0 } } });
+    const { result, rerender } = renderHook(
+      ({ realtimeRevision }) => useHistoryGroups({ ...baseArgs, realtimeRevision }),
+      { initialProps: { realtimeRevision: 1 }, wrapper: makeWrapper(client) },
+    );
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+    rerender({ realtimeRevision: 2 });
+    rerender({ realtimeRevision: 1 });
+    await act(async () => oldRequest.resolve(makeResponse({ groups: [makeGroup(0)], next_cursor: null, has_more: false })));
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(result.current.groups).toEqual([makeGroup(2)]));
   });
 
   it("keeps visible groups while a same-query realtime refresh is pending", async () => {
