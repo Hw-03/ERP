@@ -210,7 +210,7 @@ export function IoLineRow({
               ) : (
                 <ChevronRight className="h-2.5 w-2.5" />
               )}
-              {showChildren ? "하위 접기" : "하위 있음"}
+              {showChildren ? "하위 접기" : "하위 확인"}
             </button>
           )}
         </div>

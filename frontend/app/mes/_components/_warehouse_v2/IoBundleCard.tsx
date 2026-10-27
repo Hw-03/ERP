@@ -242,7 +242,7 @@ export function IoBundleCard({
       <div
         data-io-bundle-header
         data-io-internal-use={isInternalUse}
-        className={`relative mb-3 grid grid-cols-1 gap-3 lg:items-center ${
+        className={`relative grid grid-cols-1 gap-3 lg:items-center ${collapsed || !isCollapsible ? "mb-0" : "mb-3"} ${
           isInternalUse
             ? "lg:grid-cols-[minmax(0,1.6fr)_minmax(208px,auto)_minmax(112px,auto)_minmax(132px,auto)_minmax(80px,auto)_minmax(80px,auto)_44px]"
             : "lg:grid-cols-[minmax(0,1.6fr)_minmax(112px,auto)_minmax(132px,auto)_minmax(80px,auto)_minmax(80px,auto)_44px]"

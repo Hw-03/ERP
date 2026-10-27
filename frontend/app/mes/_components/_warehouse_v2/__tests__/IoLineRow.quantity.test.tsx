@@ -376,7 +376,7 @@ describe("IoLineRow quantity", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "하위 있음" }));
+    fireEvent.click(screen.getByRole("button", { name: "하위 확인" }));
 
     expect(screen.getByTestId("bom-expander")).toHaveAttribute("data-compact", "true");
     expect(screen.getByTestId("bom-expander")).toHaveAttribute(

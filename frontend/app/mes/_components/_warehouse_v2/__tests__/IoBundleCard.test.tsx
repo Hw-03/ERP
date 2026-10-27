@@ -434,7 +434,7 @@ describe("IoBundleCard", () => {
     );
 
     const group = screen.getByRole("group", { name: "BOM 차감 방식" });
-    const header = group.closest("div.relative.mb-3");
+    const header = group.closest("div.relative");
     expect(header).toHaveClass("lg:grid-cols-[minmax(0,1.6fr)_minmax(208px,auto)_minmax(112px,auto)_minmax(132px,auto)_minmax(80px,auto)_minmax(80px,auto)_44px]");
     expect(group).toHaveClass("flex", "flex-col", "gap-0.5");
     expect(within(group).getByText("차감 방식")).toHaveClass(
