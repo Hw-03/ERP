@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { workDraftsApi } from "../work-drafts";
 
-const auth = vi.hoisted(() => ({ employeeId: "actor-a", token: "tab-token" as string | null }));
+const auth = vi.hoisted(() => ({ employeeId: "actor-a", token: "tab-token" as string | null, owned: true }));
+const ownership = vi.hoisted(() => vi.fn<() => Promise<boolean>>());
 const recover = vi.hoisted(() => vi.fn());
 vi.mock("../../auth/operator-session", () => ({
-  restoreOperatorSession: (employeeId?: string) => auth.token && (!employeeId || employeeId === auth.employeeId)
+  restoreOperatorSession: (employeeId?: string) => auth.owned && auth.token && (!employeeId || employeeId === auth.employeeId)
     ? { token: auth.token, employee_id: auth.employeeId } : null,
+  validateTabOwnership: ownership,
 }));
 vi.mock("../../auth/login-recovery", () => ({ requestOperatorLogin: recover }));
 
@@ -16,11 +18,46 @@ function respond(body: unknown, status = 200): void {
 
 beforeEach(() => {
   auth.employeeId = "actor-a"; auth.token = "tab-token";
+  auth.owned = true; ownership.mockReset(); ownership.mockResolvedValue(true);
   fetchMock.mockReset(); recover.mockReset(); vi.stubGlobal("fetch", fetchMock);
 });
 afterEach(() => vi.unstubAllGlobals());
 
 describe("직원 전체 저장 작업 조회 계약", () => {
+  it("새로고침의 탭 소유권 확인 중에는 로그인 복구나 조회를 시작하지 않는다", async () => {
+    auth.owned = false;
+    let finishOwnership!: (valid: boolean) => void;
+    ownership.mockImplementation(() => new Promise((resolve) => { finishOwnership = resolve; }));
+    respond({ io_count: 3, stock_request_count: 0, total: 3 });
+    const pending = workDraftsApi.count("actor-a");
+    const result = pending.then((value) => ({ value }), (failure: unknown) => ({ failure }));
+    expect(recover).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(ownership).toHaveBeenCalledOnce();
+    auth.owned = true;
+    finishOwnership(true);
+    expect(await result).toMatchObject({ value: { total: 3 } });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get("X-Operator-Session")).toBe("tab-token");
+  });
+
+  it("소유권 확인 뒤에도 인증이 없으면 공개 조회 없이 로그인 복구를 요청한다", async () => {
+    auth.owned = false;
+    ownership.mockResolvedValue(false);
+    await expect(workDraftsApi.count("actor-a")).rejects.toMatchObject({ status: 401 });
+    expect(ownership).toHaveBeenCalledOnce();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(recover).toHaveBeenCalledOnce();
+  });
+
+  it("소유권 확인 중 계정이 바뀌면 이전 직원 조회에 새 직원 토큰을 쓰지 않는다", async () => {
+    auth.owned = false;
+    ownership.mockImplementation(async () => { auth.owned = true; auth.employeeId = "actor-b"; return true; });
+    await expect(workDraftsApi.count("actor-a")).rejects.toMatchObject({ status: 401 });
+    expect(ownership).toHaveBeenCalledOnce();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(recover).not.toHaveBeenCalled();
+  });
   it("건수는 현재 인증 직원 전용 경로만 사용한다", async () => {
     respond({ io_count: 3, stock_request_count: 0, total: 3 });
     expect(await workDraftsApi.count("actor-a")).toEqual({ io_count: 3, stock_request_count: 0, total: 3 });
@@ -92,6 +129,7 @@ describe("직원 전체 저장 작업 조회 계약", () => {
     }));
     const pending = kind === "list" ? workDraftsApi.list("actor-a", {}, { signal: controller.signal })
       : workDraftsApi.getOwnedIo("actor-a", "saved", { signal: controller.signal });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
     controller.abort();
     await expect(pending).rejects.toMatchObject({ name: "AbortError" });
     expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(true);

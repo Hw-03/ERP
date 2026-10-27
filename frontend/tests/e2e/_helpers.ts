@@ -1,14 +1,16 @@
 /**
  * e2e 공용 헬퍼.
  *
- * loginAsOperator — MesLoginGate 우회. 게이트는 3중 검증을 하므로 고정값 inject 로는 부족하다:
+ * loginAsOperator — 합성 직원의 실제 PIN 인증과 표시용 로그인 정보를 준비한다:
  *   1) sessionStorage.dexcowin_mes_operator (employee_id·name 필수)
  *   2) sessionStorage.dexcowin_mes_boot_id == GET /api/app-session 의 boot_id
  *   3) employee_id ∈ GET /api/employees?active_only=true (실재 활성 직원)
  *   4) 새 로그인처럼 비활동 기록 초기화 (기존 세션 확인 팝업과 구분)
- * → 런타임에 두 API 를 조회해 실재 직원 + 현재 boot_id 를 inject 한다.
+ *   5) verify-pin이 발급한 직원·탭 전용 인증 세션
+ * → 런타임에 직원과 boot_id를 조회하고 실제 인증 API의 결과를 저장한다.
  */
 import { expect, type Page } from "@playwright/test";
+import { randomUUID } from "node:crypto";
 
 export interface OperatorLike {
   employee_id: string;
@@ -35,7 +37,7 @@ function toOperator(emp: any): OperatorLike {
 }
 
 /**
- * 로그인 게이트를 통과하도록 sessionStorage 를 inject 한다. page.goto 전에 호출할 것.
+ * 합성 DB의 실제 인증 세션과 표시 정보를 준비한다. page.goto 전에 호출할 것.
  * @param opts.role "warehouse" | "department" — 해당 역할 primary(없으면 deputy) 직원 우선 선택.
  * @param opts.code 특정 employee_code 직원으로 로그인(2-세션 결재 테스트용). role 보다 우선.
  */
@@ -60,15 +62,24 @@ export async function loginAsOperator(
   if (!emp) throw new Error("활성 직원이 없습니다 — globalSetup 시드 확인 필요");
 
   const op = toOperator(emp);
+  const tabId = randomUUID();
+  const authenticated = await page.request.post(`/api/employees/${op.employee_id}/verify-pin`, {
+    data: { pin: "0000", tab_id: tabId },
+  });
+  expect(authenticated.ok()).toBeTruthy();
+  const { operator_session: issued } = await authenticated.json();
   await page.addInitScript(
-    ([o, bootId]) => {
+    ({ o, bootId, credential }) => {
       sessionStorage.setItem("dexcowin_mes_operator", JSON.stringify(o));
       sessionStorage.setItem("dexcowin_mes_boot_id", bootId as string);
+      sessionStorage.setItem("dexcowin_mes_operator_tab_id", credential.tab_id);
+      sessionStorage.setItem("dexcowin_mes_operator_session", JSON.stringify(credential));
       sessionStorage.setItem("dexcowin_mes_operator_activity", JSON.stringify({
         employeeId: o.employee_id, lastActivityAt: Date.now(), confirmationRequired: false,
       }));
     },
-    [op, session.boot_id] as [OperatorLike, string],
+    { o: op, bootId: session.boot_id as string,
+      credential: { ...issued, employee_id: op.employee_id, tab_id: tabId } },
   );
   return op;
 }
