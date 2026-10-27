@@ -193,7 +193,7 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
               <td className="px-4 py-2">
                 {target ? <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1"><p className={ITEM_CLASS}>{target.item_name}</p><span className="shrink-0 whitespace-nowrap font-semibold tabular-nums" style={{ color: C.muted2 }}>{formatQty(target.quantity)} {target.unit}</span>{row.targets.length > 1 && <span className="shrink-0 whitespace-nowrap text-xs font-normal" style={{ color: C.muted2 }}>외 {row.targets.length - 1}개 품목</span>}</div> : <p style={{ color: C.muted2 }}>등록된 목적 품목이 없습니다.</p>}
               </td>
-              <td className="px-3 py-2"><WorkDraftMemo notes={row.kind === "stock_request" ? formatRequestNotes(row.notes) : row.notes} showEmpty /></td>
+              <td className="px-3 py-2 text-center"><WorkDraftMemo notes={row.kind === "stock_request" ? formatRequestNotes(row.notes) : row.notes} align="center" showEmpty /></td>
               <td className={`whitespace-nowrap ${WORK_ITEM_CODE_CLASS}`} style={{ color: C.muted2 }}>{target?.mes_code ?? "—"}</td>
               <td className="px-3 py-2 text-center">{movement(row)}</td>
             </tr>

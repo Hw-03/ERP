@@ -73,7 +73,9 @@ describe("공유 작업함", () => {
     expect(screen.getByLabelText("작업 메모")).toHaveTextContent("구형 사용자 메모");
     expect(screen.queryByText(/INTERNAL-PAYLOAD/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "다른 담당자 작업 상세 펼치기" }));
-    expect(screen.getAllByLabelText("작업 메모").some((memo) => !memo.classList.contains("line-clamp-2"))).toBe(true);
+    expect(screen.getAllByLabelText("작업 메모")).toHaveLength(1);
+    expect(screen.queryByRole("region", { name: "전체 작업 메모" })).not.toBeInTheDocument();
+    if (layout === "desktop") expect(screen.getByLabelText("작업 메모")).toHaveClass("text-center", "text-sm", "font-medium", "leading-6");
     expect(screen.queryByText(/INTERNAL-PAYLOAD/)).not.toBeInTheDocument();
   });
   afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -157,7 +159,8 @@ describe("공유 작업함", () => {
     fireEvent.click(screen.getByRole("button", { name: "작업자 미입력 작업 상세 펼치기" }));
     expect(screen.getByText(shipping.requester_name)).toBeVisible();
     expect(screen.getByText("인보이스 미입력")).toBeVisible();
-    expect(screen.getByText("동반 출하품이 없습니다.")).toBeVisible();
+    expect(screen.queryByText("동반 출하품이 없습니다.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "동반 출하품" })).not.toBeInTheDocument();
   });
 
   it.each(["desktop", "mobile"] as const)("%s 전체 목록은 본인 작업에도 상세 조회만 제공한다", (layout) => {

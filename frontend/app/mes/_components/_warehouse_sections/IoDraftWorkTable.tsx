@@ -272,7 +272,7 @@ function DraftRows({
             )}
           </div>
         </td>
-        <td className="border-b px-3 py-2 text-left" style={{ borderColor: LEGACY_COLORS.border }}><WorkDraftMemo notes={draft.notes} showEmpty /></td>
+        <td className="border-b px-3 py-2 text-center" style={{ borderColor: LEGACY_COLORS.border }}><WorkDraftMemo notes={draft.notes} align="center" showEmpty /></td>
         <td className={`border-b ${WORK_ITEM_CODE_CLASS}`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
           {firstBundle?.source_mes_code ?? "—"}
         </td>
@@ -305,7 +305,6 @@ function DraftRows({
           </div>
         </td>
       </tr>
-      {expanded && draft.notes?.trim() && <tr><td colSpan={8} className="border-b px-4 py-3 text-left" style={{ borderColor: LEGACY_COLORS.border }}><WorkDraftMemo notes={draft.notes} expanded /></td></tr>}
       {expanded && draft.bundles.map((bundle, index) => (
         <BundleRows
           key={bundle.bundle_id}

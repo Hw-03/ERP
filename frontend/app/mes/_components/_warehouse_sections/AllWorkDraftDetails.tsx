@@ -8,8 +8,6 @@ import { formatQty } from "@/lib/mes/format";
 import { reservationIssueMessage } from "@/lib/io/reservation-message";
 import { workLocationLabel } from "../common/WorkReservationDetails";
 import { WORK_ITEM_CODE_CLASS, WORK_TYPE_BADGE_CLASS } from "../common/WorkDraftTableParts";
-import { WorkDraftMemo } from "../common/WorkDraftMemo";
-import { formatRequestNotes } from "./ioRequestLabels";
 
 interface DetailLine {
   key: string;
@@ -62,11 +60,17 @@ export function AllWorkDraftDetails({ work, layout, columns }: {
       {lines.length > 0 ? layout === "desktop" ? <table aria-label={title} className="w-full table-fixed border-collapse text-left text-sm">
         {columns}
         <thead className="sr-only"><tr>{["상세", "저장 시각", "담당자", "구분", "품목", "메모", "품목코드", "예정 변동"].map((label) => <th key={label} scope="col">{label}</th>)}</tr></thead>
-        <tbody>{lines.map((line) => <tr key={line.key} className="border-t align-middle" style={{ borderColor: C.border, background: C.s1 }}>
-          <td colSpan={3} aria-hidden className="px-6 py-2">
-            <svg viewBox="0 0 280 40" preserveAspectRatio="none" className="ml-auto h-10 w-[190px]" fill="none" style={{ color: C.muted2 }}>
-              <path d="M65 4v8a8 8 0 0 0 8 8h189m-10-10 10 10-10 10" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" opacity={0.5} />
-            </svg>
+        <tbody>{lines.map((line, index) => <tr key={line.key} className="border-t align-middle" style={{ borderColor: C.border, background: C.s1 }}>
+          <td colSpan={3} aria-hidden className="relative px-6 py-2">
+            <div className="h-10" />
+            <div className="absolute -inset-y-px right-6 w-[190px]" style={{ color: C.muted2, opacity: 0.5 }}>
+              <svg viewBox="0 0 190 100" preserveAspectRatio="none" className="absolute left-0 top-0 w-full" style={{ height: index === lines.length - 1 ? "calc(50% - 8px)" : "100%", opacity: 0.8 }} fill="none">
+                <path d="M44.5 0V100" stroke="currentColor" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+              </svg>
+              <svg viewBox="0 0 190 40" className="absolute top-1/2 h-10 w-full -translate-y-1/2" fill="none">
+                <path d="M44.5 12a8 8 0 0 0 8 8H178m-7-10 7 10-7 10" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
           </td>
           <td className="px-3 py-2 text-center">{badge(line)}</td>
           <td className="px-4 py-2">{identity(line)}</td>
@@ -92,14 +96,13 @@ export function AllWorkDraftDetails({ work, layout, columns }: {
       {/* Keep the desktop app mounted; MobileShell resolves its initial tab on document navigation. */}
       <ShippingLink href={`/mes?tab=shipping&shippingView=requestDetail&shippingRequestId=${encodeURIComponent(work.id)}`} className={`inline-flex min-h-11 items-center justify-self-end gap-1 rounded-[12px] px-3 font-bold hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] ${layout === "desktop" ? "col-start-3 row-start-1" : ""}`} style={{ color: C.blue, background: tint(C.blue, 10) }}>출하에서 열기<ArrowUpRight size={16} aria-hidden /></ShippingLink>
     </div>
-    {section("동반 출하품", (work.shipping_summary?.companion_lines ?? []).map((line, index) => ({
+    {Boolean(work.shipping_summary?.companion_lines.length) && section("동반 출하품", (work.shipping_summary?.companion_lines ?? []).map((line, index) => ({
       key: `${line.item_id}:${index}`, name: line.item_name, code: line.mes_code, quantity: line.quantity, unit: line.unit,
       tag: "동반 출하품", color: C.blue,
-    })), "동반 출하품이 없습니다.")}
+    })))}
   </div>;
 
   return <div>
-    {work.notes?.trim() && <section aria-label="전체 작업 메모" className="border-b p-4" style={{ borderColor: C.border }}><WorkDraftMemo notes={work.kind === "stock_request" ? formatRequestNotes(work.notes) : work.notes} expanded /></section>}
     {work.reservation_issue && <p role="status" className="m-3 rounded-[12px] p-3" style={{ background: C.warningBg, color: C.yellow }}>{reservationIssueMessage(work.reservation_issue)}</p>}
     {work.forecast_issue && <p role="status" className="m-3 rounded-[12px] p-3 text-xs leading-6" style={{ background: C.warningBg, color: C.yellow }}>이 작업의 입고·출고 예정을 모두 확인할 수 없습니다. 담당자에게 작업 내용을 확인해 주세요.</p>}
     {effects.length === 0 && targets.length > 0 && section("작업 대상", targets)}

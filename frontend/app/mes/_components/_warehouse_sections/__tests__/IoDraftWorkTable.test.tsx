@@ -108,7 +108,7 @@ describe("IoDraftWorkTable hierarchy", () => {
     expect(screen.getByText("BOX")).toBeVisible();
     expect(screen.queryByText(/총 1개/)).not.toBeInTheDocument();
   });
-  it.each(["desktop", "mobile"] as const)("%s 내 작업은 첫 품목과 메모를 요약하고 펼치면 전체를 표시한다", (layout) => {
+  it.each(["desktop", "mobile"] as const)("%s 내 작업은 첫 품목과 메모를 요약하고 펼치면 품목 상세를 표시한다", (layout) => {
     const draft = makeDraft({ notes: "첫 줄 메모\n둘째 줄 메모\n셋째 줄 메모", bundles: [makeBundle(), makeBundle({ bundle_id: "second", title: "두번째 작업 품목", quantity: 7 })] });
     const actions = { onContinue: vi.fn(), onRequestDelete: vi.fn() };
     render(layout === "desktop" ? <IoDraftWorkTable drafts={[draft]} busyId={null} {...actions} /> : <IoDraftWorkCard draft={draft} isBusy={false} {...actions} />);
@@ -117,7 +117,12 @@ describe("IoDraftWorkTable hierarchy", () => {
     expect(screen.getByLabelText("작업 메모")).toHaveClass("line-clamp-2");
     fireEvent.click(screen.getByRole("button", { name: layout === "desktop" ? "작업 상세 펼치기" : "자재 목록 펼치기" }));
     expect(screen.getByText("두번째 작업 품목")).toBeVisible();
-    expect(screen.getAllByLabelText("작업 메모").some((memo) => !memo.classList.contains("line-clamp-2"))).toBe(true);
+    if (layout === "desktop") {
+      expect(screen.getAllByLabelText("작업 메모")).toHaveLength(1);
+      expect(screen.getByLabelText("작업 메모")).toHaveClass("text-center", "text-sm", "font-medium", "leading-6");
+    } else {
+      expect(screen.getAllByLabelText("작업 메모").some((memo) => !memo.classList.contains("line-clamp-2"))).toBe(true);
+    }
   });
 
   it("구형 내 작업도 대표 품목과 메모를 접고 펼친다", () => {
