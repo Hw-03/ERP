@@ -109,7 +109,7 @@ def prepare_set(db: Session, actor: Employee, payload: dict, *, append: bool = F
     require_round_manager(actor)
     control = db.get(StocktakeControl, 1)
     if control is None or control.inventory_mode != "POOL" or not inventory_operations.is_ledger_active(db):
-        raise InventoryConflict("STOCKTAKE_APPLY_HELD", "공동재고 전환과 작업 원장 활성화를 먼저 확인해 주세요.", status_code=422)
+        raise InventoryConflict("STOCKTAKE_APPLY_HELD", "재고 전수조사에 필요한 시스템 설정이 아직 완료되지 않았습니다. 시스템 관리자에게 확인을 요청해 주세요.", status_code=422)
     round_id = uuid.UUID(payload["round_id"]) if append else None
     row = active_round(db, round_id) if append else None
     if not append and control.active_round_id is not None:
