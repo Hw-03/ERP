@@ -4023,7 +4023,7 @@ function LineSummary({ request, contentSized = false, emphasizeNonUnitQuantities
     quantityTone: emphasizeNonUnitQuantities && line.quantity !== 1 ? LEGACY_COLORS.text : undefined,
   }));
   return (
-    <div data-testid="shipping-line-summary" className={`grid gap-3 xl:grid-cols-[minmax(0,4fr)_minmax(0,4fr)_minmax(0,3fr)] ${contentSized ? "" : "h-full min-h-0"}`}>
+    <div data-testid="shipping-line-summary" className={`grid gap-3 ${contentSized ? "" : "h-full min-h-0 xl:grid-cols-[minmax(0,4fr)_minmax(0,4fr)_minmax(0,3fr)]"}`}>
       <SummaryList title="PA 구성품" lines={paLines.map(formatLine)} contentSized={contentSized} dataTestId="shipping-summary-list-pa" />
       <SummaryList title="PF 구성품" lines={pfLines.map(formatLine)} contentSized={contentSized} dataTestId="shipping-summary-list-pf" />
       <CompanionSummary lines={companionLines} contentSized={contentSized} />
@@ -4035,13 +4035,13 @@ function SummaryList({ title, lines, empty = "등록 없음", contentSized = fal
   return (
     <div className={contentSized ? "flex min-w-0 flex-col rounded-[14px] border p-3" : SHIPPING_PANEL_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
       <div className="mb-2 text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{title}</div>
-      <div data-testid={dataTestId} className={contentSized ? "grid content-start gap-2" : SHIPPING_SCROLL_LIST_CLASS}>
+      <div data-testid={dataTestId} className={contentSized ? "grid content-start gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" : SHIPPING_SCROLL_LIST_CLASS}>
         {lines.length === 0 ? (
-          <div className={SHIPPING_EMPTY_BOX_CLASS} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>{empty}</div>
+          <div className={`${SHIPPING_EMPTY_BOX_CLASS} ${contentSized ? "col-span-full" : ""}`} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>{empty}</div>
         ) : (
           lines.map((line) => (
             <div key={line.key} className="min-w-0 rounded-[12px] border px-3 py-2" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
-              <div className="truncate text-sm font-black" style={{ color: line.tone ?? LEGACY_COLORS.text }}>{line.title}</div>
+              <div className={`${contentSized ? "break-words" : "truncate"} text-sm font-black`} style={{ color: line.tone ?? LEGACY_COLORS.text }}>{line.title}</div>
               <div className="mt-0.5 flex min-w-0 items-center justify-between gap-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
                 <SummaryCode code={line.code} testId={`shipping-summary-code-${line.key}`} />
                 <span data-testid={`shipping-summary-quantity-${line.key}`} className={`shrink-0 tabular-nums ${line.quantityTone ? "font-black" : ""}`} style={{ color: line.quantityTone }}>{line.quantity}</span>
