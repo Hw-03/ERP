@@ -15,6 +15,7 @@ function work(id: string, complex = false): InventoryRelatedWork {
 }
 beforeEach(() => {
   query.data = { item_id: item.item_id, summary: { work_reserved_quantity: 0, approval_reserved_quantity: 0, shipping_reserved_quantity: 0, expected_in_quantity: 10, expected_out_quantity: 0, transfer_in_quantity: 0, transfer_out_quantity: 0, forecast_complete: true, reservation_by_location: [], forecast_by_location: [] }, works: [work("첫 담당자")] };
+  item.work_reservations = query.data.summary;
 });
 
 describe("관련 작업 카드 간소화", () => {

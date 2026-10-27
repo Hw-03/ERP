@@ -166,6 +166,7 @@ beforeEach(() => {
   });
   state.setBundles.mockReset();
   state.step = 4;
+  state.hasShortage = true;
   state.workType = "process";
   state.subType = "produce";
   state.deptIoDirection = "in";
@@ -680,6 +681,7 @@ describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
   });
 
   it("모바일 세부 유형 변경과 제출 완료는 Step 3 필터를 초기화한다", async () => {
+    state.hasShortage = false;
     state.step = 3;
     const view = renderWizard();
     fireEvent.click(screen.getByRole("button", { name: "필터 적용" }));

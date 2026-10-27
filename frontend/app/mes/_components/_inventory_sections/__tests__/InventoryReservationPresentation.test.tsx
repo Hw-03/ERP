@@ -35,6 +35,7 @@ beforeEach(() => {
         kind: "in", from: null, to: location }],
     }],
   };
+  item.work_reservations = query.data.summary;
 });
 
 describe("예약과 입고 예정의 직원용 표시", () => {
