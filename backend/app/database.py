@@ -10,6 +10,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 from app.utils import search as _search  # noqa: F401  # register deterministic SQLite search functions
+from app.read_query_diagnostics import mark_db_dependency
 
 load_dotenv()
 
@@ -148,6 +149,7 @@ def _requires_weekly_snapshot_guard(request: Request) -> bool:
 
 def get_db(request: Request) -> Generator[Session, None, None]:
     """확인된 SQLite 미리보기만 읽기 연결로 보내고 실제 변경은 기존 가드로 보호한다."""
+    mark_db_dependency()
     read_only_preview = (
         _is_file_sqlite
         and request.method == "POST"

@@ -30,6 +30,7 @@ from sqlalchemy.orm import sessionmaker
 from app._actor import get_actor_emp
 from app._logging import get_logger
 from app.database import SessionLocal, get_db
+from app.read_query_diagnostics import collect_read_queries
 from app.services import activity_audit
 from app.services.audit_actor_session import get_verified_audit_actor_code
 from app.services.realtime import suppress_realtime_revision
@@ -215,6 +216,29 @@ def _schedule_write_audit(
 
 
 async def access_log_middleware(request: Request, call_next: Callable) -> Response:
+    """Opt-in profiles cover response preparation, not body transfer or rendering."""
+    enabled = (
+        os.environ.get("QUERY_READ_DIAGNOSTICS", "").lower() in {"1", "true", "yes"}
+        and request.method == "GET"
+        and request.url.path in {"/api/items", "/api/inventory/transactions/display-groups"}
+    )
+    with collect_read_queries(enabled=enabled) as metrics:
+        try:
+            return await _access_log_impl(request, call_next)
+        finally:
+            if metrics is not None:
+                _log.info(
+                    "evt=read_query_profile rid=%s path=%s response_start_ms=%.1f "
+                    "dependency_start_ms=%.1f first_sql_ms=%.1f query_count=%d sql_ms=%.1f",
+                    getattr(request.state, "request_id", "-"), request.url.path,
+                    (time.perf_counter() - metrics.started) * 1000,
+                    metrics.dependency_start_ms if metrics.dependency_start_ms is not None else -1,
+                    metrics.first_sql_ms if metrics.first_sql_ms is not None else -1,
+                    metrics.query_count, metrics.sql_ms,
+                )
+
+
+async def _access_log_impl(request: Request, call_next: Callable) -> Response:
     """액세스 로그 분기. 본문(body)은 절대 읽지 않음 — StreamingResponse 안전."""
     t0 = time.perf_counter()
     try:

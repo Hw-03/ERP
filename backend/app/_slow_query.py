@@ -14,6 +14,7 @@ from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
 from app._logging import get_logger
+from app.read_query_diagnostics import record_query_duration
 
 
 _log = get_logger()
@@ -51,7 +52,9 @@ def install_slow_query_hook(engine: Engine) -> None:
         t0 = getattr(context, "_mes_slow_query_t0", None)
         if t0 is None:
             return
-        dur_ms = int((time.perf_counter() - t0) * 1000)
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+        record_query_duration(elapsed_ms)
+        dur_ms = int(elapsed_ms)
         if dur_ms >= SLOW_QUERY_MS:
             _log.warning(
                 "evt=slow_query dur_ms=%d sql=%s",
