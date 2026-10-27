@@ -71,7 +71,8 @@ def _history_operation(batch: IoBatch, effects: list[dict[str, Any]]) -> dict[st
     if (not logs or any(log[1] is None for log in logs)
             or any(effect["operation_line_id"] not in mapped_ids for effect in effects)):
         return None
-    produced = [log for log in logs if _value(log[1]) == "PRODUCE"]
+    output_types = {"PRODUCE", "RECEIVE"} if batch.sub_type == "disassemble" else {"PRODUCE"}
+    produced = [log for log in logs if _value(log[1]) in output_types]
     consumed = [log for log in logs if _value(log[1]) == "BACKFLUSH"]
     representative = None
     if batch.sub_type.startswith("disassemble") and consumed:

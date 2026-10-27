@@ -42,6 +42,7 @@ from app.services import io_dispatch as svc
 from app.services.bom_stock_policy import io_bom_auto_claims, issue_bom_auto_token
 from app.services.pin_auth import DEFAULT_PIN_HASH
 from app.services.sr_execution import release_reservation
+from app.services.weekly_report_contract import classify_inventory_activity
 from app.services.work_reservation_errors import WorkReservationError
 from app.routers.inventory._tx_filters import _batch_name_map
 
@@ -1691,6 +1692,9 @@ def test_default_disassemble_keeps_parent_out_and_child_recovery(
     assert result["status"] == "completed"
     assert _prod_qty(db_session, parent.item_id) == D("6")
     assert _prod_qty(db_session, child.item_id) == D("46")
+    recovered = db_session.query(TransactionLog).filter_by(item_id=child.item_id).one()
+    assert recovered.transaction_type == TransactionTypeEnum.RECEIVE
+    assert classify_inventory_activity(recovered).as_tuple() == (0, 1, 0, 0)
     assert sorted(log.quantity_change for log in db_session.query(TransactionLog).all()) == [
         D("-1"),
         D("1"),

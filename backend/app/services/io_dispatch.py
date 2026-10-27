@@ -1067,6 +1067,8 @@ def _transaction_type_for_line(batch: IoBatch, line: IoLine) -> TransactionTypeE
     if batch.sub_type == "tube_receive_supplier":
         return TransactionTypeEnum.RECEIVE
     if line.direction == "in":
+        if batch.sub_type == "disassemble":
+            return TransactionTypeEnum.RECEIVE
         return TransactionTypeEnum.PRODUCE if line.to_bucket == _BUCKET_PRODUCTION else TransactionTypeEnum.RECEIVE
     if line.direction == "out":
         if batch.sub_type == INTERNAL_USE_SUB_TYPE:
