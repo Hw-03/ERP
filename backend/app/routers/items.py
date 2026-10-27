@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Query as SAQuery, Session
 
+from app import database
 from app.database import get_db
 from app.dependencies.admin import require_admin_pin
 from app.models import (
@@ -736,18 +737,23 @@ def update_item(
             payload_summary=f"{item.item_name}: {', '.join(changed)}",
         )
 
-    commit_and_refresh(db, item)
+    db.commit()
+    # Refreshing on the writer would reacquire BEGIN IMMEDIATE for response-only
+    # stock reads. Keep externally supplied transaction binds when testing/embedding.
+    bind = db.get_bind()
+    read_bind = database.read_engine if bind is database.engine else bind
+    with Session(bind=read_bind, autoflush=False) as read_db:
+        response = get_item(item_id, db=read_db)
     if changed:
         _evt_emit(
             "item_update",
             request=request,
-            item=item.mes_code or "-",
+            item=response.mes_code or "-",
             changed=",".join(changed),
         )
     # 응답에 inventory 동봉 — 좌측 list API 와 동일한 ItemWithInventory 형태로 보내
     # 저장 직후 우측 카드의 재고/창고 표시가 빈칸이 되는 잔여 UI 버그 방지.
-    inventory = inventory_repository.get(db, item.item_id)
-    return _to_item_with_inventory(db, item, inventory)
+    return response
 
 
 @router.patch("/{item_id}/bom-unmatched-status", response_model=ItemWithInventory)

@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Annotated, List, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.database import get_db
 from app.dependencies.admin import require_admin_pin
@@ -71,6 +71,22 @@ def get_all_bom(db: Session = Depends(get_db)):
             unit=entry.unit,
         ))
     return result
+
+
+@router.get("/parent-ids", response_model=list[uuid.UUID])
+def get_bom_parent_ids(db: Session = Depends(get_db)) -> list[uuid.UUID]:
+    """전체 BOM 목록과 같은 품목 존재 조건으로 부모 ID만 중복 없이 반환한다."""
+    parent = aliased(Item)
+    child = aliased(Item)
+    rows = (
+        db.query(BOM.parent_item_id)
+        .join(parent, BOM.parent_item_id == parent.item_id)
+        .join(child, BOM.child_item_id == child.item_id)
+        .distinct()
+        .order_by(BOM.parent_item_id)
+        .all()
+    )
+    return [row.parent_item_id for row in rows]
 
 
 @router.post("", response_model=BOMResponse, status_code=status.HTTP_201_CREATED)

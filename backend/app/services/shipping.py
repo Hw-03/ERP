@@ -14,6 +14,7 @@ from app.models import (
     BOM,
     DepartmentEnum,
     Inventory,
+    InventoryLocation,
     InventoryOperation,
     InventoryOperationEffectKindEnum,
     InventoryOperationRoleEnum,
@@ -1068,62 +1069,106 @@ def _require_item_location_available(db: Session, item: Item, required: int) -> 
 
 
 def prepare_stock_shortages(db: Session, req: ShippingRequest) -> list[dict]:
-    if req.status != ShippingRequestStatusEnum.PREPARING:
-        return []
-    try:
-        request_qty = _request_quantity(req)
-        final_pa, _final_pf = _require_final_items(db, req)
-    except ShippingError:
-        return []
+    """단일 응답도 목록과 동일한 준비 수량·가용량 정책을 적용한다."""
+    return prepare_stock_shortages_for_requests(db, [req]).get(req.request_id, [])
 
-    checks_by_item: dict[uuid.UUID, tuple[Item, int, str]] = {}
 
-    def add_check(item: Item, required: int, phase: str = PREPARE_PHASE) -> None:
-        if required <= 0:
-            return
-        existing = checks_by_item.get(item.item_id)
-        if existing is None:
-            checks_by_item[item.item_id] = (item, required, phase)
-        else:
-            checks_by_item[item.item_id] = (item, existing[1] + required, phase)
-
-    add_check(final_pa, request_qty)
-    for line in req.bom_lines:
-        if not line.included or line.child_item_id == final_pa.item_id:
+def prepare_stock_shortages_for_requests(
+    db: Session,
+    requests: Iterable[ShippingRequest],
+) -> dict[uuid.UUID, list[dict]]:
+    """요청별 필요량은 유지하면서 필요한 위치 재고와 전체 출하 예약만 한 번 읽는다."""
+    checks_by_request: dict[uuid.UUID, dict[uuid.UUID, tuple[Item, int, str]]] = {}
+    departments: dict[uuid.UUID, DepartmentEnum] = {}
+    for req in requests:
+        if req.status != ShippingRequestStatusEnum.PREPARING:
             continue
-        if should_skip_bom_inventory(
-            line.child_item,
-            bom_generated=line.origin == "DEFAULT",
-        ):
+        try:
+            request_qty = _request_quantity(req)
+            final_pa, _final_pf = _require_final_items(db, req)
+        except ShippingError:
             continue
-        add_check(line.child_item, int(line.quantity or 0) * request_qty)
-    for line in req.companion_lines:
-        qty = int(line.quantity or 0)
-        add_check(line.item, qty)
 
-    shortages: list[dict] = []
-    for item, required, phase in checks_by_item.values():
-        dept, current, available = _item_location_available_after_shipping_allocations(db, item)
-        allocated = max(current - available, 0)
-        shortage = max(required - available, 0)
-        if shortage <= 0:
-            continue
-        shortages.append(
-            {
-                "item_id": item.item_id,
-                "item_name": item.item_name,
-                "mes_code": item.mes_code,
-                "process_type_code": item.process_type_code,
-                "department": dept.value,
-                "required_quantity": required,
-                "current_quantity": current,
-                "allocated_quantity": allocated,
-                "available_quantity": available,
-                "shortage_quantity": shortage,
-                "phase": phase,
-            }
+        checks_by_item: dict[uuid.UUID, tuple[Item, int, str]] = {}
+
+        def add_check(item: Item, required: int, phase: str = PREPARE_PHASE) -> None:
+            """동일 요청에서 BOM과 동반 출하품의 같은 품목 필요량을 합산한다."""
+            if required <= 0:
+                return
+            existing = checks_by_item.get(item.item_id)
+            if existing is None:
+                checks_by_item[item.item_id] = (item, required, phase)
+            else:
+                checks_by_item[item.item_id] = (item, existing[1] + required, phase)
+
+        add_check(final_pa, request_qty)
+        for line in req.bom_lines:
+            if not line.included or line.child_item_id == final_pa.item_id:
+                continue
+            if should_skip_bom_inventory(
+                line.child_item,
+                bom_generated=line.origin == "DEFAULT",
+            ):
+                continue
+            add_check(line.child_item, int(line.quantity or 0) * request_qty)
+        for line in req.companion_lines:
+            add_check(line.item, int(line.quantity or 0))
+        checks_by_request[req.request_id] = checks_by_item
+        for item, _required, _phase in checks_by_item.values():
+            departments[item.item_id] = inventory_svc.department_for_item(item)
+
+    if not departments:
+        return {}
+    locations = (
+        db.query(InventoryLocation)
+        .filter(
+            InventoryLocation.item_id.in_(departments),
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
         )
-    return shortages
+        .populate_existing()
+        .all()
+    )
+    locations_by_cell = {
+        stock_availability.AvailabilityCell.location(location.item_id, location.department): location
+        for location in locations
+    }
+    reserved_by_cell = stock_availability.bulk_reserved_by_cell(db, departments)
+    figures: dict[uuid.UUID, stock_availability.AvailabilityFigure] = {}
+    for item_id, department in departments.items():
+        cell = stock_availability.AvailabilityCell.location(item_id, department)
+        location = locations_by_cell.get(cell)
+        figures[item_id] = stock_availability.AvailabilityFigure(
+            physical=Decimal(str(location.quantity or 0)) if location else Decimal(0),
+            stock_request_pending=Decimal(str(location.pending_quantity or 0)) if location else Decimal(0),
+            active_shipping_reserved=reserved_by_cell.get(cell, Decimal(0)),
+        )
+
+    shortages_by_request: dict[uuid.UUID, list[dict]] = {}
+    for request_id, checks in checks_by_request.items():
+        shortages: list[dict] = []
+        for item, required, phase in checks.values():
+            figure = figures[item.item_id]
+            current, available = int(figure.physical), int(figure.available)
+            shortage = max(required - available, 0)
+            if shortage <= 0:
+                continue
+            shortages.append(
+                {
+                    "item_id": item.item_id,
+                    "item_name": item.item_name,
+                    "mes_code": item.mes_code,
+                    "process_type_code": item.process_type_code,
+                    "department": departments[item.item_id].value,
+                    "required_quantity": required,
+                    "current_quantity": current,
+                    "allocated_quantity": max(current - available, 0),
+                    "available_quantity": available,
+                    "shortage_quantity": shortage,
+                    "phase": phase,
+                }
+            )
+        shortages_by_request[request_id] = shortages
+    return shortages_by_request
 
 
 def _log_inventory_change(

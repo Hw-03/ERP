@@ -1,6 +1,7 @@
 """격리 조회 측정 도구의 원본 보호와 통계 계약."""
 
 import asyncio
+import hashlib
 import importlib.util
 import sqlite3
 import json
@@ -118,6 +119,93 @@ def test_measurement_counts_http_errors_and_timeout():
     assert cancelled["cancelled"] == 2
 
 
+def test_identical_raw_bodies_reuse_semantic_hash_only_within_one_condition(monkeypatch):
+    module = load_script()
+    body = b'{"b":2, "a":1}'
+    normalized, raw_hashes = [], []
+    normalize, sha256 = module._semantic_payload, hashlib.sha256
+
+    def track_normalize(value):
+        if isinstance(value, dict):
+            normalized.append(value)
+        return normalize(value)
+
+    def track_sha256(value=b"", *args, **kwargs):
+        if value == body:
+            raw_hashes.append(1)
+        return sha256(value, *args, **kwargs)
+
+    monkeypatch.setattr(module, "_semantic_payload", track_normalize)
+    monkeypatch.setattr(module.hashlib, "sha256", track_sha256)
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda _request: httpx.Response(200, content=body)), base_url="http://benchmark.invalid") as client:
+            endpoint = module.parse_endpoint("same=/api/same")
+            first = await module.measure_endpoint(client, endpoint, requests=6, concurrency=3, warmup=0, timeout=5)
+            second = await module.measure_endpoint(client, endpoint, requests=2, concurrency=1, warmup=0, timeout=5)
+            return first, second
+
+    first, second = asyncio.run(run())
+    assert len(normalized) == 2
+    assert len(raw_hashes) == 8
+    for result, count in ((first, 6), (second, 2)):
+        assert result["completed"] == count
+        assert result["raw_checksums"] == {sha256(body).hexdigest(): count}
+        assert sum(result["semantic_checksums"].values()) == count
+        assert result["response_bytes"]["total"] == len(body) * count
+        assert result["errors"] == result["cancelled"] == 0
+
+
+def test_new_raw_bodies_are_normalized_even_when_only_volatile_values_change(monkeypatch):
+    module = load_script()
+    normalized = []
+    normalize = module._semantic_payload
+    bodies = iter([b'{"value":1,"queried_at":"a"}', b'{"value":1,"queried_at":"a"}',
+                   b'{"value":1,"queried_at":"b"}', b'{"value":2,"queried_at":"b"}'])
+
+    def track_normalize(value):
+        if isinstance(value, dict):
+            normalized.append(value)
+        return normalize(value)
+
+    monkeypatch.setattr(module, "_semantic_payload", track_normalize)
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda _request: httpx.Response(200, content=next(bodies))), base_url="http://benchmark.invalid") as client:
+            return await module.measure_endpoint(client, module.parse_endpoint("changing=/api/changing"), requests=4, concurrency=2, warmup=0, timeout=5)
+
+    result = asyncio.run(run())
+    assert len(normalized) == 3
+    assert sorted(result["raw_checksums"].values()) == [1, 1, 2]
+    assert sorted(result["semantic_checksums"].values()) == [1, 3]
+    assert result["completed"] == 4
+    assert result["errors"] == result["cancelled"] == 0
+
+
+def test_identical_invalid_json_preserves_raw_fallback_and_each_http_error(monkeypatch):
+    module = load_script()
+    body, decode_calls = b"invalid-json", []
+    decode = httpx.Response.json
+
+    def track_decode(response, **kwargs):
+        decode_calls.append(1)
+        return decode(response, **kwargs)
+
+    monkeypatch.setattr(httpx.Response, "json", track_decode)
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda _request: httpx.Response(503, content=body)), base_url="http://benchmark.invalid") as client:
+            return await module.measure_endpoint(client, module.parse_endpoint("invalid=/api/invalid"), requests=3, concurrency=2, warmup=0, timeout=5)
+
+    result = asyncio.run(run())
+    assert len(decode_calls) == 1
+    assert result["completed"] == result["errors"] == 3
+    assert result["cancelled"] == 0
+    assert result["status_counts"] == {"503": 3}
+    assert result["semantic_checksums"] == result["raw_checksums"] == {hashlib.sha256(body).hexdigest(): 3}
+    assert result["response_bytes"]["total"] == len(body) * 3
+
+
 def test_mixed_load_rotates_endpoints_and_reports_each_population():
     module = load_script()
     app = FastAPI()
@@ -192,6 +280,7 @@ def test_cli_measures_real_app_without_changing_snapshot_or_running_server(tmp_p
     assert "read-only" in report["metadata"]["transport"]
     assert report["metadata"]["snapshot_unchanged"] is True
     assert len(report["metadata"]["application_sha256"]) == 64
+    assert report["metadata"]["validation_policy"] == "per-response raw SHA256; semantic canonicalization reused only for identical raw SHA256 within one condition"
 
     failure = subprocess.run([
         sys.executable, str(SCRIPT), "--snapshot", str(snapshot), "--output", str(tmp_path / "failed.json"),
@@ -201,3 +290,43 @@ def test_cli_measures_real_app_without_changing_snapshot_or_running_server(tmp_p
        capture_output=True, text=True, timeout=30)
     assert failure.returncode == 1
     assert "private-value" not in failure.stdout + failure.stderr
+
+
+def test_cli_actor_header_authorizes_notifications_without_retaining_identity(tmp_path):
+    """The optional actor header reaches GET handlers but stays out of evidence."""
+    load_script()
+    from app.database import Base
+
+    snapshot, output = tmp_path / "snapshot.db", tmp_path / "report.json"
+    engine = create_engine(f"sqlite:///{snapshot}")
+    Base.metadata.create_all(engine)
+    engine.dispose()
+    original = snapshot.read_bytes()
+    actor = "12345678-1234-5678-1234-567812345678"
+    process = subprocess.run([
+        sys.executable, str(SCRIPT), "--snapshot", str(snapshot), "--output", str(output),
+        "--requests", "2", "--concurrency", "1", "--warmup", "1",
+        "--actor-employee-id", actor,
+        "--endpoint", f"notifications=/api/notifications?recipient_employee_id={actor}",
+    ], cwd=SCRIPT.parents[1], env={**os.environ, "PYTHONPATH": str(SCRIPT.parents[1])},
+       capture_output=True, text=True, timeout=30)
+    assert process.returncode == 0, process.stderr
+    report_text = output.read_text(encoding="utf-8")
+    report = json.loads(report_text)
+    assert report["results"][0]["status_counts"] == {"200": 2}
+    assert report["metadata"]["actor_header_configured"] is True
+    assert actor not in report_text + process.stdout + process.stderr
+    assert snapshot.read_bytes() == original
+
+
+def test_cli_rejects_invalid_actor_without_exposing_value_or_touching_snapshot(tmp_path):
+    load_script()
+    actor = "private-invalid-actor"
+    process = subprocess.run([
+        sys.executable, str(SCRIPT), "--snapshot", str(tmp_path / "missing.db"),
+        "--output", str(tmp_path / "report.json"), "--actor-employee-id", actor,
+    ], capture_output=True, text=True, timeout=30)
+    assert process.returncode == 2
+    assert "actor employee ID must be a UUID" in process.stderr
+    assert actor not in process.stdout + process.stderr
+    assert not (tmp_path / "report.json").exists()

@@ -74,7 +74,7 @@ import {
   shortageLines,
 } from "../../_warehouse_v2/pullFromWarehouse";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
-import { useBomListQuery } from "@/lib/queries/useBomQuery";
+import { useBomParentIdsQuery } from "@/lib/queries/useBomQuery";
 import { LoadFailureCard } from "../../common/LoadFailureCard";
 import { useIoPreselect } from "../../_warehouse_v2/useIoPreselect";
 import { setAuditScreen } from "@/lib/activity-audit-context";
@@ -152,13 +152,12 @@ export function MobileIoComposeWizard({
     showNotice: showFeedbackNotice,
     dismissNotice: dismissFeedbackNotice,
   } = useStatusTargetNotice();
-  const bomListQuery = useBomListQuery();
+  const bomParentIdsQuery = useBomParentIdsQuery();
   const bomParents = useMemo(
-    () => new Set((bomListQuery.data ?? []).map((row) => row.parent_item_id)),
-    [bomListQuery.data],
+    () => new Set(bomParentIdsQuery.data ?? []),
+    [bomParentIdsQuery.data],
   );
-  const bomParentsLoaded = bomListQuery.isSuccess;
-  const bomRevisionRef = useRef(revision);
+  const bomParentsLoaded = bomParentIdsQuery.isSuccess;
   const reservationOwnerRef = useRef(draftToRestore);
   const autosaveBatchIdRef = useRef<string | null>(null);
   const sessionCreationKeyRef = useRef<string | null>(null);
@@ -169,7 +168,7 @@ export function MobileIoComposeWizard({
   reservationOwnerRef.current = draftSession.currentReservationBatch;
   const state = useIoWorkState(defaultWorkType, operator?.department, getAvailable,
     (draftSession.latestBatch ?? draftSession.savedBatch)?.reservation_issue?.code === "stock_shortage");
-  const itemAddBlocked = state.workType !== "tube_material" && (bomListQuery.isPending || bomListQuery.isError);
+  const itemAddBlocked = state.workType !== "tube_material" && (bomParentIdsQuery.isPending || bomParentIdsQuery.isError);
   const materialOutbound = isMaterialWorkType(state.workType) && state.materialDirectionSelected && (state.subType === "outbound_supplier" || state.subType === "tube_outbound_supplier");
   const directionSelected = isMaterialWorkType(state.workType)
     ? state.materialDirectionSelected
@@ -281,12 +280,6 @@ export function MobileIoComposeWizard({
   useEffect(() => {
     setSearch(globalSearch);
   }, [globalSearch]);
-
-  useEffect(() => {
-    if (bomRevisionRef.current === revision) return;
-    bomRevisionRef.current = revision;
-    void bomListQuery.refetch();
-  }, [bomListQuery, revision]);
 
   useIoDraftRestore({
     draftToRestore,
@@ -831,17 +824,17 @@ export function MobileIoComposeWizard({
 
         {step === 3 && (
             <>
-              {bomListQuery.isPending && (
+              {bomParentIdsQuery.isPending && (
                 <p className="mb-3 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
                   BOM 확인 중입니다.
                 </p>
               )}
-              {bomListQuery.isError && (
+              {bomParentIdsQuery.isError && (
                 <LoadFailureCard
                   prefix=""
                   message="BOM 정보를 불러오지 못했습니다. 다시 시도해 주세요"
                   retryLabel="다시 시도"
-                  onRetry={() => { void bomListQuery.refetch(); }}
+                  onRetry={() => { void bomParentIdsQuery.refetch(); }}
                 />
               )}
               {/* 항목 8 — 스캔 시작 버튼은 당분간 UI에서 숨김(코드·핸들러 유지, hidden). */}

@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { AppNotification } from "@/lib/api/types";
-import { useDeleteNotificationMutation, useDeleteReadNotificationsMutation, useMarkNotificationsReadMutation, useNotificationsQuery } from "@/lib/queries/useNotificationsQuery";
+import { useDeleteNotificationMutation, useDeleteReadNotificationsMutation, useMarkNotificationsReadMutation, useNotificationUnreadCountQuery, useNotificationsQuery } from "@/lib/queries/useNotificationsQuery";
+import { queryKeys } from "@/lib/queries/keys";
 import { employeesApi } from "@/lib/api/employees";
 import { consumeLoginNotificationPopupPending, updateCurrentOperatorPreferences, type Operator } from "../login/useCurrentOperator";
 import type { NotificationDialogProps, NotificationFilter } from "./NotificationDialog";
@@ -35,51 +37,78 @@ export function useNotificationController({ operator, onNavigate, loginDialogEna
   loginDialogEnabled: boolean;
 }): NotificationController {
   const employeeId = operator?.employee_id;
+  const qc = useQueryClient();
   const markRead = useMarkNotificationsReadMutation();
   const deleteNotification = useDeleteNotificationMutation();
   const deleteRead = useDeleteReadNotificationsMutation();
-  const [open, setOpen] = useState(false);
+  const [openEmployeeId, setOpenEmployeeId] = useState<string | undefined>();
+  const open = !!employeeId && openEmployeeId === employeeId;
   const [filter, setFilter] = useState<NotificationFilter>("all");
   const [actionError, setActionError] = useState<string | null>(null);
   const [loginPopupUpdating, setLoginPopupUpdating] = useState(false);
   const visibilityRef = useRef<HTMLDivElement>(null);
   const employeeRef = useRef(employeeId);
   employeeRef.current = employeeId;
-  const allQuery = useNotificationsQuery(employeeId);
+  const countQuery = useNotificationUnreadCountQuery(employeeId, { enabled: !open });
+  const allQuery = useNotificationsQuery(employeeId, { enabled: open && filter === "all" });
   const unreadQuery = useNotificationsQuery(employeeId, {
     unreadOnly: true,
     enabled: open && filter === "unread",
   });
   const selectedQuery = filter === "unread" ? unreadQuery : allQuery;
-  const { data } = allQuery;
-
-  const countData = unreadQuery.data && unreadQuery.dataUpdatedAt > allQuery.dataUpdatedAt
-    ? unreadQuery.data : data;
-  const unread = countData?.unread_count ?? 0;
+  const loginQuery = open ? selectedQuery : countQuery;
+  const unread = countQuery.data?.count ?? 0;
   const actionsPending = markRead.isPending || deleteNotification.isPending || deleteRead.isPending;
 
   useEffect(() => {
-    setOpen(false);
+    setOpenEmployeeId(undefined);
     setFilter("all");
     setActionError(null);
     setLoginPopupUpdating(false);
   }, [employeeId]);
 
   useEffect(() => {
-    if (!employeeId || !data) return;
+    if (!employeeId || !loginQuery.isFetchedAfterMount || !loginQuery.isSuccess || loginQuery.isFetching) return;
     if (!isVisibleInMountedTree(visibilityRef.current)) return;
     if (!consumeLoginNotificationPopupPending(employeeId)) return;
-    if (!loginDialogEnabled || !operator?.loginPopupEnabled || unread <= 0) return;
+    if (open || !loginDialogEnabled || !operator?.loginPopupEnabled || unread <= 0) return;
+    void qc.invalidateQueries({ queryKey: queryKeys.notifications.unread(employeeId), exact: true, refetchType: "none" });
     setFilter("unread");
     setActionError(null);
-    setOpen(true);
-  }, [data, employeeId, loginDialogEnabled, operator?.loginPopupEnabled, unread]);
+    setOpenEmployeeId(employeeId);
+  }, [loginQuery.dataUpdatedAt, loginQuery.isFetchedAfterMount, loginQuery.isFetching, loginQuery.isSuccess, employeeId, loginDialogEnabled, open, operator?.loginPopupEnabled, qc, unread]);
 
   const openDialog = useCallback((): void => {
+    if (!employeeId) return;
+    void qc.cancelQueries({ queryKey: queryKeys.notifications.unreadCount(employeeId) });
+    void qc.invalidateQueries({ queryKey: queryKeys.notifications.list(employeeId), exact: true, refetchType: "none" });
     setFilter("all");
     setActionError(null);
-    setOpen(true);
-  }, []);
+    setOpenEmployeeId(employeeId);
+  }, [employeeId, qc]);
+
+  function closeDialog(): void {
+    if (employeeId) {
+      void qc.cancelQueries({ queryKey: queryKeys.notifications.list(employeeId) });
+      void countQuery.refetch();
+    }
+    setOpenEmployeeId(undefined);
+  }
+
+  function changeFilter(nextFilter: NotificationFilter): void {
+    if (employeeId && nextFilter !== filter) {
+      void qc.cancelQueries({
+        queryKey: filter === "unread" ? queryKeys.notifications.unread(employeeId) : queryKeys.notifications.list(employeeId),
+        exact: true,
+      });
+      void qc.invalidateQueries({
+        queryKey: nextFilter === "unread" ? queryKeys.notifications.unread(employeeId) : queryKeys.notifications.list(employeeId),
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    setFilter(nextFilter);
+  }
 
   async function handleItemClick(n: AppNotification): Promise<void> {
     if (!employeeId || actionsPending) return;
@@ -96,7 +125,7 @@ export function useNotificationController({ operator, onNavigate, loginDialogEna
       return;
     }
     if (employeeRef.current !== employeeId) return;
-    setOpen(false);
+    closeDialog();
     if (n.target_tab) {
       onNavigate?.({
         tab: n.target_tab,
@@ -154,8 +183,8 @@ export function useNotificationController({ operator, onNavigate, loginDialogEna
   return {
     visibilityRef, open: open && !!employeeId, openDialog, unread,
     dialogProps: {
-      items: selectedQuery.data?.items ?? [], unread, filter, onFilterChange: setFilter,
-      onClose: () => setOpen(false), onMarkAll: handleMarkAll, onItemClick: handleItemClick,
+      items: selectedQuery.data?.items ?? [], unread, filter, onFilterChange: changeFilter,
+      onClose: closeDialog, onMarkAll: handleMarkAll, onItemClick: handleItemClick,
       onDeleteItem: handleDeleteItem, onDeleteRead: handleDeleteRead,
       loginPopupEnabled: operator?.loginPopupEnabled ?? false, loginPopupUpdating,
       onToggleLoginPopup: () => void handleToggleLoginPopup(),

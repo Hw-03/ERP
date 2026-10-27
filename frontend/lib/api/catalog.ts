@@ -38,6 +38,7 @@ export const catalogApi = {
 
   // BOM --------------------------------------------------------------------
   getAllBOM: (signal?: AbortSignal) => fetcher<BOMDetailEntry[]>(toApiUrl("/api/bom"), signal),
+  getBOMParentIds: (signal?: AbortSignal) => fetcher<string[]>(toApiUrl("/api/bom/parent-ids"), signal),
   getBOM: (parentItemId: string, signal?: AbortSignal) => fetcher<BOMEntry[]>(toApiUrl(`/api/bom/${parentItemId}`), signal),
   getBOMTree: (parentItemId: string, options?: { departmentOrder?: "desc" }) => {
     const query = options?.departmentOrder ? `?department_order=${options.departmentOrder}` : "";

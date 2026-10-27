@@ -6,12 +6,13 @@ import base64
 import binascii
 import json
 import uuid
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy import and_, case, func, or_
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy.orm import Load, Session, aliased, joinedload, selectinload
 
 from app._actor import get_actor_emp, set_actor
 from app.database import get_db
@@ -21,6 +22,10 @@ from app.models import (
     InventoryOperation,
     Item,
     ShippingRequest,
+    ShippingAllocation,
+    ShippingRequestBomLine,
+    ShippingRequestChecklistLine,
+    ShippingRequestCompanionLine,
     ShippingRequestRevision,
     ShippingRequestStatusEnum,
     TransactionLog,
@@ -55,6 +60,7 @@ from app.services import shipping as shipping_svc
 from app.services import shipping_actions as shipping_actions_svc
 from app.services.shipping import ShippingConflictError, ShippingError
 from app.services.item_search import build_item_search_filter, get_search_config
+from app.services.read_singleflight import coalesced_read
 
 
 router = APIRouter()
@@ -152,6 +158,10 @@ def _to_response(
     db: Session,
     req: ShippingRequest,
     latest_preparation_revision: ShippingRequestRevision | None | object = _LATEST_REVISION_UNSET,
+    *,
+    tx_rows: list[TransactionLog] | None = None,
+    reversals: dict[uuid.UUID, InventoryOperation] | None = None,
+    shortages: list[dict] | None = None,
 ) -> ShippingRequestResponse:
     if latest_preparation_revision is _LATEST_REVISION_UNSET:
         latest_preparation_revision = (
@@ -163,19 +173,21 @@ def _to_response(
             .order_by(ShippingRequestRevision.created_at.desc(), ShippingRequestRevision.revision_id.desc())
             .first()
         )
-    tx_rows = (
-        db.query(TransactionLog)
-        .filter(TransactionLog.shipping_request_id == req.request_id)
-        .order_by(TransactionLog.created_at.asc(), TransactionLog.log_id.asc())
-        .all()
-    )
-    operation_ids = {log.operation_id for log in tx_rows if log.operation_id}
-    reversals = {
-        operation.reverses_operation_id: operation
-        for operation in db.query(InventoryOperation).filter(
-            InventoryOperation.reverses_operation_id.in_(operation_ids),
-        ).all()
-    } if operation_ids else {}
+    if tx_rows is None:
+        tx_rows = (
+            db.query(TransactionLog)
+            .filter(TransactionLog.shipping_request_id == req.request_id)
+            .order_by(TransactionLog.created_at.asc(), TransactionLog.log_id.asc())
+            .all()
+        )
+    if reversals is None:
+        operation_ids = {log.operation_id for log in tx_rows if log.operation_id}
+        reversals = {
+            operation.reverses_operation_id: operation
+            for operation in db.query(InventoryOperation).filter(
+                InventoryOperation.reverses_operation_id.in_(operation_ids),
+            ).all()
+        } if operation_ids else {}
     return ShippingRequestResponse(
         request_id=req.request_id,
         status=req.status,
@@ -275,10 +287,66 @@ def _to_response(
         ],
         stock_shortages=[
             ShippingStockShortageResponse(**shortage)
-            for shortage in shipping_svc.prepare_stock_shortages(db, req)
+            for shortage in (
+                shortages if shortages is not None else shipping_svc.prepare_stock_shortages(db, req)
+            )
         ],
         transaction_count=len(tx_rows),
     )
+
+
+def _request_response_options() -> tuple[Load, ...]:
+    """관계별 기존 정렬을 유지하며 응답에 필요한 객체를 일괄 로드한다."""
+    return (
+        joinedload(ShippingRequest.base_pf_item),
+        joinedload(ShippingRequest.final_pa_item),
+        joinedload(ShippingRequest.final_pf_item),
+        selectinload(ShippingRequest.bom_lines).joinedload(ShippingRequestBomLine.child_item),
+        selectinload(ShippingRequest.companion_lines).joinedload(ShippingRequestCompanionLine.item),
+        selectinload(ShippingRequest.checklist_lines).joinedload(ShippingRequestChecklistLine.item),
+        selectinload(ShippingRequest.allocations).joinedload(ShippingAllocation.item),
+        selectinload(ShippingRequest.events),
+    )
+
+
+def _to_responses(db: Session, requests: list[ShippingRequest]) -> list[ShippingRequestResponse]:
+    """목록의 거래·역분개·수정 이력·부족 재고를 요청 범위에서 일괄 조립한다."""
+    if not requests:
+        return []
+    request_ids = [req.request_id for req in requests]
+    latest_revisions = _latest_preparation_revisions(db, request_ids)
+    tx_rows = (
+        db.query(TransactionLog)
+        .options(joinedload(TransactionLog.item))
+        .filter(TransactionLog.shipping_request_id.in_(request_ids))
+        .order_by(TransactionLog.created_at.asc(), TransactionLog.log_id.asc())
+        .all()
+    )
+    transactions: dict[uuid.UUID, list[TransactionLog]] = defaultdict(list)
+    for log in tx_rows:
+        transactions[log.shipping_request_id].append(log)
+    operation_ids = {log.operation_id for log in tx_rows if log.operation_id}
+    reversals = {
+        operation.reverses_operation_id: operation
+        for operation in db.query(InventoryOperation).filter(
+            InventoryOperation.reverses_operation_id.in_(operation_ids),
+        ).all()
+    } if operation_ids else {}
+    shortages = shipping_svc.prepare_stock_shortages_for_requests(
+        db,
+        [req for req in requests if req.final_pa_item is not None and req.final_pf_item is not None],
+    )
+    return [
+        _to_response(
+            db,
+            req,
+            latest_revisions.get(req.request_id),
+            tx_rows=transactions.get(req.request_id, []),
+            reversals=reversals,
+            shortages=shortages.get(req.request_id),
+        )
+        for req in requests
+    ]
 
 
 def _action_or_422(db: Session, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
@@ -402,18 +470,18 @@ def component_change_independent(
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.STOCK_SHORTAGE, str(exc))
 
 @router.get("/requests", response_model=list[ShippingRequestResponse])
+@coalesced_read
 def list_requests(
     status_filter: Optional[ShippingRequestStatusEnum] = Query(None, alias="status"),
     db: Session = Depends(get_db),
 ):
-    query = db.query(ShippingRequest)
+    query = db.query(ShippingRequest).options(*_request_response_options())
     if status_filter is not None:
         query = query.filter(ShippingRequest.status == status_filter)
     else:
         query = query.filter(ShippingRequest.status != ShippingRequestStatusEnum.CANCELLED)
     rows = query.order_by(ShippingRequest.created_at.desc(), ShippingRequest.request_id.desc()).all()
-    latest_revisions = _latest_preparation_revisions(db, [row.request_id for row in rows])
-    return [_to_response(db, row, latest_revisions.get(row.request_id)) for row in rows]
+    return _to_responses(db, rows)
 
 
 @router.get("/requests/{request_id}", response_model=ShippingRequestResponse)

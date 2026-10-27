@@ -6,8 +6,10 @@
  * catalogApi의 BOM 관련 메서드를 React Query로 래핑.
  * reference 패턴: useModelsQuery.ts
  *
- * 3 query + 3 mutation:
- *   useBomQuery(parentId?) — 전체 BOM 목록 또는 특정 parentId의 BOM
+ * query + mutation:
+ *   useBomListQuery — 전체 BOM 목록
+ *   useBomParentIdsQuery — 입출고 BOM 부모 ID 목록
+ *   useBomQuery(parentId) — 특정 parentId의 BOM
  *   useBomTreeQuery(parentId) — BOM 트리
  *   useBomWhereUsedQuery(itemId) — 역방향 조회
  *   useCreateBomMutation — BOM 행 추가
@@ -49,7 +51,19 @@ function assertBomList(rows: unknown): asserts rows is BOMDetailEntry[] {
   }
 }
 
-async function fetchBomList(signal: AbortSignal): Promise<BOMDetailEntry[]> {
+/** 잘못된 응답을 빈 BOM 집합으로 취급해 낱개 작업으로 오판하지 않도록 한다. */
+function assertBomParentIds(ids: unknown): asserts ids is string[] {
+  if (!Array.isArray(ids) || ids.some((id) => typeof id !== "string" || !id.trim())) {
+    throw new BomListResponseError();
+  }
+}
+
+/** 전체 목록과 부모 ID 조회가 동일한 시간 제한·취소·응답 오류 정책을 공유한다. */
+async function fetchBomList<T>(
+  signal: AbortSignal,
+  fetchRows: (signal: AbortSignal) => Promise<T>,
+  assertRows: (rows: unknown) => asserts rows is T,
+): Promise<T> {
   const controller = new AbortController();
   let timedOut = false;
   const timeoutId = setTimeout(() => {
@@ -60,8 +74,8 @@ async function fetchBomList(signal: AbortSignal): Promise<BOMDetailEntry[]> {
   signal.addEventListener("abort", abortFromQuery, { once: true });
   if (signal.aborted) abortFromQuery();
   try {
-    const rows = await catalogApi.getAllBOM(controller.signal);
-    assertBomList(rows);
+    const rows = await fetchRows(controller.signal);
+    assertRows(rows);
     return rows;
   } catch (error) {
     if (timedOut && !signal.aborted) throw new BomListTimeoutError();
@@ -84,7 +98,18 @@ function shouldRetryBomList(error: unknown): boolean {
 export function useBomListQuery(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.bom.list(),
-    queryFn: ({ signal }) => fetchBomList(signal),
+    queryFn: ({ signal }) => fetchBomList(signal, catalogApi.getAllBOM, assertBomList),
+    enabled: options?.enabled,
+    retry: (failureCount, error) => failureCount < 1 && shouldRetryBomList(error),
+    retryDelay: () => BOM_LIST_RETRY_DELAY_MS,
+  });
+}
+
+/** 입출고 BOM 유무 판별에 필요한 전체 부모 ID 목록. */
+export function useBomParentIdsQuery(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: queryKeys.bom.parentIds(),
+    queryFn: ({ signal }) => fetchBomList(signal, catalogApi.getBOMParentIds, assertBomParentIds),
     enabled: options?.enabled,
     retry: (failureCount, error) => failureCount < 1 && shouldRetryBomList(error),
     retryDelay: () => BOM_LIST_RETRY_DELAY_MS,

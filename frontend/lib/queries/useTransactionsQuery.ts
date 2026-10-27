@@ -52,7 +52,7 @@ export function useTransactionsQuery(
 export function useTransactionsSummaryQuery(params?: SummaryParams) {
   return useQuery({
     queryKey: queryKeys.transactions.summary(params),
-    queryFn: () => productionApi.getTransactionsSummary(params),
+    queryFn: ({ signal }) => productionApi.getTransactionsSummary(params, { signal }),
     // KPI 집계도 내역과 함께 변동 → 짧게 (R2-1).
     staleTime: STALE_TIME.VOLATILE,
   });
@@ -61,7 +61,7 @@ export function useTransactionsSummaryQuery(params?: SummaryParams) {
 export function useTransactionReferenceSummariesQuery(params?: ReferenceSummaryParams) {
   return useQuery({
     queryKey: queryKeys.transactions.referenceSummaries(params),
-    queryFn: () => productionApi.getTransactionReferenceSummaries(params),
+    queryFn: ({ signal }) => productionApi.getTransactionReferenceSummaries(params, { signal }),
     staleTime: STALE_TIME.VOLATILE,
   });
 }

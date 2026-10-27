@@ -24,6 +24,16 @@ function headersOf(init: RequestInit): Headers {
 }
 
 describe("notificationsApi.listNotifications", () => {
+  it("상세 조회 취소 신호를 fetch에 전달한다", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ items: [], unread_count: 0 })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const controller = new AbortController();
+
+    await notificationsApi.listNotifications("e-1", false, controller.signal);
+
+    expect((fetchSpy.mock.calls[0] as [string, RequestInit])[1].signal).toBe(controller.signal);
+  });
+
   it("안 읽음 조회 옵션을 전달하고 수신자 헤더를 유지한다", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ items: [], unread_count: 2 })));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
@@ -48,6 +58,27 @@ describe("notificationsApi.listNotifications", () => {
     expect(url).toContain("/api/notifications");
     expect(url).toContain("recipient_employee_id=e-1");
     expect(headersOf(init).get("X-Actor-Employee-Id")).toBe("e-1");
+  });
+});
+
+describe("notificationsApi.getUnreadCount", () => {
+  it("상세 대신 경량 count API를 수신자 권한·감사 헤더와 취소 신호로 조회한다", async () => {
+    expect(notificationsApi).toHaveProperty("getUnreadCount");
+    window.sessionStorage.setItem("dexcowin_mes_operator", JSON.stringify({ employee_code: "E22" }));
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ count: 4 })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const controller = new AbortController();
+
+    const result = await notificationsApi.getUnreadCount("e 1", controller.signal);
+
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/notifications/unread-count?recipient_employee_id=e%201");
+    expect(headersOf(init).get("X-Actor-Employee-Id")).toBe("e 1");
+    expect(headersOf(init).get("X-MES-Employee-Code")).toBe("E22");
+    expect(headersOf(init).get("X-MES-Audit-Session")).toMatch(/^[a-f0-9-]+$/);
+    expect(headersOf(init).get("X-MES-Terminal-Id")).toMatch(/^[a-f0-9-]+$/);
+    expect(init.signal).toBe(controller.signal);
+    expect(result).toEqual({ count: 4 });
   });
 });
 

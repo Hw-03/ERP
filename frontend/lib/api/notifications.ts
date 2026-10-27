@@ -5,7 +5,7 @@
 import { ApiError, parseError, toApiUrl } from "../api-core";
 import { getAuditRequestHeaders } from "../activity-audit-context";
 import { readCurrentEmployeeCodeForLog } from "../operator-log-context";
-import type { NotificationListResponse, NotificationMarkReadPayload } from "./types";
+import type { NotificationListResponse, NotificationMarkReadPayload, NotificationUnreadCountResponse } from "./types";
 
 
 async function requestWithActor<T>(
@@ -30,13 +30,21 @@ async function requestWithActor<T>(
 }
 
 export const notificationsApi = {
-  listNotifications: (employeeId: string, unreadOnly = false) =>
+  listNotifications: (employeeId: string, unreadOnly = false, signal?: AbortSignal) =>
     requestWithActor<NotificationListResponse>(
       toApiUrl(
         "/api/notifications?recipient_employee_id=" + encodeURIComponent(employeeId) +
           (unreadOnly ? "&unread_only=true" : ""),
       ),
       employeeId,
+      { signal },
+    ),
+
+  getUnreadCount: (employeeId: string, signal?: AbortSignal) =>
+    requestWithActor<NotificationUnreadCountResponse>(
+      toApiUrl("/api/notifications/unread-count?recipient_employee_id=" + encodeURIComponent(employeeId)),
+      employeeId,
+      { signal },
     ),
 
   markNotificationsRead: (payload: NotificationMarkReadPayload) =>

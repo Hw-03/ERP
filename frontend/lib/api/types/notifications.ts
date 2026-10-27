@@ -37,6 +37,10 @@ export interface NotificationListResponse {
   unread_count: number;
 }
 
+export interface NotificationUnreadCountResponse {
+  count: number;
+}
+
 export interface NotificationMarkReadPayload {
   recipient_employee_id: string;
   /** 없으면 안 읽은 알림 전체를 읽음 처리. */

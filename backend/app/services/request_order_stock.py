@@ -65,21 +65,27 @@ def _unavailable(reason: RequestOrderStockReason) -> RequestOrderStockResponse:
 def recalculate_request_order_stock(
     entries: Sequence[StockHistoryEntry],
     current: StockTotals | None,
+    *,
+    output_log_ids: Collection[UUID] | None = None,
 ) -> dict[UUID, RequestOrderStockResponse]:
     """현재 재고까지 연결되는 실제 원장의 연속 구간만 요청순으로 역산한다.
 
     불확실 경계는 실제 시각으로 잡는다. 이후에 승인됐어도 그 경계 이전에 요청한
     거래는 표시하지 않아, 누락된 과거 효과를 건너뛰어 숫자를 만드는 일을 막는다.
+    출력 ID를 좁혀도 원장 검증과 역산은 전체 입력을 유지한다.
     """
+    visible_entries = entries if output_log_ids is None else [
+        entry for entry in entries if entry.log_id in output_log_ids
+    ]
     if current is None:
-        return {entry.log_id: _unavailable("missing_history") for entry in entries}
+        return {entry.log_id: _unavailable("missing_history") for entry in visible_entries}
     if min(current) < 0:
-        return {entry.log_id: _unavailable("negative_balance") for entry in entries}
+        return {entry.log_id: _unavailable("negative_balance") for entry in visible_entries}
 
     reversed_ids = {entry.reverses_log_id for entry in entries if entry.reverses_log_id}
     legacy_cancellations = [entry for entry in entries if entry.cancelled and entry.log_id not in reversed_ids]
     if any(entry.cancelled_at is None for entry in legacy_cancellations):
-        return {entry.log_id: _unavailable("missing_history") for entry in entries}
+        return {entry.log_id: _unavailable("missing_history") for entry in visible_entries}
     boundary = max((entry.cancelled_at for entry in legacy_cancellations), default=None)
     reason: RequestOrderStockReason = "missing_history"
     timestamp_counts = Counter(entry.created_at for entry in entries)
@@ -111,7 +117,7 @@ def recalculate_request_order_stock(
         verified.append((entry, delta))
         running = entry.before
 
-    result = {entry.log_id: _unavailable(reason) for entry in entries}
+    result = {entry.log_id: _unavailable(reason) for entry in visible_entries}
     running = current
     ordered = sorted(
         verified,
@@ -124,15 +130,17 @@ def recalculate_request_order_stock(
         before = StockTotals(running.warehouse - delta.warehouse, running.department - delta.department)
         if min(before) < 0:
             for older, _ in ordered[index:]:
-                result[older.log_id] = _unavailable("negative_balance")
+                if older.log_id in result:
+                    result[older.log_id] = _unavailable("negative_balance")
             break
-        result[entry.log_id] = RequestOrderStockResponse(
-            status="available",
-            warehouse_qty_before=before.warehouse,
-            warehouse_qty_after=running.warehouse,
-            department_qty_before=before.department,
-            department_qty_after=running.department,
-        )
+        if entry.log_id in result:
+            result[entry.log_id] = RequestOrderStockResponse(
+                status="available",
+                warehouse_qty_before=before.warehouse,
+                warehouse_qty_after=running.warehouse,
+                department_qty_before=before.department,
+                department_qty_after=running.department,
+            )
         running = before
     return result
 
@@ -149,8 +157,9 @@ def load_request_order_stock(
     item_ids: Collection[UUID],
     *,
     request_date_expr: ColumnElement,
+    output_log_ids: Collection[UUID] | None = None,
 ) -> dict[UUID, RequestOrderStockResponse]:
-    """페이지 대상 품목을 일괄 조회하며 호출부의 요청 시각 식과 읽기 트랜잭션을 공유한다."""
+    """전체 원장은 검증하되 출력 ID가 주어지면 그 행의 표시 응답만 생성한다."""
     if not item_ids:
         return {}
     department_totals = (
@@ -196,5 +205,7 @@ def load_request_order_stock(
         ))
     result: dict[UUID, RequestOrderStockResponse] = {}
     for item_id, entries in histories.items():
-        result.update(recalculate_request_order_stock(entries, currents.get(item_id)))
+        result.update(recalculate_request_order_stock(
+            entries, currents.get(item_id), output_log_ids=output_log_ids,
+        ))
     return result

@@ -34,6 +34,7 @@ import sys
 import time
 from typing import Any, Generator
 from urllib.parse import urlsplit
+import uuid
 
 import httpx
 from sqlalchemy import create_engine, event
@@ -133,6 +134,7 @@ async def measure_endpoint(client: httpx.AsyncClient, endpoint: Endpoint | list[
             response.raise_for_status()
     latency, sizes = [], []
     statuses, checksums, raw_checksums, failures = Counter(), Counter(), Counter(), Counter()
+    semantic_hashes: dict[str, str] = {}
     pending = iter(range(requests))
     cancelled = 0
     endpoint_latencies: dict[str, list[float]] = {target.name: [] for target in endpoints}
@@ -156,13 +158,18 @@ async def measure_endpoint(client: httpx.AsyncClient, endpoint: Endpoint | list[
             else:
                 statuses[str(response.status_code)] += 1
                 sizes.append(len(response.content))
-                raw_checksums[hashlib.sha256(response.content).hexdigest()] += 1
-                try:
-                    semantic = json.dumps(_semantic_payload(response.json()), sort_keys=True,
-                                          separators=(",", ":"), ensure_ascii=False).encode()
-                except ValueError:
-                    semantic = response.content
-                checksums[hashlib.sha256(semantic).hexdigest()] += 1
+                raw_digest = hashlib.sha256(response.content).hexdigest()
+                raw_checksums[raw_digest] += 1
+                semantic_digest = semantic_hashes.get(raw_digest)
+                if semantic_digest is None:
+                    try:
+                        semantic_digest = hashlib.sha256(json.dumps(
+                            _semantic_payload(response.json()), sort_keys=True,
+                            separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+                    except ValueError:
+                        semantic_digest = raw_digest
+                    semantic_hashes[raw_digest] = semantic_digest
+                checksums[semantic_digest] += 1
             finally:
                 duration = (time.perf_counter() - started) * 1000
                 latency.append(duration)
@@ -234,7 +241,9 @@ async def run_benchmark(args: argparse.Namespace) -> dict[str, Any]:
     results = []
     try:
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app, raise_app_exceptions=False),
-                                     base_url="http://benchmark.invalid", follow_redirects=False) as client:
+                                     base_url="http://benchmark.invalid", follow_redirects=False,
+                                     headers=({"X-Actor-Employee-Id": str(args.actor_employee_id)}
+                                              if args.actor_employee_id else None)) as client:
             for concurrency in args.concurrency:
                 workloads = [endpoints] if args.mixed else endpoints
                 for endpoint in workloads:
@@ -260,6 +269,8 @@ async def run_benchmark(args: argparse.Namespace) -> dict[str, Any]:
             "python": platform.python_version(), "platform": platform.platform(), "pid": os.getpid(),
             "application_source": str(application_root), "application_sha256": application_hash.hexdigest(),
             "snapshot_sha256": snapshot_hash, "snapshot_unchanged": snapshot_unchanged,
+            "actor_header_configured": args.actor_employee_id is not None,
+            "validation_policy": "per-response raw SHA256; semantic canonicalization reused only for identical raw SHA256 within one condition",
             "percentile_method": "nearest_rank", "volatile_response_keys": sorted(VOLATILE_RESPONSE_KEYS),
             "resource_limits": "CPU/latency include client, ASGI server and checksum validation in one process; memory/OS scheduling/network not measured",
             "warmup_excluded": True, "timeout_seconds": args.timeout}, "results": results}
@@ -275,9 +286,15 @@ def main() -> None:
     parser.add_argument("--concurrency", type=int, nargs="+", default=[1, 5, 10, 20])
     parser.add_argument("--endpoint", action="append", help="NAME=/api/path?query (repeatable; no credentials)")
     parser.add_argument("--mixed", action="store_true", help="Rotate endpoints within one shared concurrent workload")
+    parser.add_argument("--actor-employee-id", help="Optional UUID actor header for recipient-protected reads; never logged")
     parser.add_argument("--warmup", type=int, default=3)
     parser.add_argument("--timeout", type=float, default=120)
     args = parser.parse_args()
+    if args.actor_employee_id is not None:
+        try:
+            args.actor_employee_id = uuid.UUID(args.actor_employee_id)
+        except ValueError:
+            parser.error("actor employee ID must be a UUID")
     if args.requests < 1 or args.warmup < 0 or args.timeout <= 0 or min(args.concurrency) < 1:
         parser.error("requests, concurrency and timeout must be positive; warmup must be nonnegative")
     try:

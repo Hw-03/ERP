@@ -46,7 +46,7 @@ import {
   type StatusTargetNotice as StatusTargetNoticeState,
 } from "../common/StatusTargetNotice";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
-import { useBomListQuery } from "@/lib/queries/useBomQuery";
+import { useBomParentIdsQuery } from "@/lib/queries/useBomQuery";
 import { LoadFailureCard } from "../common/LoadFailureCard";
 import {
   captureIoOperation,
@@ -173,14 +173,13 @@ export function IoComposeView({
   } = useStatusTargetNotice();
   const [draftSaveNotice, setDraftSaveNotice] = useState<DraftSaveNotice | null>(null);
   const draftSaveNoticeIdRef = useRef(0);
-  const bomListQuery = useBomListQuery();
+  const bomParentIdsQuery = useBomParentIdsQuery();
   // 빈 배열도 성공한 BOM 목록이다. 실패·로딩은 품목을 BOM 없음으로 오인하지 않는다.
   const bomParents = useMemo(
-    () => new Set((bomListQuery.data ?? []).map((row) => row.parent_item_id)),
-    [bomListQuery.data],
+    () => new Set(bomParentIdsQuery.data ?? []),
+    [bomParentIdsQuery.data],
   );
-  const bomParentsLoaded = bomListQuery.isSuccess;
-  const bomRevisionRef = useRef(revision);
+  const bomParentsLoaded = bomParentIdsQuery.isSuccess;
   // BOM 부모 품목으로 진입한 경우 자동 추가하지 않고 Step 3 picker 에서 row 만 강조한다.
   const [highlightItemId, setHighlightItemId] = useState<string | null>(null);
   const restoredDraftRef = useRef<string | null>(null);
@@ -202,7 +201,7 @@ export function IoComposeView({
   const state = useIoWorkState(defaultWorkType, operator?.department, getAvailable,
     (draftSession.latestBatch ?? draftSession.savedBatch)?.reservation_issue?.code === "stock_shortage");
   const pauseRevisionStale = Boolean(stocktakePause && draftSession.latestBatch && draftSession.latestBatch.revision !== draftSession.savedBatch?.revision);
-  const itemAddBlocked = state.workType !== "tube_material" && (bomListQuery.isPending || bomListQuery.isError);
+  const itemAddBlocked = state.workType !== "tube_material" && (bomParentIdsQuery.isPending || bomParentIdsQuery.isError);
   const authorizedEntryIntent = entryIntent
     && IO_WORK_TYPES.some((row) => row.id === entryIntent.workType)
     && canSeeWorkType(entryIntent.workType, operator)
@@ -393,12 +392,6 @@ export function IoComposeView({
     if (state.step !== 4) return;
     void onRefreshItems?.().catch(() => {});
   }, [state.step, onRefreshItems]);
-
-  useEffect(() => {
-    if (bomRevisionRef.current === revision) return;
-    bomRevisionRef.current = revision;
-    void bomListQuery.refetch();
-  }, [bomListQuery, revision]);
 
   useIoDraftRestore({
     draftToRestore,
@@ -1418,18 +1411,18 @@ export function IoComposeView({
             chromeOnly
             fill
           >
-            {bomListQuery.isPending && (
+            {bomParentIdsQuery.isPending && (
               <p className="mb-3 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
                 BOM 확인 중입니다.
               </p>
             )}
-            {bomListQuery.isError && (
+            {bomParentIdsQuery.isError && (
               <div className="mb-3">
                 <LoadFailureCard
                   prefix=""
                   message="BOM 정보를 불러오지 못했습니다. 다시 시도해 주세요"
                   retryLabel="다시 시도"
-                  onRetry={() => { void bomListQuery.refetch(); }}
+                  onRetry={() => { void bomParentIdsQuery.refetch(); }}
                 />
               </div>
             )}

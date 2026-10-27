@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { notificationsApi } from "@/lib/api/notifications";
 import type { NotificationListResponse } from "@/lib/api/types";
 import { queryKeys } from "./keys";
-import { useMarkNotificationsReadMutation, useNotificationsQuery } from "./useNotificationsQuery";
+import { useDeleteNotificationMutation, useDeleteReadNotificationsMutation, useMarkNotificationsReadMutation, useNotificationsQuery } from "./useNotificationsQuery";
+import * as notificationQueries from "./useNotificationsQuery";
 
 const employeeId = "employee-1";
 const key = queryKeys.notifications.list(employeeId);
@@ -29,6 +30,14 @@ const read: NotificationListResponse = {
   unread_count: 0,
 };
 const clients: QueryClient[] = [];
+
+describe("알림 count 키", () => {
+  it("직원별 count 키를 상세 목록과 분리한다", () => {
+    expect(queryKeys.notifications).toHaveProperty("unreadCount");
+    expect(queryKeys.notifications.unreadCount(employeeId)).toEqual(["notifications", "unreadCount", employeeId]);
+    expect(queryKeys.notifications.unreadCount("employee-2")).not.toEqual(queryKeys.notifications.unreadCount(employeeId));
+  });
+});
 
 function makeClient(): QueryClient {
   const client = new QueryClient({
@@ -61,6 +70,27 @@ afterEach(() => {
 });
 
 describe("알림 읽음 캐시", () => {
+  it("읽음 저장 성공 뒤 count를 동기화하고 이전 count 조회가 늦게 도착해도 되돌리지 않는다", async () => {
+    const client = makeClient();
+    const countKey = queryKeys.notifications.unreadCount(employeeId);
+    client.setQueryData(countKey, { count: 1 });
+    const oldCount = deferred<{ count: number }>();
+    const saved = deferred<NotificationListResponse>();
+    const previousFetch = client.fetchQuery({ queryKey: countKey, staleTime: 0, queryFn: ({ signal }) => {
+      void signal.aborted;
+      return oldCount.promise;
+    } }).catch(() => undefined);
+    vi.spyOn(notificationsApi, "markNotificationsRead").mockReturnValue(saved.promise);
+    const { result } = renderHook(() => useMarkNotificationsReadMutation(), { wrapper: makeWrapper(client) });
+    act(() => result.current.mutate({ recipient_employee_id: employeeId }));
+    expect(client.getQueryData(countKey)).toEqual({ count: 1 });
+    await act(async () => saved.resolve(read));
+    await waitFor(() => expect(client.getQueryData(countKey)).toEqual({ count: 0 }));
+    await act(async () => oldCount.resolve({ count: 1 }));
+    await previousFetch;
+    expect(client.getQueryData(countKey)).toEqual({ count: 0 });
+  });
+
   it.each([false, true])("전체 응답으로 오래된 미읽음 목록을 덮지 않는다 (모두 읽음=%s)", async (all) => {
     const client = makeClient();
     const unreadKey = queryKeys.notifications.unread(employeeId);
@@ -134,7 +164,7 @@ describe("알림 읽음 캐시", () => {
     }));
 
     await waitFor(() => expect(result.current.query.data).toEqual(read));
-    expect(list).toHaveBeenCalledWith(employeeId);
+    expect(list).toHaveBeenCalledWith(employeeId, false, expect.any(AbortSignal));
     expect(client.getQueryState(otherKey)?.isInvalidated).toBe(false);
     expect(client.getQueryData(otherKey)).toEqual(unread);
     await waitFor(() => expect(result.current.mutation.isSuccess).toBe(true));
@@ -182,6 +212,8 @@ describe("알림 읽음 캐시", () => {
 
   it("저장 중이거나 실패하면 기존 미읽음 상태를 유지한다", async () => {
     const client = makeClient();
+    const countKey = queryKeys.notifications.unreadCount(employeeId);
+    client.setQueryData(countKey, { count: 1 });
     const response = deferred<NotificationListResponse>();
     vi.spyOn(notificationsApi, "markNotificationsRead").mockReturnValue(response.promise);
     const { result } = renderHook(() => useMarkNotificationsReadMutation(), { wrapper: makeWrapper(client) });
@@ -191,9 +223,57 @@ describe("알림 읽음 캐시", () => {
       outcome = result.current.mutateAsync({ recipient_employee_id: employeeId }).catch((error: unknown) => error);
     });
     expect(client.getQueryData(key)).toEqual(unread);
+    expect(client.getQueryData(countKey)).toEqual({ count: 1 });
     await act(async () => response.reject(saveError));
     expect(await outcome).toBe(saveError);
     expect(client.getQueryData(key)).toEqual(unread);
+    expect(client.getQueryData(countKey)).toEqual({ count: 1 });
+  });
+});
+
+describe("알림 count 조회", () => {
+  it("새 count 훅을 직원별로 조회하고 화면 포커스·재연결에서 fresh 캐시도 재확인한다", async () => {
+    expect(notificationQueries).toHaveProperty("useNotificationUnreadCountQuery");
+    const client = makeClient();
+    const countKey = queryKeys.notifications.unreadCount(employeeId);
+    client.setQueryData(countKey, { count: 9 });
+    const count = vi.spyOn(notificationsApi, "getUnreadCount").mockResolvedValue({ count: 3 });
+    const { result } = renderHook(() => notificationQueries.useNotificationUnreadCountQuery(employeeId), { wrapper: makeWrapper(client) });
+    await waitFor(() => expect(result.current.data).toEqual({ count: 3 }));
+    expect(count).toHaveBeenCalledTimes(1);
+    count.mockResolvedValue({ count: 2 });
+    act(() => focusManager.setFocused(false));
+    act(() => focusManager.setFocused(true));
+    await waitFor(() => expect(result.current.data).toEqual({ count: 2 }));
+    count.mockResolvedValue({ count: 1 });
+    act(() => onlineManager.setOnline(false));
+    act(() => onlineManager.setOnline(true));
+    await waitFor(() => expect(result.current.data).toEqual({ count: 1 }));
+    expect(client.getQueryData(key)).toEqual(unread);
+  });
+
+  it.each(["one", "read"] as const)("삭제(%s) 성공은 count를 임의 감소시키지 않고 늦은 응답을 취소한 후 정확히 재조회한다", async (mode) => {
+    expect(notificationQueries).toHaveProperty("useNotificationUnreadCountQuery");
+    const client = makeClient();
+    const countKey = queryKeys.notifications.unreadCount(employeeId);
+    client.setQueryData(countKey, { count: 3 });
+    const oldCount = deferred<{ count: number }>();
+    const freshCount = deferred<{ count: number }>();
+    const count = vi.spyOn(notificationsApi, "getUnreadCount").mockReturnValueOnce(oldCount.promise).mockReturnValue(freshCount.promise);
+    vi.spyOn(notificationsApi, "deleteNotification").mockResolvedValue();
+    vi.spyOn(notificationsApi, "deleteReadNotifications").mockResolvedValue();
+    const { result } = renderHook(() => ({ query: notificationQueries.useNotificationUnreadCountQuery(employeeId), single: useDeleteNotificationMutation(), read: useDeleteReadNotificationsMutation() }), { wrapper: makeWrapper(client) });
+    await waitFor(() => expect(count).toHaveBeenCalledTimes(1));
+    act(() => {
+      if (mode === "one") result.current.single.mutate({ employeeId, notificationId: "already-read" });
+      else result.current.read.mutate(employeeId);
+    });
+    await waitFor(() => expect(count).toHaveBeenCalledTimes(2));
+    expect(result.current.query.data).toEqual({ count: 3 });
+    await act(async () => freshCount.resolve({ count: 3 }));
+    await act(async () => oldCount.resolve({ count: 99 }));
+    await waitFor(() => expect((mode === "one" ? result.current.single : result.current.read).isSuccess).toBe(true));
+    expect(client.getQueryData(countKey)).toEqual({ count: 3 });
   });
 });
 
@@ -212,7 +292,7 @@ describe("다른 기기에서 읽은 알림", () => {
     const client = makeClient();
     const { result } = renderHook(() => useNotificationsQuery(employeeId, { unreadOnly: true }), { wrapper: makeWrapper(client) });
     await waitFor(() => expect(result.current.data).toEqual(filtered));
-    expect(list).toHaveBeenCalledWith(employeeId, true);
+    expect(list).toHaveBeenCalledWith(employeeId, true, expect.any(AbortSignal));
     expect(client.getQueryData(key)).toEqual(unread);
   });
 

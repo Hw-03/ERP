@@ -90,6 +90,7 @@ export const queryKeys = {
   bom: {
     all: ["bom"] as const,
     list: () => ["bom", "list"] as const,
+    parentIds: () => ["bom", "parentIds"] as const,
     detail: (parentId: string) => ["bom", "detail", parentId] as const,
     tree: (parentId: string) => ["bom", "tree", parentId] as const,
     whereUsed: (itemId: string) => ["bom", "whereUsed", itemId] as const,
@@ -127,6 +128,7 @@ export const queryKeys = {
   },
   notifications: {
     all: ["notifications"] as const,
+    unreadCount: (employeeId: string) => ["notifications", "unreadCount", employeeId] as const,
     list: (employeeId: string) => ["notifications", "list", employeeId] as const,
     unread: (employeeId: string) => ["notifications", "list", employeeId, "unread"] as const,
   },

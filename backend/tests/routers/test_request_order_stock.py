@@ -2,9 +2,11 @@
 
 from datetime import datetime, timedelta
 
+from fastapi.testclient import TestClient
 import pytest
 
-from app.models import Employee, Inventory, InventoryLocation, IoBatch, TransactionLog, TransactionTypeEnum
+from app.models import Employee, Inventory, InventoryLocation, IoBatch, Item, TransactionLog, TransactionTypeEnum
+from app.schemas.transaction import RequestOrderStockResponse
 
 
 def test_stock_loader_reads_only_calculation_columns(db_session, delayed_adjustment):
@@ -68,6 +70,31 @@ def _rows(client, **params):
     response = client.get("/api/inventory/transactions/display-groups", params=params)
     assert response.status_code == 200, response.text
     return [row for group in response.json()["groups"] for row in group["logs"]], response.json()
+
+
+def test_page_constructs_stock_responses_only_for_visible_logs(
+    client: TestClient, delayed_adjustment: tuple[Item, list[TransactionLog]], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Retain full-ledger validation without constructing responses for other pages."""
+    from app.services import request_order_stock
+
+    item, _logs = delayed_adjustment
+    all_rows, _ = _rows(client, item_id=str(item.item_id))
+    expected = {row["log_id"]: row["request_order_stock"] for row in all_rows}
+    response_type = request_order_stock.RequestOrderStockResponse
+    constructed = []
+
+    def response(**values: object) -> RequestOrderStockResponse:
+        """Observe actual response allocations while preserving the real schema validation."""
+        constructed.append(values)
+        return response_type(**values)
+
+    monkeypatch.setattr(request_order_stock, "RequestOrderStockResponse", response)
+    rows, page = _rows(client, item_id=str(item.item_id), limit=1)
+
+    assert page["has_more"] and len(rows) == 1
+    assert rows[0]["request_order_stock"] == expected[rows[0]["log_id"]]
+    assert len(constructed) <= 2 * len(rows), "responses were constructed for hidden ledger entries"
 
 
 def test_delayed_approval_recalculates_request_order_without_changing_records(client, db_session, delayed_adjustment):

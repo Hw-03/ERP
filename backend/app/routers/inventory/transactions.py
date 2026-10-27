@@ -51,7 +51,7 @@ from app.services import legacy_inventory_operation_adoption as legacy_adoption_
 from app.services.transaction_display_groups import DisplayGroup, DisplayGroupRecord, group_display_records
 from app.services.request_order_stock import load_request_order_stock
 from app.services.read_singleflight import coalesced_read
-from app.services.stocktake_history import observation_groups, hydrate_observation_groups
+from app.services.stocktake_history import observation_groups, hydrate_observation_groups, observation_department_counts
 from app.services import inventory_operation_history
 from app.services.export_helpers import csv_streaming_response
 from app.services.pin_auth import verify_pin
@@ -760,6 +760,7 @@ def list_transaction_display_groups(
     request_order_stock = load_request_order_stock(
         db, {log.item_id for group in page_groups for log in group.logs},
         request_date_expr=requested_at_order,
+        output_log_ids=selected_ids,
     )
     for group in page_groups:
         for log in group.logs:
@@ -970,7 +971,7 @@ def get_transactions_summary(
     )
 
     # Typed census evidence includes unchanged counts and replaces its adjustment logs.
-    stocktake_groups = observation_groups(
+    stocktake_counts = observation_department_counts(
         db, transaction_types=transaction_types, operation_keys=operation_keys,
         search=search, department=department, model=model, process_step=process_step,
         date_from=date_from, date_to=date_to, include_archived=include_archived,
@@ -1053,15 +1054,15 @@ def get_transactions_summary(
         .all()
     )
     department_counts = {r.dept: int(r.c) for r in dept_rows if r.dept is not None}
-    for group in stocktake_groups:
-        location = group.stocktake["department"]
-        department_counts[location] = department_counts.get(location, 0) + 1
+    for location, count in stocktake_counts.items():
+        department_counts[location] = department_counts.get(location, 0) + count
+    stocktake_total = sum(stocktake_counts.values())
 
     return TransactionSummaryResponse(
-        total=int(agg.total or 0) + len(stocktake_groups),
+        total=int(agg.total or 0) + stocktake_total,
         warehouse_count=int(agg.warehouse_count or 0),
         dept_count=int(agg.dept_count or 0),
-        adjust_count=int(agg.adjust_count or 0) + len(stocktake_groups),
+        adjust_count=int(agg.adjust_count or 0) + stocktake_total,
         department_counts=department_counts,
     )
 

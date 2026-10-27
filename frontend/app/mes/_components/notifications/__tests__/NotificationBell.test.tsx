@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render as renderComponent, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppNotification } from "@/lib/api/types";
 
@@ -36,6 +37,11 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/queries/useNotificationsQuery", () => ({
+  useNotificationUnreadCountQuery: () => ({
+    data: state.queryHasData ? { count: state.unreadNotifications?.unread_count ?? state.notifications.unread_count } : undefined,
+    dataUpdatedAt: 1, isFetchedAfterMount: true, isSuccess: state.queryHasData && !state.queryError,
+    isFetching: state.queryLoading, refetch: state.refetch,
+  }),
   useNotificationsQuery: (employeeId: string, options?: { unreadOnly?: boolean; enabled?: boolean }) => {
     state.queryCalls(employeeId, options);
     return { data: state.queryHasData ? (options?.unreadOnly ? state.unreadNotifications ?? state.notifications : state.notifications) : undefined, dataUpdatedAt: options?.unreadOnly && state.unreadNotifications ? 2 : 1, isLoading: state.queryLoading, error: state.queryError, refetch: state.refetch };
@@ -66,6 +72,11 @@ vi.mock("../../login/useCurrentOperator", () => ({
 import { NotificationBell, NotificationBellButton } from "../NotificationBell";
 import { NotificationDialog } from "../NotificationDialog";
 import { useNotificationController } from "../useNotificationController";
+
+function render(ui: Parameters<typeof renderComponent>[0]) {
+  const client = new QueryClient();
+  return renderComponent(ui, { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+}
 
 function MobileHost({ more = false }: { more?: boolean }) {
   const controller = useNotificationController({ operator: state.operator, loginDialogEnabled: true });
