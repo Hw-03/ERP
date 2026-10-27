@@ -1,9 +1,10 @@
 """Reservation read models preserve source stock and only forecast open effects."""
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable
 import uuid
 
 from sqlalchemy import event
+from sqlalchemy.orm import Session
 import pytest
 
 from app.models import (
@@ -672,3 +673,55 @@ def test_current_submission_terminal_line_is_not_a_missing_mapping(db_session, m
     assert result["summary"]["expected_out_quantity"] == 0
     assert result["summary"]["forecast_complete"] is True
     assert result["works"][0]["forecast_issue"] is None
+
+
+@pytest.mark.parametrize("closed_status", [Status.COMPLETED, Status.CANCELLED, Status.REJECTED, Status.FAILED_APPROVAL])
+def test_item_status_does_not_load_unrelated_terminal_requests(
+    db_session: Session, make_item: Callable[..., Any], closed_status: Status,
+) -> None:
+    """Historical requests cannot affect current quantities or open-work mapping evidence."""
+    from app.services.work_reservation_queries import bulk_inventory_work_status
+
+    item = make_item(process_type_code="AR")
+    historical, old_line, _ = make_work(db_session, item, status="completed", reservation_status="inactive")
+    old = add_request(db_session, historical, old_line, status=closed_status)
+    old_id = old.request_id
+    current, line, _ = make_work(db_session, item, status="partially_completed", reservation_status="inactive")
+    current.submitted_at = datetime(2026, 10, 20, 9)
+    evidence = add_request(db_session, current, line, status=Status.COMPLETED)
+    evidence.created_at = datetime(2026, 10, 20, 9, 1)
+    evidence_id, item_id = evidence.request_id, item.item_id
+    db_session.flush()
+    db_session.expunge_all()
+    loaded_requests = set()
+
+    def record_load(_session: Session, instance: Any) -> None:
+        """Observe actual ORM hydration without depending on SQL formatting."""
+        if isinstance(instance, StockRequest):
+            loaded_requests.add(instance.request_id)
+
+    event.listen(db_session, "loaded_as_persistent", record_load)
+    try:
+        result = bulk_inventory_work_status(db_session, [item_id])[item_id]
+    finally:
+        event.remove(db_session, "loaded_as_persistent", record_load)
+
+    assert old_id not in loaded_requests
+    assert evidence_id in loaded_requests
+    assert result["summary"]["forecast_complete"] is True
+    assert result["summary"]["approval_reserved_quantity"] == 0
+    assert result["summary"]["transfer_in_quantity"] == 0
+
+
+def test_item_status_keeps_open_request_from_a_closed_batch(
+    db_session: Session, make_item: Callable[..., Any],
+) -> None:
+    """An open physical reservation still counts even if its operation is terminal."""
+    from app.services.work_reservation_queries import bulk_inventory_work_status
+
+    item = make_item(process_type_code="AR")
+    historical, line, _ = make_work(db_session, item, status="completed", reservation_status="inactive")
+    add_request(db_session, historical, line)
+    result = bulk_inventory_work_status(db_session, [item.item_id])[item.item_id]
+    assert result["summary"]["approval_reserved_quantity"] == 3
+    assert result["works"] == []

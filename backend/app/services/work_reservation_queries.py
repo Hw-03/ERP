@@ -6,7 +6,7 @@ from typing import Any, Iterable
 import uuid
 
 from pydantic import ValidationError
-from sqlalchemy import or_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import (
@@ -255,7 +255,7 @@ def _related_work(db: Session, batch: IoBatch, owners: dict[uuid.UUID, Employee]
 
 
 def _context(db: Session, batches: list[IoBatch], item_ids: Iterable[uuid.UUID] = ()) -> tuple[dict, list, list, dict, dict]:
-    """Load all current stock sources together, including independent requests for requested items."""
+    """Keep batch mapping evidence, but load unrelated item requests only while open."""
     batch_ids = [batch.batch_id for batch in batches]
     ids = list(item_ids)
     owners = {row.employee_id: row for row in db.query(Employee).filter(
@@ -268,7 +268,13 @@ def _context(db: Session, batches: list[IoBatch], item_ids: Iterable[uuid.UUID] 
     ledger_departments = {row.batch_id: department for row, department in ledger_rows}
     requests = db.query(StockRequest).filter(or_(
         StockRequest.operation_batch_id.in_(batch_ids),
-        StockRequest.lines.any(StockRequestLine.item_id.in_(ids)),
+        and_(
+            StockRequest.status.in_(OPEN_STATUSES),
+            StockRequest.lines.any(and_(
+                StockRequestLine.item_id.in_(ids),
+                StockRequestLine.status.in_(OPEN_STATUSES),
+            )),
+        ),
     )).options(selectinload(StockRequest.lines)).all()
     identity_ids = {row.item_id for row in ledger} | {line.item_id for request in requests for line in request.lines}
     identity_ids.update(line.item_id for batch in batches for bundle in batch.bundles for line in bundle.lines)
