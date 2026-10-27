@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { ThemeColor } from "./ThemeColor";
+import { ClientErrorReporter } from "./ClientErrorReporter";
 
 // Pretendard 변수 폰트를 self-host 로드 — OS/브라우저와 무관하게 동일 렌더.
 // 변수 폰트(45~920)라 font-black(900)·font-extrabold(800)까지 한 파일로 커버한다.
@@ -50,7 +51,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko" className={pretendard.variable}>
-      <body className="antialiased"><ThemeColor />{children}</body>
+      <body className="antialiased"><ClientErrorReporter /><ThemeColor />{children}</body>
     </html>
   );
 }

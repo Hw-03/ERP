@@ -261,6 +261,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\register-runtime-tasks.ps
 - 회전: `ConcurrentRotatingFileHandler` 기반 다중 프로세스 안전 회전, 5MiB × 기본 5 backup (`mes.log.1` ~ `mes.log.5`)
 - 환경 변수: `LOG_LEVEL` (기본 INFO), `LOG_BACKUP_COUNT` (1 이상의 정수, 기본 5; 잘못된 값은 기본값 사용), `MES_RUNTIME_ROOT` (전체 런타임 루트 재정의)
 - 내용: 전역 예외 핸들러가 잡은 ValueError/IntegrityError/Exception + INFO 레벨 메시지
+- 브라우저 미처리 오류(`window.error`, `unhandledrejection`)와 React 오류 경계는 `/api/client-events`로 best-effort 전송하며 `evt=ui_error`로 기록한다. `occurred_at`은 브라우저 발생 시각(UTC ISO), `received_at`은 서버 수신 시각(UTC ISO)이다. 파일 로그의 앞쪽 시각은 서버 로컬 시각(KST)이며, 두 시각의 차이는 PC 시계 오차나 전송 지연을 포함할 수 있다.
+- 오류의 `emp`·`employee_name`은 현재 탭의 작업자 세션을 서버가 검증한 값이다. 탭 세션이 없으면 서명 감사 쿠키와 현재 탭 사번이 일치하는 활성 직원만 사용한다. 미확인 계정은 `emp=-`로 남기며 `reported_employee_code`는 브라우저가 보고한 참고값이다. 다른 탭의 쿠키나 임의 헤더를 검증된 직원으로 기록하지 않는다.
+- 오류 유형·메시지·제한된 스택·경로·화면 정보를 남기고 활동 감사에는 `ui_error`/`failed`와 오류 메시지를 기록한다. URL 쿼리와 명시된 인증정보 값은 제거하고, PIN·토큰·쿠키·저장소 원문 및 임의 객체는 수집하지 않는다. 전송 실패는 화면을 중단하지 않으며 이미 처리한 업무 오류나 모든 `console.error`를 자동 수집하는 기능은 아니다.
 
 ### 프런트 개발 서버 종료 원인 추적
 

@@ -5,6 +5,7 @@
 
 import { useEffect } from "react";
 import { RecoveryScreen } from "./RecoveryScreen";
+import { reportClientError } from "@/lib/client-events";
 
 export default function ErrorBoundary({
   error,
@@ -14,7 +15,7 @@ export default function ErrorBoundary({
   reset: () => void;
 }) {
   useEffect(() => {
-    // 콘솔에 남기는 것 외엔 외부로 보내지 않음. 로컬 운영 환경 가정.
+    reportClientError(error, "react_boundary");
     console.error("[ErrorBoundary]", error);
   }, [error]);
 

@@ -5,6 +5,7 @@
 
 import { useEffect } from "react";
 import { RecoveryScreen } from "./RecoveryScreen";
+import { reportClientError } from "@/lib/client-events";
 
 export default function GlobalError({
   error,
@@ -14,6 +15,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
+    reportClientError(error, "global_boundary");
     console.error("[GlobalError]", error);
   }, [error]);
 
