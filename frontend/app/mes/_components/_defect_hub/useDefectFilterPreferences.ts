@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDesktopQueryState } from "../DesktopTabHome";
+import type { DefectEntryTarget } from "@/lib/defect-entry";
 import type { DefectActorScope, DefectProcessStep, DefectScope, DefectSort } from "./DefectFilterBar";
 
 const STORAGE_PREFIX = "dexcowin_mes_defect_filters:";
@@ -39,6 +40,7 @@ interface UseDefectFilterPreferencesOptions {
   currentDept?: string;
   defectDeptFilter?: string | null;
   storageScope?: "regular" | "storage";
+  entryTarget?: DefectEntryTarget | null;
 }
 
 function unique<T>(values: readonly T[]): T[] {
@@ -149,10 +151,14 @@ export function useDefectFilterPreferences({
   currentDept,
   defectDeptFilter,
   storageScope = "regular",
+  entryTarget,
 }: UseDefectFilterPreferencesOptions) {
   const [retained, setRetained] = useDesktopQueryState<{ values: StoredFilterValues; locked: boolean } | null>(`defect-filters:${employeeId}:${storageScope}`, null);
-  const restoreKey = JSON.stringify([employeeId, defaultScope, defaultSort, currentDept, defectDeptFilter, storageScope]);
-  const initialRetainedRef = useRef({ key: restoreKey, value: retained });
+  const entryKey = JSON.stringify(entryTarget ?? null);
+  const entryDepartment = entryTarget?.department;
+  const retainedKey = JSON.stringify([employeeId, storageScope]);
+  const restoreKey = JSON.stringify([employeeId, defaultScope, defaultSort, currentDept, defectDeptFilter, storageScope, entryKey]);
+  const initialRetainedRef = useRef({ key: retainedKey, value: retained });
   const [scope, setScopeState] = useState<DefectScope>(defaultScope);
   const [actorScope, setActorScopeState] = useState<DefectActorScope>("all");
   const [sort, setSortState] = useState<DefectSort>(defaultSort);
@@ -174,7 +180,7 @@ export function useDefectFilterPreferences({
 
   useEffect(() => {
     const saved = readSnapshot(employeeId, currentDept, storageScope);
-    const retained = initialRetainedRef.current.key === restoreKey ? initialRetainedRef.current.value : null;
+    const retained = initialRetainedRef.current.key === retainedKey ? initialRetainedRef.current.value : null;
     const effectiveScope = defectDeptFilter ? "my" : saved?.scope ?? defaultScope;
     const restoredValues: StoredFilterValues = {
       scope: effectiveScope,
@@ -186,9 +192,11 @@ export function useDefectFilterPreferences({
       selectedModels: saved?.selectedModels ?? [],
       selectedProcessSteps: saved?.selectedProcessSteps ?? [],
     };
-    const values = retained && !defectDeptFilter ? retained.values : restoredValues;
+    const values: StoredFilterValues = entryDepartment ? { scope: "all", actorScope: "all", sort: saved?.sort ?? defaultSort,
+      selectedDepartments: [entryDepartment], selectedModels: [], selectedProcessSteps: [] }
+      : retained && !defectDeptFilter ? retained.values : restoredValues;
     valuesRef.current = values;
-    filterLockedRef.current = retained?.locked ?? saved !== null;
+    filterLockedRef.current = entryDepartment ? false : retained?.locked ?? saved !== null;
     setScopeState(values.scope);
     setActorScopeState(values.actorScope);
     setSortState(values.sort);
@@ -196,11 +204,12 @@ export function useDefectFilterPreferences({
     setModelState(values.selectedModels);
     setProcessStepState(values.selectedProcessSteps);
     setFilterLockedState(filterLockedRef.current);
-  }, [employeeId, defaultScope, defaultSort, currentDept, defectDeptFilter, storageScope, restoreKey]);
+  }, [employeeId, defaultScope, defaultSort, currentDept, defectDeptFilter, storageScope, restoreKey, retainedKey, entryDepartment]);
 
   useEffect(() => {
+    if (entryTarget && !filterLocked) return;
     setRetained({ values: { scope, actorScope, sort, selectedDepartments, selectedModels, selectedProcessSteps }, locked: filterLocked });
-  }, [scope, actorScope, sort, selectedDepartments, selectedModels, selectedProcessSteps, filterLocked, setRetained]);
+  }, [scope, actorScope, sort, selectedDepartments, selectedModels, selectedProcessSteps, filterLocked, setRetained, entryTarget]);
 
   const persist = useCallback((next: StoredFilterValues): void => {
     if (!writeSnapshot(employeeId, { version: STORAGE_VERSION, ...next }, storageScope)) {

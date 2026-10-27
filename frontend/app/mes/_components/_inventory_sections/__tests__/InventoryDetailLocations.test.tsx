@@ -9,8 +9,19 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 import { InventoryDetailLocations } from "../InventoryDetailLocations";
 
 describe("InventoryDetailLocations", () => {
+  it.each(["DEFECT", "B_GRADE", "OBSOLETE"] as const)("%s 바로가기는 품목·부서·분류와 현재 앱 경로를 전달한다", (category) => {
+    window.history.replaceState(null, "", "/mes?tab=dashboard");
+    render(<InventoryDetailLocations item={{ item_id: "focus-item", item_name: "시험 품목", warehouse_qty: 0, locations: [],
+      defective_breakdown: [{ department: "튜브", management_category: category, quantity: 1 }],
+    } as unknown as Item} getDeptColor={() => "var(--c-blue)"} />);
+    fireEvent.click(screen.getByRole("button"));
+    const url = new URL(push.mock.calls.at(-1)![0], "http://localhost");
+    expect(url.pathname).toBe("/mes");
+    expect(Object.fromEntries(url.searchParams)).toEqual({ tab: "defect", defect_item_id: "focus-item", defect_dept: "튜브", defect_category: category });
+  });
   it("splits each department's managed stock into correctly named and colored links", () => {
     render(<InventoryDetailLocations item={{
+      item_id: "focus-item",
       warehouse_qty: 0,
       locations: [
         { department: "조립", status: "PRODUCTION", quantity: 123 },
@@ -35,7 +46,7 @@ describe("InventoryDetailLocations", () => {
     expect(screen.queryByRole("button", { name: /조립 불량 42/ })).toBeNull();
     expect(screen.getByText("조립").previousElementSibling).toHaveStyle({ background: "var(--c-blue)" });
     fireEvent.click(obsolete);
-    expect(push).toHaveBeenCalledWith("/?tab=defect");
+    expect(new URL(push.mock.calls.at(-1)![0], "http://localhost").searchParams.get("defect_category")).toBe("OBSOLETE");
   });
 
   it("keeps legacy defective location reservations when no category breakdown is supplied", () => {

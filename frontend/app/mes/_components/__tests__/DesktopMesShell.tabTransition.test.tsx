@@ -133,14 +133,14 @@ vi.mock("../DesktopTopbar", () => ({
   ),
 }));
 
-vi.mock("../DesktopInventoryView", () => ({ DesktopInventoryView: () => {
+vi.mock("../DesktopInventoryView", () => ({ DesktopInventoryView: ({ onGoToDefect }: { onGoToDefect?: (target: { itemId: string; department: string; managementCategory: "DEFECT" }) => void }) => {
   if (slowDashboard.pending) throw slowDashboard.promise;
   return <main data-testid="inventory-left-content" ref={(node) => {
     if (node) Object.defineProperties(node, {
       scrollHeight: { configurable: true, value: 2290 },
       clientWidth: { configurable: true, value: 1700 },
     });
-  }}><div data-testid="inventory-scroll-surface">dashboard content</div></main>;
+  }}><div data-testid="inventory-scroll-surface">dashboard content</div><button onClick={() => onGoToDefect?.({ itemId: "focus", department: "튜브", managementCategory: "DEFECT" })}>quick defect stock</button></main>;
 } }));
 
 it("updates the selected menu and header before a slow destination renders", () => {
@@ -781,6 +781,19 @@ describe("DesktopMesShell tab transition", () => {
 
     await waitFor(() => expect(defectViewStates).toHaveBeenLastCalledWith("hub"));
     expect(window.history.state).toMatchObject({ defect: "hub" });
+  });
+  it("재고 바로가기는 경로를 유지하고 일반 메뉴 재진입에는 대상 조건을 넘기지 않는다", async () => {
+    render(<DesktopMesShell />);
+    fireEvent.click(screen.getByRole("button", { name: "dashboard", exact: true }));
+    await screen.findByText("dashboard content");
+    fireEvent.click(screen.getByText("quick defect stock"));
+    await screen.findByText("defect content");
+    expect(window.location.pathname).toBe("/mes");
+    expect(new URLSearchParams(window.location.search).get("defect_item_id")).toBe("focus");
+    fireEvent.click(screen.getByRole("button", { name: "dashboard", exact: true }));
+    await screen.findByText("dashboard content");
+    fireEvent.click(screen.getByRole("button", { name: "defect", exact: true }));
+    expect(window.location.search).toBe("?tab=defect");
   });
 
   it("일보 권한 회수 중 보존을 기다릴 때 상단 날짜·탭 조작도 제거한다", async () => {

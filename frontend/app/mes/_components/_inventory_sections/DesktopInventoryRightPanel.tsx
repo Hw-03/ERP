@@ -5,6 +5,7 @@ import type { Item } from "@/lib/api";
 import { SlidePanel } from "../common";
 import { DesktopRightPanel } from "../DesktopRightPanel";
 import { InventoryDetailPanel } from "./InventoryDetailPanel";
+import type { DefectEntryTarget } from "@/lib/defect-entry";
 import { InventoryRecentHistoryPanel } from "./InventoryRecentHistoryPanel";
 import type { IoEntryIntent } from "../_warehouse_v2/types";
 import { ReadFailure, ReadLoading } from "../common/ReadState";
@@ -36,6 +37,7 @@ export interface DesktopInventoryRightPanelProps {
   headerBadge: React.ReactNode;
   onClose: () => void;
   onGoToWarehouse: (item: Item, intent?: IoEntryIntent) => void;
+  onGoToDefect?: (target: DefectEntryTarget) => void;
   canReceive?: boolean;
   imageFilename?: string;
   detailLoading?: boolean;
@@ -51,6 +53,7 @@ export function DesktopInventoryRightPanel({
   headerBadge,
   onClose,
   onGoToWarehouse,
+  onGoToDefect,
   canReceive,
   imageFilename,
   open = !!selectedItem,
@@ -187,6 +190,7 @@ export function DesktopInventoryRightPanel({
               {displayItem && <InventoryDetailPanel
                 item={displayItem}
                 onGoToWarehouse={onGoToWarehouse}
+                onGoToDefect={onGoToDefect}
                 canReceive={canReceive}
                 imageFilename={imageFilename}
                 actionsDisabled={actionsDisabled}

@@ -1,4 +1,5 @@
 "use client";
+import type { DefectEntryTarget } from "@/lib/defect-entry";
 import { useDesktopTabHome } from "./DesktopTabHome";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
@@ -41,6 +42,7 @@ export function DesktopInventoryView({
   globalSearch,
   onStatusChange,
   onGoToWarehouse,
+  onGoToDefect,
   onGoToWarehouseTab,
   onSummaryChange,
   capacityData,
@@ -52,6 +54,7 @@ export function DesktopInventoryView({
   onStatusChange: (status: string) => void;
   onGoToWarehouse: (item: Item, intent?: import("./_warehouse_v2/types").IoEntryIntent) => void;
   onGoToWarehouseTab?: () => void;
+  onGoToDefect?: (target: DefectEntryTarget) => void;
   onSummaryChange?: (s: { low: number; zero: number }) => void;
   capacityData?: ProductionCapacity | null;
   capacityLoading?: boolean;
@@ -275,6 +278,7 @@ export function DesktopInventoryView({
         headerBadge={headerBadge}
         onClose={closeDetail}
         onGoToWarehouse={onGoToWarehouse}
+        onGoToDefect={onGoToDefect}
         canReceive={canReceive}
         detailLoading={detailOpen && detailStatus === "loading"}
         refreshing={refreshing}

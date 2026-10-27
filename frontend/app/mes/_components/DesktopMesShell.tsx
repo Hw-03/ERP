@@ -20,6 +20,7 @@ import type { NotificationNavigationTarget } from "./notifications/NotificationB
 import { DesktopInventoryView } from "./DesktopInventoryView";
 import { DesktopWarehouseView } from "./DesktopWarehouseView";
 import { DesktopShippingView } from "./DesktopShippingView";
+import { defectEntryUrl, readDefectDepartment, type DefectEntryTarget } from "@/lib/defect-entry";
 import { resumeWorkListShippingEntry, withoutWorkListReturn } from "@/lib/work-draft-navigation";
 import { DesktopWarehouseMapTab } from "./DesktopWarehouseMapTab";
 import { DesktopDefectView } from "./DesktopDefectView";
@@ -298,7 +299,7 @@ function DesktopMesShellInner({
     // The address-bar URL is authoritative for restoring the active desktop tab.
     const currentParams = new URLSearchParams(window.location.search);
     const t = currentParams.get("tab") as DesktopTabId | null;
-    const dept = currentParams.get("defect_dept");
+    const dept = readDefectDepartment(window.location.search);
     const targetFromUrl = t && VALID_TABS.has(t) ? t : !t && dept ? "defect" : null;
     const pendingUrlTab = pendingUrlTabRef.current;
 
@@ -420,7 +421,7 @@ function DesktopMesShellInner({
   }, [activeTab, clearWarehouseEntry]);
   const [defectDeptFilter, setDefectDeptFilter] = useState<string | null>(() => {
     // 초기 URL 에 defect_dept 쿼리가 있으면 읽어 둔다
-    return searchParams.get("defect_dept");
+    return readDefectDepartment(searchParams.toString());
   });
   const {
     data: capacityData = null,
@@ -455,6 +456,11 @@ function DesktopMesShellInner({
     // tab 만 전환 — step 은 위저드(useIoUrlSync)가 tab=warehouse 와 함께 기록한다.
   }, [canOpenTab, commitDesktopTab]);
 
+  const handleGoToDefect = useCallback((target: DefectEntryTarget): void => {
+    if (!canOpenTab("defect")) return;
+    confirmAdminNavigation(() => commitDesktopTab("defect", { url: defectEntryUrl(window.location.pathname, target) }));
+  }, [canOpenTab, commitDesktopTab, confirmAdminNavigation]);
+
   const content = useMemo(() => {
     const key = contentTab === "admin" ? `admin-${adminPinEntryNonce}` : `${contentTab}-${refreshNonce}`;
     if (contentTab === "stocktake" && stocktakeAccessPending && !retainStocktake) return <StocktakeLoadingSkeleton variant="desktop" />;
@@ -466,6 +472,7 @@ function DesktopMesShellInner({
           globalSearch=""
           onStatusChange={handleStatusChange}
           onGoToWarehouse={handleGoToWarehouse}
+          onGoToDefect={handleGoToDefect}
           onGoToWarehouseTab={() => handleTabChange("warehouse")}
           onSummaryChange={setStockWarnings}
           capacityData={capacityData}
@@ -549,7 +556,7 @@ function DesktopMesShellInner({
     // setStockWarnings/setCapacityModal(setter), handleTabChange 는 안정적이거나 결과에
     // 영향이 없어 의도적으로 제외 — 누락이 아니라 최소 deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, capacityLoading, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen, isItemPickerFullscreen, isDefectItemPickerFullscreen, preferences, savePreferences, canOpenTab, handleOpenAdminPinEntry, handleDailyReportTopbarControlsChange, retainStocktake, stocktakeAccessPending]);
+  }, [contentTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, handleGoToDefect, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, capacityLoading, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen, isItemPickerFullscreen, isDefectItemPickerFullscreen, preferences, savePreferences, canOpenTab, handleOpenAdminPinEntry, handleDailyReportTopbarControlsChange, retainStocktake, stocktakeAccessPending]);
 
   return (
     <>

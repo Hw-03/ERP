@@ -83,6 +83,7 @@ vi.mock("../screens", () => ({
   MobileDashboardScreen: ({
     onStatusChange,
     onGoToWarehouse,
+    onGoToDefect,
     capacityData,
     capacityLoading,
     capacityError,
@@ -90,6 +91,7 @@ vi.mock("../screens", () => ({
   }: {
     onStatusChange: (status: string) => void;
     onGoToWarehouse?: (item: unknown, intent?: unknown) => void;
+    onGoToDefect?: (target: { itemId: string; department: string; managementCategory: "OBSOLETE" }) => void;
     capacityData?: { immediate: number } | null;
     capacityLoading?: boolean;
     capacityError?: string | null;
@@ -106,6 +108,7 @@ vi.mock("../screens", () => ({
         quick warehouse
       </button>
       <output data-testid="capacity-immediate">{capacityData?.immediate ?? "none"}</output>
+      <button type="button" onClick={() => onGoToDefect?.({ itemId: "focus", department: "튜브", managementCategory: "OBSOLETE" })}>quick defect stock</button>
       <output data-testid="capacity-pending">{String(capacityLoading)}</output>
       <output data-testid="capacity-error">{capacityError ?? "none"}</output>
       <button type="button" onClick={onCapacityRetry}>retry capacity</button>
@@ -298,6 +301,21 @@ describe("MobileShell layout", () => {
     await screen.findByText("warehouse screen");
     expect(screen.getByTestId("warehouse-preselected")).toHaveTextContent("101");
     expect(screen.getByTestId("warehouse-intent")).toHaveTextContent("receive");
+  });
+  it("재고 바로가기는 URL과 실제 탭을 함께 바꾸고 앞뒤 이동에서 대상을 복원한다", async () => {
+    render(<MobileShell />);
+    fireEvent.click(screen.getByText("quick defect stock"));
+    expect(new URLSearchParams(window.location.search).get("defect_item_id")).toBe("focus");
+    expect(screen.getByTestId("defect-screen-state")).toHaveTextContent("storage");
+    act(() => window.history.back());
+    await screen.findByText("dashboard screen");
+    act(() => window.history.forward());
+    await screen.findByTestId("defect-screen-state");
+    expect(new URLSearchParams(window.location.search).get("defect_category")).toBe("OBSOLETE");
+    fireEvent.click(screen.getByRole("button", { name: "대시보드", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "불량", exact: true }));
+    expect(window.location.search).toBe("?tab=defect");
+    expect(screen.getByTestId("defect-screen-state")).toHaveTextContent("hub");
   });
   it("출하 저장 중에는 탭과 viewport 이동을 실행하지 않는다", async () => {
     window.history.replaceState({}, "", "/mes?tab=shipping");

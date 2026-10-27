@@ -27,6 +27,8 @@ import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { ReadEmpty, ReadFailure, ReadLoading } from "./common/ReadState";
 import { matchesDefectSearch } from "./_defect_hub/defectSearch";
 import { useItemSearch } from "@/lib/queries/useItemSearch";
+import { defectEntryHistory, defectEntryView, readDefectEntry } from "@/lib/defect-entry";
+import { useDefectEntry, useDefectEntryFocus } from "./_defect_hub/useDefectEntry";
 
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -108,6 +110,7 @@ function DefectViewInner({
   onItemPickerFullscreenChange?: (fullscreen: boolean) => void;
 }) {
   const realtimeRevision = useRealtimeRevision();
+  const { target: entryTarget, returnToHub } = useDefectEntry();
   const { config: searchConfig } = useItemSearch();
   const noop = useMemo(() => () => {}, []);
   // 피커용 품목/모델 — 입출고와 동일하게 자체 로드(shell 은 넘겨주지 않음).
@@ -147,6 +150,7 @@ function DefectViewInner({
     setSelectedProcessSteps,
     resetCategoryFilters,
   } = useDefectFilterPreferences({
+    entryTarget,
     employeeId: operator.employee_id,
     defaultScope,
     defaultSort: "newest",
@@ -155,12 +159,14 @@ function DefectViewInner({
   });
   const [kpiFilter, setKpiFilter] = useState<DefectKpiKind | null>(null);
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<ViewMode>({ kind: "hub" });
+  const focus = useDefectEntryFocus(entryTarget, locations, items, search, setSearch);
+  const [view, setView] = useState<ViewMode>(() => entryTarget ? { kind: defectEntryView(entryTarget) } : { kind: "hub" });
   const [managementLocation, setManagementLocation] = useState<DefectLocation | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
   useDesktopTabHome("defect", {
     isHome: view.kind === "hub" && managementLocation === null,
     returnHome: () => {
+      if (entryTarget) returnToHub();
       setView({ kind: "hub" });
       setManagementLocation(null);
     },
@@ -268,14 +274,14 @@ function DefectViewInner({
           Date.now() - new Date(loc.defective_at).getTime() > ONE_YEAR_MS,
       );
     }
-    result = result.filter((loc) => matchesDefectSearch(loc, search, searchConfig));
+    result = result.filter((loc) => focus.itemId ? loc.item_id === focus.itemId : matchesDefectSearch(loc, focus.query, searchConfig));
 
     return [...result].sort((a, b) => {
       const ta = a.defective_at ? new Date(a.defective_at).getTime() : 0;
       const tb = b.defective_at ? new Date(b.defective_at).getTime() : 0;
       return sort === "oldest" ? ta - tb : tb - ta;
     });
-  }, [scopedLocations, sort, kpiFilter, search, poolMode, searchConfig]);
+  }, [scopedLocations, sort, kpiFilter, focus.itemId, focus.query, poolMode, searchConfig]);
 
   // KPI 집계 범위 라벨 — 숫자가 어느 범위인지 카드 부제로 노출
   const departmentScopeLabel = selectedDepartments.length > 0
@@ -299,7 +305,10 @@ function DefectViewInner({
   useEffect(() => {
     const cur = window.history.state as WorkHistoryState;
     const workView = workViewFromHistory(cur);
-    if (workView) {
+    if (entryTarget && (!cur?.defect || ["hub", "list", "storage"].includes(cur.defect))) {
+      setView({ kind: defectEntryView(entryTarget) });
+      window.history.replaceState(defectEntryHistory(cur, entryTarget), "");
+    } else if (workView) {
       setView(workView);
       if (workView.kind === "work-choice") window.history.replaceState({ defect: "work-choice", action: workView.action, source: workView.source }, "");
     } else if (cur?.defect === "storage") {
@@ -313,11 +322,16 @@ function DefectViewInner({
       setView({ kind: "list" });
       window.history.replaceState({ defect: "list" }, "");
     } else {
-      window.history.replaceState({ defect: "hub" }, "");
+      window.history.replaceState({ ...window.history.state, defect: "hub" }, "");
     }
 
     function onPop(e: PopStateEvent) {
       const s = e.state as WorkHistoryState;
+      const target = readDefectEntry(window.location.search);
+      if (target && (!s?.defect || ["hub", "list", "storage"].includes(s.defect))) {
+        setView({ kind: defectEntryView(target) });
+        return;
+      }
       const nextWorkView = workViewFromHistory(s);
       if (nextWorkView) {
         setView(nextWorkView);
@@ -337,7 +351,12 @@ function DefectViewInner({
 
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, []); // mount only
+  }, [entryTarget]);
+
+  function handleListBack(): void {
+    if (entryTarget) { returnToHub(); setView({ kind: "hub" }); }
+    else window.history.back();
+  }
 
   function handleHubSelect(id: DefectHubCardId) {
     if (id === "work") {
@@ -396,7 +415,7 @@ function DefectViewInner({
   const isFullWidthWork = view.kind !== "list" && view.kind !== "hub" && view.kind !== "storage";
 
   if (view.kind === "storage") {
-    return <div className="animate-desktop-navigation-enter flex min-h-0 min-w-0 flex-1 overflow-y-auto rounded-[28px] border p-4" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}><DefectStorageView locations={locations} items={items} productModels={productModels} currentEmployee={employee} loading={loading} loadError={error ?? refreshError} onRetry={() => setReloadNonce((value) => value + 1)} onBack={() => window.history.back()} onUpdated={() => setReloadNonce((value) => value + 1)} onMemoUpdated={handleMemoUpdated} onRestore={handleRestoreRow} /></div>;
+    return <div className="animate-desktop-navigation-enter flex min-h-0 min-w-0 flex-1 overflow-y-auto rounded-[28px] border p-4" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}><DefectStorageView entryTarget={entryTarget} locations={locations} items={items} productModels={productModels} currentEmployee={employee} loading={loading} loadError={error ?? refreshError} onRetry={() => setReloadNonce((value) => value + 1)} onBack={handleListBack} onUpdated={() => setReloadNonce((value) => value + 1)} onMemoUpdated={handleMemoUpdated} onRestore={handleRestoreRow} /></div>;
   }
 
   function handleRestoreRow(loc: DefectLocation) {
@@ -514,7 +533,7 @@ function DefectViewInner({
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => window.history.back()}
+                onClick={handleListBack}
                 className="standard-hover flex min-h-11 items-center gap-1 rounded-[10px] border px-3 text-sm font-bold transition-colors"
                 style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
               >
@@ -534,7 +553,7 @@ function DefectViewInner({
             />
 
             <DefectFilterBar
-              searchInput={<DefectSearchInput value={search} onChange={setSearch} />}
+              searchInput={<DefectSearchInput value={focus.query} onChange={focus.onChange} />}
               scope={scope}
               actorScope={actorScope}
               poolMode={poolMode}
@@ -590,19 +609,19 @@ function DefectViewInner({
               <ReadFailure message={error} onRetry={() => setReloadNonce((value) => value + 1)} />
             ) : (
               <>
-                <DefectDepartmentList
-                  emptyContent={<ReadEmpty hasSearch={!!search.trim()} hasFilters={locations.some((location) => (location.management_category ?? "DEFECT") === "DEFECT")}
+                <DefectDepartmentList initialExpandedTarget={focus.itemId ? entryTarget : null}
+                  emptyContent={<ReadEmpty hasSearch={!!focus.query.trim()} hasFilters={locations.some((location) => (location.management_category ?? "DEFECT") === "DEFECT")}
                     illustrated
                     className="min-h-[260px] flex-1"
-                    title={!search.trim() && !locations.some((location) => (location.management_category ?? "DEFECT") === "DEFECT") ? "격리된 불량 재고가 없습니다." : undefined}
-                    onReset={() => { setSearch(""); setScope("all"); setActorScope("all"); resetCategoryFilters(); setKpiFilter(null); }} />}
+                    title={focus.itemId ? "해당 품목·부서의 불량 재고가 없습니다." : !focus.query.trim() && !locations.some((location) => (location.management_category ?? "DEFECT") === "DEFECT") ? "격리된 불량 재고가 없습니다." : undefined}
+                    onReset={() => { focus.onChange(""); setScope("all"); setActorScope("all"); resetCategoryFilters(); setKpiFilter(null); }} />}
                   locations={filteredLocations}
                   currentEmployee={employee}
                   onMemoUpdated={handleMemoUpdated}
                   onProcess={handleProcessRow}
                   onBatchProcess={handleBatchProcess}
                   priorityDept={operator.department}
-                  searchActive={search.trim().length > 0}
+                  searchActive={focus.query.trim().length > 0}
                   onMoveToStorage={setManagementLocation}
                 />
                 {managementLocation && <ManagementCategoryModal location={managementLocation} currentEmployee={employee} onClose={() => setManagementLocation(null)} onUpdated={() => { setReloadNonce((value) => value + 1); setManagementLocation(null); }} />}

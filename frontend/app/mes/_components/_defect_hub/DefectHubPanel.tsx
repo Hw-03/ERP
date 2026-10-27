@@ -1,4 +1,6 @@
 "use client";
+import { defectEntryHistory, defectEntryView, readDefectEntry } from "@/lib/defect-entry";
+import { useDefectEntry, useDefectEntryFocus } from "./useDefectEntry";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -85,6 +87,7 @@ export function DefectHubPanel({
   mobilePresentation = false,
 }: Props) {
   const realtimeRevision = useRealtimeRevision();
+  const { target: entryTarget, returnToHub } = useDefectEntry();
   const [locations, setLocations] = useState<DefectLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -92,7 +95,7 @@ export function DefectHubPanel({
   const hasLoadedRef = useRef(false);
   const requestGenerationRef = useRef(0);
 
-  const [view, setView] = useState<"hub" | "work-choice" | "list" | "storage" | "process" | "cart" | "statistics">("hub");
+  const [view, setView] = useState<"hub" | "work-choice" | "list" | "storage" | "process" | "cart" | "statistics">(() => entryTarget ? defectEntryView(entryTarget) : "hub");
   const [workAction, setWorkAction] = useState<MobileDefectWorkAction | null>(null);
   const [workSource, setWorkSource] = useState<MobileDefectSourceKind | null>(null);
   const isWarehouseEmployee = currentEmployee.warehouse_role === "primary"
@@ -121,6 +124,7 @@ export function DefectHubPanel({
     setSelectedProcessSteps,
     resetCategoryFilters,
   } = useDefectFilterPreferences({
+    entryTarget,
     employeeId: currentEmployee.employee_id,
     defaultScope,
     defaultSort: "oldest",
@@ -129,6 +133,7 @@ export function DefectHubPanel({
   });
   const [kpiFilter, setKpiFilter] = useState<DefectKpiKind | null>(null);
   const [search, setSearch] = useState("");
+  const focus = useDefectEntryFocus(entryTarget, locations, items, search, setSearch);
   const { config: searchConfig } = useItemSearch();
   const [processingLocations, setProcessingLocations] = useState<DefectLocation[]>([]);
   const [processingBatch, setProcessingBatch] = useState(false);
@@ -260,10 +265,10 @@ export function DefectHubPanel({
       return sort === "oldest" ? ta - tb : tb - ta;
     });
 
-    result = result.filter((loc) => matchesDefectSearch(loc, search, searchConfig));
+    result = result.filter((loc) => focus.itemId ? loc.item_id === focus.itemId : matchesDefectSearch(loc, focus.query, searchConfig));
 
     return result;
-  }, [scopedLocations, sort, kpiFilter, search, poolMode, searchConfig]);
+  }, [scopedLocations, sort, kpiFilter, focus.itemId, focus.query, poolMode, searchConfig]);
 
   const departmentScopeLabel = selectedDepartments.length > 0
     ? selectedDepartments.join(" · ")
@@ -324,7 +329,11 @@ export function DefectHubPanel({
   useEffect(() => {
     function applyHistoryState(state: unknown): void {
       const target = state as WorkHistoryState;
-      if (mobilePresentation && (target?.defect === "work-choice" || (target?.defect === "cart" && (target.mode === "add" || target.mode === "scrap")))) {
+      const entry = readDefectEntry(window.location.search);
+      if (entry && (!target?.defect || ["hub", "list", "storage"].includes(target.defect))) {
+        setView(defectEntryView(entry));
+        window.history.replaceState(defectEntryHistory(state, entry), "");
+      } else if (mobilePresentation && (target?.defect === "work-choice" || (target?.defect === "cart" && (target.mode === "add" || target.mode === "scrap")))) {
         const selection = workSelectionFromHistory(target);
         setWorkAction(selection.action);
         setWorkSource(selection.source);
@@ -359,13 +368,18 @@ export function DefectHubPanel({
     }
 
     const initialState = window.history.state as { defect?: string } | null;
-    if (initialState?.defect) applyHistoryState(initialState);
-    else window.history.replaceState({ defect: "hub" }, "");
+    if (entryTarget || initialState?.defect) applyHistoryState(initialState);
+    else window.history.replaceState({ ...window.history.state, defect: "hub" }, "");
 
     const onPop = (event: PopStateEvent) => applyHistoryState(event.state);
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [mobilePresentation]);
+  }, [mobilePresentation, entryTarget]);
+
+  function handleListBack(): void {
+    if (entryTarget) { returnToHub(); setView("hub"); }
+    else window.history.back();
+  }
 
   function handleHubSelect(id: DefectHubCardId) {
     if (id === "work") {
@@ -493,7 +507,7 @@ export function DefectHubPanel({
   }
 
   if (view === "storage") {
-    return <DefectStorageView mobilePresentation={mobilePresentation} hasData={hasLoadedRef.current} locations={locations} items={items} productModels={productModels} currentEmployee={currentEmployee} loading={loading} loadError={error ?? refreshError} onRetry={() => setReloadNonce((value) => value + 1)} onBack={() => window.history.back()} onUpdated={() => setReloadNonce((value) => value + 1)} onMemoUpdated={(recordId, memo) => setLocations((current) => current.map((location) => location.record_id === recordId && recordId != null ? { ...location, reason_memo: memo } : location))} onRestore={handleRestore} />;
+    return <DefectStorageView entryTarget={entryTarget} mobilePresentation={mobilePresentation} hasData={hasLoadedRef.current} locations={locations} items={items} productModels={productModels} currentEmployee={currentEmployee} loading={loading} loadError={error ?? refreshError} onRetry={() => setReloadNonce((value) => value + 1)} onBack={handleListBack} onUpdated={() => setReloadNonce((value) => value + 1)} onMemoUpdated={(recordId, memo) => setLocations((current) => current.map((location) => location.record_id === recordId && recordId != null ? { ...location, reason_memo: memo } : location))} onRestore={handleRestore} />;
   }
 
   if (view === "statistics") {
@@ -564,7 +578,7 @@ export function DefectHubPanel({
         }}
       />
 
-      <DefectSearchInput value={search} onChange={setSearch} />
+      <DefectSearchInput value={focus.query} onChange={focus.onChange} />
 
       {/* KPI 필터 활성 표시 */}
       {kpiFilter && !(poolMode && kpiFilter === "over_one_year") && (
@@ -602,16 +616,17 @@ export function DefectHubPanel({
       ) : (
         <div className={mobilePresentation ? dataRevealClassName : "contents"}>
           <DefectDepartmentList
+            initialExpandedTarget={focus.itemId ? entryTarget : null}
             mobilePresentation={mobilePresentation}
-            emptyContent={<ReadEmpty hasSearch={!!search.trim()} hasFilters={locations.length > 0}
-              title={!search.trim() && locations.length === 0 ? "격리된 불량 재고가 없습니다." : undefined}
-              onReset={() => { setSearch(""); setScope("all"); resetCategoryFilters(); setKpiFilter(null); }} />}
+            emptyContent={<ReadEmpty hasSearch={!!focus.query.trim()} hasFilters={locations.length > 0}
+              title={focus.itemId ? "해당 품목·부서의 불량 재고가 없습니다." : !focus.query.trim() && locations.length === 0 ? "격리된 불량 재고가 없습니다." : undefined}
+              onReset={() => { focus.onChange(""); setScope("all"); resetCategoryFilters(); setKpiFilter(null); }} />}
             locations={filteredLocations}
             currentEmployee={currentEmployee}
             onMemoUpdated={handleMemoUpdated}
             onProcess={handleProcess}
             onBatchProcess={handleBatchProcess}
-            searchActive={search.trim().length > 0}
+            searchActive={focus.query.trim().length > 0}
             onMoveToStorage={setManagementLocation}
           />
           {managementLocation && <ManagementCategoryModal location={managementLocation} currentEmployee={currentEmployee} onClose={() => setManagementLocation(null)} onUpdated={() => { setReloadNonce((value) => value + 1); setManagementLocation(null); }} />}
@@ -666,7 +681,7 @@ export function DefectHubPanel({
         <>
           <button
             type="button"
-            onClick={() => window.history.back()}
+            onClick={handleListBack}
             className="standard-hover flex items-center gap-1 self-start rounded-[10px] border px-3 py-1.5 text-xs font-bold transition-colors"
             style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
           >

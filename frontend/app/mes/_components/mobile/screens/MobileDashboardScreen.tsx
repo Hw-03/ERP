@@ -1,4 +1,5 @@
 "use client";
+import type { DefectEntryTarget } from "@/lib/defect-entry";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Item, type ProductModel, type ProductionCapacity } from "@/lib/api";
@@ -49,6 +50,7 @@ export function MobileDashboardScreen({
   globalSearch,
   onStatusChange,
   onGoToWarehouse,
+  onGoToDefect,
   capacityData,
   capacityLoading = false,
   capacityError = null,
@@ -61,6 +63,7 @@ export function MobileDashboardScreen({
   onStatusChange: (status: string) => void;
   onGoToWarehouse: (item: Item, intent?: IoEntryIntent) => void;
   onGoToWarehouseTab?: () => void;
+  onGoToDefect?: (target: DefectEntryTarget) => void;
   onSummaryChange?: (s: { low: number; zero: number }) => void;
   capacityData?: ProductionCapacity | null;
   capacityLoading?: boolean;
@@ -344,6 +347,7 @@ export function MobileDashboardScreen({
         {detailError && <ReadFailure message={detailError} onRetry={() => void retryDetail()} refresh={!!displayItem} />}
         {detailOpen && displayItem && (
           <MobileInventoryDetailContent
+            onGoToDefect={onGoToDefect}
             refreshing={refreshing}
             key={displayItem.item_id}
             item={displayItem}

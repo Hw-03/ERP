@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { defectEntryUrl, type DefectEntryTarget } from "@/lib/defect-entry";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
@@ -17,10 +18,12 @@ export function InventoryDetailLocations({
   item,
   getDeptColor,
   mobile = false,
+  onGoToDefect,
 }: {
   item: Item;
   getDeptColor: (name: string) => string;
   mobile?: boolean;
+  onGoToDefect?: (target: DefectEntryTarget) => void;
 }) {
   const router = useRouter();
 
@@ -108,7 +111,11 @@ export function InventoryDetailLocations({
                   <button
                     key={entry.management_category}
                     type="button"
-                    onClick={() => router.push("/?tab=defect")}
+                    onClick={() => {
+                      const target = { itemId: item.item_id, department: dept, managementCategory: entry.management_category };
+                      if (onGoToDefect) onGoToDefect(target);
+                      else router.push(defectEntryUrl(window.location.pathname, target));
+                    }}
                     className="mt-1 flex min-h-11 w-full items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left transition-opacity hover:opacity-80"
                     style={{ background: `color-mix(in srgb, ${stockColor} 10%, ${LEGACY_COLORS.s1})`, borderColor: `color-mix(in srgb, ${stockColor} 60%, ${LEGACY_COLORS.border})` }}
                     aria-label={`${dept} ${label} ${formatQty(entry.quantity)} — 불량 탭으로 이동`}

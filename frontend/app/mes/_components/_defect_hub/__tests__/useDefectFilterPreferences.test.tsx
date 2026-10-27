@@ -9,6 +9,19 @@ const storageKey = (employeeId: string) => `dexcowin_mes_defect_filters:${employ
 const storageViewKey = (employeeId: string) => `dexcowin_mes_defect_storage_filters:${employeeId}`;
 
 describe("useDefectFilterPreferences", () => {
+  it.each(["regular", "storage"] as const)("%s 바로가기는 고정 설정을 보존하고 임시 조건만 적용한다", (storageScope) => {
+    const key = storageScope === "regular" ? storageKey("employee-1") : storageViewKey("employee-1");
+    const saved = JSON.stringify({ version: 2, scope: "my", actorScope: "mine", sort: "oldest", selectedDepartments: ["조립"], selectedModels: ["SOLO"], selectedProcessSteps: ["F"] });
+    localStorage.setItem(key, saved);
+    const target = { itemId: "focus", department: "튜브", managementCategory: "DEFECT" as const };
+    const { result, rerender } = renderHook(({ entryTarget }) => useDefectFilterPreferences({ employeeId: "employee-1", currentDept: "조립", defaultScope: "my", defaultSort: "newest", storageScope, entryTarget }), { initialProps: { entryTarget: target as typeof target | null } });
+    expect(result.current).toMatchObject({ scope: "all", actorScope: "all", selectedDepartments: ["튜브"], selectedModels: [], selectedProcessSteps: [], filterLocked: false });
+    act(() => result.current.setSelectedDepartments(["고압"]));
+    expect(localStorage.getItem(key)).toBe(saved);
+    rerender({ entryTarget: null });
+    expect(result.current).toMatchObject({ scope: "my", actorScope: "mine", selectedDepartments: ["조립"], selectedModels: ["SOLO"], selectedProcessSteps: ["F"], filterLocked: true });
+    expect(localStorage.getItem(key)).toBe(saved);
+  });
   it("PC 하위 화면을 다시 열면 고정하지 않은 조회 조건도 유지한다", () => {
     function Filters() {
       const filters = useDefectFilterPreferences({ employeeId: "employee-1", defaultScope: "all", defaultSort: "newest" });

@@ -9,6 +9,7 @@ import { PIN_LENGTH } from "@/lib/auth/constants";
 import { LEGACY_COLORS, getDepartmentFallbackColor } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
+import type { DefectEntryTarget } from "@/lib/defect-entry";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const RECORD_GRID_CLASS = "grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(110px,0.38fr)_minmax(110px,0.38fr)_minmax(0,2fr)] lg:gap-6";
@@ -37,6 +38,7 @@ interface Props {
   priorityDept?: string;
   searchActive?: boolean;
   emptyContent?: ReactNode;
+  initialExpandedTarget?: DefectEntryTarget | null;
 }
 
 function parseBackendTimestamp(value: string | null): Date | null {
@@ -83,6 +85,7 @@ export function DefectDepartmentList({
   priorityDept,
   searchActive = false,
   emptyContent,
+  initialExpandedTarget,
 }: Props) {
   const grouped = groupByDepartment(locations);
   const depts = Object.keys(grouped).sort((a, b) => {
@@ -94,6 +97,14 @@ export function DefectDepartmentList({
   });
   const [collapsedDepts, setCollapsedDepts] = useState<Set<string>>(new Set());
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const expandedTargetKey = initialExpandedTarget
+    ? `${initialExpandedTarget.department}:${initialExpandedTarget.itemId}${storageMode ? `:${initialExpandedTarget.managementCategory}` : ""}`
+    : null;
+  useEffect(() => {
+    if (!expandedTargetKey) return;
+    setExpandedItems((previous) => new Set(previous).add(expandedTargetKey));
+    setCollapsedDepts(new Set());
+  }, [expandedTargetKey]);
   const [batchSelection, setBatchSelection] = useState<{
     groupKey: string;
     recordIds: Set<string>;

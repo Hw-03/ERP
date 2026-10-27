@@ -25,6 +25,8 @@ import { SkeletonBlock, dataRevealClassName } from "../common/LoadingSkeleton";
 import { ReadEmpty, ReadLoading } from "../common/ReadState";
 import { SearchInput } from "../common/SearchInput";
 import { DefectListSkeleton } from "./DefectListSkeleton";
+import type { DefectEntryTarget } from "@/lib/defect-entry";
+import { useDefectEntryFocus } from "./useDefectEntry";
 
 type StorageFilter = "ALL" | "B_GRADE" | "OBSOLETE";
 
@@ -50,7 +52,9 @@ export function DefectStorageView({
   onRetry,
   mobilePresentation = false,
   hasData = locations.length > 0,
+  entryTarget,
 }: {
+  entryTarget?: DefectEntryTarget | null;
   mobilePresentation?: boolean;
   hasData?: boolean;
   locations: DefectLocation[];
@@ -65,15 +69,23 @@ export function DefectStorageView({
   loadError?: string | null;
   onRetry?: () => void;
 }): JSX.Element {
-  const [filter, setFilter] = useDesktopQueryState<StorageFilter>("defect-storage-filter", "ALL");
+  const [storedFilter, setStoredFilter] = useDesktopQueryState<StorageFilter>("defect-storage-filter", "ALL");
   const [search, setSearch] = useDesktopQueryState("defect-storage-search", "");
+  const focus = useDefectEntryFocus(entryTarget, locations, items, search, setSearch);
+  const entryKey = JSON.stringify(entryTarget ?? null);
+  const [entryFilter, setEntryFilter] = useState<{ key: string; value: StorageFilter } | null>(null);
+  const filter = entryTarget ? entryFilter?.key === entryKey ? entryFilter.value : entryTarget.managementCategory as StorageFilter : storedFilter;
+  const setFilter = (value: StorageFilter): void => {
+    if (entryTarget) setEntryFilter({ key: entryKey, value });
+    else setStoredFilter(value);
+  };
   const [selected, setSelected] = useState<DefectLocation | null>(null);
   const poolMode = locations.some((location) => location.pool_id);
   const {
     scope, actorScope, sort, filterLocked, setScope, setActorScope, setSort, setFilterLocked,
     selectedDepartments, selectedModels, selectedProcessSteps, setSelectedDepartments, setSelectedModels,
     setSelectedProcessSteps, resetCategoryFilters,
-  } = useDefectFilterPreferences({ employeeId: currentEmployee.employee_id, defaultScope: "all", defaultSort: "newest", currentDept: currentEmployee.department, storageScope: "storage" });
+  } = useDefectFilterPreferences({ employeeId: currentEmployee.employee_id, defaultScope: "all", defaultSort: "newest", currentDept: currentEmployee.department, storageScope: "storage", entryTarget });
   const departmentOptions = useMemo(() => Array.from(new Set(locations.map((location) => location.department))).sort(), [locations]);
   const modelOptions = useMemo(() => Array.from(new Set(productModels.map((model) => model.model_name).filter((name): name is string => Boolean(name)))), [productModels]);
   const scoped = useMemo(() => {
@@ -84,7 +96,7 @@ export function DefectStorageView({
     return filterDefectLocations(result, items, productModels, { departments: selectedDepartments, models: selectedModels, processSteps: selectedProcessSteps });
   }, [locations, scope, actorScope, poolMode, currentEmployee.department, currentEmployee.employee_id, items, productModels, selectedDepartments, selectedModels, selectedProcessSteps]);
   const { config: searchConfig } = useItemSearch();
-  const searched = useMemo(() => scoped.filter((location) => matchesDefectSearch(location, search, searchConfig)), [scoped, search, searchConfig]);
+  const searched = useMemo(() => scoped.filter((location) => focus.itemId ? location.item_id === focus.itemId : matchesDefectSearch(location, focus.query, searchConfig)), [scoped, focus.itemId, focus.query, searchConfig]);
   const storage = useMemo(() => searched.filter((location) => {
     const category = categoryOf(location);
     return (category === "B_GRADE" || category === "OBSOLETE")
@@ -109,23 +121,23 @@ export function DefectStorageView({
     <div className={`grid gap-2 ${mobilePresentation ? "grid-cols-3" : "sm:grid-cols-3"}`} role="group" aria-label="보관 분류 필터">
       {(["ALL", "B_GRADE", "OBSOLETE"] as StorageFilter[]).map((value) => <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)} className="rounded-[14px] border px-4 py-3 text-left" style={{ background: filter === value ? tint(value === "B_GRADE" ? LEGACY_COLORS.purple : value === "OBSOLETE" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.blue, 12) : LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}><span className="block text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{value === "ALL" ? "전체 보관" : categoryLabel[value]}</span><span className="mt-1 block text-2xl font-black" style={{ color: LEGACY_COLORS.muted2 }}>{mobilePresentation && loading && !hasData ? <SkeletonBlock className="h-8 w-14" /> : <span className={mobilePresentation ? dataRevealClassName : undefined}>{counts[value]}{poolMode ? "종" : "건"}</span>}</span></button>)}
     </div>
-    <DefectFilterBar mobilePresentation={mobilePresentation} searchInput={mobilePresentation ? undefined : <DefectSearchInput value={search} onChange={setSearch} ariaLabel="B급·구형 검색" placeholder="품목명 · 품목 코드 · 사유 검색" />} scope={scope} actorScope={actorScope} poolMode={poolMode} sort={sort} filterLocked={filterLocked} onScopeChange={setScope} onActorScopeChange={setActorScope} onSortChange={setSort} onFilterLockedChange={setFilterLocked} currentDept={currentEmployee.department} departments={departmentOptions} selectedDepartments={selectedDepartments} onDepartmentsChange={setSelectedDepartments} models={modelOptions} selectedModels={selectedModels} onModelsChange={setSelectedModels} selectedProcessSteps={selectedProcessSteps} onProcessStepsChange={setSelectedProcessSteps} onResetCategoryFilters={resetCategoryFilters} />
-    {mobilePresentation && <SearchInput ariaLabel="B급·구형 검색" value={search} onChange={setSearch} placeholder="품목명 · 품목 코드 · 사유 검색" className="!rounded-[10px]" inputProps={{ className: "!font-bold" }} />}
+    <DefectFilterBar mobilePresentation={mobilePresentation} searchInput={mobilePresentation ? undefined : <DefectSearchInput value={focus.query} onChange={focus.onChange} ariaLabel="B급·구형 검색" placeholder="품목명 · 품목 코드 · 사유 검색" />} scope={scope} actorScope={actorScope} poolMode={poolMode} sort={sort} filterLocked={filterLocked} onScopeChange={setScope} onActorScopeChange={setActorScope} onSortChange={setSort} onFilterLockedChange={setFilterLocked} currentDept={currentEmployee.department} departments={departmentOptions} selectedDepartments={selectedDepartments} onDepartmentsChange={setSelectedDepartments} models={modelOptions} selectedModels={selectedModels} onModelsChange={setSelectedModels} selectedProcessSteps={selectedProcessSteps} onProcessStepsChange={setSelectedProcessSteps} onResetCategoryFilters={resetCategoryFilters} />
+    {mobilePresentation && <SearchInput ariaLabel="B급·구형 검색" value={focus.query} onChange={focus.onChange} placeholder="품목명 · 품목 코드 · 사유 검색" className="!rounded-[10px]" inputProps={{ className: "!font-bold" }} />}
     {loadError && <LoadFailureCard prefix="최신 B급·구형 보관 목록을 동기화하지 못했습니다" message={loadError} retryLabel="다시 동기화" onRetry={onRetry} />}
     {mobilePresentation && loading && !hasData ? <ReadLoading label="B급·구형 자재 불러오는 중" skeleton={<DefectListSkeleton />} /> : mobilePresentation && loadError && !hasData ? null : storage.length === 0 ? mobilePresentation ? <EmptyState
       illustrated
       className="min-h-[260px] flex-1"
-      variant={search.trim() ? "no-search-result" : "no-data"}
-      title={search.trim() ? "검색 결과가 없습니다." : "보관 중인 B급·구형 자재가 없습니다."}
+      variant={focus.query.trim() ? "no-search-result" : "no-data"}
+      title={focus.itemId ? "해당 품목·부서·분류의 재고가 없습니다." : focus.query.trim() ? "검색 결과가 없습니다." : "보관 중인 B급·구형 자재가 없습니다."}
       description=""
     /> : <ReadEmpty
       illustrated
       className="min-h-[260px] flex-1"
-      hasSearch={!!search.trim()}
+      hasSearch={!!focus.query.trim()}
       hasFilters={locations.some((location) => ["B_GRADE", "OBSOLETE"].includes(categoryOf(location)))}
-      title={!search.trim() && !locations.some((location) => ["B_GRADE", "OBSOLETE"].includes(categoryOf(location))) ? "보관 중인 B급·구형 자재가 없습니다." : undefined}
-      onReset={() => { setSearch(""); setFilter("ALL"); setScope("all"); setActorScope("all"); resetCategoryFilters(); }}
-    /> : <div className={mobilePresentation ? dataRevealClassName : "contents"}><DefectDepartmentList mobilePresentation={mobilePresentation} storageMode locations={storage} currentEmployee={currentEmployee} priorityDept={mobilePresentation ? undefined : currentEmployee.department} onProcess={onRestore} onMoveToStorage={setSelected} onMemoUpdated={onMemoUpdated} searchActive={search.trim().length > 0} /></div>}
+      title={focus.itemId ? "해당 품목·부서·분류의 재고가 없습니다." : !focus.query.trim() && !locations.some((location) => ["B_GRADE", "OBSOLETE"].includes(categoryOf(location))) ? "보관 중인 B급·구형 자재가 없습니다." : undefined}
+      onReset={() => { focus.onChange(""); setFilter("ALL"); setScope("all"); setActorScope("all"); resetCategoryFilters(); }}
+    /> : <div className={mobilePresentation ? dataRevealClassName : "contents"}><DefectDepartmentList initialExpandedTarget={focus.itemId ? entryTarget : null} mobilePresentation={mobilePresentation} storageMode locations={storage} currentEmployee={currentEmployee} priorityDept={mobilePresentation ? undefined : currentEmployee.department} onProcess={onRestore} onMoveToStorage={setSelected} onMemoUpdated={onMemoUpdated} searchActive={focus.query.trim().length > 0} /></div>}
     </>}
     {selected && <ManagementCategoryModal location={selected} currentEmployee={currentEmployee} onClose={() => setSelected(null)} onUpdated={() => { onUpdated(); setSelected(null); }} />}
   </div>;

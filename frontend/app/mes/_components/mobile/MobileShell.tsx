@@ -50,6 +50,7 @@ import type { NotificationNavigationTarget } from "../notifications/Notification
 import { DirtyGuardProvider, useBeforeViewportSwitch, useFlushDirtyEntries, useConfirmNavigation } from "@/lib/ui/dirty-guard";
 import { mobileHistoryState } from "./historyState";
 import { mobileTabLocation } from "./mobileNavigation";
+import { defectEntryHistory, defectEntryUrl, readDefectDepartment, type DefectEntryTarget } from "@/lib/defect-entry";
 import { StocktakeView } from "../stocktake/StocktakeView";
 import { useStocktakeMenuVisibility } from "../stocktake/useStocktakeMenuVisibility";
 import { StocktakeLoadingSkeleton } from "../stocktake/StocktakeLoadingSkeleton";
@@ -68,7 +69,7 @@ export type MobileTabId =
   | "dailyReport"
   | "stocktake";
 
-type MobileTargetEntry = { item?: Item; intent?: IoEntryIntent; notification?: NotificationNavigationTarget };
+type MobileTargetEntry = { item?: Item; intent?: IoEntryIntent; notification?: NotificationNavigationTarget; managedStock?: DefectEntryTarget };
 
 const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon; color: string }> = {
   dashboard: { label: "대시보드", icon: Boxes, color: DESKTOP_TAB_ICON_COLORS.dashboard },
@@ -197,7 +198,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
     const params = new URLSearchParams(window.location.search);
     const t = params.get("tab");
     if (t && (VALID_TAB_IDS as string[]).includes(t)) setActiveTab(t as MobileTabId);
-    const d = params.get("defect_dept");
+    const d = readDefectDepartment(window.location.search);
     if (d) setDefectDeptFilter(d);
   }, []);
 
@@ -268,7 +269,11 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
         source: "mobile",
       });
     }
-    const { url, state: historyState } = mobileTabLocation(window.location.href, target, Number(window.history.state?.mobileShippingIndex ?? 0) + (replace ? 0 : 1));
+    const destination = mobileTabLocation(window.location.href, target, Number(window.history.state?.mobileShippingIndex ?? 0) + (replace ? 0 : 1));
+    const managedStock = target === "defect" ? targetEntry?.managedStock : undefined;
+    const url = managedStock ? defectEntryUrl(window.location.pathname, managedStock) : destination.url;
+    const historyState = managedStock ? defectEntryHistory(destination.state, managedStock) : destination.state;
+    if (managedStock) setDefectDeptFilter(managedStock.department);
     if (entry === "target" && targetEntry) historyState.mobileTargetEntry = targetEntry;
     if (replace) window.history.replaceState(historyState, "", url);
     else window.history.pushState(historyState, "", url);
@@ -285,7 +290,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
       setWarehouseIntent(entry?.intent ?? null);
       setWarehouseNotificationTarget(entry?.notification ?? null);
     }
-    if (target === "defect") setDefectDeptFilter(entry?.notification?.section ?? new URLSearchParams(window.location.search).get("defect_dept"));
+    if (target === "defect") setDefectDeptFilter(entry?.notification?.section ?? readDefectDepartment(window.location.search));
     setActiveTab(target);
   }, []);
 
@@ -448,6 +453,11 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
     });
   }, [canOpenMobileTab, commitMobileTab, confirmNavigation]);
 
+  const handleGoToDefect = useCallback((target: DefectEntryTarget): void => {
+    if (!canOpenMobileTab("defect")) return;
+    confirmNavigation(() => commitMobileTab("defect", "target", false, { managedStock: target }));
+  }, [canOpenMobileTab, commitMobileTab, confirmNavigation]);
+
   const loadCapacity = useCallback(() => {
     const requestId = ++capacityRequestRef.current;
     setCapacityLoading(true);
@@ -518,6 +528,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
           globalSearch=""
           onStatusChange={handleStatusChange}
           onGoToWarehouse={handleGoToWarehouse}
+          onGoToDefect={handleGoToDefect}
           onGoToWarehouseTab={() => handleTabChange("warehouse")}
           onSummaryChange={setStockWarnings}
           capacityData={capacityData}
@@ -602,6 +613,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
     warehouseNotificationTarget?.relatedRequestId,
     warehouseNotificationTarget?.section,
     handleGoToWarehouse,
+    handleGoToDefect,
     handleStatusChange,
     canOpenMobileTab,
     canReceive,

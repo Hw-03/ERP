@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from "react";
 import Image from "next/image";
 import { ChevronRight, Eye } from "lucide-react";
 import type { Item } from "@/lib/api";
+import type { DefectEntryTarget } from "@/lib/defect-entry";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { ImageLightbox } from "@/lib/ui/ImageLightbox";
 import { useDeptColorLookup } from "../DepartmentsContext";
@@ -20,6 +21,7 @@ const mix = (color: string, amount: number, base = "transparent") =>
 type Props = {
   item: Item;
   onGoToWarehouse: (item: Item, intent?: IoEntryIntent) => void;
+  onGoToDefect?: (target: DefectEntryTarget) => void;
   canReceive?: boolean;
   actionsDisabled?: boolean;
   refreshing?: boolean;
@@ -31,6 +33,7 @@ type Props = {
 export function InventoryDetailPanel({
   item,
   onGoToWarehouse,
+  onGoToDefect,
   canReceive = false,
   actionsDisabled = false,
   refreshing = false,
@@ -54,7 +57,7 @@ export function InventoryDetailPanel({
     if (writeBlocked) setIoMenu(null);
   }, [writeBlocked]);
   const locationSection = (Number(item.warehouse_qty) > 0 || (item.locations ?? []).some((location) => Number(location.quantity) > 0))
-    ? <InventoryDetailLocations item={item} getDeptColor={getDeptColor} mobile={mobile} /> : null;
+    ? <InventoryDetailLocations item={item} getDeptColor={getDeptColor} mobile={mobile} onGoToDefect={onGoToDefect} /> : null;
 
   return (
     <div className={mobile ? "flex flex-col gap-2" : "space-y-4"}>
