@@ -67,10 +67,10 @@ test.describe("입출고 V2 — 부서 입출고(생산)", () => {
     await expect(child).toBeVisible();
     await expect(child.locator("[data-io-location]")).toContainText("튜브");
     await expect(child.getByRole("button", { name: "재고 반영 변경" })).toHaveAttribute("aria-pressed", "true");
-    const quantity = child.getByRole("spinbutton", { name: "수량", exact: true });
+    const quantity = child.getByRole("button", { name: "수량 수정", exact: true });
     await expect(quantity).toBeEnabled();
-    await expect(quantity).toHaveValue("2");
+    await expect(quantity).toHaveText("2");
     await child.getByRole("button", { name: "+1", exact: true }).click();
-    await expect(quantity).toHaveValue("3");
+    await expect(quantity).toHaveText("3");
   });
 });

@@ -303,7 +303,7 @@ describe("IoBundleCard", () => {
       />,
     );
 
-    expect(screen.getByRole("spinbutton", { name: "기준 수량" })).toHaveClass("min-h-[44px]");
+    expect(screen.getByRole("button", { name: "기준 수량 수정" })).toHaveClass("min-h-[44px]");
     expect(screen.getByRole("button", { name: "-1" })).toHaveClass("min-h-[44px]");
   });
 
@@ -410,7 +410,7 @@ describe("IoBundleCard", () => {
     );
     expect(
       sourceBadge.compareDocumentPosition(
-        screen.getByRole("spinbutton", { name: "기준 수량" }),
+        screen.getByRole("button", { name: "기준 수량 수정" }),
       ),
     ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
@@ -663,7 +663,7 @@ describe("IoBundleCard", () => {
     fireEvent.click(header);
 
     expect(screen.getByRole("button", { name: "상·하위 차감" })).toBeDisabled();
-    expect(screen.getByRole("spinbutton", { name: "기준 수량" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "기준 수량 수정" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "재고 반영 변경" })).toBeDisabled();
     expect(screen.getByLabelText("수량")).toHaveAttribute("aria-readonly", "true");
     expect(screen.getByRole("button", { name: "묶음 삭제" })).toBeDisabled();

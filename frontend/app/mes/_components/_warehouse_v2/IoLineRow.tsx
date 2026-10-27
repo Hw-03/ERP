@@ -268,6 +268,7 @@ export function IoLineRow({
         </div>
       ) : (
         <QuantityStepper
+          inlineEdit
           value={currentQty}
           onChange={onStepperChange}
           disabled={editingDisabled || bomStockExempt}

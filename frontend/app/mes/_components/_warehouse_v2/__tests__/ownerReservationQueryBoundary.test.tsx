@@ -68,7 +68,9 @@ it.each([["desktop", true], ["mobile", true], ["desktop", false], ["mobile", fal
   }
   const view = render(<QueryClientProvider client={client}><Composer /></QueryClientProvider>);
   await waitFor(() => expect(calls).toBe(1));
-  fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "5" } });
+  fireEvent.click(screen.getByRole("button", { name: "수량 수정" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "수량" }), { target: { value: "5" } });
+  fireEvent.blur(screen.getByRole("textbox", { name: "수량" }));
   fireEvent.click(screen.getByRole("button", { name: "작업 내용 반영", exact: true }));
   await waitFor(() => expect(api.saveDraft).toHaveBeenCalledTimes(1));
   if (hasCache) await waitFor(() => expect(client.getQueryData<Item[]>(key)?.[0].pending_quantity).toBe(5));

@@ -1,9 +1,71 @@
-import { createRef } from "react";
+import { createRef, useState } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { QuantityStepper } from "../QuantityStepper";
 
 describe("QuantityStepper", () => {
+  it("입출고 인라인 편집은 비우거나 다시 입력하는 동안 확정하지 않고 Enter에서 숫자로 반영한다", () => {
+    const onChange = vi.fn();
+    function Editor() {
+      const [value, setValue] = useState(12);
+      return <QuantityStepper inlineEdit value={value} onChange={(next) => { setValue(next); onChange(next); }} />;
+    }
+    render(<Editor />);
+    fireEvent.click(screen.getByRole("button", { name: "수량 수정" }));
+    const input = screen.getByRole("textbox", { name: "수량" });
+    expect(input).toHaveFocus();
+    expect((input as HTMLInputElement).selectionStart).toBe(0);
+    expect((input as HTMLInputElement).selectionEnd).toBe(2);
+    fireEvent.change(input, { target: { value: "" } });
+    expect(input).toHaveValue("");
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: "005" } });
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onChange).toHaveBeenCalledOnce();
+    expect(onChange).toHaveBeenCalledWith(5);
+    expect(screen.getByRole("button", { name: "수량 수정" })).toHaveTextContent("5");
+    expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+  });
+
+  it.each(["", "-1", "1.5", "2e3", "문자"])("입출고 인라인 편집에서 잘못된 값 '%s'는 기존 수량으로 복귀한다", (value) => {
+    const onChange = vi.fn();
+    render(<QuantityStepper inlineEdit value={12} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "수량 수정" }));
+    const input = screen.getByRole("textbox", { name: "수량" });
+    fireEvent.change(input, { target: { value } });
+    fireEvent.blur(input);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "수량 수정" })).toHaveTextContent("12");
+  });
+
+  it("입출고 인라인 편집은 blur 확정·Escape 취소와 0 수량을 지원한다", () => {
+    const onChange = vi.fn();
+    render(<QuantityStepper inlineEdit value={12} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "수량 수정" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "수량" }), { target: { value: "20" } });
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "수량" }), { key: "Escape" });
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "수량 수정" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "수량" }), { target: { value: "0" } });
+    fireEvent.blur(screen.getByRole("textbox", { name: "수량" }));
+    expect(onChange).toHaveBeenCalledOnce();
+    expect(onChange).toHaveBeenCalledWith(0);
+  });
+  it("입출고 인라인 편집도 최소 수량과 잠금 상태를 지킨다", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<QuantityStepper inlineEdit min={1} value={3} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "수량 수정" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "수량" }), { target: { value: "0" } });
+    fireEvent.blur(screen.getByRole("textbox", { name: "수량" }));
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "수량 수정" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "수량" }), { target: { value: "8" } });
+    rerender(<QuantityStepper inlineEdit min={1} value={3} onChange={onChange} disabled />);
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "수량 수정" })).toBeDisabled();
+    expect(onChange).not.toHaveBeenCalled();
+  });
   it("화살표를 길게 누르면 반복 조정하고 손을 떼면 멈춘다", () => {
     vi.useFakeTimers();
     const onChange = vi.fn();

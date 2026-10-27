@@ -35,6 +35,13 @@ function row(): HTMLElement {
 }
 function available(): HTMLElement { return row().querySelector("[data-io-stock]") as HTMLElement; }
 
+function editQuantity(value: string): void {
+  fireEvent.click(within(row()).getByRole("button", { name: "수량 수정" }));
+  const input = within(row()).getByRole("textbox", { name: "수량" });
+  fireEvent.change(input, { target: { value } });
+  fireEvent.blur(input);
+}
+
 beforeEach(() => {
   vi.resetAllMocks(); realtime.revision = 0;
   window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=4");
@@ -91,14 +98,14 @@ it.each(["desktop", "mobile"] as const)("%s 부족 작업 수량을 줄이면 �
   const props = { globalSearch: "", operator, employees: [], setItems: vi.fn(), onStatusChange: vi.fn(), restoreDraft: partial, restoreNonce: 1, restoreStep: 4 as const };
   const view = render(<View {...props} items={[{ ...item, warehouse_qty: 3, pending_quantity: 3 }]} />);
   expect(screen.getByRole("button", { name: /재고가 부족한 항목이 있습니다/ })).toBeInTheDocument();
-  fireEvent.change(within(row()).getByRole("spinbutton"), { target: { value: "2" } });
+  editQuantity("2");
   expect(screen.queryByText(/재고가 부족한 항목이 있습니다/)).not.toBeInTheDocument();
   expect(screen.queryByText("작업 내용을 반영한 뒤 제출해 주세요.")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: /제출확인/ })).toBeDisabled();
   expect(api.saveDraft).not.toHaveBeenCalled();
-  fireEvent.change(within(row()).getByRole("spinbutton"), { target: { value: "4" } });
+  editQuantity("4");
   expect(screen.getByRole("button", { name: /재고가 부족한 항목이 있습니다/ })).toBeInTheDocument();
-  fireEvent.change(within(row()).getByRole("spinbutton"), { target: { value: "2" } });
+  editQuantity("2");
   const secured = { ...partial, revision: 2, reservation_issue: null,
     bundles: [{ ...partial.bundles[0], quantity: 2, lines: [{ ...line, quantity: 2 }] }],
     effective_plan: { ...draft.effective_plan!, effects: [{ ...draft.effective_plan!.effects[0], quantity: 2 }] } };
@@ -124,7 +131,7 @@ it.each(["desktop", "mobile"] as const)("%s 관리자 취소 후 현재 예약 �
   await waitFor(() => expect(api.getBatch).toHaveBeenCalledWith(draft.batch_id));
   await waitFor(() => expect(available()).toHaveTextContent("가능 재고10"));
   expect(await screen.findByText(/현재 상태: 취소/)).toBeInTheDocument();
-  expect(within(row()).getByRole("spinbutton")).toHaveValue(5);
+  expect(within(row()).getByRole("button", { name: "수량 수정" })).toHaveTextContent("5");
   fireEvent.click(screen.getByRole("button", { name: "작업 내용 반영", exact: true }));
   await waitFor(() => expect(api.saveDraft).toHaveBeenCalledWith(expect.objectContaining({ batch_id: draft.batch_id, expected_revision: 1 })));
 });

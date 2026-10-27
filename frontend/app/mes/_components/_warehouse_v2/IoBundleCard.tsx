@@ -374,6 +374,7 @@ export function IoBundleCard({
         <div data-io-bundle-quantity onClick={(e) => e.stopPropagation()} className={`border-t pt-3 lg:self-center lg:border-t-0 lg:pt-0 ${subType === "internal_use_out" ? "lg:w-[276px]" : ""}`}>
           {showBundleQtyStepper ? (
             <QuantityStepper
+              inlineEdit
               value={stepperQty}
               onChange={applyStepperQty}
               label="기준 수량"

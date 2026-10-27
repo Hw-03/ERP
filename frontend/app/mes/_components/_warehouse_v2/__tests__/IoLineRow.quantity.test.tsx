@@ -92,7 +92,7 @@ describe("IoLineRow quantity", () => {
     expect(screen.queryByText("재고 반영 포함")).not.toBeInTheDocument();
     expect(screen.queryByText("고압")).not.toBeInTheDocument();
     expect(screen.getByText("6-HR-0001")).toBeInTheDocument();
-    expect(screen.getByLabelText("수량")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "수량 수정" })).toBeInTheDocument();
   });
   it("calculates current and expected warehouse stock for adjustment in/out", () => {
     const inbound = makeLine({
@@ -143,7 +143,9 @@ describe("IoLineRow quantity", () => {
     expect(screen.getByText("10")).toBeInTheDocument();
     expect(screen.getByText("7")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "9" } });
+    fireEvent.click(screen.getByRole("button", { name: "수량 수정" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "수량" }), { target: { value: "9" } });
+    fireEvent.blur(screen.getByRole("textbox", { name: "수량" }));
     expect(onQuantityChange).toHaveBeenCalledWith(9, 1);
   });
 
@@ -161,7 +163,9 @@ describe("IoLineRow quantity", () => {
       />,
     );
 
-    fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "24" } });
+    fireEvent.click(screen.getByRole("button", { name: "수량 수정" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "수량" }), { target: { value: "24" } });
+    fireEvent.blur(screen.getByRole("textbox", { name: "수량" }));
 
     expect(onQuantityChange).toHaveBeenCalledWith(24, 0);
     expect(screen.getByText("창고 수량")).toBeInTheDocument();
@@ -181,7 +185,7 @@ describe("IoLineRow quantity", () => {
       />,
     );
 
-    expect(screen.getByRole("spinbutton", { name: "수량" })).toHaveClass("min-h-[44px]");
+    expect(screen.getByRole("button", { name: "수량 수정" })).toHaveClass("min-h-[44px]");
     expect(screen.getByRole("button", { name: "-1" })).toHaveClass("min-h-[44px]");
   });
 
@@ -268,7 +272,7 @@ describe("IoLineRow quantity", () => {
       />,
     );
 
-    const row = screen.getByRole("spinbutton", { name: "수량" }).closest("[style*='grid-template-columns']");
+    const row = screen.getByRole("button", { name: "수량 수정" }).closest("[style*='grid-template-columns']");
     if (!row) throw new Error("제외된 수량 행을 찾을 수 없습니다.");
     expect(row).not.toHaveStyle({ opacity: "0.6" });
     expect(screen.getByRole("button", { name: "재고 반영 변경" })).toHaveStyle({ opacity: "0.6" });
@@ -314,7 +318,7 @@ describe("IoLineRow quantity", () => {
       />,
     );
 
-    const row = screen.getByRole("spinbutton", { name: "수량" }).closest("[style*='grid-template-columns']");
+    const row = screen.getByRole("button", { name: "수량 수정" }).closest("[style*='grid-template-columns']");
     if (!row) throw new Error("하위 BOM 수량 행을 찾을 수 없습니다.");
     expect(row).toHaveClass("lg:pr-0");
     expect(row).not.toHaveClass("lg:pr-[18px]");
@@ -628,7 +632,7 @@ describe("IoLineRow quantity", () => {
 
     expect(screen.getByText("BOM 재고 미반영")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "BOM 재고 미반영 항목" })).toBeDisabled();
-    expect(screen.getByRole("spinbutton", { name: "수량" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "수량 수정" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "+1" })).toBeDisabled();
   });
 });

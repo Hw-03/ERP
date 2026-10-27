@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import type { ReactNode, Ref } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ReactElement, ReactNode, Ref } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
@@ -18,6 +18,8 @@ interface QuantityStepperProps {
   min?: number;
   step?: number | "any";
   inputRef?: Ref<HTMLInputElement>;
+  /** 입출고는 숫자를 클릭해 편집하고 Enter·blur에서만 확정한다. */
+  inlineEdit?: boolean;
   className?: string;
 }
 
@@ -40,6 +42,7 @@ export function QuantityStepper({
   min = 0,
   step = 1,
   inputRef,
+  inlineEdit = false,
   className = "",
 }: QuantityStepperProps) {
   const minimum = safeMinimum(min);
@@ -118,7 +121,7 @@ export function QuantityStepper({
         <StepButton tone={LEGACY_COLORS.red} disabled={minusDisabled} onClick={() => changeBy(-1)}>
           -1
         </StepButton>
-        <QuantityInput
+        {inlineEdit ? <InlineQuantityValue value={current} onChange={onChange} label={label} min={minimum} step={step} disabled={disabled} inputTitle={inputTitle} /> : <QuantityInput
           aria-label={label}
           inputMode={step === 1 ? "numeric" : "decimal"}
           min={minimum}
@@ -130,7 +133,7 @@ export function QuantityStepper({
           onChange={(event) => changeInput(event.target.value)}
           onFocus={(event) => event.currentTarget.select()}
           className="h-11 min-h-[44px] w-[72px] rounded-[10px] border px-2 py-2 text-base font-black"
-        />
+        />}
         <StepButton tone={LEGACY_COLORS.green} disabled={plusDisabled} onClick={() => changeBy(1)}>
           +1
         </StepButton>
@@ -170,6 +173,44 @@ export function QuantityStepper({
       </div>
     </div>
   );
+}
+
+/** 입력 중인 문자열은 확정 전까지 수량 계산에 전달하지 않는다. */
+function InlineQuantityValue({ value, onChange, label, min = 0, step = 1, disabled, inputTitle }: Pick<QuantityStepperProps, "value" | "onChange" | "label" | "min" | "step" | "disabled" | "inputTitle">): ReactElement {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(value));
+  const editingRef = useRef(false);
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (editing) { input.current?.focus(); input.current?.select(); }
+  }, [editing]);
+  useEffect(() => {
+    if (disabled) { editingRef.current = false; setEditing(false); }
+  }, [disabled]);
+
+  function finish(commit: boolean): void {
+    if (!editingRef.current) return;
+    editingRef.current = false;
+    setEditing(false);
+    const text = draft.trim();
+    const next = Number(text);
+    const valid = (step === 1 ? /^\d+$/ : /^\d+(?:\.\d+)?$/).test(text)
+      && Number.isFinite(next) && next >= min;
+    if (commit && !disabled && valid && next !== value) onChange(next);
+  }
+
+  const className = "quantity-input h-11 min-h-[44px] w-[72px] rounded-[10px] border px-2 py-2 text-base font-black";
+  return editing ? <input data-io-quantity-value ref={input} type="text" inputMode={step === 1 ? "numeric" : "decimal"}
+    aria-label={label} value={draft} disabled={disabled} title={inputTitle} className={className}
+    onChange={(event) => setDraft(event.target.value)} onBlur={() => finish(true)}
+    onKeyDown={(event) => {
+      if (event.key === "Enter" || event.key === "Escape") {
+        event.preventDefault();
+        finish(event.key === "Enter");
+      }
+    }} /> : <button data-io-quantity-value type="button" aria-label={`${label} 수정`} disabled={disabled}
+    title={inputTitle ?? "클릭하여 수량 수정"} className={`standard-hover ${className}`}
+    onClick={() => { setDraft(String(value)); editingRef.current = true; setEditing(true); }}>{value}</button>;
 }
 
 function StepButton({

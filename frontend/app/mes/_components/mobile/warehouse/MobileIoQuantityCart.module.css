@@ -135,9 +135,10 @@
 
 .cart [data-io-stepper] input:focus-visible { outline: none; }
 
-.cart [data-io-stepper] > div > button { display: none; }
+.cart [data-io-stepper] > div > button:not([data-io-quantity-value]) { display: none; }
 
-.cart [data-io-stepper] input {
+.cart [data-io-stepper] input,
+.cart [data-io-stepper] [data-io-quantity-value] {
   width: 48px;
   min-width: 0;
   height: 56px;
