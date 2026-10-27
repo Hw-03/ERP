@@ -13,6 +13,7 @@ import { StatusPill } from "../common/StatusPill";
 import { StocktakePauseNotice } from "../common/StocktakePauseNotice";
 import { Button } from "@/lib/ui/Button";
 import { WorkDraftMemo } from "../common/WorkDraftMemo";
+import { useWorkListScroll } from "./useWorkListScroll";
 import { formatWorkTimestamp, getIoDraftOperationColor, getIoDraftOperationLabel, getIoDraftTransactionType, WORK_ITEM_CODE_CLASS, WORK_TIMESTAMP_CLASS, WORK_TYPE_BADGE_CLASS, WorkExpandButton, WorkMovementSummary } from "../common/WorkDraftTableParts";
 import type { WorkDraftMovementSummary } from "@/lib/api/types/work-drafts";
 import {
@@ -117,14 +118,16 @@ export function IoDraftWorkTable({
   onRequestDelete,
 }: IoDraftWorkTableProps) {
   const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
+  const { listScrolled, ...scrollHandlers } = useWorkListScroll();
 
   return (
-    <div className="relative min-h-0 min-w-0 flex-1" data-scrollbar-rail-shell>
+    <div className="relative min-h-0 min-w-0 flex-1" data-scrollbar-rail-shell data-work-list-scrolled={listScrolled || undefined}>
     <div
       role="region"
       aria-label="작업 중 목록"
       tabIndex={0}
       data-scrollbar-rail-viewport
+      {...scrollHandlers}
       className="sg absolute inset-y-0 left-0 -right-2.5 overflow-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
     >
       <div className="min-h-full min-w-[1440px]" style={{ background: LEGACY_COLORS.s1 }}>
@@ -139,7 +142,7 @@ export function IoDraftWorkTable({
           <col className="w-[360px]" />
           <col className="w-[176px]" />
         </colgroup>
-        <thead className="sticky top-0 z-10" style={{ background: LEGACY_COLORS.s1 }}>
+        <thead data-work-table-header className="sticky top-0 z-10" style={{ background: LEGACY_COLORS.s1 }}>
           <tr style={{ color: LEGACY_COLORS.muted2 }}>
             <th
               scope="col"

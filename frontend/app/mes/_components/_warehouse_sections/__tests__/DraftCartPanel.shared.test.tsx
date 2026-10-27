@@ -45,6 +45,32 @@ const props = { layout: "desktop" as const, employeeId: "emp-1", refreshNonce: 0
 function openAll(): void { fireEvent.click(screen.getByRole("button", { name: "전체 작업" })); }
 
 describe("공유 작업함", () => {
+  it("전체 작업을 스크롤하면 탭을 접고 맨 위로 돌아와야 다시 펼친다", () => {
+    render(<DraftCartPanel {...props} defaultScope="all" />);
+    const list = screen.getByRole("region", { name: "전체 작업 중 목록" });
+    const panel = screen.getByRole("region", { name: "전체 작업 목록" });
+    Object.defineProperties(list, { scrollHeight: { value: 1200 }, clientHeight: { value: 600 } });
+    fireEvent.scroll(list, { target: { scrollTop: 24 } });
+    expect(panel).toHaveAttribute("data-work-list-scrolled", "true");
+    fireEvent.scroll(list, { target: { scrollTop: 180 } });
+    expect(panel).toHaveAttribute("data-work-list-scrolled", "true");
+    // 탭이 접히며 목록 높이가 늘어도 중간 위치에서는 다시 펼치지 않는다.
+    fireEvent.scroll(list, { target: { scrollTop: 20 } });
+    expect(panel).toHaveAttribute("data-work-list-scrolled", "true");
+    expect(screen.getByRole("textbox", { name: "전체 작업 검색" })).toBeVisible();
+    fireEvent.scroll(list, { target: { scrollTop: 0 } });
+    expect(panel).not.toHaveAttribute("data-work-list-scrolled", "true");
+  });
+
+  it("전체 작업을 다시 열면 이전의 접힌 탭 상태를 남기지 않는다", () => {
+    render(<DraftCartPanel {...props} defaultScope="all" />);
+    fireEvent.scroll(screen.getByRole("region", { name: "전체 작업 중 목록" }), { target: { scrollTop: 180 } });
+    expect(screen.getByRole("region", { name: "전체 작업 목록" })).toHaveAttribute("data-work-list-scrolled", "true");
+    fireEvent.click(screen.getByRole("button", { name: "내 작업", exact: true }));
+    openAll();
+    expect(screen.getByRole("region", { name: "전체 작업 목록" })).not.toHaveAttribute("data-work-list-scrolled", "true");
+  });
+
   it.each(["desktop", "mobile"] as const)("%s 부서 승인 담당자는 전체 작업으로 진입하고 내 작업도 선택할 수 있다", (layout) => {
     const { rerender, unmount } = render(<DraftCartPanel {...props} layout={layout} defaultScope="all" />);
     expect(screen.getByRole("button", { name: "전체 작업", exact: true })).toHaveAttribute("aria-pressed", "true");
@@ -78,7 +104,7 @@ describe("공유 작업함", () => {
     if (layout === "desktop") expect(screen.getByLabelText("작업 메모")).toHaveClass("text-center", "text-sm", "font-medium", "leading-6");
     expect(screen.queryByText(/INTERNAL-PAYLOAD/)).not.toBeInTheDocument();
   });
-  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
   beforeEach(() => {
     vi.clearAllMocks();
     motion.reduced = false;
@@ -87,6 +113,35 @@ describe("공유 작업함", () => {
     state.mineLoading = false;
     state.list = { ...state.list, data: { items: [other, own], total: 2, skip: 0, limit: 30 }, isPending: false, isFetching: false, isError: false, error: null };
     state.detail = { ...state.detail, data: undefined, isPending: false, isError: false, error: null };
+  });
+
+  it("검색·필터 높이가 바뀌면 데스크톱 열 제목의 고정 위치도 갱신하고 해제한다", () => {
+    let height = 72;
+    let resize: ResizeObserverCallback = () => {};
+    const disconnect = vi.fn();
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(() => ({ height } as DOMRect));
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(callback: ResizeObserverCallback) { resize = callback; }
+      observe = vi.fn();
+      disconnect = disconnect;
+    });
+    const { unmount } = render(<DraftCartPanel {...props} defaultScope="all" />);
+    const surface = screen.getByRole("region", { name: "전체 작업 목록" });
+    expect(surface.style.getPropertyValue("--work-search-height")).toBe("72px");
+    height = 144;
+    act(() => resize([], {} as ResizeObserver));
+    expect(surface.style.getPropertyValue("--work-search-height")).toBe("144px");
+    unmount();
+    expect(surface.style.getPropertyValue("--work-search-height")).toBe("");
+    expect(disconnect).toHaveBeenCalledOnce();
+  });
+
+  it("모바일 작업 목록에는 데스크톱 검색 높이 감시를 추가하지 않는다", () => {
+    const observe = vi.fn();
+    vi.stubGlobal("ResizeObserver", class { observe = observe; disconnect() {} });
+    render(<DraftCartPanel {...props} layout="mobile" defaultScope="all" />);
+    expect(screen.getByRole("region", { name: "전체 작업 목록" }).style.getPropertyValue("--work-search-height")).toBe("");
+    expect(observe).not.toHaveBeenCalled();
   });
 
   it("빈 내 작업에서도 범위 전환을 유지하고 전체의 타인 작업에는 변경 행동을 제공하지 않는다", () => {

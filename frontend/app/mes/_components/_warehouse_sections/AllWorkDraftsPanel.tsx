@@ -1,7 +1,7 @@
 "use client";
 import { StocktakePauseNotice } from "../common/StocktakePauseNotice";
 
-import { Fragment, useEffect, useRef, useState, type CSSProperties, type JSX } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type JSX } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ClipboardList, Sparkles, Truck } from "lucide-react";
 import { ApiError } from "@/lib/api-core";
 import type { WorkDraftFilters, WorkDraftSelection, WorkDraftSummary } from "@/lib/api/types/work-drafts";
@@ -24,6 +24,7 @@ import { FlowBadge } from "../_history_sections/historyTableHelpers";
 import { finalizeHistoryGroupLabel, getHistoryListOperationLabel, getHistoryProcessGroupLabel } from "../_history_sections/historyPresentation";
 import { IO_WORK_TYPES } from "../_warehouse_v2/ioWorkType";
 import { WorkDraftMemo } from "../common/WorkDraftMemo";
+import { useWorkListScroll } from "./useWorkListScroll";
 import { formatRequestNotes } from "./ioRequestLabels";
 import { formatWorkTimestamp, WORK_ITEM_CODE_CLASS, WORK_TIMESTAMP_CLASS, WORK_TYPE_BADGE_CLASS, WorkExpandButton, WorkMovementSummary } from "../common/WorkDraftTableParts";
 
@@ -52,6 +53,25 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
   const pageOutOfRange = Boolean(data && data.total > 0 && data.skip >= data.total);
   const pending = !list.isError && (list.isPending || pageOutOfRange);
   const work = detail.data?.kind === selected?.kind && detail.data?.id === selected?.id ? detail.data : undefined;
+  const { listScrolled, ...scrollHandlers } = useWorkListScroll();
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const search = searchRef.current;
+    const surface = search?.parentElement;
+    if (layout !== "desktop" || !search || !surface) return;
+    // 필터의 접힘 전환과 줄바꿈 중에도 열 제목을 검색 영역 바로 아래에 둔다.
+    const updateHeight = (): void => {
+      surface.style.setProperty("--work-search-height", `${search.getBoundingClientRect().height}px`);
+    };
+    updateHeight();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateHeight);
+    observer?.observe(search);
+    return () => {
+      observer?.disconnect();
+      surface.style.removeProperty("--work-search-height");
+    };
+  }, [layout]);
 
   const previousRefresh = useRef(refreshNonce);
   useEffect(() => {
@@ -123,7 +143,7 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
   const emptyState = !pending && data?.total === 0 && !list.isError ? <EmptyState compact comfortable variant={hasFilters ? "no-search-result" : "no-data"} title={hasFilters ? "조건에 맞는 작업이 없습니다." : "저장된 작업이 없습니다."} description={hasFilters ? "검색어나 필터를 바꿔 확인해 주세요." : "작업을 저장하면 이곳에서 확인할 수 있습니다."} /> : null;
   const columns = <colgroup><col className="w-[52px]" /><col className="w-[104px]" /><col className="w-44" /><col className="w-48" /><col /><col className="w-[200px]" /><col className="w-[152px]" /><col className="w-[280px]" /></colgroup>;
   const sort = filters.sort ?? "department";
-  const header = <thead className="sticky top-0 z-10" style={{ color: C.muted2, background: C.s1 }}><tr><th scope="col" aria-label="상세" className="border-b p-0" style={{ borderColor: C.border }} />{["저장 시각", "담당자 · 부서", "작업", "대상", "메모", "품목코드", "예정 변동"].map((label, index) => {
+  const header = <thead data-work-table-header className="sticky top-0 z-10" style={{ color: C.muted2, background: C.s1 }}><tr><th scope="col" aria-label="상세" className="border-b p-0" style={{ borderColor: C.border }} />{["저장 시각", "담당자 · 부서", "작업", "대상", "메모", "품목코드", "예정 변동"].map((label, index) => {
     const sortable = index < 2;
     const active = index === 0 ? sort !== "department" : index === 1 && sort === "department";
     const ascending = sort === "updated_asc" || sort === "department";
@@ -138,8 +158,8 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
       </button> : label}
     </th>;
   })}</tr></thead>;
-  return <section aria-label="전체 작업 목록" className="flex min-h-0 flex-1 flex-col gap-3 text-sm leading-6" style={{ color: C.text }}>
-    <div className="-mt-3 flex min-w-0 shrink-0 flex-col rounded-b-[24px] border border-t-0 px-3 pb-3" style={{ background: C.s1, borderColor: C.border }}>
+  return <section aria-label="전체 작업 목록" data-work-list-scrolled={layout === "desktop" && listScrolled || undefined} className="flex min-h-0 flex-1 flex-col gap-3 text-sm leading-6" style={{ color: C.text }}>
+    <div ref={searchRef} data-work-search className="-mt-3 flex min-w-0 shrink-0 flex-col rounded-b-[24px] border border-t-0 px-3 pb-3" style={{ background: C.s1, borderColor: C.border }}>
     <div className="flex min-w-0 items-stretch gap-2">
       <SearchInput className="min-w-0 flex-1" style={{ background: C.bg, boxShadow: `inset 0 1px 2px color-mix(in srgb, ${C.text} 4%, transparent)` }} value={filters.search ?? ""} ariaLabel="전체 작업 검색" placeholder="담당자·품목 검색" onChange={(search) => changeFilters({ search })} />
       <InventoryFilterToggleButton filtersOpen={filtersOpen} onToggle={() => setFiltersOpen((open) => !open)} controlsId="work-draft-filter-panel" showLogic={false} logic="AND" onLogicChange={() => undefined} />
@@ -166,7 +186,8 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
     </div>
     </div>
     {layout === "desktop" ? <div className="relative min-h-0 flex-1" data-scrollbar-rail-shell>
-      <div role="region" aria-label="전체 작업 중 목록" aria-busy={pending} tabIndex={0} data-scrollbar-rail-viewport className="sg absolute inset-y-0 left-0 -right-2.5 overflow-auto [scrollbar-gutter:stable] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]">
+      <div role="region" aria-label="전체 작업 중 목록" aria-busy={pending} tabIndex={0} data-scrollbar-rail-viewport className="sg absolute inset-y-0 left-0 -right-2.5 overflow-auto [scrollbar-gutter:stable] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+        {...scrollHandlers}>
       <div className="relative flex min-h-full min-w-[1480px] flex-col" style={{ background: C.s1 }}>
       {pending && <span role="status" className="sr-only">전체 작업 목록 불러오는 중</span>}
       {failure && <div className="p-4">{failure}</div>}

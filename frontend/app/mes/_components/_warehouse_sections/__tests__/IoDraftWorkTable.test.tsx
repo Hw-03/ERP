@@ -88,6 +88,29 @@ function makeDraft(overrides: Partial<IoBatch> = {}): IoBatch {
 }
 
 describe("IoDraftWorkTable hierarchy", () => {
+  it("내 작업도 스크롤하면 탭을 접고 맨 위에서 복원한다", () => {
+    render(<IoDraftWorkTable drafts={[makeDraft()]} busyId={null} onContinue={vi.fn()} onRequestDelete={vi.fn()} />);
+    const viewport = screen.getByRole("region", { name: "작업 중 목록" });
+    Object.defineProperties(viewport, { scrollHeight: { value: 1200, configurable: true }, clientHeight: { value: 600, configurable: true } });
+    fireEvent.scroll(viewport, { target: { scrollTop: 180 } });
+    expect(viewport.closest("[data-scrollbar-rail-shell]")).toHaveAttribute("data-work-list-scrolled", "true");
+    fireEvent.scroll(viewport, { target: { scrollTop: 0 } });
+    expect(viewport.closest("[data-scrollbar-rail-shell]")).not.toHaveAttribute("data-work-list-scrolled", "true");
+  });
+
+  it("짧은 내 작업은 탭이 접혀 스크롤이 없어져도 흔들리지 않고 위로 스크롤하면 복원한다", () => {
+    render(<IoDraftWorkTable drafts={[makeDraft()]} busyId={null} onContinue={vi.fn()} onRequestDelete={vi.fn()} />);
+    const viewport = screen.getByRole("region", { name: "작업 중 목록" });
+    fireEvent.scroll(viewport, { target: { scrollTop: 20 } });
+    expect(viewport.closest("[data-scrollbar-rail-shell]")).toHaveAttribute("data-work-list-scrolled", "true");
+    fireEvent.scroll(viewport, { target: { scrollTop: 0 } });
+    expect(viewport.closest("[data-scrollbar-rail-shell]")).toHaveAttribute("data-work-list-scrolled", "true");
+    fireEvent.wheel(viewport, { deltaY: -100 });
+    expect(viewport.closest("[data-scrollbar-rail-shell]")).not.toHaveAttribute("data-work-list-scrolled", "true");
+    fireEvent.scroll(viewport, { target: { scrollTop: 20 } });
+    fireEvent.keyDown(viewport, { key: "Home", ctrlKey: true });
+    expect(viewport.closest("[data-scrollbar-rail-shell]")).not.toHaveAttribute("data-work-list-scrolled", "true");
+  });
   it.each(["desktop", "mobile"] as const)("%s 작업 목록의 중복 부분 예약 안내를 생략하고 부족 요약은 유지한다", (layout) => {
     const draft = makeDraft({ bundles: [makeBundle({ lines: [makeLine({ shortage: 2 })] })], reservation_status: "reserved", effective_plan: { version: 1, fingerprint: "partial", effects: [
       { kind: "out", item_id: "item-1", quantity: 5 },

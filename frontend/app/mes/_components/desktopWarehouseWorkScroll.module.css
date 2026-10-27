@@ -1,0 +1,109 @@
+/* 탭과 표는 같은 스크롤을 사용하고, 검색·열 제목만 그 안에서 고정한다. */
+.workScroll:has([data-warehouse-work-scroll]) {
+  padding-right: 1rem;
+}
+
+.workScroll [data-warehouse-work-scroll] {
+  container-type: inline-size;
+  overflow: auto;
+  padding-right: 0;
+}
+
+.workScroll:has([data-work-scope-tabs]) [data-warehouse-section-tabs] {
+  top: auto;
+  left: 0;
+  width: 100cqw;
+}
+
+.workScroll [data-work-scope-tabs] {
+  position: sticky;
+  left: 0;
+  width: 100cqw;
+  border-radius: 24px;
+  border-bottom-width: 1px;
+}
+
+.workScroll [data-testid="warehouse-section-work-area"]:has([data-work-scope="all"]) {
+  min-width: 1480px;
+}
+
+.workScroll [data-testid="warehouse-section-work-area"]:has([data-work-scope="mine"] [data-scrollbar-rail-viewport]) {
+  min-width: 1440px;
+}
+
+.workScroll [data-testid="warehouse-section-work-area"]:has([data-work-scope-tabs]),
+.workScroll [data-testid="warehouse-section-work-area"]:has([data-work-scope-tabs]) > div,
+.workScroll [data-work-scope],
+.workScroll [data-work-scope] > section,
+.workScroll [data-work-scope] [data-scrollbar-rail-shell] {
+  flex-shrink: 0;
+  min-height: auto;
+}
+
+/* 가로 스크롤도 바깥에서 처리해 thead의 sticky 기준이 나뉘지 않게 한다. */
+.workScroll [data-work-scope] [data-scrollbar-rail-viewport] {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  overflow: visible;
+  scrollbar-gutter: auto;
+}
+
+.workScroll [data-work-scope] [data-scrollbar-rail-shell] {
+  overflow: clip;
+  border-radius: 24px;
+}
+
+.workScroll [data-work-search] {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 30;
+  width: 100cqw;
+  margin-top: 0;
+  margin-bottom: -12px;
+  padding-top: 12px;
+  border-top-width: 1px;
+  border-bottom-width: 0;
+  border-radius: 24px 24px 0 0;
+  background: var(--c-popup-bg) !important;
+}
+
+.workScroll [data-work-table-header] {
+  top: var(--work-search-height, 0px);
+  background: var(--c-popup-bg) !important;
+}
+
+.workScroll [data-work-search]::before,
+.workScroll [data-work-search]::after {
+  position: absolute;
+  top: 0;
+  width: 24px;
+  height: 24px;
+  content: "";
+  pointer-events: none;
+}
+
+.workScroll [data-work-search]::before {
+  left: 0;
+  background: radial-gradient(circle at 100% 100%, transparent 0 23px, var(--c-bg) 24px);
+}
+
+.workScroll [data-work-search]::after {
+  right: 0;
+  background: radial-gradient(circle at 0 100%, transparent 0 23px, var(--c-bg) 24px);
+}
+
+.workScroll [data-work-table-header] > tr > th {
+  background: var(--c-popup-bg);
+}
+
+.workScroll [data-work-search] ~ [data-scrollbar-rail-shell],
+.workScroll [data-work-search] ~ [data-scrollbar-rail-shell] [data-scrollbar-rail-frame] {
+  border-radius: 0 0 24px 24px;
+  border-top-width: 0;
+}
+
+.workScroll [data-work-search] ~ [data-scrollbar-rail-shell] [data-scrollbar-rail-masks] > :first-child {
+  visibility: hidden;
+}

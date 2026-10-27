@@ -25,6 +25,7 @@ import {
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { LoadFailureCard } from "./common/LoadFailureCard";
+import workScrollStyles from "./desktopWarehouseWorkScroll.module.css";
 
 // 탭 전환 remount 사이 직전 카운트 보존 (세션 내 메모리 캐시).
 // 새로고침 시 휘발 — 첫 진입은 항상 fresh fetch.
@@ -318,14 +319,16 @@ export function DesktopWarehouseView({
   const removeWorkAreaBottomSpace = sectionTab === "cart" || (isWorkAreaSection && workAreaEmpty);
 
   return (
-    <div className="flex h-full min-h-0 flex-1 min-w-0 overflow-x-hidden">
+    <div className={`${workScrollStyles.workScroll} flex h-full min-h-0 flex-1 min-w-0 overflow-x-hidden`}>
       <div
         data-testid="desktop-warehouse-content"
-        className={`scrollbar-hide flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto overflow-x-hidden pl-0 pr-4 pt-0 ${isComposeSection || removeWorkAreaBottomSpace ? "pb-0" : "pb-10"}`}
+        data-warehouse-work-scroll={sectionTab === "cart" || undefined}
+        className={`${sectionTab === "cart" ? "sg [scrollbar-gutter:stable]" : "scrollbar-hide"} flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto overflow-x-hidden pl-0 pr-4 pt-0 ${isComposeSection || removeWorkAreaBottomSpace ? "pb-0" : "pb-10"}`}
       >
         <WarehouseHeader loadFailure={loadFailure} />
         {!itemPickerFullscreen && (
           <div
+            data-warehouse-section-tabs
             className={`sticky top-0 z-20 shrink-0 overflow-hidden bg-[var(--c-bg)] transition-[max-height,opacity,transform,margin] duration-200 ${
               hideSectionTabs ? "-mb-3 max-h-0 -translate-y-1 opacity-0" : "max-h-20 translate-y-0 opacity-100"
             }`}
