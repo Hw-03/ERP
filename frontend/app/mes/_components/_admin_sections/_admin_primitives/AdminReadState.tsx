@@ -36,10 +36,11 @@ export function AdminReadBoundary({ read, skeleton, children, label, reveal = tr
 }) {
   const ref = useAdminReadReveal(read.loading, !!read.error || !reveal);
   const loading = read.loading && !read.error;
-  return <div ref={ref} style={{ display: "contents" }}
-    role={loading ? "status" : undefined} aria-label={loading ? `${label} 불러오는 중` : undefined} aria-busy={loading || undefined}>
+  return <div ref={ref} style={{ display: "contents" }}>
     {read.error ? <ReadFailure message={read.error} onRetry={read.retry} /> : loading
-      ? <div aria-hidden="true" className="flex h-full min-h-0 flex-1 flex-col">{skeleton}</div>
+      ? <div className="flex h-full min-h-0 flex-1 flex-col" role="status" aria-label={`${label} 불러오는 중`} aria-busy="true">
+        <div aria-hidden="true" className="flex h-full min-h-0 flex-1 flex-col">{skeleton}</div>
+      </div>
       : children}
   </div>;
 }
