@@ -28,6 +28,7 @@ from app.services.bom import BomCache
 from app.services.bom import explode_bom as _explode_bom_svc
 from app.services.bom import merge_requirements
 from app.services.production_capacity import compute_capacity
+from app.services.read_singleflight import coalesced_read
 from app.routers._errors import ErrorCode, http_error
 from app.routers.inventory._tx_helper import resolve_producer
 from app.repositories import item_repository
@@ -199,6 +200,7 @@ def _explode_bom(
     description="기존 호출자 호환용 경로입니다. 신규 연동은 /api/production/capacity를 사용하세요.",
     deprecated=True,
 )
+@coalesced_read
 def get_production_capacity(db: Session = Depends(get_db)):
     """생산 가능 수량 — legacy(PF 합산) + AF 기준 블록을 함께 반환.
 

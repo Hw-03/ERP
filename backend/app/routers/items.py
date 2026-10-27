@@ -45,6 +45,7 @@ from app.services import audit
 from app.services import inventory as inventory_svc
 from app.services import stock_availability, stock_math
 from app.services.work_reservation_queries import bulk_inventory_work_status
+from app.services.read_singleflight import coalesced_read
 from app.services.audit_actor_session import get_verified_audit_actor_code
 from app.services.inventory_read import bulk_defective_breakdown as _bulk_defective_breakdown
 from app.services.item_display_order import insert_item_at_process_end
@@ -362,6 +363,7 @@ def create_item(
 
 
 @router.get("", response_model=List[ItemWithInventory])
+@coalesced_read
 def list_items(
     process_type_code: Optional[str] = Query(
         None,

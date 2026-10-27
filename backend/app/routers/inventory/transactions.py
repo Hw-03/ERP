@@ -50,6 +50,7 @@ from app.services import inventory_operation_cancellation as operation_cancellat
 from app.services import legacy_inventory_operation_adoption as legacy_adoption_svc
 from app.services.transaction_display_groups import DisplayGroup, DisplayGroupRecord, group_display_records
 from app.services.request_order_stock import load_request_order_stock
+from app.services.read_singleflight import coalesced_read
 from app.services.stocktake_history import observation_groups, hydrate_observation_groups
 from app.services import inventory_operation_history
 from app.services.export_helpers import csv_streaming_response
@@ -575,6 +576,7 @@ def _load_display_work_groups(
     "/transactions/display-groups",
     response_model=TransactionDisplayGroupPageResponse,
 )
+@coalesced_read
 def list_transaction_display_groups(
     item_id: Optional[uuid.UUID] = Query(None),
     operation_batch_id: Optional[uuid.UUID] = Query(None),
