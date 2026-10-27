@@ -19,7 +19,7 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import String, and_, case, cast, func, literal, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Query as ORMQuery, Session
 from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.engine import Row
 
@@ -470,6 +470,70 @@ def list_transactions(
     return result
 
 
+def _page_modern_display_query(
+    query: ORMQuery, db: Session, *, limit: int,
+    cursor: dict[str, str | None] | None, search_filter: ColumnElement | None,
+) -> ORMQuery:
+    """Page whole operation/submission buckets; retain legacy lifecycle grouping unchanged.
+
+    Legacy defect pairs can join separate log identities, so their filtered ranges
+    keep the existing grouper. Modern ranges rank bucket anchors in SQL before
+    loading records, including one extra bucket for the next-page indicator.
+    """
+    if db.query(query.filter(TransactionLog.operation_id.is_(None)).exists()).scalar():
+        return query
+    cursor_at = cursor_created = cursor_id = None
+    if cursor:
+        try:
+            cursor_at = datetime.fromisoformat(cursor["sort_at"] or "")
+            cursor_created = datetime.fromisoformat(cursor["created_at"] or "")
+            cursor_id = uuid.UUID(cursor["log_id"] or "")
+        except ValueError:
+            return query
+        # Noncanonical external cursors retain the existing lexical comparison.
+        if (cursor_at.tzinfo or cursor_created.tzinfo
+                or cursor_at.isoformat() != cursor["sort_at"]
+                or cursor_created.isoformat() != cursor["created_at"]
+                or str(cursor_id) != cursor["log_id"]):
+            return query
+    operation_kind = (
+        select(InventoryOperation.kind)
+        .where(InventoryOperation.operation_id == TransactionLog.operation_id)
+        .correlate(TransactionLog).scalar_subquery()
+    )
+    original = and_(operation_kind != InventoryOperationKindEnum.CANCELLATION,
+                    TransactionLog.reverses_log_id.is_(None))
+    bucket = case(
+        (and_(original, TransactionLog.submission_id.isnot(None)),
+         literal("submission:") + cast(TransactionLog.submission_id, String)),
+        (and_(original, TransactionLog.operation_batch_id.isnot(None)),
+         literal("io-submission:") + cast(TransactionLog.operation_batch_id, String)),
+        else_=literal("operation:") + cast(TransactionLog.operation_id, String),
+    )
+    requested_at = _history_request_date_expr()
+    ordering = (requested_at.desc(), TransactionLog.created_at.desc(), TransactionLog.log_id.desc())
+    eligible = query.filter(~TransactionLog.operation_id.in_(select(StocktakeApplication.operation_id)))
+    ranked = eligible.with_entities(
+        bucket.label("bucket"), requested_at.label("requested_at"),
+        TransactionLog.created_at.label("created_at"), TransactionLog.log_id.label("log_id"),
+        func.row_number().over(partition_by=bucket, order_by=ordering).label("position"),
+        func.max(case((search_filter, 1), else_=0) if search_filter is not None else literal(1))
+        .over(partition_by=bucket).label("matched"),
+    ).subquery()
+    anchors = select(ranked.c.bucket).where(ranked.c.position == 1, ranked.c.matched == 1)
+    if cursor:
+        anchors = anchors.where(or_(
+            ranked.c.requested_at < cursor_at,
+            and_(ranked.c.requested_at == cursor_at, ranked.c.created_at < cursor_created),
+            and_(ranked.c.requested_at == cursor_at, ranked.c.created_at == cursor_created,
+                 ranked.c.log_id < cursor_id),
+        ))
+    anchors = anchors.order_by(
+        ranked.c.requested_at.desc(), ranked.c.created_at.desc(), ranked.c.log_id.desc(),
+    ).limit(limit + 1)
+    return eligible.filter(bucket.in_(anchors))
+
+
 def _load_display_work_groups(
     db: Session, *, item_id: Optional[uuid.UUID] = None,
     operation_batch_id: Optional[uuid.UUID] = None, transaction_type: Optional[TransactionTypeEnum] = None,
@@ -479,6 +543,8 @@ def _load_display_work_groups(
     date_from: Optional[date] = None, date_to: Optional[date] = None, include_archived: bool = False,
     requester_employee_id: Optional[uuid.UUID] = None,
     search_config: dict | None = None,
+    page_limit: int | None = None,
+    page_cursor: dict[str, str | None] | None = None,
 ) -> _DisplayWorkQuery:
     """Keep list and calendar work identity and search membership identical."""
     query = (
@@ -511,6 +577,10 @@ def _load_display_work_groups(
     )
     search_filter = _history_search_filter(search, db,
         groups=[group["terms"] for group in search_config["synonym_groups"]] if search_config else None)
+    if page_limit is not None:
+        query = _page_modern_display_query(
+            query, db, limit=page_limit, cursor=page_cursor, search_filter=search_filter,
+        )
     matched_log_ids = (
         {log_id for (log_id,) in query.with_entities(TransactionLog.log_id).filter(search_filter).all()}
         if search_filter is not None else None
@@ -605,11 +675,15 @@ def list_transaction_display_groups(
     started = perf_counter()
     search_config = get_search_config(db)
     search_version = search_config["version"]
+    cursor_value = _decode_display_group_cursor(cursor) if cursor else None
+    if cursor_value and cursor_value.get("search_version") != search_version:
+        raise http_error(409, "SEARCH_CONFIG_STALE", "검색 설정이 변경되었습니다. 처음부터 다시 조회해 주세요.")
     data = _load_display_work_groups(db, item_id=item_id, operation_batch_id=operation_batch_id,
         transaction_type=transaction_type, transaction_types=transaction_types, operation_keys=operation_keys,
         reference_no=reference_no, search=search, department=department, model=model, process_step=process_step,
         date_from=date_from, date_to=date_to, include_archived=include_archived,
-        requester_employee_id=requester_employee_id, search_config=search_config)
+        requester_employee_id=requester_employee_id, search_config=search_config,
+        page_limit=None if include_operation_only else limit, page_cursor=cursor_value)
     groups, rows = data.groups, data.rows
     batch_map, stock_request_map, operation_map = data.batch_map, data.stock_request_map, data.operation_map
     queried_at = data.queried_at
@@ -626,10 +700,7 @@ def list_transaction_display_groups(
         groups = [*groups, *(TransactionDisplayGroupResponse(type="operation", key=str(operation.operation_id), logs=[],
             operation={"effective_at": operation.effective_at, "operation_id": str(operation.operation_id)}) for operation in operation_rows)]
         groups.sort(key=_display_group_sort_tuple, reverse=True)
-    if cursor:
-        cursor_value = _decode_display_group_cursor(cursor)
-        if cursor_value.get("search_version") != search_version:
-            raise http_error(409, "SEARCH_CONFIG_STALE", "검색 설정이 변경되었습니다. 처음부터 다시 조회해 주세요.")
+    if cursor_value:
         groups = [group for group in groups if _is_after_display_group_cursor(group, cursor_value)]
     selected_groups = groups[:limit]
     grouped_at = perf_counter()
