@@ -6,6 +6,7 @@ import type { StocktakeCommandKind, StocktakeEvent, StocktakeProgress, Stocktake
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { formatKstDateTime } from "@/lib/mes-format";
+import { makeClientRequestId } from "@/lib/uuid";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { Operator } from "../login/useCurrentOperator";
 import type { RecoveredStocktakeCommand } from "./StocktakeCommandRecovery";
@@ -38,8 +39,6 @@ function message(error: unknown): string {
 function code(error: unknown): string | undefined {
   return error && typeof error === "object" && "code" in error ? String(error.code) : undefined;
 }
-
-function idempotencyKey(): string { return crypto.randomUUID(); }
 
 /** Keep input values mounted while animating height and excluding inactive controls. */
 function ManagementFields({ open, children }: { open: boolean; children: ReactNode }): ReactNode {
@@ -142,7 +141,7 @@ export function StocktakeManagement({ token, operator, round, onChanged, section
     if (!canManageRounds || busyRef.current || unknown) return null;
     const submittedRound = roundRef.current;
     const submittedAction = actionRef.current;
-    const key = idempotencyKey();
+    const key = makeClientRequestId();
     busyRef.current = true;
     setBusy(true); setError(""); setNotice(""); setPreparationIssues([]);
     try {

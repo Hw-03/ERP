@@ -33,6 +33,18 @@ function mount(selectedTarget: StocktakeTarget = target) {
     updateTarget: (next: StocktakeTarget) => { selectedTarget = next; view.rerender(tree()); } };
 }
 describe("stocktake input integration", () => {
+  it("LAN HTTP에서도 작업 중단을 전송하고 처리 상태를 해제한다", async () => {
+    vi.stubGlobal("crypto", { getRandomValues: crypto.getRandomValues.bind(crypto) });
+    try {
+      vi.mocked(stocktakeApi.command).mockRejectedValue(new Error("중단 실패"));
+      mount();
+      fireEvent.click(screen.getByRole("button", { name: "작업 중단", exact: true }));
+      await waitFor(() => expect(stocktakeApi.command).toHaveBeenCalledOnce());
+      expect(vi.mocked(stocktakeApi.command).mock.calls[0][4]?.key).toMatch(/^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i);
+      expect(await screen.findByRole("alert")).toHaveTextContent("중단 실패");
+      expect(screen.getByRole("button", { name: "작업 중단", exact: true })).toBeEnabled();
+    } finally { vi.unstubAllGlobals(); }
+  });
   it("중단 버튼만 처리 상태를 표시하고 중복 실행을 막는다", async () => {
     let fail!: (error: Error) => void;
     vi.mocked(stocktakeApi.command).mockReturnValue(new Promise((_resolve, reject) => { fail = reject; }));

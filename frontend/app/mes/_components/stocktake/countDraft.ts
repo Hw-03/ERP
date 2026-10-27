@@ -1,3 +1,5 @@
+import { makeClientRequestId } from "@/lib/uuid";
+
 export const CATEGORIES = ["normal", "defect", "b_grade", "obsolete"] as const;
 export type Category = (typeof CATEGORIES)[number];
 export type Quantities = Record<Category, number | null>;
@@ -89,7 +91,7 @@ export class CountDraft {
         if (!this.sameActor()) throw new Error("작업자가 변경되었거나 인증이 만료되었습니다. 입력을 보존하고 저장을 중단했습니다.");
         if (this.count.status !== "DRAFT") throw new Error("현재 계수 상태에서는 수정할 수 없습니다.");
         const body = { expected_version: this.count.version, fence: this.count.fence, quantities: this.quantities() };
-        this.pending = { body, key: crypto.randomUUID(), edit: this.edits };
+        this.pending = { body, key: makeClientRequestId(), edit: this.edits };
         this.saving = true;
         this.error = null;
         this.emit();

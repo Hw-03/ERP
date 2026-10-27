@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { isStocktakeNotApplied, stocktakeApi } from "@/lib/api/stocktake";
 import { restoreOperatorSession } from "@/lib/auth/operator-session";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
+import { makeClientRequestId } from "@/lib/uuid";
 import { readCurrentOperator, type Operator } from "../login/useCurrentOperator";
 import { CATEGORIES, CountDraft, type DraftCount } from "./countDraft";
 import type { StocktakeTarget } from "@/lib/api/types/stocktake";
@@ -82,7 +83,7 @@ export function StocktakeCountEditor({ target, token, operator, onChanged, enabl
   const command = async (kind: "count_confirm" | "count_resume" | "count_abandon" | "count_force_release") => {
     if (busyRef.current || unknown) return;
     busyRef.current = true; setBusy(true); setActiveAction(kind); setActionError("");
-    const key = crypto.randomUUID();
+    const key = makeClientRequestId();
     let commandStarted = false;
     try {
       if (kind === "count_confirm") await draft.flush();

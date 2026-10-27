@@ -6,6 +6,17 @@ function setup(save = vi.fn(async (body) => ({ ...initial, version: body.expecte
   return { save, draft: new CountDraft(initial, save, () => true) };
 }
 describe("CountDraft", () => {
+  it("saves with a UUID key when LAN HTTP has no randomUUID", async () => {
+    vi.stubGlobal("crypto", { getRandomValues: crypto.getRandomValues.bind(crypto) });
+    try {
+      const save = vi.fn(async (body, _key?: string) => ({ ...initial, version: body.expected_version + 1, quantities: body.quantities }));
+      const { draft } = setup(save);
+      draft.edit("normal", "7");
+      await draft.flush();
+      expect(save.mock.calls[0][1]).toMatch(/^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i);
+      expect(draft.dirty).toBe(false);
+    } finally { vi.unstubAllGlobals(); }
+  });
   it("exposes a newer realtime revision immediately when recovery settles an in-flight save", async () => {
     let reject!: (error: Error) => void;
     const { draft } = setup(vi.fn(() => new Promise<DraftCount>((_resolve, fail) => { reject = fail; })));

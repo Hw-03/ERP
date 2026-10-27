@@ -120,6 +120,18 @@ async function openWaiting(): Promise<void> {
 }
 
 describe("StocktakeView integration", () => {
+  it("LAN HTTP에서도 선택한 계수의 검토와 재고 반영을 전송한다", async () => {
+    vi.stubGlobal("crypto", { getRandomValues: crypto.getRandomValues.bind(crypto) });
+    try {
+      targets = [confirmedTarget()];
+      mount();
+      await openWaiting();
+      fireEvent.click(await screen.findByRole("button", { name: "재고 반영", exact: true }));
+      await waitFor(() => expect(stocktakeApi.command).toHaveBeenCalledWith("application_bulk_apply", expect.any(String), "token-employee-a", expect.any(Object), expect.any(Object)));
+      const calls = vi.mocked(stocktakeApi.command).mock.calls;
+      for (const call of calls) expect(call[4]?.key).toMatch(/^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i);
+    } finally { vi.unstubAllGlobals(); }
+  });
   it.each(["desktop", "mobile"] as const)("%s 검색 사전 갱신은 대상 재조회와 계수 입력 보존을 함께 수행한다", async variant => {
     const { client } = mount(variant, true);
     await waitFor(() => expect(client.getQueryData(queryKeys.itemSearch.config())).toMatchObject({ version: "search-v1" }));

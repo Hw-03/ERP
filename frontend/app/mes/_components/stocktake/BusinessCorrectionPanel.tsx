@@ -8,6 +8,7 @@ import type { StocktakeCommandKind } from "@/lib/api/types/stocktake";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { formatKstDateTime } from "@/lib/mes-format";
+import { makeClientRequestId } from "@/lib/uuid";
 import type { Operator } from "../login/useCurrentOperator";
 import type { RecoveredStocktakeCommand } from "./StocktakeCommandRecovery";
 import { STOCKTAKE_CARD } from "./StocktakeCountEditor";
@@ -100,7 +101,7 @@ export function BusinessCorrectionPanel({ token, operator, onChanged, recovered 
   };
   const command = async (kind: StocktakeCommandKind, path: string, payload: Record<string, unknown>, admin = false): Promise<Record<string, unknown> | null> => {
     if (busyRef.current || unknown) return null;
-    const key = crypto.randomUUID();
+    const key = makeClientRequestId();
     busyRef.current = true;
     setBusy(true); setError("");
     try {

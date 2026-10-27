@@ -36,6 +36,21 @@ it("requests a correction without sending an actor identity", async () => {
   expect(JSON.stringify(vi.mocked(stocktakeApi.command).mock.calls[0][3])).not.toContain("admin");
 });
 
+it("LAN HTTP에서도 업무 정정 요청을 전송한다", async () => {
+  vi.stubGlobal("crypto", { getRandomValues: crypto.getRandomValues.bind(crypto) });
+  try {
+    vi.mocked(stocktakeApi.command).mockResolvedValue({ correction_id: "correction-2", version: 1, status: "REQUESTED" });
+    render(<BusinessCorrectionPanel token="t" operator={operator} onChanged={vi.fn()} />);
+    fireEvent.click(screen.getByText("업무 정정", { selector: "summary" }));
+    fireEvent.change(screen.getByLabelText("원업무 ID"), { target: { value: "source-2" } });
+    fireEvent.change(screen.getByLabelText("정정 사유"), { target: { value: "잘못된 완료" } });
+    fireEvent.change(screen.getByLabelText("증빙"), { target: { value: "담당자 확인 기록" } });
+    fireEvent.click(screen.getByRole("button", { name: "정정 요청" }));
+    await waitFor(() => expect(stocktakeApi.command).toHaveBeenCalledOnce());
+    expect(vi.mocked(stocktakeApi.command).mock.calls[0][4]?.key).toMatch(/^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i);
+  } finally { vi.unstubAllGlobals(); }
+});
+
 it("keeps processing and receipt recovery visible when correction controls are collapsed", async () => {
   let rejectCommand!: (error: Error) => void;
   vi.mocked(stocktakeApi.command).mockImplementationOnce(() => new Promise((_, reject) => { rejectCommand = reject; }));

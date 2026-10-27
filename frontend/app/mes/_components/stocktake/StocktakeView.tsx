@@ -5,6 +5,7 @@ import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-quer
 import { MapPin } from "lucide-react";
 import { isStocktakeNotApplied, stocktakeApi } from "@/lib/api/stocktake";
 import { formatKstDateTime } from "@/lib/mes-format";
+import { makeClientRequestId } from "@/lib/uuid";
 import type { StocktakeCount, StocktakeLatestSummaryResponse, StocktakePage, StocktakeProgress, StocktakeRound, StocktakeTarget, StocktakeWaitingSelection } from "@/lib/api/types/stocktake";
 import { readOperatorSession, restoreOperatorSession, validateTabOwnership, type StoredOperatorSession } from "@/lib/auth/operator-session";
 import { ApiError } from "@/lib/api-core";
@@ -239,7 +240,7 @@ function StocktakeWorkspace({ token, operator, enabled, variant }: { token: stri
   const execute = async (kind: "count_start" | "application_bulk_preview" | "application_bulk_apply", path: string, payload: object, target?: StocktakeTarget) => {
     if (busyRef.current || unknown) return;
     busyRef.current = true; setBusy(true); setActiveAction(kind); setError(""); setNotice("");
-    const key = crypto.randomUUID();
+    const key = makeClientRequestId();
     const generation = selectionGeneration.current;
     const selectedKey = selectionKeyRef.current;
     try {

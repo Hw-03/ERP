@@ -24,6 +24,22 @@ beforeEach(() => {
 });
 
 describe("StocktakeManagement", () => {
+  it("LAN HTTP에서도 시작 검토와 회차 시작 요청을 보낸다", async () => {
+    vi.stubGlobal("crypto", { getRandomValues: crypto.getRandomValues.bind(crypto) });
+    try {
+      const started = vi.fn();
+      vi.mocked(stocktakeApi.command).mockResolvedValue({ preview_id: "start-preview", preview_hash: "hash", target_count: 1 });
+      render(<StocktakeManagement token="t" operator={operator} round={null} onChanged={vi.fn()} section="rounds" focusStart onStarted={started} />);
+      fireEvent.change(screen.getByRole("textbox", { name: "회차 이름" }), { target: { value: "새 조사" } });
+      fireEvent.click(screen.getByRole("button", { name: "시작 대상 확인", exact: true }));
+      fireEvent.click(await screen.findByRole("button", { name: "회차 시작", exact: true }));
+      await waitFor(() => expect(started).toHaveBeenCalledOnce());
+      const calls = vi.mocked(stocktakeApi.command).mock.calls;
+      expect(calls.map(([kind]) => kind)).toEqual(["round_start_preview", "round_start"]);
+      for (const call of calls) expect(call[4]?.key).toMatch(/^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i);
+      expect(calls[0][4]?.key).not.toBe(calls[1][4]?.key);
+    } finally { vi.unstubAllGlobals(); }
+  });
   it("대기 화면의 시작 진입은 회차 이름에 초점을 두고 명령을 보내지 않는다", () => {
     render(<StocktakeManagement token="t" operator={operator} round={null} onChanged={vi.fn()} section="rounds" focusStart />);
     expect(screen.getByRole("textbox", { name: "회차 이름" })).toHaveFocus();
