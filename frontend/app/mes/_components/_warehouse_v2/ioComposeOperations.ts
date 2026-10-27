@@ -206,7 +206,9 @@ async function submitComposition(
         ? "위치별 결재 요청 완료"
         : responseKind === "department"
           ? "부서 결재 요청 완료"
-          : "창고 결재 요청 완료"
+          : responseKind === "as_research"
+            ? "AS·연구 전용 결재 요청 완료"
+            : "창고 결재 요청 완료"
       : "입출고 반영 완료";
     if (draftIdRef.current === draftId) draftIdRef.current = null;
     return { response, title, submittedDraftId: draftId };

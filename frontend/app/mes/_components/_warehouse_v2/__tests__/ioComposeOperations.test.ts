@@ -18,6 +18,33 @@ function operationRefs(): IoOperationRefs {
 }
 
 describe("ioComposeOperations", () => {
+  it.each([
+    ["as_research", true, 1, "AS·연구 전용 결재 요청 완료"],
+    ["warehouse", true, 1, "창고 결재 요청 완료"],
+    ["department", true, 1, "부서 결재 요청 완료"],
+    ["as_research", false, 1, "입출고 반영 완료"],
+    ["as_research", true, 2, "위치별 결재 요청 완료"],
+  ] as const)("%s 결재·승인 여부 %s·요청 %s건에 맞는 완료 제목을 표시한다", async (kind, requiresApproval, count, title) => {
+    const bundles = [{ bundle_id: "bundle-1", lines: [] } as never];
+    const submit = vi.fn(async () => ({
+      requires_approval: requiresApproval,
+      message: "서버 완료 안내",
+      stock_requests: Array.from({ length: count }, () => ({ approval_kind: kind })),
+    } as never));
+    const setResult = vi.fn();
+
+    await runCompositionSubmit(
+      "employee-1", "internal_use_out", "조립", async () => {}, () => bundles,
+      { current: null }, submit, vi.fn(), vi.fn(), setResult,
+      vi.fn(), vi.fn(), vi.fn(), async () => [], vi.fn(),
+    );
+
+    expect(submit).toHaveBeenCalledOnce();
+    expect(submit).toHaveBeenCalledWith(bundles);
+    expect(setResult).toHaveBeenCalledOnce();
+    expect(setResult).toHaveBeenCalledWith({ kind: "success", title, message: "서버 완료 안내" });
+  });
+
   it.each([null, "draft-1"])("같은 작업 %s의 제출 대기 중 내용이 바뀌어도 확정 성공을 숨기지 않는다", async (draftId) => {
     const refs = operationRefs();
     const setResult = vi.fn();
