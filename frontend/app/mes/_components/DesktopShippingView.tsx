@@ -2090,7 +2090,9 @@ function RequestDetailEntry({ request, loading = false, onBack, onEdit, onDelete
             <button type="button" aria-label="요청 목록으로 돌아가기" onClick={onBack} className={`${SHIPPING_ICON_BOX_CLASS} self-center`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
               <ArrowLeft className="h-4 w-4" />
             </button>
-            <PanelTitle icon={PackageCheck} title={finalPfName} subtitle={titleSubtitle} />
+            <div className="flex min-h-[64px] min-w-0 max-w-full items-center rounded-[14px] border px-3 py-2" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+              <PanelTitle icon={PackageCheck} title={finalPfName} subtitle={titleSubtitle} />
+            </div>
             <InvoiceNumberEditor request={request} onSaved={onInvoiceSaved} />
             <ShippingWorkersEditor request={request} onSaved={onInvoiceSaved} />
             <div data-testid="shipping-request-detail-quantity" className="flex min-h-[64px] min-w-[112px] basis-[112px] grow items-center rounded-[14px] border px-3 py-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>

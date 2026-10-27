@@ -90,13 +90,13 @@ export function ShippingWorkersEditor({ request, onSaved }: { request: ShippingR
   }
   useRegisterDirty(`shipping-workers-${request.request_id}`, dirty, () => save(true), () => { setValue(request.worker_names ?? ""); setError(null); }, { mode: editable ? "save" : "confirm-only" });
 
-  return <section aria-label="작업자 정보" className="min-w-0 basis-[280px] grow">
-    <div className="flex min-h-[64px] items-center gap-2 rounded-[14px] border px-3 py-2" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
-      <label className="min-w-0 flex-1"><span className="block text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>작업자</span>
-        {editable ? <ShippingWorkersInput aria-label="작업자" value={value} maxLength={200} disabled={saving} onValueChange={setValue} placeholder="이름 입력 (여러 명 가능, 선택)" className="mt-1 min-h-11 w-full min-w-0 bg-transparent text-sm font-bold outline-none focus-visible:ring-2" style={{ color: LEGACY_COLORS.text }} />
+  return <section aria-label="작업자 정보" className="min-w-0 basis-[280px] grow lg:flex lg:min-w-[280px] lg:flex-col">
+    <div className="flex min-h-[64px] min-w-0 flex-1 items-center gap-2 rounded-[14px] border px-3 py-2 transition-shadow focus-within:ring-2 focus-within:ring-[color:var(--c-blue)]" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+      <label className="min-w-0 flex-1"><span className="block text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>작업자</span>
+        {editable ? <ShippingWorkersInput aria-label="작업자" value={value} maxLength={200} disabled={saving} onValueChange={setValue} placeholder="이름 입력 (여러 명 가능, 선택)" className="mt-1 min-h-11 w-full min-w-0 bg-transparent text-sm font-bold outline-none lg:mt-0.5 lg:h-7 lg:min-h-0 lg:p-0" style={{ color: LEGACY_COLORS.text }} />
           : <span className="mt-1 block break-words text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>{request.worker_names || "미입력"}</span>}
       </label>
-      {editable && <button type="button" aria-label="작업자 저장" onClick={() => void save()} disabled={saving || !dirty} className="min-h-11 shrink-0 rounded-[12px] border px-4 text-sm font-bold disabled:opacity-45" style={{ background: tint(LEGACY_COLORS.blue, 14), borderColor: tint(LEGACY_COLORS.blue, 40), color: LEGACY_COLORS.blue }}>{saving ? "저장 중" : "저장"}</button>}
+      {editable && <button type="button" aria-label="작업자 저장" onClick={() => void save()} disabled={saving || !dirty} className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-[12px] border px-4 text-sm font-black disabled:cursor-not-allowed disabled:opacity-45" style={{ background: tint(LEGACY_COLORS.blue, 14), borderColor: tint(LEGACY_COLORS.blue, 40), color: LEGACY_COLORS.blue }}>{saving ? "저장 중" : "저장"}</button>}
     </div>
     {!editable && dirty && <p className="mt-2 break-words text-sm" style={{ color: LEGACY_COLORS.yellow }}>저장하지 않은 입력: {value || "미입력"} · 준비 중 상태에서 저장할 수 있습니다.</p>}
     {error && <p role="alert" className="mt-2 text-sm" style={{ color: LEGACY_COLORS.red }}>{error}</p>}
