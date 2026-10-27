@@ -156,7 +156,7 @@ export function IoBundleCart({
         // 항목 4-7C — 모바일 띠 배경/상단선 제거(저장·제출확인 버튼만 떠 보이게).
         <div data-io-cart-actions className="sticky bottom-0 z-20 -mx-3 mt-auto flex flex-col gap-2 bg-[var(--c-bg)] px-4 pb-0 pt-2 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-1">
           {footerNotice}
-          {!canAdvance && hasShortage && (
+          {!canAdvance && hasShortage && !(pullEnabled && onPullFromWarehouse) && (
             <p className="text-center text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
               재고가 부족한 항목이 있습니다
             </p>
@@ -188,7 +188,7 @@ export function IoBundleCart({
                 color: LEGACY_COLORS.red,
               }}
             >
-              {pullButtonLabel}
+              재고가 부족한 항목이 있습니다 · {pullButtonLabel}
             </button>
           )}
           {onSaveDraft ? (

@@ -158,7 +158,7 @@ describe("IoBundleCart layout", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "부족 1개 전체 가져오기" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "재고가 부족한 항목이 있습니다 · 부족 1개 전체 가져오기" })).toBeInTheDocument();
 
     rerender(
       <IoBundleCart
@@ -180,7 +180,28 @@ describe("IoBundleCart layout", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "선택한 1개 가져오기" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "재고가 부족한 항목이 있습니다 · 선택한 1개 가져오기" })).toBeInTheDocument();
+  });
+
+  it("현재 부족이 해결되면 중복 안내와 가져오기 버튼을 숨기고 작업 반영 버튼을 남긴다", () => {
+    const props = {
+      bundles: [bundle], subType: "warehouse_to_dept" as const,
+      itemMap: new Map([[item.item_id, item]]), getAvailable: () => 10,
+      onToggleLine: vi.fn(), onQuantityChange: vi.fn(), onRemoveLine: vi.fn(),
+      onRemoveBundle: vi.fn(), onAdvance: vi.fn(), onSaveDraft: vi.fn(),
+      canAdvance: false, pullEnabled: true,
+      onPullFromWarehouse: vi.fn(),
+    };
+    const { rerender } = render(<IoBundleCart {...props} />);
+
+    expect(screen.queryByText("작업 내용을 반영한 뒤 제출해 주세요.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /가져오기/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "작업 중 등록" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "제출확인 →" })).toBeDisabled();
+
+    rerender(<IoBundleCart {...props} hasShortage />);
+    expect(screen.queryByText("작업 내용을 반영한 뒤 제출해 주세요.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /가져오기/ })).toBeInTheDocument();
   });
 
   it("재계산 중에는 임시저장과 다음 단계 이동을 막는다", () => {

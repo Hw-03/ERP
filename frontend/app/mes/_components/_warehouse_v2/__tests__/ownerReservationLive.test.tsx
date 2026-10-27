@@ -70,7 +70,7 @@ it.each(["desktop", "mobile"] as const)("%s 실시간 재고 감소로 새로 �
   expect(screen.queryByTitle("창고에서 가져오기 대상으로 선택")).not.toBeInTheDocument();
   view.rerender(<View {...props} items={[{ ...item, pending_quantity: 8 }]} />);
   fireEvent.click(await screen.findByTitle("창고에서 가져오기 대상으로 선택"));
-  fireEvent.click(screen.getByRole("button", { name: "선택한 1개 가져오기" }));
+  fireEvent.click(screen.getByRole("button", { name: "재고가 부족한 항목이 있습니다 · 선택한 1개 가져오기" }));
   await waitFor(() => expect(api.preview).toHaveBeenCalledWith(expect.objectContaining({ sub_type: "warehouse_to_dept", targets: [expect.objectContaining({ item_id: item.item_id })] })));
   expect(api.saveDraft).not.toHaveBeenCalled();
   expect(line.shortage).toBe(0);
