@@ -56,6 +56,7 @@ interface Props {
   bundles: IoBundle[];
   notes: string;
   hasShortage: boolean;
+  stockChecking?: boolean;
   hasInvalidQuantity: boolean;
   submitting: boolean;
   saving: boolean;
@@ -199,6 +200,7 @@ export function IoConfirmStep({
   bundles,
   notes,
   hasShortage,
+  stockChecking = false,
   hasInvalidQuantity,
   submitting,
   saving,
@@ -279,10 +281,12 @@ export function IoConfirmStep({
   const submitDisabled =
     submitting || saving ||
     (effectIncludedLines.length === 0 && !allowsNoEffectCustomBomApproval) ||
-    hasShortage || hasInvalidQuantity || missingInternalUseBomMode || (materialOutbound && memoMissing) || defectReasonMissing;
+    stockChecking || hasShortage || hasInvalidQuantity || missingInternalUseBomMode || (materialOutbound && memoMissing) || defectReasonMissing;
   const saveDisabled = submitting || saving || bundles.length === 0;
   const accent = ioDirectionTone(subType);
-  const blockerText = hasShortage
+  const blockerText = stockChecking
+    ? "사용 가능 재고를 확인하고 있습니다."
+    : hasShortage
     ? "재고 부족 라인이 있어 제출할 수 없습니다. Step 4에서 라인을 다시 확인하세요."
     : hasInvalidQuantity
     ? "0 이하 수량 라인이 있어 제출할 수 없습니다."

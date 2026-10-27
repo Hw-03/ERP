@@ -98,6 +98,12 @@ export function useIoDraft(draftToRestore?: IoBatch | null, restoreNonce?: numbe
     && reservationSnapshot.batch.requester_employee_id === reservationContext.employeeId
     ? reservationSnapshot.batch : null;
 
+  // 예약을 차감한 재고와 본인 예약을 함께 확인해야 부족 여부를 확정할 수 있다.
+  const currentBatch = latestBatch ?? savedBatch ?? draftToRestore;
+  const stockChecking = Boolean(reservationContext?.inventoryQueryState && currentBatch?.status === "draft"
+    && currentBatch.reservation_status === "reserved"
+    && currentBatch.requester_employee_id === reservationContext.employeeId && !currentReservationBatch);
+
   function getRevision(batchId: string): number {
     const revision = revisions.current.get(batchId);
     if (revision === undefined) throw new Error("작업 버전을 확인할 수 없습니다. 작업 중 목록에서 다시 불러오세요.");
@@ -233,5 +239,5 @@ export function useIoDraft(draftToRestore?: IoBatch | null, restoreNonce?: numbe
     }
   }
 
-  return { drafting, saveDraft, restoreDraft, savedBatch, latestBatch, stocktakePause: (latestBatch ?? savedBatch)?.stocktake_pause ?? null, currentReservationBatch, getRevision, observeBatch, resetSession, captureSession, submitDraft, deleteDraft, refreshAfterFailure };
+  return { drafting, saveDraft, restoreDraft, savedBatch, latestBatch, stocktakePause: (latestBatch ?? savedBatch)?.stocktake_pause ?? null, currentReservationBatch, stockChecking, getRevision, observeBatch, resetSession, captureSession, submitDraft, deleteDraft, refreshAfterFailure };
 }

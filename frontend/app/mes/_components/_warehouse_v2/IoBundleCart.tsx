@@ -37,6 +37,7 @@ interface Props {
   onAdvance: () => void;
   canAdvance: boolean;
   hasShortage?: boolean;
+  stockChecking?: boolean;
   hasInvalidQuantity?: boolean;
   invalidLineCodes?: string[];
   /** 현재 작업을 작업 중 목록에 등록하거나 변경 내용을 반영한다. */
@@ -70,8 +71,9 @@ export function IoBundleCart({
   onRemoveLine,
   onRemoveBundle,
   onAdvance,
-  canAdvance,
-  hasShortage,
+  canAdvance: readyToAdvance,
+  hasShortage: currentShortage,
+  stockChecking = false,
   hasInvalidQuantity,
   invalidLineCodes = [],
   onSaveDraft,
@@ -86,6 +88,8 @@ export function IoBundleCart({
   pullBlocked,
   mobilePresentation = false,
 }: Props) {
+  const canAdvance = readyToAdvance && !stockChecking;
+  const hasShortage = currentShortage && !stockChecking;
   const pullSelectedCount = pullSelected?.size ?? 0;
   const includedCount = bundles.flatMap((bundle) => bundle.lines).filter((line) => line.included).length;
   const hasMissingInternalUseBomMode =
@@ -159,6 +163,7 @@ export function IoBundleCart({
         // 항목 4-7C — 모바일 띠 배경/상단선 제거(저장·제출확인 버튼만 떠 보이게).
         <div data-io-cart-actions className="sticky bottom-0 z-20 -mx-3 mt-auto flex flex-col gap-2 bg-[var(--c-bg)] px-4 pb-0 pt-2 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-0">
           {footerNotice}
+          {stockChecking && <p role="status" className="text-center text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>사용 가능 재고를 확인하고 있습니다.</p>}
           {!canAdvance && hasShortage && !(pullEnabled && onPullFromWarehouse) && (
             <p className="text-center text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
               재고가 부족한 항목이 있습니다

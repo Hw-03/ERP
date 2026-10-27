@@ -546,6 +546,7 @@ export function MobileIoComposeWizard({
   }
 
   async function pullFromWarehouse() {
+    if (draftSession.stockChecking) return;
     if (pullingRef.current) return;
     if (itemAddBlocked) {
       setError("BOM 정보를 불러오지 못했습니다. 다시 시도해 주세요");
@@ -588,6 +589,7 @@ export function MobileIoComposeWizard({
   }
 
   async function handleSubmit() {
+    if (draftSession.stockChecking) return;
     if (state.hasShortage) {
       setError("부족 자재를 확보한 뒤 작업 내용을 다시 반영해 주세요.");
       state.goTo(4);
@@ -967,6 +969,7 @@ export function MobileIoComposeWizard({
               if (internalUsePreviewLock.busy) return;
               if (state.canAdvance[4]) state.goTo(5);
             }}
+            stockChecking={draftSession.stockChecking}
             canAdvance={state.canAdvance[4]}
             hasShortage={state.hasCurrentShortage}
             hasInvalidQuantity={state.hasInvalidQuantity}
@@ -992,6 +995,7 @@ export function MobileIoComposeWizard({
             subType={state.subType}
             bundles={state.bundles}
             notes={state.notes}
+            stockChecking={draftSession.stockChecking}
             hasShortage={state.hasShortage}
             hasInvalidQuantity={state.hasInvalidQuantity}
             submitting={submitting}
