@@ -15,7 +15,10 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.models import (
     Department,
@@ -455,15 +458,78 @@ def test_migration_preserves_existing_employee_login_popup_setting(
     assert bool(saved.login_notification_popup_enabled) is False
 
 
-def test_create_employee_defaults_hidden_sidebar_tabs_empty(db_session, client):
-    """New employees can see every sidebar tab unless explicitly restricted."""
+def test_create_employee_defaults_hidden_sidebar_tabs_admin(db_session, client):
+    """Omitted menus hide admin without granting business approval roles."""
     resp = client.post(
         "/api/employees",
         headers=ADMIN_HEADERS,
         json=_emp_payload(name="Default tabs"),
     )
     assert resp.status_code == 201, resp.text
-    assert resp.json()["hidden_sidebar_tabs"] == []
+    assert resp.json()["hidden_sidebar_tabs"] == ["admin"]
+    assert resp.json()["warehouse_role"] == "none"
+    assert resp.json()["department_role"] == "none"
+    assert resp.json()["as_research_approver"] is False
+
+
+@pytest.mark.parametrize("hidden_tabs", [[], ["weekly"], ["admin", "history"]])
+def test_create_employee_respects_explicit_menus_and_approval_roles(
+    client: TestClient, hidden_tabs: list[str],
+) -> None:
+    """An explicit menu list wins over the default, independently of roles."""
+    response = client.post(
+        "/api/employees",
+        headers=ADMIN_HEADERS,
+        json=_emp_payload(
+            hidden_sidebar_tabs=hidden_tabs,
+            warehouse_role="primary",
+            department_role="deputy",
+            as_research_approver=True,
+        ),
+    )
+    assert response.status_code == 201, response.text
+    data = response.json()
+    assert data["hidden_sidebar_tabs"] == hidden_tabs
+    assert data["warehouse_role"] == "primary"
+    assert data["department_role"] == "deputy"
+    assert data["as_research_approver"] is True
+
+
+@pytest.mark.parametrize("hidden_tabs", [[], ["admin", "weekly"]])
+def test_admin_menu_default_preserves_existing_employee(
+    db_session: Session, client: TestClient, hidden_tabs: list[str],
+) -> None:
+    """Creating a worker and editing a name leave existing access and PIN intact."""
+    from app.services.pin_auth import hash_pin
+
+    employee = Employee(
+        employee_code="SAVED01", name="기존 직원", role="사원", phone="010-0000-0000",
+        department="조립", warehouse_role="primary", department_role="deputy",
+        as_research_approver=True, pin_hash=hash_pin("1234"), io_enabled=True,
+        hidden_sidebar_tabs=",".join(hidden_tabs), theme="dark", sidebar_mode="collapsed",
+        login_notification_popup_enabled=False, is_active="true",
+    )
+    db_session.add(employee)
+    db_session.commit()
+    db_session.refresh(employee)
+    employee_id = employee.employee_id
+    before = {column.name: getattr(employee, column.name) for column in Employee.__table__.columns}
+
+    created = client.post("/api/employees", headers=ADMIN_HEADERS, json=_emp_payload(name="새 직원"))
+    assert created.status_code == 201, created.text
+    assert created.json()["hidden_sidebar_tabs"] == ["admin"]
+    db_session.expire_all()
+    saved = db_session.get(Employee, employee_id)
+    assert {key: getattr(saved, key) for key in before} == before
+
+    updated = client.put(f"/api/employees/{employee_id}", headers=ADMIN_HEADERS, json={"name": "변경한 이름"})
+    assert updated.status_code == 200, updated.text
+    db_session.expire_all()
+    saved = db_session.get(Employee, employee_id)
+    expected = {key: value for key, value in before.items() if key not in {"name", "updated_at"}}
+    assert {key: getattr(saved, key) for key in expected} == expected
+    assert saved.name == "변경한 이름"
+    assert updated.json()["hidden_sidebar_tabs"] == hidden_tabs
 
 
 def test_update_employee_hidden_sidebar_tabs_round_trips(db_session, client):
@@ -500,7 +566,7 @@ def test_create_employee_io_enabled_false_hides_io_related_tabs(db_session, clie
     )
     assert resp.status_code == 201, resp.text
     assert resp.json()["io_enabled"] is False
-    assert resp.json()["hidden_sidebar_tabs"] == ["warehouse", "defect"]
+    assert resp.json()["hidden_sidebar_tabs"] == ["admin", "warehouse", "defect"]
 
 
 def test_hidden_sidebar_tabs_couple_warehouse_and_defect(db_session, client):
@@ -611,7 +677,7 @@ def test_update_employee_rejects_hiding_last_admin_tab_access(db_session, client
     create_resp = client.post(
         "/api/employees",
         headers=ADMIN_HEADERS,
-        json=_emp_payload(name="Only admin tab access"),
+        json=_emp_payload(name="Only admin tab access", hidden_sidebar_tabs=[]),
     )
     assert create_resp.status_code == 201, create_resp.text
     emp_id = create_resp.json()["employee_id"]

@@ -31,6 +31,7 @@ describe("EmployeeAddInline", () => {
     expect(selectors).toHaveLength(4);
     expect(screen.getByRole("combobox", { name: "직급" })).toBe(selectors[0]);
     expect(selectors[0]).toHaveTextContent("사원");
+    expect(screen.getByText(/새 직원은 관리자 메뉴가 기본 숨김/)).toBeInTheDocument();
 
     fireEvent.click(selectors[0]);
     expect(screen.getByRole("option", { name: "책임연구원" })).toBeInTheDocument();

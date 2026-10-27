@@ -288,19 +288,15 @@ def create_employee(
             "department_role 은 none/primary/deputy 중 하나여야 합니다.",
         )
 
-    hidden_tabs = _validate_hidden_sidebar_tabs(payload.hidden_sidebar_tabs)
     hidden_tabs_provided = _payload_has_field(payload, "hidden_sidebar_tabs")
+    hidden_tabs = _validate_hidden_sidebar_tabs(
+        payload.hidden_sidebar_tabs if hidden_tabs_provided else ["admin"]
+    )
     io_enabled = payload.io_enabled if payload.io_enabled is not None else True
     if hidden_tabs_provided:
         io_enabled = _io_enabled_from_hidden_tabs(hidden_tabs)
     elif not io_enabled:
         hidden_tabs = _hide_io_related_tabs(hidden_tabs)
-    _ensure_admin_tab_access_remains(
-        db,
-        employee_id=None,
-        hidden_sidebar_tabs=hidden_tabs,
-        is_active=bool(payload.is_active),
-    )
     if bool(payload.is_active) and bool(payload.as_research_approver):
         from app.services.internal_use_approval import lock_approver_roster
 
@@ -353,6 +349,7 @@ def update_employee(
     candidate_hidden_tabs = _parse_hidden_sidebar_tabs(
         getattr(employee, "hidden_sidebar_tabs", "")
     )
+    had_admin_access = _is_active_value(employee.is_active) and "admin" not in candidate_hidden_tabs
     candidate_io_enabled = bool(getattr(employee, "io_enabled", True))
     hidden_tabs_provided = _payload_has_field(payload, "hidden_sidebar_tabs")
     if hidden_tabs_provided:
@@ -372,12 +369,13 @@ def update_employee(
         if payload.is_active is not None
         else _is_active_value(employee.is_active)
     )
-    _ensure_admin_tab_access_remains(
-        db,
-        employee_id=employee.employee_id,
-        hidden_sidebar_tabs=candidate_hidden_tabs,
-        is_active=candidate_is_active,
-    )
+    if had_admin_access:
+        _ensure_admin_tab_access_remains(
+            db,
+            employee_id=employee.employee_id,
+            hidden_sidebar_tabs=candidate_hidden_tabs,
+            is_active=candidate_is_active,
+        )
     if payload.as_research_approver is not None or payload.is_active is not None:
         from app.services.internal_use_approval import lock_and_refresh_employee
 
