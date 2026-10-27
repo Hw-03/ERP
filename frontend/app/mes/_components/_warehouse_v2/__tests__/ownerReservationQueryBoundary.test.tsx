@@ -13,7 +13,7 @@ import { MobileIoComposeWizard } from "../../mobile/warehouse/MobileIoComposeWiz
 vi.mock("next/navigation", () => ({ usePathname: () => "/mes", useRouter: () => ({ push: vi.fn() }), useSearchParams: () => new URLSearchParams("tab=warehouse&section=compose&step=4") }));
 vi.mock("@/lib/api", () => ({ api: { getItems: vi.fn(), getBatch: vi.fn(), saveDraft: vi.fn() } }));
 vi.mock("@/lib/queries/realtime", () => ({ useRealtimeRevision: () => 0 }));
-vi.mock("@/lib/queries/useBomQuery", () => ({ useBomListQuery: () => ({ data: [], isSuccess: true, isPending: false, isError: false, refetch: vi.fn() }) }));
+vi.mock("@/lib/queries/useBomQuery", () => ({ useBomParentIdsQuery: () => ({ data: [], isSuccess: true, isPending: false, isError: false, refetch: vi.fn() }) }));
 vi.mock("@/lib/queries/useModelsQuery", () => ({ useModelsQuery: () => ({ data: [], error: null }) }));
 vi.mock("@/lib/queries/useEmployeesQuery", () => ({ useEmployeesQuery: () => ({ data: [], error: null }) }));
 vi.mock("@/lib/activity-audit-context", () => ({ setAuditScreen: vi.fn() }));

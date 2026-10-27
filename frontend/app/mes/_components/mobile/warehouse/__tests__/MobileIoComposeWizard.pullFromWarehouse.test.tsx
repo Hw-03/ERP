@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { IoBundle, IoInternalUseBomMode } from "@/lib/api";
 import { MobileIoComposeWizard } from "../MobileIoComposeWizard";
 
+const realtime = vi.hoisted(() => ({ revision: 0 }));
+vi.mock("@/lib/queries/realtime", () => ({ useRealtimeRevision: () => realtime.revision }));
+
 const state = vi.hoisted(() => ({
   step: 4,
   workType: "process",
@@ -44,7 +47,7 @@ const saveDraft = vi.hoisted(() => vi.fn());
 const previewTarget = vi.hoisted(() => vi.fn());
 const submit = vi.hoisted(() => vi.fn());
 const bomQuery = vi.hoisted(() => ({
-  data: [] as { parent_item_id: string }[],
+  data: [] as string[],
   isSuccess: true,
   isPending: false,
   isError: false,
@@ -53,7 +56,7 @@ const bomQuery = vi.hoisted(() => ({
 
 vi.mock("@/lib/api", () => ({ api: { getAllBOM: vi.fn(() => new Promise(() => {})), getItems: vi.fn(() => Promise.resolve([])) } }));
 vi.mock("@/lib/queries/useBomQuery", () => ({
-  useBomListQuery: () => bomQuery,
+  useBomParentIdsQuery: () => bomQuery,
 }));
 vi.mock("../../../_warehouse_v2/useIoWorkState", () => ({ useIoWorkState: () => state }));
 vi.mock("../../../_warehouse_v2/useIoDraftRestore", () => ({ useIoDraftRestore: ({ draftToRestore, autosaveBatchIdRef }: { draftToRestore?: { batch_id: string }; autosaveBatchIdRef: { current: string | null } }) => { if (draftToRestore) autosaveBatchIdRef.current = draftToRestore.batch_id; } }));
@@ -158,6 +161,7 @@ function applyBundleUpdates() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  realtime.revision = 0;
   Object.assign(bomQuery, {
     data: [],
     isSuccess: true,
@@ -184,6 +188,20 @@ beforeEach(() => {
 });
 
 describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
+  it("BOM 조회 실패 후 사용자가 다시 시도할 수 있다", () => {
+    Object.assign(bomQuery, { isSuccess: false, isError: true });
+    state.step = 3;
+    renderWizard();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(bomQuery.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("realtime revision 변경은 BOM query를 화면에서 중복 refetch하지 않는다", () => {
+    const view = renderWizard();
+    realtime.revision = 1;
+    view.rerender(<MobileIoComposeWizard globalSearch="" operator={operator} items={[]} setItems={vi.fn()} onStatusChange={vi.fn()} />);
+    expect(bomQuery.refetch).not.toHaveBeenCalled();
+  });
   it("모바일 반환 방식도 진입 때만 체크를 해제하고 체크·동일 방식·수량 변경은 선택을 보존한다", async () => {
     state.workType = "internal_use";
     state.subType = "internal_use_out";
@@ -216,7 +234,7 @@ describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
 
   it("캐시된 BOM 목록이 있어도 조회 오류가 확정되면 부족 품목 가져오기를 막는다", async () => {
     Object.assign(bomQuery, {
-      data: [{ parent_item_id: "cached-bom-parent" }],
+      data: ["cached-bom-parent"],
       isSuccess: false,
       isPending: false,
       isError: true,

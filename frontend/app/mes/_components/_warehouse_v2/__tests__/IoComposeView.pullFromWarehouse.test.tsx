@@ -5,8 +5,9 @@ import { api } from "@/lib/api";
 import { IoComposeView } from "../IoComposeView";
 
 const dirtyRegistration = vi.hoisted(() => ({ dirty: false }));
+const realtime = vi.hoisted(() => ({ revision: 0 }));
 const bomQuery = vi.hoisted(() => ({
-  data: [] as { parent_item_id: string }[],
+  data: [] as string[],
   isSuccess: true,
   isPending: false,
   isError: false,
@@ -32,9 +33,9 @@ vi.mock("@/lib/api", () => ({
   },
 }));
 
-vi.mock("@/lib/queries/realtime", () => ({ useRealtimeRevision: () => 0 }));
+vi.mock("@/lib/queries/realtime", () => ({ useRealtimeRevision: () => realtime.revision }));
 vi.mock("@/lib/queries/useBomQuery", () => ({
-  useBomListQuery: () => bomQuery,
+  useBomParentIdsQuery: () => bomQuery,
 }));
 vi.mock("@/lib/activity-audit-context", () => ({ setAuditScreen: vi.fn() }));
 vi.mock("@/lib/client-events", () => ({ sendClientEvent: vi.fn() }));
@@ -269,6 +270,7 @@ function renderCompose(onDraftSaved = vi.fn(), restoreStep = 4, onStatusChange =
 
 beforeEach(() => {
   vi.resetAllMocks();
+  realtime.revision = 0;
   Object.assign(bomQuery, {
     data: [],
     isSuccess: true,
@@ -285,6 +287,21 @@ beforeEach(() => {
 });
 
 describe("IoComposeView 부족 품목 가져오기", () => {
+  it("BOM 조회 실패 후 사용자가 다시 시도할 수 있다", () => {
+    Object.assign(bomQuery, { isSuccess: false, isError: true });
+    renderCompose(vi.fn(), 3);
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(bomQuery.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("realtime revision 변경은 BOM query를 화면에서 중복 refetch하지 않는다", async () => {
+    const view = renderCompose();
+    await screen.findByTestId("pull-cart-state");
+    realtime.revision = 1;
+    view.rerender(<IoComposeView globalSearch="" operator={operator} employees={[]} items={[]} productModels={[]}
+      setItems={() => {}} restoreDraft={sourceDraft} restoreNonce={1} restoreStep={4} onStatusChange={vi.fn()} />);
+    expect(bomQuery.refetch).not.toHaveBeenCalled();
+  });
   it("원작업 전량예약 저장 없이 창고 작업으로 이동하고 수정한 원작업으로 복귀한다", async () => {
     vi.mocked(api.saveDraft).mockRejectedValue(new Error("원작업 자재 부족"));
     renderCompose();
@@ -327,7 +344,7 @@ describe("IoComposeView 부족 품목 가져오기", () => {
   });
   it("캐시된 BOM 목록이 있어도 조회 오류가 확정되면 부족 품목 가져오기를 막는다", async () => {
     Object.assign(bomQuery, {
-      data: [{ parent_item_id: "cached-bom-parent" }],
+      data: ["cached-bom-parent"],
       isSuccess: false,
       isPending: false,
       isError: true,

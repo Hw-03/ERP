@@ -12,7 +12,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/api", () => ({ api: { getItems: vi.fn(), getBatch: vi.fn(), saveDraft: vi.fn(), preview: vi.fn() } }));
 vi.mock("@/lib/queries/realtime", () => ({ useRealtimeRevision: () => realtime.revision }));
-vi.mock("@/lib/queries/useBomQuery", () => ({ useBomListQuery: () => ({ data: [], isSuccess: true, isPending: false, isError: false, refetch: vi.fn() }) }));
+vi.mock("@/lib/queries/useBomQuery", () => ({ useBomParentIdsQuery: () => ({ data: [], isSuccess: true, isPending: false, isError: false, refetch: vi.fn() }) }));
 vi.mock("@/lib/activity-audit-context", () => ({ setAuditScreen: vi.fn() }));
 vi.mock("@/lib/client-events", () => ({ sendClientEvent: vi.fn() }));
 vi.mock("@/lib/ui/dirty-guard", () => ({ useRegisterDirty: vi.fn() }));

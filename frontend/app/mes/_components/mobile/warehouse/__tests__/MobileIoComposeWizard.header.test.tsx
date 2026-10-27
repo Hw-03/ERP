@@ -39,7 +39,7 @@ vi.mock("@/lib/api", () => ({
   },
 }));
 vi.mock("@/lib/queries/useBomQuery", () => ({
-  useBomListQuery: () => ({ data: [], isSuccess: true, isPending: false, isError: false, refetch: vi.fn() }),
+  useBomParentIdsQuery: () => ({ data: [], isSuccess: true, isPending: false, isError: false, refetch: vi.fn() }),
 }));
 
 vi.mock("../../../_warehouse_v2/useIoWorkState", () => ({
