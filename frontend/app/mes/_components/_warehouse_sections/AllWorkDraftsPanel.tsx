@@ -25,6 +25,8 @@ import { finalizeHistoryGroupLabel, getHistoryListOperationLabel, getHistoryProc
 import { IO_WORK_TYPES } from "../_warehouse_v2/ioWorkType";
 import { WorkDraftMemo } from "../common/WorkDraftMemo";
 import { useWorkListScroll } from "./useWorkListScroll";
+import { readWorkListReturn, saveWorkListReturn } from "@/lib/work-draft-navigation";
+import { useWorkListReturnScroll } from "./useWorkListReturnScroll";
 import { formatRequestNotes } from "./ioRequestLabels";
 import { formatWorkTimestamp, WORK_ITEM_CODE_CLASS, WORK_TIMESTAMP_CLASS, WORK_TYPE_BADGE_CLASS, WorkExpandButton, WorkMovementSummary } from "../common/WorkDraftTableParts";
 
@@ -42,9 +44,10 @@ interface Props {
 
 /** 전체 작업은 담당자에 관계없이 상세 조회만 제공한다. */
 export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props): JSX.Element {
-  const [filters, setFilters] = useState<WorkDraftFilters>({ skip: 0, limit: PAGE_SIZE, sort: "department" });
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [selected, setSelected] = useState<WorkDraftSelection | null>(null);
+  const [returnState] = useState(() => layout === "desktop" ? readWorkListReturn(employeeId) : null);
+  const [filters, setFilters] = useState<WorkDraftFilters>(returnState?.filters ?? { skip: 0, limit: PAGE_SIZE, sort: "department" });
+  const [filtersOpen, setFiltersOpen] = useState(returnState?.filtersOpen ?? false);
+  const [selected, setSelected] = useState<WorkDraftSelection | null>(returnState?.selected ?? null);
   const { list, detail } = useWorkDrafts(employeeId, filters, selected);
   const getDeptColor = useDeptColorLookup();
   const { notice, showNotice, dismissNotice } = useStatusTargetNotice();
@@ -53,7 +56,8 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
   const pageOutOfRange = Boolean(data && data.total > 0 && data.skip >= data.total);
   const pending = !list.isError && (list.isPending || pageOutOfRange);
   const work = detail.data?.kind === selected?.kind && detail.data?.id === selected?.id ? detail.data : undefined;
-  const { listScrolled, ...scrollHandlers } = useWorkListScroll();
+  const returnScroll = useWorkListReturnScroll(returnState, Boolean(data) && !pending && (!selected || Boolean(work) || detail.isError), Boolean(list.isFetching || detail.isFetching));
+  const { listScrolled, ...scrollHandlers } = useWorkListScroll(returnState?.listScrolled ?? false, returnScroll.restoring);
   const searchRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
@@ -92,13 +96,19 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
     showNotice("작업 상태가 변경되었습니다. 최신 목록을 확인해 주세요.", "info");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail.error, selected]);
+  useEffect(() => {
+    if (selected && data && !list.isFetching && !pending && data.skip === (filters.skip ?? 0)
+        && !data.items.some((row) => row.kind === selected.kind && row.id === selected.id)) setSelected(null);
+  }, [data, filters.skip, list.isFetching, pending, selected]);
 
   function changeFilters(patch: Partial<WorkDraftFilters>): void {
+    returnScroll.cancelRestore();
     setFilters((current) => ({ ...current, ...patch, skip: patch.skip ?? 0 }));
     setSelected(null);
     if (notice) dismissNotice(notice.id);
   }
   function toggle(row: WorkDraftSummary): void {
+    returnScroll.cancelRestore();
     setSelected((current) => current?.id === row.id && current.kind === row.kind ? null : { kind: row.kind, id: row.id });
   }
   function workerLabel(row: WorkDraftSummary): string {
@@ -135,7 +145,13 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
     if (selected?.id !== row.id || selected.kind !== row.kind) return null;
     return <div id={`work-draft-${row.kind}-${row.id}`} className="text-sm leading-6" style={{ background: C.s2 }}>
       {detail.isError ? <div className="p-4"><ReadFailure message="작업 상세를 불러오지 못했습니다. 다시 시도해 주세요." onRetry={() => void detail.refetch()} /></div> : !work ? <div className="p-4"><ReadLoading label="작업 상세 불러오는 중" /></div>
-        : <AllWorkDraftDetails work={work} layout={layout} columns={columns} />}
+        : <AllWorkDraftDetails work={work} layout={layout} columns={columns} onOpenShipping={() => {
+          const viewport = returnScroll.viewportRef.current;
+          const outer = viewport?.closest<HTMLElement>('[data-testid="desktop-warehouse-content"]');
+          if (viewport) saveWorkListReturn(employeeId, { scope: "all", filters, filtersOpen, selected,
+            scrollTop: (outer ?? viewport).scrollTop, scrollLeft: (outer ?? viewport).scrollLeft,
+            listScrolled: outer ? outer.scrollTop > 0 : listScrolled, outerScrollTop: outer?.scrollTop });
+        }} />}
     </div>;
   }
   const hasFilters = Boolean(filters.search?.trim() || filters.requester_department);
@@ -162,7 +178,7 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
     <div ref={searchRef} data-work-search className="-mt-3 flex min-w-0 shrink-0 flex-col rounded-b-[24px] border border-t-0 px-3 pb-3" style={{ background: C.s1, borderColor: C.border }}>
     <div className="flex min-w-0 items-stretch gap-2">
       <SearchInput className="min-w-0 flex-1" style={{ background: C.bg, boxShadow: `inset 0 1px 2px color-mix(in srgb, ${C.text} 4%, transparent)` }} value={filters.search ?? ""} ariaLabel="전체 작업 검색" placeholder="담당자·품목 검색" onChange={(search) => changeFilters({ search })} />
-      <InventoryFilterToggleButton filtersOpen={filtersOpen} onToggle={() => setFiltersOpen((open) => !open)} controlsId="work-draft-filter-panel" showLogic={false} logic="AND" onLogicChange={() => undefined} />
+      <InventoryFilterToggleButton filtersOpen={filtersOpen} onToggle={() => { returnScroll.cancelRestore(); setFiltersOpen((open) => !open); }} controlsId="work-draft-filter-panel" showLogic={false} logic="AND" onLogicChange={() => undefined} />
     </div>
     <div id="work-draft-filter-panel" aria-hidden={!filtersOpen} inert={!filtersOpen || undefined}
       className="grid min-w-0 transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none"
@@ -186,7 +202,7 @@ export function AllWorkDraftsPanel({ employeeId, layout, refreshNonce }: Props):
     </div>
     </div>
     {layout === "desktop" ? <div className="relative min-h-0 flex-1" data-scrollbar-rail-shell>
-      <div role="region" aria-label="전체 작업 중 목록" aria-busy={pending} tabIndex={0} data-scrollbar-rail-viewport className="sg absolute inset-y-0 left-0 -right-2.5 overflow-auto [scrollbar-gutter:stable] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+      <div ref={returnScroll.viewportRef} role="region" aria-label="전체 작업 중 목록" aria-busy={pending} tabIndex={0} data-scrollbar-rail-viewport className="sg absolute inset-y-0 left-0 -right-2.5 overflow-auto [scrollbar-gutter:stable] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
         {...scrollHandlers}>
       <div className="relative flex min-h-full min-w-[1480px] flex-col" style={{ background: C.s1 }}>
       {pending && <span role="status" className="sr-only">전체 작업 목록 불러오는 중</span>}

@@ -25,6 +25,7 @@ import {
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { LoadFailureCard } from "./common/LoadFailureCard";
+import { withoutWorkListReturn } from "@/lib/work-draft-navigation";
 import workScrollStyles from "./desktopWarehouseWorkScroll.module.css";
 
 // 탭 전환 remount 사이 직전 카운트 보존 (세션 내 메모리 캐시).
@@ -307,7 +308,7 @@ export function DesktopWarehouseView({
     }
     const query = params.toString();
     window.history.pushState(
-      { ...(window.history.state || {}), warehouseSection: next },
+      { ...withoutWorkListReturn(window.history.state), warehouseSection: next },
       "",
       `${window.location.pathname}${query ? `?${query}` : ""}`,
     );

@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api-core";
+import { saveWorkListReturn } from "@/lib/work-draft-navigation";
 import { DraftCartPanel } from "../DraftCartPanel";
 
 const state = vi.hoisted(() => ({
@@ -11,6 +12,17 @@ const state = vi.hoisted(() => ({
   query: vi.fn(),
 }));
 const motion = vi.hoisted(() => ({ reduced: false }));
+const login = vi.hoisted(() => ({ employeeId: "emp-1", token: "login-1", version: 0 }));
+vi.mock("@/lib/auth/operator-session", () => ({
+  restoreOperatorSession: (employeeId?: string) => !employeeId || employeeId === login.employeeId
+    ? { employee_id: login.employeeId, token: login.token } : null,
+}));
+vi.mock("../../login/useCurrentOperator", () => ({
+  getOperatorAccessContext: () => ({ employeeId: login.employeeId, login: 1, version: login.version }),
+}));
+vi.mock("next/link", () => ({ default: ({ href, onClick, children, ...rest }: React.ComponentProps<"a">) =>
+  <a {...rest} href={href} onClick={(event) => { onClick?.(event); event.preventDefault(); }}>{children}</a>,
+}));
 vi.mock("@/lib/queries/useDraftCartQuery", () => ({
   useDraftCartQuery: () => ({ data: state.mineLoading ? undefined : state.mine, isLoading: state.mineLoading, error: null, refetch: vi.fn() }),
   useDeleteIoDraftMutation: () => ({ mutate: vi.fn() }),
@@ -107,6 +119,8 @@ describe("공유 작업함", () => {
   afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.replaceState(null, "", "/mes?tab=warehouse");
+    login.employeeId = "emp-1"; login.token = "login-1"; login.version = 0;
     motion.reduced = false;
     vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: motion.reduced })));
     state.mine = { stockDrafts: [], ioDrafts: [] };
@@ -142,6 +156,57 @@ describe("공유 작업함", () => {
     render(<DraftCartPanel {...props} layout="mobile" defaultScope="all" />);
     expect(screen.getByRole("region", { name: "전체 작업 목록" }).style.getPropertyValue("--work-search-height")).toBe("");
     expect(observe).not.toHaveBeenCalled();
+  });
+
+  it("출하 링크로 떠난 이력에는 전체 목록의 조건·펼침·스크롤을 복원한다", () => {
+    window.history.replaceState({ __NA: true, tree: "keep-next-state" }, "", "/mes?tab=warehouse");
+    state.list.data = { items: [shipping], total: 1, skip: 0, limit: 30 };
+    state.detail.data = { ...shipping, shipping_summary: { invoice_number: "INV", companion_lines: [] } };
+    const view = render(<DraftCartPanel {...props} />);
+    openAll();
+    fireEvent.change(screen.getByRole("textbox", { name: "전체 작업 검색" }), { target: { value: "ADX" } });
+    fireEvent.click(screen.getByRole("button", { name: "필터" }));
+    fireEvent.click(screen.getByRole("button", { name: "출하", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "저장 시각 정렬" }));
+    fireEvent.click(screen.getByRole("button", { name: `${shipping.worker_names} 작업 상세 펼치기` }));
+    const list = screen.getByRole("region", { name: "전체 작업 중 목록" });
+    Object.defineProperties(list, { scrollHeight: { value: 1600, configurable: true }, clientHeight: { value: 400, configurable: true } });
+    fireEvent.scroll(list, { target: { scrollTop: 550, scrollLeft: 30 } });
+    fireEvent.click(screen.getByRole("link", { name: "출하에서 열기" }));
+    expect(new URLSearchParams(window.location.search).get("section")).toBe("cart");
+    expect(window.history.state).toMatchObject({ __NA: true, tree: "keep-next-state" });
+    const source = { state: window.history.state, url: window.location.href };
+    view.unmount();
+    window.history.pushState(null, "", "/mes?tab=shipping&shippingView=requestDetail&shippingRequestId=shipping-work");
+    window.history.replaceState(source.state, "", source.url);
+    render(<DraftCartPanel {...props} />);
+    expect(screen.getByRole("button", { name: "전체 작업" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("textbox", { name: "전체 작업 검색" })).toHaveValue("ADX");
+    expect(screen.getByRole("button", { name: "필터" })).toHaveAttribute("aria-expanded", "true");
+    expect(state.query).toHaveBeenLastCalledWith("emp-1", expect.objectContaining({ search: "ADX", requester_department: "출하", sort: "updated_desc" }), { kind: "shipping", id: "shipping-work" });
+    expect(screen.getByRole("region", { name: "전체 작업 목록" })).toHaveAttribute("data-work-list-scrolled", "true");
+  });
+
+  it("복원 대상이 최신 목록에서 사라지면 펼침만 해제하고 검색 조건을 유지한다", () => {
+    saveWorkListReturn("emp-1", { scope: "all", filters: { search: "BAT", skip: 0 }, filtersOpen: false,
+      selected: { kind: "shipping", id: "shipping-work" }, scrollTop: 500, scrollLeft: 0, listScrolled: true });
+    state.list.data = { items: [], total: 0, skip: 0, limit: 30 };
+    render(<DraftCartPanel {...props} />);
+    expect(screen.getByRole("textbox", { name: "전체 작업 검색" })).toHaveValue("BAT");
+    expect(state.query).toHaveBeenLastCalledWith("emp-1", { search: "BAT", skip: 0 }, null);
+    expect(screen.queryByRole("link", { name: "출하에서 열기" })).not.toBeInTheDocument();
+  });
+
+  it("수정 키로 새 탭을 여는 링크는 원본 이력의 URL과 상태를 바꾸지 않는다", () => {
+    state.list.data = { items: [shipping], total: 1, skip: 0, limit: 30 };
+    state.detail.data = { ...shipping, shipping_summary: { invoice_number: "INV", companion_lines: [] } };
+    render(<DraftCartPanel {...props} />);
+    openAll();
+    fireEvent.click(screen.getByRole("button", { name: `${shipping.worker_names} 작업 상세 펼치기` }));
+    const original = { url: window.location.href, state: window.history.state };
+    fireEvent.click(screen.getByRole("link", { name: "출하에서 열기" }), { ctrlKey: true });
+    expect(window.location.href).toBe(original.url);
+    expect(window.history.state).toEqual(original.state);
   });
 
   it("빈 내 작업에서도 범위 전환을 유지하고 전체의 타인 작업에는 변경 행동을 제공하지 않는다", () => {

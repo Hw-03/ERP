@@ -22,10 +22,11 @@ interface DetailLine {
 }
 
 /** 공개 예정만 품목별로 표시하며 서로 다른 품목·단위의 수량을 합하지 않는다. */
-export function AllWorkDraftDetails({ work, layout, columns }: {
+export function AllWorkDraftDetails({ work, layout, columns, onOpenShipping }: {
   work: WorkDraftDetail;
   layout: "desktop" | "mobile";
   columns: ReactNode;
+  onOpenShipping?: () => void;
 }): JSX.Element {
   const ShippingLink = layout === "desktop" ? Link : "a";
   const effects: DetailLine[] = (work.expected_effects ?? []).map((effect) => ({
@@ -94,7 +95,9 @@ export function AllWorkDraftDetails({ work, layout, columns }: {
         <div className="min-w-0"><dt className="text-xs" style={{ color: C.muted2 }}>인보이스</dt><dd className="break-keep font-bold [overflow-wrap:anywhere]">{work.shipping_summary?.invoice_number || "인보이스 미입력"}</dd></div>
       </dl>
       {/* Keep the desktop app mounted; MobileShell resolves its initial tab on document navigation. */}
-      <ShippingLink href={`/mes?tab=shipping&shippingView=requestDetail&shippingRequestId=${encodeURIComponent(work.id)}`} className={`inline-flex min-h-11 items-center justify-self-end gap-1 rounded-[12px] px-3 font-bold hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] ${layout === "desktop" ? "col-start-3 row-start-1" : ""}`} style={{ color: C.blue, background: tint(C.blue, 10) }}>출하에서 열기<ArrowUpRight size={16} aria-hidden /></ShippingLink>
+      <ShippingLink href={`/mes?tab=shipping&shippingView=requestDetail&shippingRequestId=${encodeURIComponent(work.id)}`} onClick={(event) => {
+        if (layout === "desktop" && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) onOpenShipping?.();
+      }} className={`inline-flex min-h-11 items-center justify-self-end gap-1 rounded-[12px] px-3 font-bold hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] ${layout === "desktop" ? "col-start-3 row-start-1" : ""}`} style={{ color: C.blue, background: tint(C.blue, 10) }}>출하에서 열기<ArrowUpRight size={16} aria-hidden /></ShippingLink>
     </div>
     {Boolean(work.shipping_summary?.companion_lines.length) && section("동반 출하품", (work.shipping_summary?.companion_lines ?? []).map((line, index) => ({
       key: `${line.item_id}:${index}`, name: line.item_name, code: line.mes_code, quantity: line.quantity, unit: line.unit,

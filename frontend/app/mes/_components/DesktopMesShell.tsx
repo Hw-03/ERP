@@ -20,6 +20,7 @@ import type { NotificationNavigationTarget } from "./notifications/NotificationB
 import { DesktopInventoryView } from "./DesktopInventoryView";
 import { DesktopWarehouseView } from "./DesktopWarehouseView";
 import { DesktopShippingView } from "./DesktopShippingView";
+import { resumeWorkListShippingEntry, withoutWorkListReturn } from "@/lib/work-draft-navigation";
 import { DesktopWarehouseMapTab } from "./DesktopWarehouseMapTab";
 import { DesktopDefectView } from "./DesktopDefectView";
 import { DesktopAdminView } from "./DesktopAdminView";
@@ -234,7 +235,7 @@ function DesktopMesShellInner({
       requestHome(() => {
         if (tab === "shipping") return; // Its owner synchronizes the guarded URL transition.
         const url = new URL(window.location.href);
-        const state = { ...window.history.state };
+        const state = withoutWorkListReturn(window.history.state);
         if (tab === "warehouse") {
           for (const name of ["section", "step", "draftId", "stockRequestId"]) url.searchParams.delete(name);
           delete state.wic;
@@ -325,7 +326,9 @@ function DesktopMesShellInner({
           }, () => {
             pendingShippingHistoryTabRef.current = null;
             pendingUrlTabRef.current = "shipping";
-            router.replace(shippingHistoryUrlRef.current, { scroll: false });
+            if (!resumeWorkListShippingEntry(operator?.employee_id ?? "", shippingHistoryUrlRef.current)) {
+              router.replace(shippingHistoryUrlRef.current, { scroll: false });
+            }
           });
           return;
         }

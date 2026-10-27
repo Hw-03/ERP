@@ -4,6 +4,7 @@ import { FilePenLine } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { workDraftsApi } from "@/lib/api/work-drafts";
 import { restoreOperatorSession } from "@/lib/auth/operator-session";
+import { forgetCurrentWorkListReturn, readWorkListReturn } from "@/lib/work-draft-navigation";
 import type { IoBatch, StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
@@ -59,7 +60,7 @@ function DraftCartPanelContent({
   onEmptyStateChange,
   onStartCompose,
 }: Props) {
-  const [scope, setScope] = useState<"mine" | "all">(defaultScope);
+  const [scope, setScope] = useState<"mine" | "all">(() => layout === "desktop" && employeeId ? readWorkListReturn(employeeId)?.scope ?? defaultScope : defaultScope);
   const { data, isLoading: loading, error: qError, refetch } = useDraftCartQuery(employeeId, { enabled: scope === "mine" });
   const drafts = data?.stockDrafts ?? [];
   const ioDrafts = data?.ioDrafts ?? [];
@@ -172,7 +173,7 @@ function DraftCartPanelContent({
     <div className={`flex ${layout === "mobile" ? "min-h-full [&_.dexray-empty-state]:min-h-0" : "min-h-0"} flex-1 flex-col gap-3`}>
       <div data-work-scope-tabs className={`shrink-0 border p-3 ${scope === "all" && employeeId ? "rounded-t-[24px] border-b-0" : "rounded-[24px]"}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
         <div role="group" aria-label="작업 조회 범위" className="grid grid-cols-2 gap-1 rounded-[16px] p-1" style={{ background: LEGACY_COLORS.bg }}>
-          {(["mine", "all"] as const).map((value) => <Button key={value} variant="ghost" className="min-h-11 min-w-0 w-full !text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--c-blue)]" style={{ background: scope === value ? LEGACY_COLORS.s1 : "transparent", borderColor: scope === value ? LEGACY_COLORS.border : "transparent", color: scope === value ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2, filter: "none", boxShadow: scope === value ? `0 2px 6px color-mix(in srgb, ${LEGACY_COLORS.text} 8%, transparent)` : "none" }} aria-pressed={scope === value} disabled={!employeeId} onClick={() => { setScope(value); setDeleteTarget(null); setOpError(null); }}>{value === "mine" ? "내 작업" : "전체 작업"}</Button>)}
+          {(["mine", "all"] as const).map((value) => <Button key={value} variant="ghost" className="min-h-11 min-w-0 w-full !text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--c-blue)]" style={{ background: scope === value ? LEGACY_COLORS.s1 : "transparent", borderColor: scope === value ? LEGACY_COLORS.border : "transparent", color: scope === value ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2, filter: "none", boxShadow: scope === value ? `0 2px 6px color-mix(in srgb, ${LEGACY_COLORS.text} 8%, transparent)` : "none" }} aria-pressed={scope === value} disabled={!employeeId} onClick={() => { if (scope !== value && layout === "desktop") forgetCurrentWorkListReturn(); setScope(value); setDeleteTarget(null); setOpError(null); }}>{value === "mine" ? "내 작업" : "전체 작업"}</Button>)}
         </div>
       </div>
       <div key={scope} data-work-scope={scope} className="relative flex min-h-0 flex-1 flex-col gap-3">

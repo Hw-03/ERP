@@ -8,6 +8,12 @@ import { DesktopMesShell } from "../DesktopMesShell";
 import { AppearancePreferencesProvider } from "../useAppearancePreferences";
 import { SIDEBAR_TAB_IDS, type DesktopTabId } from "../tabAccess";
 import { sendClientEvent } from "@/lib/client-events";
+import { resumeWorkListShippingEntry } from "@/lib/work-draft-navigation";
+
+vi.mock("@/lib/work-draft-navigation", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/work-draft-navigation")>(),
+  resumeWorkListShippingEntry: vi.fn(() => false),
+}));
 
 const setAuditScreen = vi.hoisted(() => vi.fn());
 const operatorState = vi.hoisted(() => ({ current: null as { employee_id: string; name: string; department: string; hidden_sidebar_tabs: string[]; level?: string; department_role?: string } | null }));
@@ -466,6 +472,25 @@ describe("DesktopMesShell tab transition", () => {
       if (decision === "failure") expect(screen.getByLabelText("출하 작업자 입력")).toHaveValue("미저장 작업자");
       else await screen.findByText("history content");
     }
+  });
+
+  it("작업 목록으로 뒤로 간 이탈을 취소하면 원래 출하 entry로 앞으로 이동해 목록 이력을 보존한다", () => {
+    operatorState.current = { employee_id: "worker-a", name: "작업자", department: "조립", hidden_sidebar_tabs: [] };
+    const { rerender } = render(<DesktopMesShell />);
+    fireEvent.click(screen.getByRole("button", { name: "shipping", exact: true }));
+    const detailSearch = "?tab=shipping&shippingView=requestDetail&shippingRequestId=shipping-1";
+    window.history.replaceState({}, "", `/mes${detailSearch}`);
+    rerender(<DesktopMesShell />);
+    fireEvent.change(screen.getByLabelText("출하 작업자 입력"), { target: { value: "미저장 작업자" } });
+    window.history.replaceState({}, "", "/mes?tab=warehouse&section=cart");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    rerender(<DesktopMesShell />);
+    vi.mocked(resumeWorkListShippingEntry).mockReturnValueOnce(true);
+    routerReplace.mockClear();
+    fireEvent.click(screen.getByText("계속 작성"));
+    expect(resumeWorkListShippingEntry).toHaveBeenCalledWith("worker-a", detailSearch);
+    expect(routerReplace).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("출하 작업자 입력")).toHaveValue("미저장 작업자");
   });
 
   it("허용 메뉴가 전부 회수되면 설정으로 이동한다", async () => {
