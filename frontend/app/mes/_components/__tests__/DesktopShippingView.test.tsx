@@ -3265,10 +3265,10 @@ describe("DesktopShippingView", () => {
 
   it("balances the request-list header and labels request metadata explicitly", async () => {
     vi.mocked(api.getShippingRequests).mockResolvedValue([
-      request({ request_id: "requested-meta", status: "PREPARING", request_quantity: 1, requested_by_name: "김건호" }),
+      request({ request_id: "requested-meta", status: "PREPARING", request_quantity: 1, requested_by_name: "김건호", worker_names: "김현우, 김민재" }),
       request({ request_id: "preparing-meta", status: "PREPARING", request_quantity: 2 }),
-      request({ request_id: "prepared-meta", status: "PREPARED", request_quantity: 3 }),
-      request({ request_id: "requested-missing", status: "PREPARING", requested_by_name: null }),
+      request({ request_id: "prepared-meta", status: "PREPARED", request_quantity: 3, worker_names: "이형진" }),
+      request({ request_id: "requested-missing", status: "PREPARING", requested_by_name: null, worker_names: null }),
     ]);
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
@@ -3282,6 +3282,13 @@ describe("DesktopShippingView", () => {
     const namedMetadata = within(named).getByTestId("shipping-request-metadata-requested-meta");
     expect(within(namedMetadata).getByText("요청 일시")).toBeInTheDocument();
     expect(within(namedMetadata).getByText("김건호")).toBeInTheDocument();
+    expect(within(namedMetadata).getByText("작업자")).toBeInTheDocument();
+    expect(within(namedMetadata).getByText("김현우, 김민재")).toBeInTheDocument();
+    const requester = within(namedMetadata).getByTestId("shipping-request-meta-requester-requested-meta");
+    const worker = within(namedMetadata).getByTestId("shipping-request-meta-worker-requested-meta");
+    const quantity = within(namedMetadata).getByTestId("shipping-request-meta-quantity-requested-meta");
+    expect(requester.nextElementSibling).toBe(worker);
+    expect(worker.nextElementSibling).toBe(quantity);
     expect(within(namedMetadata).getByText("1대")).toBeInTheDocument();
     expect(named).not.toHaveTextContent("· 김건호");
 
@@ -3290,9 +3297,11 @@ describe("DesktopShippingView", () => {
 
     const prepared = container.querySelector('[data-shipping-request-id="prepared-meta"]') as HTMLElement;
     expect(within(prepared).getByText("3대")).toBeInTheDocument();
+    expect(within(prepared).getByText("이형진")).toBeInTheDocument();
 
     const missing = container.querySelector('[data-shipping-request-id="requested-missing"]') as HTMLElement;
     expect(within(missing).getByText("요청자 없음")).toBeInTheDocument();
+    expect(within(missing).getByTestId("shipping-request-meta-worker-requested-missing")).toHaveTextContent("미입력");
   });
 
   it("8.12-01 keeps request cards focused on the actual shipment", async () => {
@@ -3342,7 +3351,7 @@ describe("DesktopShippingView", () => {
     expect(title).toHaveClass("text-base");
     expect(title).not.toHaveClass("line-clamp-2", "min-h-10");
     expect(within(row).queryByTestId("shipping-request-board-quantity-request-board-layout")).not.toBeInTheDocument();
-    expect(metadata).toHaveClass("grid", "grid-cols-[1.5fr_1fr_1fr_2fr]", "border-t", "pt-1.5");
+    expect(metadata).toHaveClass("grid", "grid-cols-5", "border-t", "pt-1.5");
     expect(within(row).queryByText("실제 출하품")).not.toBeInTheDocument();
     expect(within(row).getByTestId("shipping-request-code-request-board-layout")).toHaveTextContent("9-PF-0046");
     expect(within(row).queryByText(/기준 PF/)).not.toBeInTheDocument();
@@ -3368,7 +3377,7 @@ describe("DesktopShippingView", () => {
     }
     expect(preparedMetadata).toHaveTextContent("김건호");
     expect(preparedMetadata).toHaveTextContent("3대");
-    const missingInvoice = within(preparedMetadata).getByText("미입력");
+    const missingInvoice = within(within(preparedMetadata).getByTestId("shipping-request-meta-invoice-request-board-prepared-layout")).getByText("미입력");
     expect(missingInvoice).toHaveStyle({ color: LEGACY_COLORS.yellow });
   });
 

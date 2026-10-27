@@ -4189,6 +4189,7 @@ function RequestRow({ request, active, layout = "default", onClick }: { request:
   const metadata = [
     { key: "date", label: dateLabel, value: formatDate(dateValue), tabular: true },
     { key: "requester", label: "요청자", value: request.requested_by_name ?? "요청자 없음", tabular: false },
+    ...(layout === "requestBoard" ? [{ key: "worker", label: "작업자", value: request.worker_names?.trim() || "미입력", tabular: false }] : []),
     { key: "quantity", label: "출하 수량", value: `${request.request_quantity}대`, tabular: true },
     { key: "invoice", label: "인보이스", value: request.invoice_number ?? "미입력", tabular: false },
   ] as const;
@@ -4233,7 +4234,7 @@ function RequestRow({ request, active, layout = "default", onClick }: { request:
       {structuredLayout ? (
         <div
           data-testid={`shipping-request-metadata-${request.request_id}`}
-          className="mt-2 grid grid-cols-[1.5fr_1fr_1fr_2fr] gap-x-2 border-t pt-1.5"
+          className={`mt-2 grid ${layout === "requestBoard" ? "grid-cols-5" : "grid-cols-[1.5fr_1fr_1fr_2fr]"} gap-x-2 border-t pt-1.5`}
           style={{ borderColor: LEGACY_COLORS.border }}
         >
           {metadata.map((item) => (
