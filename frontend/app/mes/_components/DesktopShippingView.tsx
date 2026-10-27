@@ -2085,9 +2085,9 @@ function RequestDetailEntry({ request, loading = false, onBack, onEdit, onDelete
   return (
     <div className="min-w-0">
       <div data-testid="shipping-request-detail" data-surface="layout-only" className="flex min-w-0 flex-col">
-        <div data-testid="shipping-request-detail-header" className={SHIPPING_TOP_ROW_CLASS}>
-          <div className={`${SHIPPING_ROW_CLASS} flex-1 flex-wrap`}>
-            <button type="button" aria-label="요청 목록으로 돌아가기" onClick={onBack} className={SHIPPING_ICON_BOX_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+        <div data-testid="shipping-request-detail-header" className="flex flex-wrap items-stretch justify-between gap-3">
+          <div className="flex min-w-0 flex-1 flex-wrap items-stretch gap-3">
+            <button type="button" aria-label="요청 목록으로 돌아가기" onClick={onBack} className={`${SHIPPING_ICON_BOX_CLASS} self-center`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
               <ArrowLeft className="h-4 w-4" />
             </button>
             <PanelTitle icon={PackageCheck} title={finalPfName} subtitle={titleSubtitle} />
@@ -2193,10 +2193,10 @@ function InvoiceNumberEditor({ request, onSaved }: { request: ShippingRequest; o
         ? { text: "인보이스 번호를 입력해야 준비 완료 처리를 진행할 수 있습니다.", tone: LEGACY_COLORS.yellow }
         : null;
   return (
-    <section data-testid="shipping-invoice-editor" className="min-w-[280px] basis-[280px] grow" aria-label="인보이스 번호 편집">
+    <section data-testid="shipping-invoice-editor" className="flex min-w-[280px] basis-[280px] grow" aria-label="인보이스 번호 편집">
       <div
         data-testid="shipping-invoice-field-shell"
-        className="flex min-h-[64px] min-w-0 items-center gap-2 rounded-[14px] border px-3 py-2 transition-shadow focus-within:ring-2 focus-within:ring-[color:var(--c-blue)]"
+        className="flex min-h-[64px] min-w-0 flex-1 items-center gap-2 rounded-[14px] border px-3 py-2 transition-shadow focus-within:ring-2 focus-within:ring-[color:var(--c-blue)]"
         style={{
           background: LEGACY_COLORS.bg,
           borderColor: fieldMessage ? tint(fieldMessage.tone, 42) : LEGACY_COLORS.border,
