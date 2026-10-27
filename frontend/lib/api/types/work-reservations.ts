@@ -40,7 +40,7 @@ export interface WorkEffectivePlan {
 export interface WorkReservationShortage extends WorkItemIdentity {
   location: WorkSourceLocation;
   required_quantity: number;
-  /** 해당 배치의 기존 예약을 재사용한 가용량. 미래 입고는 포함하지 않는다. */
+  /** 저장 후에는 해당 작업이 실제 확보한 수량. 기존 예약을 포함하며 미래 입고는 제외한다. */
   available_quantity: number;
   shortage_quantity: number;
 }

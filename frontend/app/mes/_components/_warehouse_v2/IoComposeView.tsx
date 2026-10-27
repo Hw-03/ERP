@@ -199,7 +199,8 @@ export function IoComposeView({
   const { drafting, saveDraft } = draftSession;
   const stocktakePause = draftSession.stocktakePause;
   reservationOwnerRef.current = draftSession.currentReservationBatch;
-  const state = useIoWorkState(defaultWorkType, operator?.department, getAvailable);
+  const state = useIoWorkState(defaultWorkType, operator?.department, getAvailable,
+    (draftSession.latestBatch ?? draftSession.savedBatch)?.reservation_issue?.code === "stock_shortage");
   const pauseRevisionStale = Boolean(stocktakePause && draftSession.latestBatch && draftSession.latestBatch.revision !== draftSession.savedBatch?.revision);
   const itemAddBlocked = state.workType !== "tube_material" && (bomListQuery.isPending || bomListQuery.isError);
   const authorizedEntryIntent = entryIntent
@@ -824,6 +825,11 @@ export function IoComposeView({
   }
 
   async function handleSubmit() {
+    if (state.hasShortage) {
+      setError("부족 자재를 확보한 뒤 작업 내용을 다시 반영해 주세요.");
+      state.goTo(4);
+      return;
+    }
     if (stocktakePause && (stocktakePause.state !== "ready" || pauseRevisionStale)) {
       setError("관련 품목 조사 반영 후 작업 중 목록에서 다시 열어 주세요.");
       return;
@@ -1543,7 +1549,7 @@ export function IoComposeView({
                 // state.goTo(5) → step=5 → 자동 스크롤 useEffect 가 Step 4 collapsed top 으로.
               }}
               canAdvance={state.canAdvance[4]}
-              hasShortage={state.hasShortage}
+              hasShortage={state.hasCurrentShortage}
               hasInvalidQuantity={state.hasInvalidQuantity}
               invalidLineCodes={state.includedLines
                 .filter((line) => Number(line.quantity) <= 0)

@@ -263,7 +263,7 @@ function DraftRows({
             <span className="shrink-0 whitespace-nowrap font-semibold tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>{formatQty(primaryQty, { maximumFractionDigits: 4, trimTrailingZeros: true })} {firstBundle ? bundlePrimaryLine(firstBundle)?.unit || firstBundle.lines[0]?.unit || "EA" : "EA"}</span>
             </div>
             {["반려됨", "예약 상태 확인 필요"].includes(reservationStatusLabel(draft)) && <StatusPill label={reservationStatusLabel(draft)} tone="warning" showDot={false} className="mt-1 !px-2.5 !py-1" />}
-            {draft.reservation_issue && <p className="mt-1 break-keep text-xs leading-5 [overflow-wrap:anywhere]" style={{ color: LEGACY_COLORS.yellow }}>{reservationIssueMessage(draft.reservation_issue)}</p>}
+            {draft.reservation_issue && draft.reservation_issue.code !== "stock_shortage" && <p className="mt-1 break-keep text-xs leading-5 [overflow-wrap:anywhere]" style={{ color: LEGACY_COLORS.yellow }}>{reservationIssueMessage(draft.reservation_issue)}</p>}
             <StocktakePauseNotice pause={draft.stocktake_pause} />
             {rejection?.rejected_reason && (
               <p className="mt-1 truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.red }}>

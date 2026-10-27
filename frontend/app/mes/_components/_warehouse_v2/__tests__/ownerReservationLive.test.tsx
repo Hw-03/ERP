@@ -17,7 +17,6 @@ vi.mock("@/lib/activity-audit-context", () => ({ setAuditScreen: vi.fn() }));
 vi.mock("@/lib/client-events", () => ({ sendClientEvent: vi.fn() }));
 vi.mock("@/lib/ui/dirty-guard", () => ({ useRegisterDirty: vi.fn() }));
 vi.mock("../IoTargetPicker", () => ({ IoTargetPicker: () => null }));
-vi.mock("../IoConfirmStep", () => ({ IoConfirmStep: () => null }));
 
 const operator = { employee_id: "employee", name: "작업자", department: "조립", warehouse_role: "none" };
 const item = { item_id: "material", item_name: "예약 자재", mes_code: "MATERIAL", unit: "EA", quantity: 10, warehouse_qty: 10,
@@ -43,6 +42,75 @@ beforeEach(() => {
   vi.mocked(api.getBatch).mockResolvedValue(draft);
   vi.mocked(api.saveDraft).mockResolvedValue({ ...draft, revision: 2 });
   vi.mocked(api.preview).mockResolvedValue({ bundles: [{ ...draft.bundles[0], bundle_id: "warehouse-bundle" }] } as never);
+});
+
+it.each(["desktop", "mobile"] as const)("%s 부족 작업은 저장하고 재고가 도착해도 다시 반영하기 전에는 제출확인을 막는다", async (layout) => {
+  const View = layout === "desktop" ? IoComposeView : MobileIoComposeWizard;
+  const partial = { ...draft, reservation_issue: { code: "stock_shortage", message: "internal", shortages: [
+    { item_id: item.item_id, item_name: item.item_name, mes_code: item.mes_code, unit: "EA", location: { bucket: "warehouse", department: null }, required_quantity: 5, available_quantity: 3, shortage_quantity: 2 },
+  ] } } as IoBatch;
+  vi.mocked(api.getBatch).mockResolvedValue(partial);
+  vi.mocked(api.saveDraft).mockResolvedValue({ ...partial, revision: 2 });
+  const props = { globalSearch: "", operator, employees: [], setItems: vi.fn(), onStatusChange: vi.fn(), restoreDraft: partial, restoreNonce: 1, restoreStep: 4 as const };
+  const view = render(<View {...props} items={[{ ...item, warehouse_qty: 3, pending_quantity: 3 }]} />);
+  expect(screen.getByRole("button", { name: "작업 내용 반영", exact: true })).toBeEnabled();
+  expect(screen.getByRole("button", { name: /제출확인/ })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "작업 내용 반영", exact: true }));
+  await waitFor(() => expect(api.saveDraft).toHaveBeenCalledTimes(1));
+  view.rerender(<View {...props} items={[{ ...item, warehouse_qty: 8, pending_quantity: 3 }]} />);
+  await waitFor(() => expect(available()).toHaveTextContent("가능 재고8"));
+  expect(screen.getByRole("button", { name: /제출확인/ })).toBeDisabled();
+  vi.mocked(api.saveDraft).mockResolvedValue({ ...draft, revision: 3, reservation_issue: null });
+  vi.mocked(api.getBatch).mockResolvedValue({ ...draft, revision: 3, reservation_issue: null });
+  fireEvent.click(screen.getByRole("button", { name: "작업 내용 반영", exact: true }));
+  await waitFor(() => expect(api.saveDraft).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(screen.getByRole("button", { name: /제출확인/ })).toBeEnabled());
+});
+
+it.each(["desktop", "mobile"] as const)("%s 최종 확인 단계로 복원해도 미확보 예약의 제출 버튼은 잠근다", async (layout) => {
+  const View = layout === "desktop" ? IoComposeView : MobileIoComposeWizard;
+  const partial = { ...draft, reservation_issue: { code: "stock_shortage", message: "internal", shortages: [
+    { item_id: item.item_id, item_name: item.item_name, mes_code: item.mes_code, unit: "EA", location: { bucket: "warehouse", department: null }, required_quantity: 5, available_quantity: 3, shortage_quantity: 2 },
+  ] } } as IoBatch;
+  vi.mocked(api.getBatch).mockResolvedValue(partial);
+  await act(async () => {
+    render(<View globalSearch="" operator={operator} employees={[]} items={[{ ...item, warehouse_qty: 20, pending_quantity: 3 }]}
+      setItems={vi.fn()} onStatusChange={vi.fn()} restoreDraft={partial} restoreNonce={1} restoreStep={5} />);
+  });
+  expect(screen.getByRole("button", { name: "창고 결재 요청 1건" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "작업 내용 반영", exact: true })).toBeEnabled();
+});
+
+it.each(["desktop", "mobile"] as const)("%s 부족 작업 수량을 줄이면 현재 부족 안내를 지우고 다시 반영한 뒤 제출확인을 연다", async (layout) => {
+  const View = layout === "desktop" ? IoComposeView : MobileIoComposeWizard;
+  const partial = { ...draft, work_type: "process", sub_type: "produce", from_department: "조립",
+    reservation_issue: { code: "stock_shortage", message: "internal", shortages: [
+      { item_id: item.item_id, item_name: item.item_name, mes_code: item.mes_code, unit: "EA", location: { bucket: "warehouse", department: null }, required_quantity: 5, available_quantity: 3, shortage_quantity: 2 },
+    ] } } as IoBatch;
+  vi.mocked(api.getBatch).mockResolvedValue(partial);
+  const props = { globalSearch: "", operator, employees: [], setItems: vi.fn(), onStatusChange: vi.fn(), restoreDraft: partial, restoreNonce: 1, restoreStep: 4 as const };
+  const view = render(<View {...props} items={[{ ...item, warehouse_qty: 3, pending_quantity: 3 }]} />);
+  expect(screen.getByRole("button", { name: /재고가 부족한 항목이 있습니다/ })).toBeInTheDocument();
+  fireEvent.change(within(row()).getByRole("spinbutton"), { target: { value: "2" } });
+  expect(screen.queryByText(/재고가 부족한 항목이 있습니다/)).not.toBeInTheDocument();
+  expect(screen.queryByText("작업 내용을 반영한 뒤 제출해 주세요.")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /제출확인/ })).toBeDisabled();
+  expect(api.saveDraft).not.toHaveBeenCalled();
+  fireEvent.change(within(row()).getByRole("spinbutton"), { target: { value: "4" } });
+  expect(screen.getByRole("button", { name: /재고가 부족한 항목이 있습니다/ })).toBeInTheDocument();
+  fireEvent.change(within(row()).getByRole("spinbutton"), { target: { value: "2" } });
+  const secured = { ...partial, revision: 2, reservation_issue: null,
+    bundles: [{ ...partial.bundles[0], quantity: 2, lines: [{ ...line, quantity: 2 }] }],
+    effective_plan: { ...draft.effective_plan!, effects: [{ ...draft.effective_plan!.effects[0], quantity: 2 }] } };
+  vi.mocked(api.getBatch).mockResolvedValue(secured);
+  vi.mocked(api.saveDraft).mockResolvedValue(secured);
+  fireEvent.click(screen.getByRole("button", { name: "작업 내용 반영", exact: true }));
+  await waitFor(() => expect(api.saveDraft).toHaveBeenCalledWith(expect.objectContaining({ bundles: [expect.objectContaining({ lines: [expect.objectContaining({ quantity: 2 })] })] })));
+  await act(async () => {});
+  view.rerender(<View {...props} items={[{ ...item, warehouse_qty: 3, pending_quantity: 2 }]} />);
+  await waitFor(() => expect(screen.getByRole("button", { name: /제출확인/ })).toBeEnabled());
+  expect(screen.queryByText(/재고가 부족한 항목이 있습니다/)).not.toBeInTheDocument();
+  expect(screen.queryByText("작업 내용을 반영한 뒤 제출해 주세요.")).not.toBeInTheDocument();
 });
 
 it.each(["desktop", "mobile"] as const)("%s 관리자 취소 후 현재 예약 가산을 없애고 편집 수량과 관측 버전은 보존한다", async (layout) => {

@@ -1,17 +1,35 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
-import { WorkReservationNotice } from "../WorkReservationNotice";
+import { reservationStatusLabel, WorkReservationNotice } from "../WorkReservationNotice";
 import type { IoBatch } from "@/lib/api";
-import { LEGACY_COLORS } from "@/lib/mes/color";
 
-it("예약 해제된 임시 작업은 작업 중으로 안내하고 확보한 자재만 강조한다", () => {
+it.each([3, 0])("실제 확보 수량 %i에 따라 일부 예약과 예약 없음을 구분한다", (acquired) => {
+  const batch = { batch_id: "partial", status: "draft", reservation_status: "reserved",
+    effective_plan: { effects: [{ kind: "out", item_id: "item", quantity: 5 }] },
+    reservation_issue: { code: "stock_shortage", message: "internal", shortages: [
+      { item_id: "item", item_name: "예약 자재", mes_code: "MAT", unit: "EA", location: { bucket: "warehouse", department: null }, required_quantity: 5, available_quantity: acquired, shortage_quantity: 5 - acquired },
+    ] } } as IoBatch;
+  expect(reservationStatusLabel(batch)).toBe(acquired > 0 ? "자재 일부 예약" : "자재 예약 없음");
+  const { container } = render(<WorkReservationNotice batch={batch} />);
+  expect(container).toBeEmptyDOMElement();
+});
+
+it("부족한 품목이 전부 미확보여도 다른 품목이 확보됐으면 일부 예약으로 안내한다", () => {
+  const batch = { batch_id: "partial", status: "draft", reservation_status: "reserved",
+    effective_plan: { effects: [{ kind: "out", item_id: "item", quantity: 5 }, { kind: "out", item_id: "secured", quantity: 2 }] },
+    reservation_issue: { code: "stock_shortage", message: "internal", shortages: [
+      { item_id: "item", item_name: "예약 자재", unit: "EA", required_quantity: 5, available_quantity: 0, shortage_quantity: 5 },
+    ] } } as IoBatch;
+  expect(reservationStatusLabel(batch)).toBe("자재 일부 예약");
+});
+
+it("일반 저장 작업은 예약 전후 모두 별도 안내 박스를 표시하지 않는다", () => {
   const batch = { batch_id: "batch", status: "draft", reservation_status: "inactive" } as IoBatch;
   const view = render(<WorkReservationNotice batch={batch} />);
-  expect(screen.getByText("작업 중")).toBeInTheDocument();
-  expect(screen.queryByText("예약 해제")).not.toBeInTheDocument();
+  expect(view.container).toBeEmptyDOMElement();
   view.rerender(<WorkReservationNotice batch={{ ...batch, reservation_status: "reserved" }} />);
-  expect(screen.getByText("작업 중").parentElement).toHaveStyle({ color: LEGACY_COLORS.green });
+  expect(view.container).toBeEmptyDOMElement();
 });
 
 it("반려되어 돌아온 작업은 반려 상태와 재저장 안내를 보존한다", () => {
@@ -22,11 +40,17 @@ it("반려되어 돌아온 작업은 반려 상태와 재저장 안내를 보존
   expect(screen.getByText("반려 후 다시 저장하여 예약해야 합니다.")).toBeInTheDocument();
 });
 
-it("예약 자재가 없는 입고는 자재를 확보했다는 배지를 표시하지 않는다", () => {
+it("예약 자재가 없는 입고도 별도 안내 박스를 표시하지 않는다", () => {
   const batch = { batch_id: "batch", status: "draft", reservation_status: "not_required" } as IoBatch;
+  const { container } = render(<WorkReservationNotice batch={batch} />);
+  expect(container).toBeEmptyDOMElement();
+});
+
+it("재고 조사로 멈춘 작업의 안내는 보존한다", () => {
+  const batch = { batch_id: "batch", status: "draft", reservation_status: "inactive",
+    stocktake_pause: { token: "pause", round_id: "round", state: "blocked", paused_at: "2026-10-23T00:00:00Z", pending_target_count: 1, missing_target_count: 0 } } as IoBatch;
   render(<WorkReservationNotice batch={batch} />);
-  expect(screen.getByText("예약 대상 없음")).toBeInTheDocument();
-  expect(screen.queryByText("예약 중")).not.toBeInTheDocument();
+  expect(screen.getByText("재고 조사 중")).toBeInTheDocument();
 });
 
 it("원작업 복귀는 미저장 변경 안내를 확인한 뒤에만 실행한다", () => {

@@ -287,11 +287,11 @@ def save_draft(db: Session, payload: IoDraftUpsert, *, creation_command: str = "
         cells = stocktake_pause.io_required_cells(db, batch) + stocktake_pause.io_required_cells(db, batch, plan)
         can_reserve = stocktake_pause.ensure_work_save(db, "io", batch.batch_id, cells,
             getattr(payload, "stocktake_resume_token", None))
-        reservations.replace_reservations(db, batch, plan if can_reserve else None)
+        reservations.replace_reservations(db, batch, plan if can_reserve else None, allow_partial=True)
         batch.effective_plan = plan
         resumed = can_reserve and stocktake_pause.complete_work_save(db, "io", batch.batch_id)
         reservations.record_event(db, batch, "stocktake_resumed" if resumed else "saved", expected_revision, requester.employee_id, requester.name)
-        return _batch_to_payload(batch)
+        return _draft_to_current_stock_payload(db, batch)
 
     batch = _persist_batch(db, requester=requester, payload=payload, status="draft")
     batch.revision = 1
@@ -304,11 +304,12 @@ def save_draft(db: Session, payload: IoDraftUpsert, *, creation_command: str = "
     can_reserve = stocktake_pause.ensure_work_save(db, "io", batch.batch_id,
         stocktake_pause.io_required_cells(db, batch, plan), getattr(payload, "stocktake_resume_token", None),
         direct_submit=creation_command == "direct_submit")
-    reservations.replace_reservations(db, batch, plan if can_reserve else None)
+    reservations.replace_reservations(db, batch, plan if can_reserve else None,
+                                     allow_partial=creation_command == "draft")
     batch.effective_plan = plan
     if creation_command == "draft":
         reservations.record_event(db, batch, "saved", 0, requester.employee_id, requester.name)
-    return _batch_to_payload(batch)
+    return _draft_to_current_stock_payload(db, batch)
 
 
 def validate_creation_replay(batch: IoBatch, payload: IoDraftUpsert, fingerprint: str | None = None) -> dict:

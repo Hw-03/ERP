@@ -1,4 +1,4 @@
-"""Explicit saves reserve whole source cells without moving physical stock."""
+"""Explicit saves reserve available source stock without moving physical stock."""
 from collections.abc import Callable
 from copy import deepcopy
 from decimal import Decimal
@@ -56,7 +56,7 @@ def test_save_reserves_and_replay_does_not_duplicate(client, db_session, make_it
     assert db_session.query(TransactionLog).count() == 0
 
 
-def test_edit_reuses_own_reservation_and_preserves_on_shortage(client, db_session, make_item, owner):
+def test_edit_reuses_own_reservation_and_saves_available_on_shortage(client, db_session, make_item, owner):
     item = make_item(process_type_code="AR", warehouse_qty=Decimal(6))
     payload = draft_payload(owner, item)
     first = client.put("/api/io/draft", json=payload).json()
@@ -68,15 +68,18 @@ def test_edit_reuses_own_reservation_and_preserves_on_shortage(client, db_sessio
         assert response.json()["revision"] == expected_version
         assert pending(db_session, item) == quantity
         payload["expected_revision"] = expected_version
-    payload["notes"] = "must not persist"
+    payload["notes"] = "partial reservation"
     payload["bundles"][0]["lines"][0]["quantity"] = 7
-    failed = client.put("/api/io/draft", json=payload)
-    assert failed.status_code == 422, failed.text
-    assert failed.json()["detail"]["code"] == "STOCK_SHORTAGE"
-    assert failed.json()["detail"]["extra"]["reservation_shortages"][0]["available_quantity"] == 6
-    assert pending(db_session, item) == 2
+    saved = client.put("/api/io/draft", json=payload)
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["reservation_status"] == "reserved"
+    shortage = saved.json()["reservation_issue"]["shortages"][0]
+    assert shortage["required_quantity"] == 7
+    assert shortage["available_quantity"] == 6
+    assert shortage["shortage_quantity"] == 1
+    assert pending(db_session, item) == 6
     batch = db_session.query(IoBatch).one()
-    assert batch.revision == 3 and batch.notes != "must not persist"
+    assert batch.revision == 4 and batch.notes == "partial reservation"
 
 
 def test_revision_and_key_conflicts_and_soft_delete(client, db_session, make_item, owner):
@@ -146,7 +149,7 @@ def test_other_owner_is_rejected_before_version_or_key_details(client, db_sessio
     assert pending(db_session, item) == 3
 
 
-def test_multi_material_edit_rolls_back_every_line_and_event(client, db_session, make_item, owner):
+def test_multi_material_edit_saves_each_available_input(client, db_session, make_item, owner):
     from app.models import IoDraftReservation, IoWorkReservationEvent
     first = make_item(process_type_code="AR", warehouse_qty=Decimal(10))
     second = make_item(process_type_code="AR", warehouse_qty=Decimal(1))
@@ -156,12 +159,13 @@ def test_multi_material_edit_rolls_back_every_line_and_event(client, db_session,
     payload["bundles"][0]["lines"][0]["quantity"] = 6
     payload["bundles"].extend(draft_payload(owner, second, 2)["bundles"])
     response = client.put("/api/io/draft", json=payload)
-    assert response.status_code == 422, response.text
-    assert pending(db_session, first) == 3 and pending(db_session, second) == 0
-    assert db_session.query(IoDraftReservation).one().quantity == 3
-    assert db_session.query(IoWorkReservationEvent).count() == 1
+    assert response.status_code == 200, response.text
+    assert pending(db_session, first) == 6 and pending(db_session, second) == 1
+    assert {row.item_id: row.quantity for row in db_session.query(IoDraftReservation)} == {
+        first.item_id: 6, second.item_id: 1}
+    assert db_session.query(IoWorkReservationEvent).count() == 2
     batch = db_session.query(IoBatch).one()
-    assert batch.revision == 1 and len(batch.bundles) == 1
+    assert batch.revision == 2 and len(batch.bundles) == 2
 
 
 def test_available_subtracts_approval_shipping_and_draft_once(client, db_session, make_item, owner):
@@ -194,7 +198,6 @@ def test_read_saved_draft_reuses_ledger_without_mutating_stock(client, db_sessio
 
 def test_future_receipt_cannot_fund_current_input(db_session, make_item, owner):
     from app.services.io_reservations import replace_reservations
-    from app.services.work_reservation_errors import WorkReservationError
     item = make_item(process_type_code="AR", warehouse_qty=Decimal(0))
     batch = IoBatch(work_type="process", sub_type="produce", requester_employee_id=owner.employee_id,
         requester_name=owner.name, requester_department="조립", status="draft")
@@ -204,10 +207,12 @@ def test_future_receipt_cannot_fund_current_input(db_session, make_item, owner):
     plan = {"version": 1, "fingerprint": "example", "effects": [
         {**identity, "kind": "in", "from": None, "to": {"bucket": "warehouse", "department": None}},
         {**identity, "kind": "out", "from": {"bucket": "warehouse", "department": None}, "to": None}]}
-    with pytest.raises(WorkReservationError) as error:
-        replace_reservations(db_session, batch, plan)
-    assert error.value.code == "STOCK_SHORTAGE"
-    assert error.value.extra["reservation_shortages"][0]["available_quantity"] == 0
+    replace_reservations(db_session, batch, plan, allow_partial=True)
+    assert batch.reservation_status == "reserved"
+    assert batch.reservation_issue["code"] == "stock_shortage"
+    assert batch.reservation_issue["shortages"][0]["available_quantity"] == 0
+    assert batch.reservation_issue["shortages"][0]["shortage_quantity"] == 5
+    assert pending(db_session, item) == 0
 
 
 @pytest.mark.parametrize("endpoint", ["draft", "direct_id", "direct_key"])
@@ -354,21 +359,24 @@ def test_saved_plan_missing_requires_resave(db_session: Session, owner: Employee
     assert error.value.code == "WORK_RESAVE_REQUIRED"
 
 
-def test_new_shortage_never_persists_inactive_draft(
+def test_new_shortage_persists_reserved_draft_with_actual_ledger(
     client: TestClient, db_session: Session, make_item: Callable[..., Item], owner: Employee,
 ) -> None:
-    """Removing the old status must not make insufficient new saves persist as inactive."""
+    """A shortage keeps the requested plan and only acquires the available quantity."""
     from app.models import IoDraftReservation, IoWorkReservationEvent
 
     item = make_item(process_type_code="AR", warehouse_qty=Decimal(1))
     db_session.commit()
     response = client.put("/api/io/draft", json=draft_payload(owner, item, 2))
-    assert response.status_code == 422, response.text
-    assert response.json()["detail"]["code"] == "STOCK_SHORTAGE"
-    assert pending(db_session, item) == 0
-    assert db_session.query(IoBatch).count() == 0
-    assert db_session.query(IoDraftReservation).count() == 0
-    assert db_session.query(IoWorkReservationEvent).count() == 0
+    assert response.status_code == 200, response.text
+    saved = response.json()
+    assert saved["reservation_status"] == "reserved"
+    assert saved["reservation_issue"]["code"] == "stock_shortage"
+    assert saved["effective_plan"]["effects"][0]["quantity"] == 2
+    assert pending(db_session, item) == 1
+    assert db_session.query(IoBatch).count() == 1
+    assert db_session.query(IoDraftReservation).one().quantity == 1
+    assert db_session.query(IoWorkReservationEvent).count() == 1
     assert db_session.query(TransactionLog).count() == 0
 
 

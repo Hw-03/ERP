@@ -156,11 +156,16 @@ def test_postgres_last_unit_and_creation_retry_serialize(
         assert second["ok"]
         assert first["value"]["batch_id"] == second["value"]["batch_id"]
     else:
-        assert second["code"] == "STOCK_SHORTAGE", second
+        assert second["ok"], second
+        issue = second["value"]["reservation_issue"]
+        assert issue["code"] == "stock_shortage"
+        assert issue["shortages"][0]["shortage_quantity"] == 1
     with postgres_make_session() as db:
-        assert db.query(IoBatch).one().revision == 1
+        batches = db.query(IoBatch).all()
+        assert len(batches) == (1 if same_key else 2)
+        assert all(batch.revision == 1 for batch in batches)
         assert db.query(IoDraftReservation).one().quantity == 1
-        assert db.query(IoWorkReservationEvent).count() == 1
+        assert db.query(IoWorkReservationEvent).count() == (1 if same_key else 2)
         inventory = db.query(Inventory).one()
         assert inventory.quantity == 1
         if source == "warehouse":

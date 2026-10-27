@@ -88,6 +88,19 @@ function makeDraft(overrides: Partial<IoBatch> = {}): IoBatch {
 }
 
 describe("IoDraftWorkTable hierarchy", () => {
+  it.each(["desktop", "mobile"] as const)("%s 작업 목록의 중복 부분 예약 안내를 생략하고 부족 요약은 유지한다", (layout) => {
+    const draft = makeDraft({ bundles: [makeBundle({ lines: [makeLine({ shortage: 2 })] })], reservation_status: "reserved", effective_plan: { version: 1, fingerprint: "partial", effects: [
+      { kind: "out", item_id: "item-1", quantity: 5 },
+    ] } as IoBatch["effective_plan"], reservation_issue: { code: "stock_shortage", message: "internal", shortages: [
+      { item_id: "item-1", item_name: "부족 자재", mes_code: "MAT", unit: "EA", location: { bucket: "warehouse", department: null }, required_quantity: 5, available_quantity: 3, shortage_quantity: 2 },
+    ] } });
+    const actions = { onContinue: vi.fn(), onRequestDelete: vi.fn() };
+    render(layout === "desktop" ? <IoDraftWorkTable drafts={[draft]} busyId={null} {...actions} /> : <IoDraftWorkCard draft={draft} isBusy={false} {...actions} />);
+    expect(screen.queryByText("자재 일부 예약")).not.toBeInTheDocument();
+    expect(screen.queryByText(/확보 가능한 자재만 예약했습니다/)).not.toBeInTheDocument();
+    expect(screen.getByText(layout === "desktop" ? "부족 1종" : "자재 1종 부족")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "이어서 작업" })).toBeEnabled();
+  });
   it("모바일 대표 품목은 묶음 개수 대신 실제 저장한 직접 라인 수량을 표시한다", () => {
     const draft = makeDraft({ bundles: [makeBundle({ source_kind: "manual", quantity: 1, lines: [makeLine({ quantity: 500, unit: "BOX" })] })] });
     render(<IoDraftWorkCard draft={draft} isBusy={false} onContinue={vi.fn()} onRequestDelete={vi.fn()} />);

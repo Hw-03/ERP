@@ -1503,6 +1503,7 @@ def _handoff_saved_reservation(db: Session, batch: IoBatch, requester: Employee,
     ensure_work_submit(db, "io", batch.batch_id, io_required_cells(db, batch))
     validate_io_items(db, batch.bundles, sub_type=batch.sub_type)
     reservations.validate_saved_plan(db, batch)
+    reservations.require_full_reservation(db, batch)
     supplier = validate_supplier_for_operation(db, work_type=batch.work_type,
         sub_type=batch.sub_type, supplier_id=batch.supplier_id)
     if supplier is not None:

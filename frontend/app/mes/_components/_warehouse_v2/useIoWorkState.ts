@@ -35,6 +35,7 @@ export function useIoWorkState(
   initialWorkType?: IoWorkType,
   initialDepartment?: string | null,
   getAvailable?: GetAvailable,
+  savedReservationShortage = false,
 ) {
   const defaultDepartment = initialDepartment || "조립";
   const [workType, setWorkTypeBase] = useState<IoWorkType>(initialWorkType ?? "receive");
@@ -130,7 +131,7 @@ export function useIoWorkState(
     ),
     [bundles, subType],
   );
-  const hasShortage = effectIncludedLines.some((line) => {
+  const hasCurrentShortage = effectIncludedLines.some((line) => {
     if (!getAvailable) return line.shortage > 0;
     if (line.from_bucket === "none") return false;
     const available = getAvailable(line);
@@ -138,6 +139,7 @@ export function useIoWorkState(
       ? line.shortage > 0
       : Number(line.quantity) > available;
   });
+  const hasShortage = savedReservationShortage || hasCurrentShortage;
   const hasInvalidQuantity =
     bundles.some((bundle) => !isWholeQuantity(bundle.quantity, 0)) ||
     effectIncludedLines.some((line) => !isWholeQuantity(line.quantity, 1));
@@ -241,6 +243,7 @@ export function useIoWorkState(
     includedLines,
     excludedLines,
     hasShortage,
+    hasCurrentShortage,
     hasInvalidQuantity,
     hasMissingInternalUseBomMode,
     canAdvance,

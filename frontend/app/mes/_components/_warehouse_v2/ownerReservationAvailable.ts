@@ -18,5 +18,11 @@ export function ownerReservationAvailable(item: Item, line: IoLine, batch?: IoBa
     return from.bucket === line.from_bucket && from.department === (line.from_department || null)
       ? total + effect.quantity : total;
   }, 0);
-  return available + ownQuantity;
+  const shortageQuantity = batch.reservation_issue?.code === "stock_shortage"
+    ? batch.reservation_issue.shortages.reduce((total, shortage) =>
+      shortage.item_id === line.item_id && shortage.location.bucket === line.from_bucket
+        && shortage.location.department === (line.from_department || null)
+        ? total + shortage.shortage_quantity : total, 0)
+    : 0;
+  return available + Math.max(0, ownQuantity - shortageQuantity);
 }

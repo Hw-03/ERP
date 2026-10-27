@@ -138,7 +138,7 @@ def test_recount_pauses_resumed_work_and_preserves_other_draft_items(db_session,
     assert db_session.query(models.Inventory).filter_by(item_id=item.item_id).one().pending_quantity == 0
 
 
-def test_resume_shortage_rolls_back_content_and_pause(db_session, make_item, owner):
+def test_resume_shortage_saves_partial_reservation_and_blocks_submit(db_session, make_item, owner):
     from app.services.work_stocktake_pause import pause_payload
     item, payload, saved, env = start_with_work(db_session, make_item, owner)
     mark_applied(db_session, env[3]["round_id"], item.item_id)
@@ -146,15 +146,21 @@ def test_resume_shortage_rolls_back_content_and_pause(db_session, make_item, own
     original = pause_payload(db_session, "io", batch.batch_id)
     revision = batch.revision
     payload.update(batch_id=str(batch.batch_id), expected_revision=revision,
-                   stocktake_resume_token=original["token"], notes="Must roll back")
+                   stocktake_resume_token=original["token"], notes="Partial reservation")
     payload["bundles"][0]["lines"][0]["quantity"] = 11
+    saved = io_draft.save_draft(db_session, IoDraftUpsert.model_validate(payload))
+    db_session.commit()
+    assert batch.bundles[0].lines[0].quantity == 11 and batch.notes == "Partial reservation"
+    assert batch.revision == revision + 1
+    assert pause_payload(db_session, "io", batch.batch_id) is None
+    assert saved["reservation_issue"]["shortages"][0]["shortage_quantity"] == 1
+    assert db_session.query(models.IoDraftReservation).one().quantity == 10
+    from app.services import io_actions
     with pytest.raises(WorkReservationError) as error:
-        io_draft.save_draft(db_session, IoDraftUpsert.model_validate(payload))
+        io_actions.submit_existing_draft(db_session, batch_id=batch.batch_id,
+            requester_employee_id=owner.employee_id, expected_revision=saved["revision"])
     assert error.value.code == "STOCK_SHORTAGE"
-    db_session.rollback()
-    assert batch.bundles[0].lines[0].quantity == 3 and batch.notes is None
-    assert batch.revision == revision
-    assert pause_payload(db_session, "io", batch.batch_id) == original
+    assert batch.status == "draft" and batch.revision == revision + 1
 
 
 def test_direct_submit_blocked_until_all_its_cells_applied(db_session, make_item, owner):

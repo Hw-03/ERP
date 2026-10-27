@@ -49,9 +49,15 @@ def test_last_unit_or_same_create_key_has_only_one_ledger(make_session, same_key
     if same_key:
         assert results[0] == results[1]
     else:
-        assert results.count("STOCK_SHORTAGE") == 1
+        assert len(set(results)) == 2
     with make_session() as db:
-        assert db.query(IoBatch).count() == 1
+        batches = db.query(IoBatch).all()
+        assert len(batches) == (1 if same_key else 2)
+        assert sum(batch.reservation_issue is not None for batch in batches) == (0 if same_key else 1)
+        if not same_key:
+            shortage = next(batch.reservation_issue for batch in batches if batch.reservation_issue)
+            assert shortage["code"] == "stock_shortage"
+            assert shortage["shortages"][0]["shortage_quantity"] == 1
         assert db.query(IoDraftReservation).one().quantity == 1
         assert db.query(Inventory).one().pending_quantity == 1
         assert db.query(Inventory).one().warehouse_qty == 1

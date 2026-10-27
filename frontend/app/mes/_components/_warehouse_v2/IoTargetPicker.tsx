@@ -1018,9 +1018,7 @@ function ItemTable({
                 />
               );
             };
-            const materialStockBlocked = (subType === "outbound_supplier" && warehouseAvailableQty <= 0) || (subType === "tube_outbound_supplier" && sourceAvailableQty <= 0);
-            const selectionBlocked = addBlocked || materialStockBlocked;
-            const rowClickEnabled = mode === "single_only" && !busy && !addBlocked && (isSingleSelected || !materialStockBlocked);
+            const rowClickEnabled = mode === "single_only" && !busy && !addBlocked;
             const bomBundleIds = selectedBundles
               .filter((bundle) => bundle.source_kind === "bom_parent")
               .map((bundle) => bundle.bundle_id);
@@ -1029,7 +1027,7 @@ function ItemTable({
               .map((bundle) => bundle.bundle_id);
             const toggleSingleItem = () => {
               if (isSingleSelected) onRemove(singleBundleIds);
-              else if (!selectionBlocked) onAdd(item, singleItemSourceKind(subType));
+              else if (!addBlocked) onAdd(item, singleItemSourceKind(subType));
             };
             return (
               <HighlightableRow
@@ -1181,7 +1179,7 @@ function ItemTable({
                       <button
                         type="button"
                         aria-pressed={isSingleSelected}
-                        disabled={busy || (!isSingleSelected && selectionBlocked)}
+                        disabled={busy || (!isSingleSelected && addBlocked)}
                         onClick={(event) => {
                           event.stopPropagation();
                           toggleSingleItem();

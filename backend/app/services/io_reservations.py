@@ -99,10 +99,10 @@ def ledger_quantities(db: Session, batch_id: uuid.UUID) -> dict[AvailabilityCell
             db.query(IoDraftReservation).filter_by(batch_id=batch_id).all()}
 
 
-def replace_reservations(db: Session, batch: IoBatch, plan: dict[str, Any] | None) -> None:
-    """Validate all sources first, then atomically apply only each cell's delta."""
-    rows = db.query(IoDraftReservation).filter_by(batch_id=batch.batch_id).all()
-    old = {reservation_cell(row): Decimal(row.quantity) for row in rows}
+def _required_inputs(plan: dict[str, Any] | None) -> tuple[
+    dict[AvailabilityCell, Decimal], dict[AvailabilityCell, dict[str, Any]],
+]:
+    """같은 출발 위치의 필요량을 합산하며 미래 입고를 확보량으로 상계하지 않는다."""
     needed: dict[AvailabilityCell, Decimal] = {}
     identities: dict[AvailabilityCell, dict[str, Any]] = {}
     for effect in (plan or {}).get("effects", []):
@@ -113,6 +113,39 @@ def replace_reservations(db: Session, batch: IoBatch, plan: dict[str, Any] | Non
                 else AvailabilityCell.location(uuid.UUID(effect["item_id"]), source["department"]))
         needed[cell] = needed.get(cell, Decimal(0)) + Decimal(effect["quantity"])
         identities[cell] = {key: effect[key] for key in ("item_id", "item_name", "mes_code", "unit")}
+    return needed, identities
+
+
+def _shortage_rows(
+    needed: dict[AvailabilityCell, Decimal],
+    identities: dict[AvailabilityCell, dict[str, Any]],
+    secured: dict[AvailabilityCell, Decimal],
+) -> list[dict[str, Any]]:
+    """부족량과 실제 확보량을 품목·출발 위치별 공통 응답으로 반환한다."""
+    return [{**identities[cell], "location": {
+        "bucket": "warehouse" if cell.department is None else "production", "department": cell.department},
+        "required_quantity": int(quantity), "available_quantity": int(secured.get(cell, Decimal(0))),
+        "shortage_quantity": int(quantity - secured.get(cell, Decimal(0)))}
+        for cell, quantity in needed.items() if secured.get(cell, Decimal(0)) < quantity]
+
+
+def require_full_reservation(db: Session, batch: IoBatch) -> None:
+    """가용 재고가 늘었어도 다시 저장해 원장에 확보하기 전에는 제출하지 않는다."""
+    needed, identities = _required_inputs(batch.effective_plan)
+    shortages = _shortage_rows(needed, identities, ledger_quantities(db, batch.batch_id))
+    if shortages:
+        raise WorkReservationError("STOCK_SHORTAGE", "자재가 모두 확보되지 않아 제출할 수 없습니다. 작업 내용을 다시 반영해 주세요.",
+            422, {"shortages": [f"{row['item_name']}: {row['shortage_quantity']} 부족" for row in shortages],
+                  "reservation_shortages": shortages})
+
+
+def replace_reservations(
+    db: Session, batch: IoBatch, plan: dict[str, Any] | None, *, allow_partial: bool = False,
+) -> None:
+    """저장은 가용량까지만 확보하고, 직접 제출·기존 전환은 전량 확보를 요구한다."""
+    rows = db.query(IoDraftReservation).filter_by(batch_id=batch.batch_id).all()
+    old = {reservation_cell(row): Decimal(row.quantity) for row in rows}
+    needed, identities = _required_inputs(plan)
     cells = sorted(set(old) | set(needed), key=lambda cell: cell.sort_key)
     affected_items = {cell.item_id for cell in cells}
     for snapshot in [batch.effective_plan, plan]:
@@ -122,15 +155,10 @@ def replace_reservations(db: Session, batch: IoBatch, plan: dict[str, Any] | Non
         if cell.department is not None:
             inventory_svc._lock_location(db, cell.item_id, cell.department, cell.status)
     figures = figures_for_cells(db, cells, lock_allocations=True)
-    shortages = []
-    for cell, quantity in needed.items():
-        available = figures[cell].available + old.get(cell, Decimal(0))
-        if available < quantity:
-            shortages.append({**identities[cell], "location": {
-                "bucket": "warehouse" if cell.department is None else "production", "department": cell.department},
-                "required_quantity": int(quantity), "available_quantity": int(available),
-                "shortage_quantity": int(quantity - available)})
-    if shortages:
+    secured = {cell: min(quantity, max(Decimal(0), figures[cell].available + old.get(cell, Decimal(0))))
+               for cell, quantity in needed.items()}
+    shortages = _shortage_rows(needed, identities, secured)
+    if shortages and not allow_partial:
         bundle_names = {str(bundle.bundle_id): bundle.title_snapshot for bundle in batch.bundles}
         messages = []
         for row in shortages:
@@ -140,7 +168,7 @@ def replace_reservations(db: Session, batch: IoBatch, plan: dict[str, Any] | Non
         raise WorkReservationError("STOCK_SHORTAGE", "재고 부족으로 예약할 수 없습니다.", 422,
                                    {"shortages": messages, "reservation_shortages": shortages})
     for cell in cells:
-        delta = needed.get(cell, Decimal(0)) - old.get(cell, Decimal(0))
+        delta = secured.get(cell, Decimal(0)) - old.get(cell, Decimal(0))
         if not delta:
             continue
         if cell.department is None:
@@ -151,13 +179,17 @@ def replace_reservations(db: Session, batch: IoBatch, plan: dict[str, Any] | Non
     for row in rows:
         db.delete(row)
     db.flush()
-    for cell, quantity in needed.items():
+    for cell, quantity in secured.items():
+        if quantity == 0:
+            continue
         db.add(IoDraftReservation(batch_id=batch.batch_id, item_id=cell.item_id,
             source_bucket="warehouse" if cell.department is None else "production",
             source_department=cell.department or "", quantity=int(quantity)))
     batch.effective_plan = plan
     batch.reservation_status = "inactive" if plan is None else "reserved" if needed else "not_required"
-    batch.reservation_issue = None
+    batch.reservation_issue = {"code": "stock_shortage",
+        "message": "확보 가능한 자재만 예약했습니다. 부족 자재를 확보한 뒤 작업 내용을 다시 반영해 주세요.",
+        "shortages": shortages} if shortages else None
     db.flush()
 
 

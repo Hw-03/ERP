@@ -158,7 +158,7 @@ export function IoDraftWorkCard({
       {/* 대표 품목과 나머지 개수는 접힌 상태에서도 확인한다. */}
       <StocktakePauseNotice pause={draft.stocktake_pause} />
       {["반려됨", "예약 상태 확인 필요"].includes(reservationStatusLabel(draft)) && <StatusPill label={reservationStatusLabel(draft)} tone="warning" showDot={false} className="mt-2 !px-2.5 !py-1" />}
-      {draft.reservation_issue && <p className="mt-2 rounded-[12px] px-3 py-2 text-sm leading-6" style={{ color: LEGACY_COLORS.yellow, background: LEGACY_COLORS.warningBg }}>{reservationIssueMessage(draft.reservation_issue)}</p>}
+      {draft.reservation_issue && draft.reservation_issue.code !== "stock_shortage" && <p className="mt-2 rounded-[12px] px-3 py-2 text-sm leading-6" style={{ color: LEGACY_COLORS.yellow, background: LEGACY_COLORS.warningBg }}>{reservationIssueMessage(draft.reservation_issue)}</p>}
       <ul className="mt-3 space-y-2">
         {draft.bundles.slice(0, 1).map((b) => {
           const parentLine = (b.lines ?? []).find((line) => line.origin === "direct")
