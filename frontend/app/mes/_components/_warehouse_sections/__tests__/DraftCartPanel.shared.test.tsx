@@ -158,7 +158,8 @@ describe("공유 작업함", () => {
     expect(observe).not.toHaveBeenCalled();
   });
 
-  it("출하 링크로 떠난 이력에는 전체 목록의 조건·펼침·스크롤을 복원한다", () => {
+  it.each([true, false])("출하 링크로 떠난 이력에는 전체 목록의 조건·펼침·스크롤을 복원한다 (randomUUID=%s)", (available) => {
+    if (!available) vi.stubGlobal("crypto", { getRandomValues: crypto.getRandomValues.bind(crypto) });
     window.history.replaceState({ __NA: true, tree: "keep-next-state" }, "", "/mes?tab=warehouse");
     state.list.data = { items: [shipping], total: 1, skip: 0, limit: 30 };
     state.detail.data = { ...shipping, shipping_summary: { invoice_number: "INV", companion_lines: [] } };
@@ -179,7 +180,15 @@ describe("공유 작업함", () => {
     view.unmount();
     window.history.pushState(null, "", "/mes?tab=shipping&shippingView=requestDetail&shippingRequestId=shipping-work");
     window.history.replaceState(source.state, "", source.url);
+    const dimensions = vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(1600);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(400);
+    vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockReturnValue(1200);
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
     render(<DraftCartPanel {...props} />);
+    const restored = screen.getByRole("region", { name: "전체 작업 중 목록" });
+    expect(restored.scrollTop).toBe(550);
+    expect(restored.scrollLeft).toBe(30);
+    dimensions.mockRestore();
     expect(screen.getByRole("button", { name: "전체 작업" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("textbox", { name: "전체 작업 검색" })).toHaveValue("ADX");
     expect(screen.getByRole("button", { name: "필터" })).toHaveAttribute("aria-expanded", "true");

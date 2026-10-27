@@ -16,6 +16,27 @@ function deferred<T>() { let resolve!: (value: T) => void; let reject!: (reason?
 function remote(employeeId = "E1", version = 1) { window.dispatchEvent(new StorageEvent("storage", { key: savedKey, newValue: JSON.stringify({ version, employeeId, eventId: "remote-1" }), storageArea: localStorage })); }
 
 describe("employee appearance synchronization", () => {
+  it("publishes distinct notifications and refreshes from their payload without randomUUID", async () => {
+    vi.stubGlobal("crypto", { getRandomValues: crypto.getRandomValues.bind(crypto) });
+    try {
+      const { result } = renderHook(useAppearancePreferences, { wrapper });
+      await waitFor(() => expect(employeesApi.getEmployeeAppearance).toHaveBeenCalledTimes(1));
+      await act(async () => result.current.savePreferences({ theme: "dark", sidebarMode: "expanded" }));
+      expect(employeesApi.setEmployeeAppearance).toHaveBeenCalledWith("E1", { theme: "dark", sidebar_mode: "expanded" });
+      const first = localStorage.getItem(savedKey);
+      expect(first).not.toBeNull();
+      const payload = JSON.parse(first!);
+      expect(Object.keys(payload).sort()).toEqual(["employeeId", "eventId", "version"]);
+      expect(payload).toMatchObject({ version: 1, employeeId: "E1", eventId: expect.stringMatching(/^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i) });
+      await act(async () => result.current.savePreferences({ theme: "dark", sidebarMode: "expanded" }));
+      expect(JSON.parse(localStorage.getItem(savedKey)!).eventId).not.toBe(payload.eventId);
+      const reads = vi.mocked(employeesApi.getEmployeeAppearance).mock.calls.length;
+      vi.mocked(employeesApi.getEmployeeAppearance).mockResolvedValue(pair("E1", "dark", "collapsed"));
+      act(() => window.dispatchEvent(new StorageEvent("storage", { key: savedKey, newValue: first, storageArea: localStorage })));
+      await waitFor(() => expect(result.current.preferences).toEqual({ theme: "dark", sidebarMode: "collapsed" }));
+      expect(employeesApi.getEmployeeAppearance).toHaveBeenCalledTimes(reads + 1);
+    } finally { vi.unstubAllGlobals(); }
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear(); sessionStorage.clear();

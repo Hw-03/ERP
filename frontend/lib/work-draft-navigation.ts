@@ -1,5 +1,6 @@
 import type { WorkDraftFilters, WorkDraftSelection } from "./api/types/work-drafts";
 import { restoreOperatorSession } from "./auth/operator-session";
+import { makeClientRequestId } from "./uuid";
 import { getOperatorAccessContext } from "@/app/mes/_components/login/useCurrentOperator";
 
 const RETURN_KEY = "warehouseWorkReturnKey";
@@ -54,7 +55,7 @@ export function saveWorkListReturn(employeeId: string, view: WorkListReturn): vo
   url.searchParams.set("section", "cart");
   for (const key of ["step", "draftId", "stockRequestId"]) url.searchParams.delete(key);
   const previous = window.history.state?.[RETURN_KEY];
-  const key = typeof previous === "string" && entries.has(previous) ? previous : crypto.randomUUID();
+  const key = typeof previous === "string" && entries.has(previous) ? previous : makeClientRequestId();
   entries.set(key, { employeeId, identity: workDraftIdentity(), href: url.href,
     view: { ...view, filters: { ...view.filters }, selected: view.selected ? { ...view.selected } : null } });
   window.history.replaceState({ ...window.history.state, [RETURN_KEY]: key }, "", url);

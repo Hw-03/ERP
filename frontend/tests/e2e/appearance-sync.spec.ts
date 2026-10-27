@@ -17,7 +17,11 @@ async function saveDarkExpanded(page: Page) {
   await page.getByRole("button", { name: "저장", exact: true }).click();
 }
 
-test("같은 직원의 설정 저장은 다른 탭에 반영하고 작성 중인 선택과 PIN은 보존한다", async ({ page, context }) => {
+for (const randomUUIDAvailable of [true, false]) {
+test(`같은 직원의 설정 저장은 다른 탭에 반영하고 작성 중인 선택과 PIN은 보존한다 (randomUUID=${randomUUIDAvailable})`, async ({ page, context }) => {
+  if (!randomUUIDAvailable) await context.addInitScript(() => {
+    Object.defineProperty(crypto, "randomUUID", { configurable: true, value: undefined });
+  });
   const employee = await openSettings(page);
   const second = await context.newPage();
   await openSettings(second, employee.employee_code);
@@ -32,6 +36,7 @@ test("같은 직원의 설정 저장은 다른 탭에 반영하고 작성 중인
   await expect(second.getByLabel("현재 PIN", { exact: true })).toHaveValue("1234");
   expect(await second.evaluate(() => JSON.parse(sessionStorage.getItem("dexcowin_mes_operator")!).sidebar_mode)).toBe("expanded");
 });
+}
 
 test("같은 브라우저의 서로 다른 직원 탭은 계정과 화면 설정을 독립적으로 유지한다", async ({ page, context }) => {
   const employee = await openSettings(page);

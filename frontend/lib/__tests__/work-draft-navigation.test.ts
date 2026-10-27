@@ -23,6 +23,18 @@ beforeEach(() => {
 afterEach(() => { cleanups.splice(0).forEach((dispose) => dispose()); clearWorkListReturns(); vi.restoreAllMocks(); });
 
 describe("작업 목록의 이력별 복귀 주소", () => {
+  it("creates and reuses a return key without randomUUID on LAN HTTP", () => {
+    vi.stubGlobal("crypto", { getRandomValues: crypto.getRandomValues.bind(crypto) });
+    try {
+      saveWorkListReturn("a", snapshot);
+      const key = window.history.state.warehouseWorkReturnKey;
+      expect(key).toMatch(/^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i);
+      expect(readWorkListReturn("a")).toEqual(snapshot);
+      saveWorkListReturn("a", { ...snapshot, scrollTop: 42 });
+      expect(window.history.state.warehouseWorkReturnKey).toBe(key);
+      expect(readWorkListReturn("a")?.scrollTop).toBe(42);
+    } finally { vi.unstubAllGlobals(); }
+  });
   it("현재 entry만 교체하고 Next 상태를 보존하며 이력에는 식별 키만 남긴다", () => {
     const count = window.history.length;
     saveWorkListReturn("a", snapshot);

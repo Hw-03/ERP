@@ -3,6 +3,7 @@
 import { createContext, createElement, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { employeesApi, type EmployeeAppearance } from "@/lib/api/employees";
 import { normalizeSidebarMode, type SidebarMode } from "@/lib/sidebar-mode";
+import { makeClientRequestId } from "@/lib/uuid";
 import { readCurrentOperator, updateCurrentOperatorPreferences, useCurrentOperator } from "./login/useCurrentOperator";
 
 export type AppearanceTheme = "light" | "dark";
@@ -118,7 +119,7 @@ export function AppearancePreferencesProvider({ children }: { children: ReactNod
     if (saved.employee_id !== employeeId) throw new Error("Appearance employee mismatch");
     // Successful writes notify other tabs even if this tab changed employee meanwhile.
     try {
-      window.localStorage.setItem(SAVED_EVENT_KEY, JSON.stringify({ version: 1, employeeId, eventId: crypto.randomUUID() }));
+      window.localStorage.setItem(SAVED_EVENT_KEY, JSON.stringify({ version: 1, employeeId, eventId: makeClientRequestId() }));
     } catch { /* Storage restrictions must not turn a committed save into a failure. */ }
     if (!mounted.current || readCurrentOperator()?.employee_id !== employeeId) return;
     // A late earlier write can become the final DB value; read it without applying its stale payload.
