@@ -1062,6 +1062,18 @@
       },
       "BOMTreeNode": {
         "properties": {
+          "additional_producible_limiting_item_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Additional Producible Limiting Item Id"
+          },
           "additional_producible_quantity": {
             "anyOf": [
               {
@@ -1072,6 +1084,22 @@
               }
             ],
             "title": "Additional Producible Quantity"
+          },
+          "additional_producible_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "finite",
+                  "no_constraints",
+                  "unavailable"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Additional Producible Status"
           },
           "children": {
             "default": [],
@@ -1090,6 +1118,45 @@
             "default": 0,
             "title": "Department Stock",
             "type": "integer"
+          },
+          "fast_production": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fast Production"
+          },
+          "fast_production_limiting_item_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fast Production Limiting Item Id"
+          },
+          "fast_production_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "finite",
+                  "no_constraints",
+                  "unavailable"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fast Production Status"
           },
           "item_id": {
             "format": "uuid",
@@ -1130,6 +1197,56 @@
           "required_quantity": {
             "title": "Required Quantity",
             "type": "integer"
+          },
+          "ship_ready": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ship Ready"
+          },
+          "total_production": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Production"
+          },
+          "total_production_limiting_item_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Production Limiting Item Id"
+          },
+          "total_production_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "finite",
+                  "no_constraints",
+                  "unavailable"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Production Status"
           },
           "unit": {
             "title": "Unit",
@@ -1255,6 +1372,137 @@
           "stock_after"
         ],
         "title": "BackflushDetail",
+        "type": "object"
+      },
+      "BomCapacitySimulationRequest": {
+        "properties": {
+          "excluded_item_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Excluded Item Ids",
+            "type": "array"
+          }
+        },
+        "title": "BomCapacitySimulationRequest",
+        "type": "object"
+      },
+      "BomCapacitySimulationResponse": {
+        "properties": {
+          "additional_producible_limiting_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Additional Producible Limiting Item Id"
+          },
+          "additional_producible_quantity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Additional Producible Quantity"
+          },
+          "additional_producible_status": {
+            "enum": [
+              "finite",
+              "no_constraints",
+              "unavailable"
+            ],
+            "title": "Additional Producible Status",
+            "type": "string"
+          },
+          "fast_production": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fast Production"
+          },
+          "fast_production_limiting_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fast Production Limiting Item Id"
+          },
+          "fast_production_status": {
+            "enum": [
+              "finite",
+              "no_constraints",
+              "unavailable"
+            ],
+            "title": "Fast Production Status",
+            "type": "string"
+          },
+          "item_id": {
+            "title": "Item Id",
+            "type": "string"
+          },
+          "ship_ready": {
+            "title": "Ship Ready",
+            "type": "integer"
+          },
+          "total_production": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Production"
+          },
+          "total_production_limiting_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Production Limiting Item Id"
+          },
+          "total_production_status": {
+            "enum": [
+              "finite",
+              "no_constraints",
+              "unavailable"
+            ],
+            "title": "Total Production Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "ship_ready",
+          "fast_production",
+          "fast_production_status",
+          "total_production",
+          "total_production_status",
+          "additional_producible_quantity",
+          "additional_producible_status"
+        ],
+        "title": "BomCapacitySimulationResponse",
         "type": "object"
       },
       "BomCheckComponent": {
@@ -2019,6 +2267,17 @@
             ],
             "title": "Fast Production Limiting Item"
           },
+          "fast_production_limiting_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fast Production Limiting Item Id"
+          },
           "model_symbol": {
             "anyOf": [
               {
@@ -2069,6 +2328,17 @@
               }
             ],
             "title": "Total Production Limiting Item"
+          },
+          "total_production_limiting_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Production Limiting Item Id"
           }
         },
         "required": [
@@ -2188,6 +2458,17 @@
             ],
             "title": "Fast Production"
           },
+          "fast_production_limiting_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fast Production Limiting Item Id"
+          },
           "fast_production_status": {
             "enum": [
               "finite",
@@ -2214,6 +2495,17 @@
               }
             ],
             "title": "Total Production"
+          },
+          "total_production_limiting_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Production Limiting Item Id"
           },
           "total_production_status": {
             "enum": [
@@ -19707,6 +19999,60 @@
         ]
       }
     },
+    "/api/bom/{parent_item_id}/capacity/simulate": {
+      "post": {
+        "description": "Calculate request-local exclusions for a general BOM root using a read snapshot.",
+        "operationId": "preview_bom_capacity_api_bom__parent_item_id__capacity_simulate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "parent_item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Parent Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BomCapacitySimulationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BomCapacitySimulationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Bom Capacity",
+        "tags": [
+          "BOM"
+        ]
+      }
+    },
     "/api/bom/{parent_item_id}/tree": {
       "get": {
         "description": "Return a recursive BOM tree for a given parent item.\n\n진입 시 BOM 캐시 1회 + 후손 후보 Items/정상 재고 집계 IN 1회씩으로 N+1 제거.",
@@ -36231,7 +36577,7 @@
     },
     "/health/ready": {
       "get": {
-        "description": "Admit employee traffic only after read-only schema and business checks.",
+        "description": "Await shared diagnostics without occupying another synchronous worker.",
         "operationId": "health_ready_health_ready_get",
         "responses": {
           "200": {

@@ -214,6 +214,18 @@ class BOMTreeNode(BaseModel):
         None,
         exclude_if=lambda value: value is None,
     )
+    additional_producible_limiting_item_id: Optional[uuid.UUID] = Field(
+        None,
+        exclude_if=lambda value: value is None,
+    )
+    additional_producible_status: Optional[Literal["finite", "no_constraints", "unavailable"]] = Field(None, exclude_if=lambda value: value is None)
+    ship_ready: Optional[int] = Field(None, exclude_if=lambda value: value is None)
+    fast_production: Optional[int] = Field(None, exclude_if=lambda value: value is None)
+    fast_production_status: Optional[Literal["finite", "no_constraints", "unavailable"]] = Field(None, exclude_if=lambda value: value is None)
+    fast_production_limiting_item_id: Optional[uuid.UUID] = Field(None, exclude_if=lambda value: value is None)
+    total_production: Optional[int] = Field(None, exclude_if=lambda value: value is None)
+    total_production_status: Optional[Literal["finite", "no_constraints", "unavailable"]] = Field(None, exclude_if=lambda value: value is None)
+    total_production_limiting_item_id: Optional[uuid.UUID] = Field(None, exclude_if=lambda value: value is None)
     production_capacity_ignored: bool = False
     children: List["BOMTreeNode"] = []
 

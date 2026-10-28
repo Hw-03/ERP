@@ -273,6 +273,42 @@ async function writeJson<T>(
 
 export const postJson = <T>(url: string, body?: unknown): Promise<T> =>
   writeJson<T>(url, "POST", body);
+
+/** 읽기 전용 계산은 프록시의 30초 한도까지 기다리고 연결 실패만 한 번 복구한다. */
+export async function postPreviewJson<T>(url: string, body: unknown, signal?: AbortSignal): Promise<T> {
+  const controller = new AbortController();
+  const cancel = () => controller.abort(signal?.reason);
+  if (signal?.aborted) cancel();
+  else signal?.addEventListener("abort", cancel, { once: true });
+  const timer = setTimeout(() => controller.abort(), 30_000);
+  const init: RequestInit = {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...authHeaders(), ...getAuditRequestHeaders() },
+    body: JSON.stringify(body),
+    signal: controller.signal,
+  };
+  try {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const response = await fetch(url, init);
+        if (!response.ok) throw await parseApiError(response);
+        return await response.json() as T;
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        if (controller.signal.aborted) throw new ApiConnectionError();
+        const transient = error instanceof TypeError || (error instanceof ApiError && [500, 502, 503, 504].includes(error.status));
+        if (attempt === 0 && transient) continue;
+        if (error instanceof ApiError) throw error;
+        throw new ApiConnectionError();
+      }
+    }
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", cancel);
+  }
+}
+
 export const putJson = <T>(url: string, body?: unknown): Promise<T> =>
   writeJson<T>(url, "PUT", body);
 export const patchJson = <T>(url: string, body?: unknown): Promise<T> =>

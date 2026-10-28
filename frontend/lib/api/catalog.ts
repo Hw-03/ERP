@@ -8,11 +8,12 @@
  * 총 10 메소드.
  */
 
-import { deleteJson, fetcher, patchJson, postJson, putJson, toApiUrl } from "../api-core";
+import { deleteJson, fetcher, patchJson, postJson, postPreviewJson, putJson, toApiUrl } from "../api-core";
 import type {
   BOMDetailEntry,
   BOMEntry,
   BOMTreeNode,
+  BOMCapacitySimulation,
   ProductModel,
 } from "./types";
 
@@ -44,6 +45,8 @@ export const catalogApi = {
     const query = options?.departmentOrder ? `?department_order=${options.departmentOrder}` : "";
     return fetcher<BOMTreeNode>(toApiUrl(`/api/bom/${parentItemId}/tree${query}`));
   },
+  simulateBOMCapacity: (parentItemId: string, payload: { excluded_item_ids: string[] }, signal?: AbortSignal) =>
+    postPreviewJson<BOMCapacitySimulation>(toApiUrl(`/api/bom/${parentItemId}/capacity/simulate`), payload, signal),
   /** 주어진 품목을 자식으로 사용하는 parent BOM 행. 직접 사용처(1단계). */
   getBOMWhereUsed: (itemId: string, signal?: AbortSignal) =>
     fetcher<BOMDetailEntry[]>(toApiUrl(`/api/bom/where-used/${itemId}`), signal),

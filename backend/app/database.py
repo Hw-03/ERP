@@ -130,6 +130,7 @@ _WEEKLY_SNAPSHOT_GUARD_PREFIXES = (
 )
 
 _SQLITE_READ_ONLY_PREVIEW_ROUTES = frozenset({
+    "/api/bom/{parent_item_id}/capacity/simulate",
     "/api/production/capacity/simulate",
     "/api/io/preview",
     "/api/inventory/operations/{operation_id}/cancel/preview",

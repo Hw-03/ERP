@@ -36,6 +36,28 @@ export interface BOMTreeNode {
   warehouse_stock?: number;
   department_stock?: number;
   additional_producible_quantity?: number;
+  additional_producible_limiting_item_id?: string | null;
+  ship_ready?: number;
+  fast_production?: number | null;
+  total_production?: number | null;
+  fast_production_status?: "finite" | "no_constraints" | "unavailable";
+  total_production_status?: "finite" | "no_constraints" | "unavailable";
+  fast_production_limiting_item_id?: string | null;
+  total_production_limiting_item_id?: string | null;
   production_capacity_ignored?: boolean;
   children: BOMTreeNode[];
+}
+
+export interface BOMCapacitySimulation {
+  item_id: string;
+  additional_producible_quantity: number | null;
+  additional_producible_status: "finite" | "no_constraints" | "unavailable";
+  additional_producible_limiting_item_id: string | null;
+  ship_ready: number;
+  fast_production: number | null;
+  total_production: number | null;
+  fast_production_status: "finite" | "no_constraints" | "unavailable";
+  total_production_status: "finite" | "no_constraints" | "unavailable";
+  fast_production_limiting_item_id: string | null;
+  total_production_limiting_item_id: string | null;
 }

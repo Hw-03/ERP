@@ -470,15 +470,24 @@ def compute_additional_producible_quantity(
     계산용 BOM에 유효한 직계 제약이 없으면 ``None``을 반환한다. 공유 자재와
     중간재 재고의 네팅은 `_max_buildable`의 검증된 전체 BOM 로직을 그대로 쓴다.
     """
-    if not bom_cache.get(root_id):
-        return None
+    return compute_additional_producible_capacity(
+        root_id, bom_cache=bom_cache, fig_by_id=fig_by_id,
+    )[0]
 
-    total_buildable, _bottleneck = _max_buildable(
-        root_id,
-        bom_cache=bom_cache,
-        fig_by_id=fig_by_id,
+
+def compute_additional_producible_capacity(
+    root_id: uuid.UUID,
+    *,
+    bom_cache: BomCache,
+    fig_by_id: FigById,
+) -> tuple[int | None, uuid.UUID | None]:
+    """Return additional units and their bottleneck from one shared-stock calculation."""
+    if not bom_cache.get(root_id):
+        return None, None
+    total_buildable, bottleneck = _max_buildable(
+        root_id, bom_cache=bom_cache, fig_by_id=fig_by_id,
     )
-    return max(total_buildable - _own_available(root_id, fig_by_id), 0)
+    return max(total_buildable - _own_available(root_id, fig_by_id), 0), bottleneck
 
 
 def _fast_packaging_requirements(
@@ -659,6 +668,8 @@ def compute_af_capacity(
                 "total_production": total_qty,
                 "fast_production_limiting_item": _bottleneck_label(fast_btl, items_map),
                 "total_production_limiting_item": _bottleneck_label(total_btl, items_map),
+                "fast_production_limiting_item_id": str(fast_btl) if fast_btl else None,
+                "total_production_limiting_item_id": str(total_btl) if total_btl else None,
                 "bom_status": (
                     "complete" if (pf and metadata_bom_cache.get(pf_id)) else "incomplete"
                 ),

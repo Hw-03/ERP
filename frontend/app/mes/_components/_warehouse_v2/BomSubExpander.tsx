@@ -472,6 +472,9 @@ export function getBomBranchItemIds(tree: BOMTreeNode): string[] {
 }
 
 type ModalBomTreeProps = {
+  highlightDescription?: string;
+  allowTopLevelExclusion?: boolean;
+  highlightedItemId?: string;
   headerNotice?: ReactNode;
   tree: BOMTreeNode;
   expandedItemIds: ReadonlySet<string>;
@@ -494,7 +497,10 @@ function formatModalBomQuantity(quantity: number, unit: string): string {
   return `${formatQty(quantity, { maximumFractionDigits: 2, trimTrailingZeros: true })} ${unit}`;
 }
 
-function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem, showStockBreakdown = false, mobilePresentation = false, excludedItemIds, onToggleExcluded, ancestorExcluded = false, protectedItemIds }: {
+function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem, showStockBreakdown = false, mobilePresentation = false, excludedItemIds, onToggleExcluded, ancestorExcluded = false, protectedItemIds, highlightedItemId, highlightDescription, allowTopLevelExclusion = false }: {
+  highlightDescription?: string;
+  allowTopLevelExclusion?: boolean;
+  highlightedItemId?: string;
   node: BOMTreeNode;
   depth: number;
   expandedItemIds: ReadonlySet<string>;
@@ -508,7 +514,7 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem, showStock
 }) {
   const explicitlyExcluded = excludedItemIds?.has(node.item_id) === true;
   const excluded = explicitlyExcluded || ancestorExcluded;
-  const canExclude = onToggleExcluded && depth > 0 && !protectedItemIds?.has(node.item_id);
+  const canExclude = onToggleExcluded && (allowTopLevelExclusion || depth > 0) && !protectedItemIds?.has(node.item_id);
   const gridClass = showStockBreakdown ? "bom-capacity-stock-grid" : "bom-detail-modal-grid";
   const hasKids = node.children.length > 0;
   const ChevronCell = onToggleExcluded && hasKids ? "button" : "span";
@@ -557,8 +563,12 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem, showStock
           className="min-h-11 min-w-11 shrink-0 rounded-[10px] border px-2 text-xs font-bold transition-colors hover:brightness-95 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
           style={{ color: explicitlyExcluded ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2, borderColor: explicitlyExcluded ? LEGACY_COLORS.yellow : LEGACY_COLORS.border, background: explicitlyExcluded ? LEGACY_COLORS.warningBg : LEGACY_COLORS.s2 }}
         >{explicitlyExcluded ? "복원" : "제외"}</button>}
-        {onToggleExcluded ? <span className="min-w-0">
-          {node.item_name}
+        {onToggleExcluded ? <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+          <span>{node.item_name}</span>
+          {!excluded && highlightedItemId === node.item_id && <span className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-x-2 gap-y-1 text-right">
+            <span style={{ color: LEGACY_COLORS.blue }}>생산 제한 품목</span>
+            {highlightDescription && <span className="min-w-0 whitespace-normal break-words" style={{ color: LEGACY_COLORS.muted2 }}>{highlightDescription}</span>}
+          </span>}
           {ancestorExcluded && <span className="ml-2 inline-block text-xs font-normal" style={{ color: LEGACY_COLORS.muted2 }}>상위 항목 제외</span>}
         </span> : node.item_name}
       </span>
@@ -588,7 +598,7 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem, showStock
 
   return (
     <>
-      <li data-testid="bom-modal-row" data-depth={depth} style={excluded ? { opacity: 0.55 } : undefined}>
+      <li data-testid="bom-modal-row" data-bom-item-id={node.item_id} data-bom-excluded={excluded ? "true" : "false"} data-depth={depth} className={!excluded && highlightedItemId === node.item_id ? "relative z-[1] outline outline-2 outline-[var(--c-blue)] outline-offset-[-2px]" : undefined} style={excluded ? { opacity: 0.55 } : undefined}>
         {mobilePresentation ? (
           <div className="min-w-0 border-b py-3 pr-3" style={{ borderColor: LEGACY_COLORS.border, background, paddingLeft: 12 + Math.min(depth, 3) * 12 }}>
             <div className="flex min-w-0 items-start gap-1">
@@ -655,14 +665,17 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem, showStock
           onToggleExcluded={onToggleExcluded}
           ancestorExcluded={excluded}
           protectedItemIds={protectedItemIds}
+          highlightedItemId={highlightedItemId}
+          highlightDescription={highlightDescription}
+          allowTopLevelExclusion={allowTopLevelExclusion}
         />
       ))}
     </>
   );
 }
 
-export function ModalBomTree({ tree, expandedItemIds, onToggleItem, showStockBreakdown = false, mobilePresentation = false, excludedItemIds, onToggleExcluded, headerNotice }: ModalBomTreeProps) {
-  const protectedItemIds = new Set(tree.children.map((node) => node.item_id));
+export function ModalBomTree({ tree, expandedItemIds, onToggleItem, showStockBreakdown = false, mobilePresentation = false, excludedItemIds, onToggleExcluded, headerNotice, highlightedItemId, highlightDescription, allowTopLevelExclusion = false }: ModalBomTreeProps) {
+  const protectedItemIds = new Set(allowTopLevelExclusion ? [tree.item_id] : tree.children.map((node) => node.item_id));
   return (
     <div
       data-testid="bom-modal-tree-scroll"
@@ -708,6 +721,9 @@ export function ModalBomTree({ tree, expandedItemIds, onToggleItem, showStockBre
               excludedItemIds={excludedItemIds}
               onToggleExcluded={onToggleExcluded}
               protectedItemIds={protectedItemIds}
+              highlightedItemId={highlightedItemId}
+              highlightDescription={highlightDescription}
+              allowTopLevelExclusion={allowTopLevelExclusion}
             />
           ))}
         </ul>

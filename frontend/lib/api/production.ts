@@ -2,7 +2,7 @@
  * 생산, 수량 이력, 통합 작업과 내보내기 — `@/lib/api/production`.
  */
 
-import { fetcher, postJson, toApiUrl } from "../api-core";
+import { fetcher, postJson, postPreviewJson, toApiUrl } from "../api-core";
 import type {
   ProductionCapacity,
   ProductionCapacitySimulation,
@@ -328,8 +328,8 @@ export const productionApi = {
   getProductionCapacity: () =>
     fetcher<ProductionCapacity>(toApiUrl("/api/production/capacity")),
 
-  simulateProductionCapacity: (payload: { pf_item_id: string; excluded_item_ids: string[] }) =>
-    postJson<ProductionCapacitySimulation>(toApiUrl("/api/production/capacity/simulate"), payload),
+  simulateProductionCapacity: (payload: { pf_item_id: string; excluded_item_ids: string[] }, signal?: AbortSignal) =>
+    postPreviewJson<ProductionCapacitySimulation>(toApiUrl("/api/production/capacity/simulate"), payload, signal),
 
   getTransactions: (
     params?: {

@@ -204,6 +204,33 @@ def test_capacity_simulation_skips_write_guards_for_non_file_databases(preview_d
         generator.close()
 
 
+def test_general_bom_simulation_reads_committed_stock_while_writer_is_held(preview_database):
+    """General BOM exclusion requests must use the same read-only preview connection."""
+    from app.routers import bom
+
+    env = preview_database
+    env.app.include_router(bom.router, prefix="/api/bom")
+    statements = []
+
+    @event.listens_for(env.reader, "before_cursor_execute")
+    def record(_connection, _cursor, statement, _params, _context, _many):
+        statements.append(statement)
+
+    with env.writer.connect() as locker:
+        transaction = locker.begin()
+        locker.execute(update(Inventory).where(Inventory.item_id == env.ids.item).values(warehouse_qty=99))
+        try:
+            with TestClient(env.app, raise_server_exceptions=False) as client:
+                response = client.post(f"/api/bom/{env.ids.parent}/capacity/simulate", json={"excluded_item_ids": []})
+            assert response.status_code == 200, response.text
+            assert response.json()["additional_producible_quantity"] == 3
+            assert response.json()["additional_producible_limiting_item_id"] == str(env.ids.item)
+        finally:
+            transaction.rollback()
+    assert statements
+    assert not any(sql.lstrip().upper().startswith(("INSERT", "UPDATE", "DELETE")) for sql in statements)
+
+
 def test_preview_read_transaction_does_not_block_another_writer(preview_database):
     from starlette.requests import Request
 

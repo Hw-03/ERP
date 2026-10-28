@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, GitBranch, X } from "lucide-react";
+import { ChevronLeft, GitBranch, LocateFixed, X } from "lucide-react";
 import Image from "next/image";
 import { api } from "@/lib/api";
 import type { ProductionCapacityPfVariant, ProductionCapacitySimulation } from "@/lib/api/types/production";
@@ -26,24 +26,33 @@ function SummaryCard({
   value,
   color,
   simulating = false,
+  onLocate,
+  canLocate = false,
 }: {
   label: string;
   value: number | string;
   color: string;
   simulating?: boolean;
+  onLocate?: () => void;
+  canLocate?: boolean;
 }) {
+  const Card = onLocate ? "button" : "div";
   return (
-    <div
-      className="flex h-16 min-w-0 flex-col justify-center rounded-[14px] border px-3 py-2"
+    <Card
+      type={onLocate ? "button" : undefined}
+      onClick={onLocate}
+      disabled={onLocate ? !canLocate : undefined}
+      aria-label={onLocate ? `${label} 제한 품목 찾기` : undefined}
+      className="flex h-16 min-w-0 flex-col justify-center rounded-[14px] border px-3 py-2 enabled:hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
       style={{ background: simulating ? LEGACY_COLORS.warningBg : LEGACY_COLORS.s2, borderColor: simulating ? LEGACY_COLORS.yellow : LEGACY_COLORS.border }}
     >
       <div className="text-center text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-        {label}
+        <span className="relative inline-block">{label}{onLocate && <LocateFixed aria-hidden className="absolute left-full top-1/2 ml-1 h-3.5 w-3.5 -translate-y-1/2" />}</span>
       </div>
       <div className="mt-0.5 text-center text-lg font-black tabular-nums" style={{ color }}>
         {typeof value === "number" ? formatQty(value) : value}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -59,6 +68,8 @@ function PfWorkspace({ variant, onBack, onClose }: Props) {
   const [simulation, setSimulation] = useState<{ selectionKey: string; value: ProductionCapacitySimulation } | null>(null);
   const [simulationError, setSimulationError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [highlight, setHighlight] = useState<{ itemId: string; sequence: number; field: "fast_production" | "total_production" } | null>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
   const selectionKey = [...excludedItemIds].sort().join(",");
   const calculationKey = `${selectionKey}:${revision ?? "initial"}:${attempt}`;
   const simulating = excludedItemIds.size > 0;
@@ -74,11 +85,14 @@ function PfWorkspace({ variant, onBack, onClose }: Props) {
   useEffect(() => {
     if (!selectionKey) return;
     let active = true;
+    const controller = new AbortController();
     setSimulationError(null);
-    api.simulateProductionCapacity({ pf_item_id: variant.pf_item_id, excluded_item_ids: selectionKey.split(",") })
-      .then((value) => { if (active) setSimulation({ selectionKey, value }); })
-      .catch(() => { if (active) setSimulationError(calculationKey); });
-    return () => { active = false; };
+    const timer = window.setTimeout(() => {
+      api.simulateProductionCapacity({ pf_item_id: variant.pf_item_id, excluded_item_ids: selectionKey.split(",") }, controller.signal)
+        .then((value) => { if (active) setSimulation({ selectionKey, value }); })
+        .catch(() => { if (active) setSimulationError(calculationKey); });
+    }, 200);
+    return () => { active = false; window.clearTimeout(timer); controller.abort(); };
   }, [calculationKey, selectionKey, variant.pf_item_id]);
 
   useEffect(() => {
@@ -97,6 +111,7 @@ function PfWorkspace({ variant, onBack, onClose }: Props) {
   }, [currentTree]);
 
   const toggleExcluded = (itemId: string): void => {
+    setHighlight(null);
     setSimulation(null);
     setExcludedItemIds((current) => {
       const next = new Set(current);
@@ -125,6 +140,44 @@ function PfWorkspace({ variant, onBack, onClose }: Props) {
       return next;
     });
   };
+
+  const limitingId = (field: "fast_production" | "total_production"): string | null => {
+    const source = simulating ? currentSimulation : variant;
+    return source?.[`${field}_limiting_item_id`] ?? null;
+  };
+  const findPath = (itemId: string): string[] | null => {
+    if (!currentTree) return null;
+    const visit = (node: typeof currentTree, path: string[]): string[] | null => {
+      if (excludedItemIds.has(node.item_id)) return null;
+      if (node.item_id === itemId) return path;
+      for (const child of node.children) {
+        const found = visit(child, [...path, node.item_id]);
+        if (found) return found;
+      }
+      return null;
+    };
+    for (const child of currentTree.children) {
+      const path = visit(child, []);
+      if (path) return path;
+    }
+    return null;
+  };
+  const locate = (field: "fast_production" | "total_production"): void => {
+    const itemId = limitingId(field);
+    if (!itemId) return;
+    const path = findPath(itemId);
+    if (!path) return;
+    setExpandedItemIds((current) => new Set([...current, ...path]));
+    setHighlight((current) => ({ itemId, sequence: (current?.sequence ?? 0) + 1, field }));
+  };
+  useEffect(() => {
+    if (!highlight) return;
+    const row = Array.from(tableRef.current?.querySelectorAll<HTMLElement>("[data-bom-item-id]") ?? [])
+      .find((element) => element.dataset.bomItemId === highlight.itemId && element.dataset.bomExcluded !== "true");
+    row?.scrollIntoView?.({ block: "center", behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+    const timer = window.setTimeout(() => setHighlight(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [highlight]);
 
   return (
     <section
@@ -176,8 +229,8 @@ function PfWorkspace({ variant, onBack, onClose }: Props) {
           {simulating && <button type="button" onClick={() => { setExcludedItemIds(new Set()); setSimulation(null); }} className="h-16 shrink-0 rounded-[10px] border px-3 text-sm font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]" style={{ color: LEGACY_COLORS.yellow, background: LEGACY_COLORS.warningBg, borderColor: LEGACY_COLORS.yellow }}>전체 초기화</button>}
           <div className="grid min-w-0 flex-1 grid-cols-3 gap-2 xl:w-auto xl:grid-cols-[7.5rem_7.5rem_7.5rem]">
             <SummaryCard label="출하 대기" value={currentSimulation?.ship_ready ?? variant.ship_ready} color={LEGACY_COLORS.cyan} simulating={simulating} />
-            <SummaryCard label="빠른 생산" value={simulatedValue("fast_production")} color={LEGACY_COLORS.blue} simulating={simulating} />
-            <SummaryCard label="총생산" value={simulatedValue("total_production")} color={LEGACY_COLORS.purple} simulating={simulating} />
+            <SummaryCard label="빠른 생산" value={simulatedValue("fast_production")} color={LEGACY_COLORS.blue} simulating={simulating} onLocate={() => locate("fast_production")} canLocate={!!limitingId("fast_production") && findPath(limitingId("fast_production")!) !== null} />
+            <SummaryCard label="총생산" value={simulatedValue("total_production")} color={LEGACY_COLORS.purple} simulating={simulating} onLocate={() => locate("total_production")} canLocate={!!limitingId("total_production") && findPath(limitingId("total_production")!) !== null} />
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button
@@ -212,7 +265,7 @@ function PfWorkspace({ variant, onBack, onClose }: Props) {
           </button>
         </div>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col px-4 py-3 xl:px-6 xl:py-4">
+      <div ref={tableRef} className="flex min-h-0 flex-1 flex-col px-4 py-3 xl:px-6 xl:py-4">
         {tree === false || error ? (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3">
             <div
@@ -245,6 +298,8 @@ function PfWorkspace({ variant, onBack, onClose }: Props) {
           <EmptyState compact illustrated className="min-h-0 flex-1 rounded-[18px] border border-[var(--c-border)] bg-[var(--c-s2)]" title="하위 품목이 없습니다." description="" />
         ) : (
           <ModalBomTree
+            highlightedItemId={highlight?.itemId}
+            highlightDescription={highlight?.field === "total_production" ? "총생산 수량에는 현재 재고가 포함됩니다." : undefined}
             headerNotice={simulating ? <span className="flex min-w-0 flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs font-normal" style={{ color: LEGACY_COLORS.yellow }}>
               <span className="font-bold" role="status">시뮬레이션 중</span>
               <span>{excludedItemIds.size}개 제외 · 실제 BOM은 변경되지 않습니다.</span>

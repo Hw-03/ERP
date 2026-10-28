@@ -12,18 +12,34 @@ from app.dependencies.admin import require_admin_pin
 from app.models import BOM, Item
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import BOMCreate, BOMDetailResponse, BOMResponse, BOMTreeNode, BOMUpdate
+from app.schemas.capacity_simulation import BomCapacitySimulationRequest, BomCapacitySimulationResponse
 from app.services import audit, stock_math
 from app.services._tx import commit_and_refresh, commit_only
 from app._evt import emit as _evt_emit
 from app.services.bom import BomCache, bom_child_item_ordering, bom_modal_tree_child_ordering_key, build_bom_cache
 from app.services.production_capacity import (
     build_af_capacity_bom_cache,
-    compute_additional_producible_quantity,
     is_production_capacity_ignored,
 )
 from app.repositories import item_repository
+from app.services.production_capacity_simulation import SimulationItemNotFound, compute_bom_capacity_values, simulate_bom_capacity
 
 router = APIRouter()
+
+
+@router.post("/{parent_item_id}/capacity/simulate", response_model=BomCapacitySimulationResponse)
+def preview_bom_capacity(
+    parent_item_id: uuid.UUID,
+    payload: BomCapacitySimulationRequest,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Calculate request-local exclusions for a general BOM root using a read snapshot."""
+    try:
+        return simulate_bom_capacity(db, parent_item_id, payload.excluded_item_ids)
+    except SimulationItemNotFound as exc:
+        raise http_error(404, ErrorCode.NOT_FOUND, str(exc)) from exc
+    except ValueError as exc:
+        raise http_error(422, ErrorCode.VALIDATION_ERROR, str(exc)) from exc
 
 
 def _require_editable_bom_parent(db: Session, parent_item_id: uuid.UUID) -> Item:
@@ -267,11 +283,13 @@ def get_bom_tree(
         stock_by_item=fig_by_id,
     )
     capacity_bom_cache = build_af_capacity_bom_cache(bom_cache, items_map)
-    tree.additional_producible_quantity = compute_additional_producible_quantity(
-        parent_item_id,
-        bom_cache=capacity_bom_cache,
-        fig_by_id=fig_by_id,
+    quantities = compute_bom_capacity_values(
+        parent_item_id, baseline=capacity_bom_cache, excluded=set(),
+        figures=fig_by_id, items_map=items_map,
     )
+    for field, value in quantities.items():
+        if field != "item_id":
+            setattr(tree, field, uuid.UUID(value) if field.endswith("_limiting_item_id") and value else value)
     return tree
 
 

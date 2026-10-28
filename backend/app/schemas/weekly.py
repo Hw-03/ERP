@@ -238,6 +238,8 @@ class CapacityPfVariant(BaseModel):
     total_production: int = Field(..., description="총생산 — 이 PF 루트로 BOM 전체 재귀 이론 최대.")
     fast_production_limiting_item: Optional[str] = None
     total_production_limiting_item: Optional[str] = None
+    fast_production_limiting_item_id: Optional[str] = None
+    total_production_limiting_item_id: Optional[str] = None
     bom_status: Literal["complete", "incomplete"]
 
 

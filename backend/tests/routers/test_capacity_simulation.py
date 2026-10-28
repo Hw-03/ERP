@@ -31,6 +31,20 @@ def preview(client, pf, *excluded):
     })
 
 
+def test_capacity_limiting_ids_follow_exclusions(client, scenario):
+    pf, pa, af, part, scarce, other = scenario
+    baseline = next(row for row in client.get("/api/production/capacity").json()["af"]["pf_variants"]
+                    if row["pf_item_id"] == str(pf.item_id))
+    for key in ("fast_production_limiting_item_id", "total_production_limiting_item_id"):
+        assert baseline[key] == str(scarce.item_id)
+        assert preview(client, pf).json()[key] == baseline[key]
+        assert preview(client, pf, scarce).json()[key] == str(other.item_id)
+        assert preview(client, pf, af, scarce, other).json()[key] is None
+    remaining_af = preview(client, pf, scarce, other).json()
+    assert remaining_af["fast_production_limiting_item_id"] == str(af.item_id)
+    assert remaining_af["total_production_limiting_item_id"] == str(part.item_id)
+
+
 def test_preview_excludes_bottleneck_without_persisting(client, db_session, scenario):
     pf, pa, af, part, scarce, other = scenario
     before = (db_session.query(BOM).count(), db_session.query(TransactionLog).count(),

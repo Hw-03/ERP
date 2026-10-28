@@ -317,6 +317,8 @@ export interface ProductionCapacityAfItem {
 
 /** AF 에 연결된 PF 변형 — PF 1종 기준 3수량. */
 export interface ProductionCapacityPfVariant {
+  fast_production_limiting_item_id?: string | null;
+  total_production_limiting_item_id?: string | null;
   pf_item_id: string;
   pf_code: string | null;
   pf_name: string;
@@ -335,6 +337,8 @@ export interface ProductionCapacityPfVariant {
 
 /** 현재 화면에서만 사용하는 BOM 제외 계산 결과. null은 재료 제약 없음이다. */
 export interface ProductionCapacitySimulation {
+  fast_production_limiting_item_id?: string | null;
+  total_production_limiting_item_id?: string | null;
   pf_item_id: string;
   ship_ready: number;
   fast_production: number | null;
