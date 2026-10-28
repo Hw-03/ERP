@@ -130,6 +130,7 @@ _WEEKLY_SNAPSHOT_GUARD_PREFIXES = (
 )
 
 _SQLITE_READ_ONLY_PREVIEW_ROUTES = frozenset({
+    "/api/production/capacity/simulate",
     "/api/io/preview",
     "/api/inventory/operations/{operation_id}/cancel/preview",
 })
@@ -151,8 +152,7 @@ def get_db(request: Request) -> Generator[Session, None, None]:
     """확인된 SQLite 미리보기만 읽기 연결로 보내고 실제 변경은 기존 가드로 보호한다."""
     mark_db_dependency()
     read_only_preview = (
-        _is_file_sqlite
-        and request.method == "POST"
+        request.method == "POST"
         and getattr(request.scope.get("route"), "path", None) in _SQLITE_READ_ONLY_PREVIEW_ROUTES
     )
     close_preview = request.method == "POST" and request.url.path.startswith("/api/stocktakes/rounds/") and request.url.path.endswith("/close-previews")

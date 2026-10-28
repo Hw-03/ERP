@@ -134,6 +134,76 @@ def test_preview_query_only_rejects_all_dml(preview_database):
         generator.close()
 
 
+def test_capacity_simulation_uses_read_snapshot_without_writes(preview_database):
+    """The real simulation route can run while the SQLite writer is held elsewhere."""
+    from app.routers import production
+
+    env = preview_database
+    env.app.include_router(production.router, prefix="/api/production")
+    with env.factory() as db:
+        db.add_all([
+            ProcessType(code="PF", prefix="P", suffix="F", stage_order=80),
+            ProcessType(code="PA", prefix="P", suffix="A", stage_order=75),
+            ProcessType(code="AF", prefix="A", suffix="F", stage_order=70),
+        ])
+        db.flush()
+        pf = Item(item_name="Synthetic PF", process_type_code="PF", model_symbol="9", serial_no=1, unit="EA")
+        pa = Item(item_name="Synthetic PA", process_type_code="PA", model_symbol="9", serial_no=1, unit="EA")
+        af = Item(item_name="Synthetic AF", process_type_code="AF", model_symbol="9", serial_no=1, unit="EA")
+        db.add_all([pf, pa, af])
+        db.flush()
+        db.add_all([
+            BOM(parent_item_id=pf.item_id, child_item_id=pa.item_id, quantity=1, unit="EA"),
+            BOM(parent_item_id=pa.item_id, child_item_id=af.item_id, quantity=1, unit="EA"),
+            BOM(parent_item_id=pa.item_id, child_item_id=env.ids.item, quantity=1, unit="EA"),
+            Inventory(item_id=af.item_id, quantity=10, warehouse_qty=10, pending_quantity=0),
+        ])
+        pf_id = str(pf.item_id)
+        db.commit()
+    statements = []
+
+    @event.listens_for(env.reader, "before_cursor_execute")
+    def record(_connection, _cursor, sql, _params, _context, _many):
+        statements.append(sql)
+
+    with env.writer.connect() as locker:
+        transaction = locker.begin()
+        locker.execute(update(Inventory).where(Inventory.item_id == env.ids.item).values(warehouse_qty=99))
+        try:
+            with TestClient(env.app, raise_server_exceptions=False) as client:
+                response = client.post("/api/production/capacity/simulate", json={
+                    "pf_item_id": pf_id, "excluded_item_ids": [],
+                })
+            assert response.status_code == 200, response.text
+            assert response.json()["fast_production"] == 7
+        finally:
+            transaction.rollback()
+    assert statements
+    assert not any(sql.lstrip().upper().startswith(("INSERT", "UPDATE", "DELETE")) for sql in statements)
+
+
+def test_capacity_simulation_skips_write_guards_for_non_file_databases(preview_database, monkeypatch):
+    """Read-only route semantics must not depend on SQLite's connection selection."""
+    from starlette.requests import Request
+    from app.services import weekly_inventory_snapshot, stocktake_guard
+
+    def reject_write_guard(*args, **kwargs):
+        raise AssertionError("Read-only simulation entered a write guard")
+
+    monkeypatch.setattr(database, "_is_file_sqlite", False)
+    monkeypatch.setattr(weekly_inventory_snapshot, "ensure_due_snapshot_committed", reject_write_guard)
+    monkeypatch.setattr(stocktake_guard, "lock_control", reject_write_guard)
+    path = "/api/production/capacity/simulate"
+    request = Request({"type": "http", "method": "POST", "path": path,
+                       "route": SimpleNamespace(path=path), "headers": []})
+    generator = database.get_db(request)
+    db = next(generator)
+    try:
+        assert db.query(Inventory).count() == 2
+    finally:
+        generator.close()
+
+
 def test_preview_read_transaction_does_not_block_another_writer(preview_database):
     from starlette.requests import Request
 

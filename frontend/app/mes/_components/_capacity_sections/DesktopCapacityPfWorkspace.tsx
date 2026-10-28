@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, GitBranch, X } from "lucide-react";
 import Image from "next/image";
-import type { ProductionCapacityPfVariant } from "@/lib/api/types/production";
+import { api } from "@/lib/api";
+import type { ProductionCapacityPfVariant, ProductionCapacitySimulation } from "@/lib/api/types/production";
+import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import {
@@ -23,21 +25,23 @@ function SummaryCard({
   label,
   value,
   color,
+  simulating = false,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   color: string;
+  simulating?: boolean;
 }) {
   return (
     <div
-      className="min-w-0 rounded-[14px] border px-3 py-2"
-      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+      className="flex h-16 min-w-0 flex-col justify-center rounded-[14px] border px-3 py-2"
+      style={{ background: simulating ? LEGACY_COLORS.warningBg : LEGACY_COLORS.s2, borderColor: simulating ? LEGACY_COLORS.yellow : LEGACY_COLORS.border }}
     >
       <div className="text-center text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
         {label}
       </div>
       <div className="mt-0.5 text-center text-lg font-black tabular-nums" style={{ color }}>
-        {formatQty(value)}
+        {typeof value === "number" ? formatQty(value) : value}
       </div>
     </div>
   );
@@ -45,13 +49,67 @@ function SummaryCard({
 
 /** 선택한 출하 완제품(PF)의 세 수량과 전체 BOM을 전용으로 표시한다. */
 export function DesktopCapacityPfWorkspace({ variant, onBack, onClose }: Props) {
+  return <PfWorkspace key={variant.pf_item_id} variant={variant} onBack={onBack} onClose={onClose} />;
+}
+
+function PfWorkspace({ variant, onBack, onClose }: Props) {
   const { tree, error, retry } = useBomTree(variant.pf_item_id, true, "desc");
+  const revision = useRealtimeRevision();
+  const [excludedItemIds, setExcludedItemIds] = useState<Set<string>>(() => new Set());
+  const [simulation, setSimulation] = useState<{ selectionKey: string; value: ProductionCapacitySimulation } | null>(null);
+  const [simulationError, setSimulationError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const selectionKey = [...excludedItemIds].sort().join(",");
+  const calculationKey = `${selectionKey}:${revision ?? "initial"}:${attempt}`;
+  const simulating = excludedItemIds.size > 0;
+  const currentSimulation = simulation?.selectionKey === selectionKey ? simulation.value : null;
+  const failed = simulationError === calculationKey;
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(() => new Set());
   const expandedPfRef = useRef<string | null>(null);
   const currentTree = tree && tree.item_id === variant.pf_item_id ? tree : null;
   const branchItemIds = currentTree ? getBomBranchItemIds(currentTree) : [];
   const hasExpandedItems = branchItemIds.some((itemId) => expandedItemIds.has(itemId));
   const hasCollapsedItems = branchItemIds.some((itemId) => !expandedItemIds.has(itemId));
+
+  useEffect(() => {
+    if (!selectionKey) return;
+    let active = true;
+    setSimulationError(null);
+    api.simulateProductionCapacity({ pf_item_id: variant.pf_item_id, excluded_item_ids: selectionKey.split(",") })
+      .then((value) => { if (active) setSimulation({ selectionKey, value }); })
+      .catch(() => { if (active) setSimulationError(calculationKey); });
+    return () => { active = false; };
+  }, [calculationKey, selectionKey, variant.pf_item_id]);
+
+  useEffect(() => {
+    if (!currentTree) return;
+    const validIds = new Set<string>();
+    const visit = (node: typeof currentTree, depth: number): void => {
+      if (depth > 0) validIds.add(node.item_id);
+      node.children.forEach((child) => visit(child, depth + 1));
+    };
+    currentTree.children.forEach((child) => visit(child, 0));
+    currentTree.children.forEach((child) => validIds.delete(child.item_id));
+    setExcludedItemIds((current) => {
+      const next = new Set([...current].filter((id) => validIds.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [currentTree]);
+
+  const toggleExcluded = (itemId: string): void => {
+    setSimulation(null);
+    setExcludedItemIds((current) => {
+      const next = new Set(current);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  };
+  const simulatedValue = (field: "fast_production" | "total_production"): number | string => {
+    if (!simulating) return variant[field];
+    if (!currentSimulation) return failed ? "—" : "계산 중…";
+    return currentSimulation[`${field}_status`] === "no_constraints" ? "제약 없음" : currentSimulation[field] ?? "—";
+  };
 
   useEffect(() => {
     if (!currentTree || expandedPfRef.current === variant.pf_item_id) return;
@@ -73,7 +131,7 @@ export function DesktopCapacityPfWorkspace({ variant, onBack, onClose }: Props) 
       aria-label="선택한 출하 완제품 BOM"
       className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
     >
-      <div className="flex shrink-0 flex-col gap-3 border-b px-4 py-3 xl:flex-row xl:items-center xl:gap-4 xl:px-6 xl:py-4" style={{ borderColor: LEGACY_COLORS.border }}>
+      <div className="flex shrink-0 flex-col gap-3 border-b px-4 py-3 2xl:flex-row 2xl:items-center xl:gap-4 xl:px-6 xl:py-4" style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex shrink-0 items-center gap-3">
           <button
             type="button"
@@ -115,17 +173,18 @@ export function DesktopCapacityPfWorkspace({ variant, onBack, onClose }: Props) 
           </div>
         </div>
         <div className="flex w-full shrink-0 items-center gap-2 xl:w-auto">
+          {simulating && <button type="button" onClick={() => { setExcludedItemIds(new Set()); setSimulation(null); }} className="h-16 shrink-0 rounded-[10px] border px-3 text-sm font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]" style={{ color: LEGACY_COLORS.yellow, background: LEGACY_COLORS.warningBg, borderColor: LEGACY_COLORS.yellow }}>전체 초기화</button>}
           <div className="grid min-w-0 flex-1 grid-cols-3 gap-2 xl:w-auto xl:grid-cols-[7.5rem_7.5rem_7.5rem]">
-            <SummaryCard label="출하 대기" value={variant.ship_ready} color={LEGACY_COLORS.cyan} />
-            <SummaryCard label="빠른 생산" value={variant.fast_production} color={LEGACY_COLORS.blue} />
-            <SummaryCard label="총생산" value={variant.total_production} color={LEGACY_COLORS.purple} />
+            <SummaryCard label="출하 대기" value={currentSimulation?.ship_ready ?? variant.ship_ready} color={LEGACY_COLORS.cyan} simulating={simulating} />
+            <SummaryCard label="빠른 생산" value={simulatedValue("fast_production")} color={LEGACY_COLORS.blue} simulating={simulating} />
+            <SummaryCard label="총생산" value={simulatedValue("total_production")} color={LEGACY_COLORS.purple} simulating={simulating} />
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
               onClick={() => setExpandedItemIds(new Set(branchItemIds))}
               disabled={!hasCollapsedItems}
-              className="h-8 rounded-[10px] border px-3 text-xs font-bold transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+              className="h-16 rounded-[10px] border px-3 text-xs font-bold transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
               style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text, background: LEGACY_COLORS.s2 }}
             >
               모두 펼치기
@@ -134,7 +193,7 @@ export function DesktopCapacityPfWorkspace({ variant, onBack, onClose }: Props) 
               type="button"
               onClick={() => setExpandedItemIds(new Set())}
               disabled={!hasExpandedItems}
-              className="h-8 rounded-[10px] border px-3 text-xs font-bold transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+              className="h-16 rounded-[10px] border px-3 text-xs font-bold transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
               style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text, background: LEGACY_COLORS.s2 }}
             >
               모두 접기
@@ -143,14 +202,13 @@ export function DesktopCapacityPfWorkspace({ variant, onBack, onClose }: Props) 
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:brightness-110"
+            className="flex h-16 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:brightness-110"
             style={{
-              background: `color-mix(in srgb, ${LEGACY_COLORS.red} 15%, transparent)`,
               color: LEGACY_COLORS.red,
             }}
             aria-label="닫기"
           >
-            <X className="h-4 w-4" />
+            <span className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.red} 15%, transparent)` }}><X className="h-4 w-4" /></span>
           </button>
         </div>
       </div>
@@ -187,10 +245,20 @@ export function DesktopCapacityPfWorkspace({ variant, onBack, onClose }: Props) 
           <EmptyState compact illustrated className="min-h-0 flex-1 rounded-[18px] border border-[var(--c-border)] bg-[var(--c-s2)]" title="하위 품목이 없습니다." description="" />
         ) : (
           <ModalBomTree
+            headerNotice={simulating ? <span className="flex min-w-0 flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs font-normal" style={{ color: LEGACY_COLORS.yellow }}>
+              <span className="font-bold" role="status">시뮬레이션 중</span>
+              <span>{excludedItemIds.size}개 제외 · 실제 BOM은 변경되지 않습니다.</span>
+              {failed && <span role="alert" className="flex flex-wrap items-center justify-center gap-2" style={{ color: LEGACY_COLORS.red }}>
+                <span>{currentSimulation ? "최신 계산 갱신 실패" : "시뮬레이션 계산에 실패했습니다."}</span>
+                <button type="button" className="min-h-11 rounded-[10px] border px-2 font-bold" style={{ borderColor: LEGACY_COLORS.red }} onClick={() => setAttempt((value) => value + 1)}>계산 다시 시도</button>
+              </span>}
+            </span> : undefined}
             showStockBreakdown
             tree={currentTree}
             expandedItemIds={expandedItemIds}
             onToggleItem={toggleItem}
+            excludedItemIds={excludedItemIds}
+            onToggleExcluded={toggleExcluded}
           />
         )}
       </div>

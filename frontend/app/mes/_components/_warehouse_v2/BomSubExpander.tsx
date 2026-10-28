@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronRight, GitBranch } from "lucide-react";
 import { api } from "@/lib/api";
 import type { BOMTreeNode } from "@/lib/api";
@@ -472,11 +472,14 @@ export function getBomBranchItemIds(tree: BOMTreeNode): string[] {
 }
 
 type ModalBomTreeProps = {
+  headerNotice?: ReactNode;
   tree: BOMTreeNode;
   expandedItemIds: ReadonlySet<string>;
   onToggleItem: (itemId: string) => void;
   showStockBreakdown?: boolean;
   mobilePresentation?: boolean;
+  excludedItemIds?: ReadonlySet<string>;
+  onToggleExcluded?: (itemId: string) => void;
 };
 
 function hasSelectedRowText(row: HTMLElement): boolean {
@@ -491,16 +494,24 @@ function formatModalBomQuantity(quantity: number, unit: string): string {
   return `${formatQty(quantity, { maximumFractionDigits: 2, trimTrailingZeros: true })} ${unit}`;
 }
 
-function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem, showStockBreakdown = false, mobilePresentation = false }: {
+function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem, showStockBreakdown = false, mobilePresentation = false, excludedItemIds, onToggleExcluded, ancestorExcluded = false, protectedItemIds }: {
   node: BOMTreeNode;
   depth: number;
   expandedItemIds: ReadonlySet<string>;
   onToggleItem: (itemId: string) => void;
   showStockBreakdown?: boolean;
   mobilePresentation?: boolean;
+  excludedItemIds?: ReadonlySet<string>;
+  onToggleExcluded?: (itemId: string) => void;
+  ancestorExcluded?: boolean;
+  protectedItemIds?: ReadonlySet<string>;
 }) {
+  const explicitlyExcluded = excludedItemIds?.has(node.item_id) === true;
+  const excluded = explicitlyExcluded || ancestorExcluded;
+  const canExclude = onToggleExcluded && depth > 0 && !protectedItemIds?.has(node.item_id);
   const gridClass = showStockBreakdown ? "bom-capacity-stock-grid" : "bom-detail-modal-grid";
   const hasKids = node.children.length > 0;
+  const ChevronCell = onToggleExcluded && hasKids ? "button" : "span";
   const open = expandedItemIds.has(node.item_id);
   const isCapacityIgnoredZeroStock = node.production_capacity_ignored === true && node.current_stock === 0;
   const isZeroStockWarning = node.current_stock === 0 && !isCapacityIgnoredZeroStock;
@@ -514,8 +525,12 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem, showStock
       : undefined;
   const cells = (
     <>
-      <span
-        aria-hidden
+      <ChevronCell
+        type={onToggleExcluded && hasKids ? "button" : undefined}
+        aria-hidden={onToggleExcluded && hasKids ? undefined : true}
+        aria-label={onToggleExcluded && hasKids ? `${node.item_name} ${open ? "접기" : "펼치기"}` : undefined}
+        aria-expanded={onToggleExcluded && hasKids ? open : undefined}
+        onClick={onToggleExcluded && hasKids ? () => onToggleItem(node.item_id) : undefined}
         className="flex h-11 w-11 shrink-0 items-center justify-center"
         style={{
           color: LEGACY_COLORS.muted2,
@@ -526,13 +541,26 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem, showStock
           className="h-4 w-4 transition-transform duration-150"
           style={{ transform: open ? "rotate(90deg)" : "none" }}
         />}
-      </span>
+      </ChevronCell>
       <span
         data-testid="bom-modal-name-cell"
-        className="min-w-0 cursor-text select-text break-words px-3 py-2 font-semibold leading-snug"
+        className={`min-w-0 cursor-text select-text break-words px-3 py-2 font-semibold leading-snug${onToggleExcluded ? " flex items-center gap-2" : ""}`}
         style={{ color: LEGACY_COLORS.text, paddingLeft: 12 + depth * MODAL_TREE_DEPTH_INDENT_PX }}
       >
-        {node.item_name}
+        {canExclude && <button
+          type="button"
+          aria-label={`${node.item_name} ${explicitlyExcluded ? "복원" : "제외"}`}
+          aria-pressed={explicitlyExcluded}
+          disabled={ancestorExcluded}
+          onClick={(event) => { event.stopPropagation(); onToggleExcluded(node.item_id); }}
+          onKeyDown={(event) => event.stopPropagation()}
+          className="min-h-11 min-w-11 shrink-0 rounded-[10px] border px-2 text-xs font-bold transition-colors hover:brightness-95 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+          style={{ color: explicitlyExcluded ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2, borderColor: explicitlyExcluded ? LEGACY_COLORS.yellow : LEGACY_COLORS.border, background: explicitlyExcluded ? LEGACY_COLORS.warningBg : LEGACY_COLORS.s2 }}
+        >{explicitlyExcluded ? "복원" : "제외"}</button>}
+        {onToggleExcluded ? <span className="min-w-0">
+          {node.item_name}
+          {ancestorExcluded && <span className="ml-2 inline-block text-xs font-normal" style={{ color: LEGACY_COLORS.muted2 }}>상위 항목 제외</span>}
+        </span> : node.item_name}
       </span>
       <span className="min-w-0 cursor-text select-text truncate px-3 font-mono text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
         <ModalBomCode code={node.mes_code} />
@@ -560,7 +588,7 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem, showStock
 
   return (
     <>
-      <li data-testid="bom-modal-row" data-depth={depth}>
+      <li data-testid="bom-modal-row" data-depth={depth} style={excluded ? { opacity: 0.55 } : undefined}>
         {mobilePresentation ? (
           <div className="min-w-0 border-b py-3 pr-3" style={{ borderColor: LEGACY_COLORS.border, background, paddingLeft: 12 + Math.min(depth, 3) * 12 }}>
             <div className="flex min-w-0 items-start gap-1">
@@ -585,12 +613,15 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem, showStock
           </div>
         ) : hasKids ? (
           <div
-            role="button"
-            tabIndex={0}
+            role={onToggleExcluded ? undefined : "button"}
+            tabIndex={onToggleExcluded ? undefined : 0}
             onClick={(event) => {
+              if (onToggleExcluded) return;
               if (!hasSelectedRowText(event.currentTarget)) onToggleItem(node.item_id);
             }}
             onKeyDown={(event) => {
+              if (onToggleExcluded) return;
+              if (event.target !== event.currentTarget) return;
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
                 onToggleItem(node.item_id);
@@ -598,7 +629,7 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem, showStock
             }}
             className={`bom-modal-grid ${gridClass} min-h-[52px] w-full cursor-pointer border-b text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] focus-visible:outline-offset-[-2px]${depthClass}`}
             style={{ borderColor: LEGACY_COLORS.border, background }}
-            aria-expanded={open}
+            aria-expanded={onToggleExcluded ? undefined : open}
           >
             {cells}
           </div>
@@ -620,13 +651,18 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem, showStock
           mobilePresentation={mobilePresentation}
           expandedItemIds={expandedItemIds}
           onToggleItem={onToggleItem}
+          excludedItemIds={excludedItemIds}
+          onToggleExcluded={onToggleExcluded}
+          ancestorExcluded={excluded}
+          protectedItemIds={protectedItemIds}
         />
       ))}
     </>
   );
 }
 
-export function ModalBomTree({ tree, expandedItemIds, onToggleItem, showStockBreakdown = false, mobilePresentation = false }: ModalBomTreeProps) {
+export function ModalBomTree({ tree, expandedItemIds, onToggleItem, showStockBreakdown = false, mobilePresentation = false, excludedItemIds, onToggleExcluded, headerNotice }: ModalBomTreeProps) {
+  const protectedItemIds = new Set(tree.children.map((node) => node.item_id));
   return (
     <div
       data-testid="bom-modal-tree-scroll"
@@ -647,7 +683,10 @@ export function ModalBomTree({ tree, expandedItemIds, onToggleItem, showStockBre
           }}
         >
           <span aria-hidden />
-          <span className="px-3">구성품명</span>
+          {headerNotice ? <div className="flex min-w-0 items-center gap-3 px-3 py-2">
+            <span className="shrink-0">구성품명</span>
+            <div className="min-w-0 flex-1 text-center">{headerNotice}</div>
+          </div> : <span className="px-3">구성품명</span>}
           <span className="px-3">품목코드</span>
           <span className="text-center">소요량</span>
           {showStockBreakdown && <>
@@ -666,6 +705,9 @@ export function ModalBomTree({ tree, expandedItemIds, onToggleItem, showStockBre
               mobilePresentation={mobilePresentation}
               expandedItemIds={expandedItemIds}
               onToggleItem={onToggleItem}
+              excludedItemIds={excludedItemIds}
+              onToggleExcluded={onToggleExcluded}
+              protectedItemIds={protectedItemIds}
             />
           ))}
         </ul>

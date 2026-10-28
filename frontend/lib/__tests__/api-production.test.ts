@@ -362,6 +362,17 @@ describe("productionApi", () => {
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/production/capacity");
   });
 
+  it("simulateProductionCapacity sends only the temporary selection", async () => {
+    const response = { pf_item_id: "pf", ship_ready: 0, fast_production: 7, fast_production_status: "finite", total_production: null, total_production_status: "no_constraints" };
+    const fetchSpy = vi.fn<typeof fetch>().mockResolvedValue(makeResponse(response));
+    globalThis.fetch = fetchSpy;
+    const payload = { pf_item_id: "pf", excluded_item_ids: ["part"] };
+    expect(await productionApi.simulateProductionCapacity(payload)).toEqual(response);
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/production/capacity/simulate");
+    expect(fetchSpy.mock.calls[0][1]?.method).toBe("POST");
+    expect(JSON.parse(fetchSpy.mock.calls[0][1]?.body as string)).toEqual(payload);
+  });
+
   it("getTransactionEdits GET /transactions/{id}/edits", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;

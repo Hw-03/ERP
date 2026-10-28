@@ -28,6 +28,8 @@ from app.services.bom import BomCache
 from app.services.bom import explode_bom as _explode_bom_svc
 from app.services.bom import merge_requirements
 from app.services.production_capacity import compute_capacity
+from app.schemas.capacity_simulation import CapacitySimulationRequest, CapacitySimulationResponse
+from app.services.production_capacity_simulation import SimulationItemNotFound, simulate_capacity
 from app.services.read_singleflight import coalesced_read
 from app.routers._errors import ErrorCode, http_error
 from app.routers.inventory._tx_helper import resolve_producer
@@ -37,6 +39,17 @@ from app.repositories import item_repository
 router = APIRouter()
 
 logger = logging.getLogger("mes")
+
+
+@router.post("/capacity/simulate", response_model=CapacitySimulationResponse)
+def preview_production_capacity(payload: CapacitySimulationRequest, db: Session = Depends(get_db)) -> dict:
+    """Preview exclusions in memory without changing BOM, stock, or revisions."""
+    try:
+        return simulate_capacity(db, payload.pf_item_id, payload.excluded_item_ids)
+    except SimulationItemNotFound as exc:
+        raise http_error(404, ErrorCode.NOT_FOUND, str(exc)) from exc
+    except ValueError as exc:
+        raise http_error(422, ErrorCode.VALIDATION_ERROR, str(exc)) from exc
 
 
 @router.post(

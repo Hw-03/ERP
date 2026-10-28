@@ -5,6 +5,7 @@
 import { fetcher, postJson, toApiUrl } from "../api-core";
 import type {
   ProductionCapacity,
+  ProductionCapacitySimulation,
   ProductionCheckResponse,
   ProductionReceiptResponse,
   TransactionEditLog,
@@ -326,6 +327,9 @@ export const productionApi = {
 
   getProductionCapacity: () =>
     fetcher<ProductionCapacity>(toApiUrl("/api/production/capacity")),
+
+  simulateProductionCapacity: (payload: { pf_item_id: string; excluded_item_ids: string[] }) =>
+    postJson<ProductionCapacitySimulation>(toApiUrl("/api/production/capacity/simulate"), payload),
 
   getTransactions: (
     params?: {

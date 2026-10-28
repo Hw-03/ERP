@@ -333,6 +333,16 @@ export interface ProductionCapacityPfVariant {
   bom_status: "complete" | "incomplete";
 }
 
+/** 현재 화면에서만 사용하는 BOM 제외 계산 결과. null은 재료 제약 없음이다. */
+export interface ProductionCapacitySimulation {
+  pf_item_id: string;
+  ship_ready: number;
+  fast_production: number | null;
+  fast_production_status: "finite" | "no_constraints";
+  total_production: number | null;
+  total_production_status: "finite" | "no_constraints";
+}
+
 /** AF(조립 완제품) 기준 신규 생산 가능 수량 블록. */
 export interface ProductionCapacityAfBlock {
   basis: "AF";
