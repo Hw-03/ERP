@@ -32,6 +32,7 @@ function getNextRuntimeRole(processRef) {
 
   if (isNextCli) return "cli";
   if (isNextPrivateWorker) return "worker";
+  if (path.resolve(entryScript) === path.join(__dirname, "next-server.js")) return "custom";
   return null;
 }
 
@@ -230,7 +231,7 @@ function initializeNextSignalProbe({
     processRef,
     diagnostics,
   });
-  if (runtimeRole === "worker") {
+  if (runtimeRole === "worker" || runtimeRole === "custom") {
     configureNextWorkerDiagnosticReport({ processRef, diagnostics });
   }
   if (runtimeRole === "cli") {

@@ -8,11 +8,11 @@ try {
     $runtime = Get-MesRuntimeRoot -RepoRoot $RepoRoot
     $node = Resolve-ProfileFrontendNodeCommand -Profile ([pscustomobject]@{Name='development'}) -RuntimeRoot $runtime
     $frontend = Join-Path $RepoRoot "frontend"
-    $cli = Join-Path $frontend "node_modules\next\dist\bin\next"
-    $check = Invoke-CheckedExternalCommand -FilePath $node -ArgumentList @($cli, "--help") -WorkingDirectory $frontend
+    $cli = Join-Path $frontend "scripts\next-server.js"
+    $check = Invoke-CheckedExternalCommand -FilePath $node -ArgumentList @($cli, "--check") -WorkingDirectory $frontend
     if (-not $check.Success) {
         $check.Output | Out-Host
-        throw "Next.js CLI dependencies unavailable (exit $($check.ExitCode)): $($check.LaunchError)"
+        throw "Frontend server dependencies unavailable (exit $($check.ExitCode)): $($check.LaunchError)"
     }
     Write-Host "FRONTEND_RUNTIME_CHECK=PASS"
     exit 0

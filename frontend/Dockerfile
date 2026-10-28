@@ -10,11 +10,11 @@ RUN npm ci
 
 COPY . .
 
-# Next.js production 빌드 (.next/ 산출물 생성). 환경변수는 compose 에서 주입.
+# Next.js production 빌드 (.next-prod/ 산출물 생성). 환경변수는 compose 에서 주입.
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 EXPOSE 3000
 
-# 운영용: next dev 금지. build 산출물을 next start 로 서빙.
+# 운영용: 관리형 API 프록시와 custom server의 production 모드로 서빙.
 CMD ["npm", "run", "start"]

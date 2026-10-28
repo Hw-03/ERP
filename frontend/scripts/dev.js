@@ -232,7 +232,7 @@ diagnostics.log("frontend server wrapper started", {
   pid: process.pid,
 });
 
-const nextCli = path.join(__dirname, "..", "node_modules", "next", "dist", "bin", "next");
+const nextCli = path.join(__dirname, "next-server.js");
 const nextSignalProbePath = path.join(__dirname, "next-signal-probe.js");
 
 child = spawn(

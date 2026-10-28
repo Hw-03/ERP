@@ -61,7 +61,7 @@ cd frontend
 npm run dev
 ```
 
-프론트는 `scripts/next-server.js`의 raw socket 경계를 거쳐 기존 Next `/api` rewrite를 사용한다. 이 경계를 우회하는 직접 `next dev`/`next start` 실행은 client-IP 기반 PIN 시도 제한을 무력화하므로 사용하지 않는다.
+프론트는 `scripts/next-server.js`에서 `/api` 요청을 고정된 `BACKEND_INTERNAL_URL`로 전달하고, 페이지·정적 파일·HMR은 Next에 맡긴다. API 전용 연결 풀은 유휴 연결을 1초 후 정리하며 요청 직전에도 만료를 검사한다. `npm run dev`, `npm run dev:raw`, `npm run start`가 같은 전달부를 사용한다. 직접 `next dev`/`next start`를 실행하면 API 전달부를 거치지 않으므로 사용하지 않는다.
 
 개발·직원 프론트는 각 환경의 ignored `_attic/runtime/frontend-node-path.txt`에서 Node.js 20 실행 파일의 절대 경로를 읽는다. 설정이 없으면 PATH의 Node 20을 사용하며 다른 주 버전이면 실행 전에 중단한다. 공용 Node 설치와 전역 PATH는 변경하지 않는다.
 

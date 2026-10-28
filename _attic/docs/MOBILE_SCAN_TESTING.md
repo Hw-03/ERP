@@ -86,9 +86,9 @@ cloudflared tunnel --url http://localhost:3000
 
 ---
 
-### 3순위: Next.js experimental HTTPS (localhost만)
+### [STALE] 이전 방식: Next.js experimental HTTPS (localhost만)
 
-PC에서 localhost로 테스트할 때만 유효. 모바일 실기기 테스트에는 사용 불가.
+아래 직접 CLI 방식은 관리형 API 프록시를 거치지 않아 현재 MES 기능 검증에 사용하지 않는다. 실제 개발 서버는 표준 실행 명령으로 시작하고 위의 HTTPS 터널 방식으로 검증한다. 관리형 진입점에는 `--experimental-https` 옵션이 없다.
 
 ```bash
 cd frontend

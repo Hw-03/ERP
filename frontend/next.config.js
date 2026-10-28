@@ -9,11 +9,6 @@ const { PHASE_DEVELOPMENT_SERVER } = require("next/constants");
  *   - start  → .next-prod
  */
 module.exports = (phase) => {
-  const backendInternalUrl = (
-    process.env.BACKEND_INTERNAL_URL ||
-    (phase === PHASE_DEVELOPMENT_SERVER ? "http://localhost:8011" : "http://localhost:8010")
-  ).trim();
-
   /** @type {import('next').NextConfig} */
   const config = {
     devIndicators: false,
@@ -25,14 +20,6 @@ module.exports = (phase) => {
           experimental: { turbopackFileSystemCacheForDev: false },
         }
       : {}),
-    async rewrites() {
-      return [
-        {
-          source: "/api/:path*",
-          destination: `${backendInternalUrl}/api/:path*`,
-        },
-      ];
-    },
     distDir: phase === PHASE_DEVELOPMENT_SERVER ? ".next" : ".next-prod",
   };
   return config;

@@ -99,6 +99,14 @@ def test_overlay_cannot_include_a_database_or_secret(tmp_path: Path) -> None:
             module.validate_overlay(tmp_path, relative)
 
 
+def test_overlay_accepts_managed_proxy_source_modules(tmp_path: Path) -> None:
+    module = load_module()
+    source = tmp_path / "frontend/scripts/api-agent.mjs"
+    source.parent.mkdir(parents=True)
+    source.write_text("export const idle = 1000;", encoding="utf-8")
+    assert module.validate_overlay(tmp_path, "frontend/scripts/api-agent.mjs") == source.resolve()
+
+
 def test_overlay_respects_source_bytes_without_including_other_dirty_files(tmp_path: Path) -> None:
     module = load_module()
     repo = tmp_path / "repo"
@@ -186,6 +194,8 @@ def test_start_readiness_failure_stops_owned_processes_and_retains_evidence(tmp_
     processes = []
     def launch_owned(command, cwd, env, log):
         assert not env.get("NEXT_PUBLIC_API_URL")
+        if str(log).endswith("frontend.log"):
+            assert str(command[1]).endswith("frontend/scripts/next-server.js") or str(command[1]).endswith("frontend\\scripts\\next-server.js")
         process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
         processes.append(process)
         return module.receipt(process.pid)

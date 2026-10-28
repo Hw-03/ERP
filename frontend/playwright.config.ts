@@ -12,7 +12,7 @@
  *   npx playwright test --ui  # UI 모드
  *
  * 전용 DB·전용 백엔드(포트 8021)·시드는 globalSetup 이 자동 처리한다(실 mes.db 미접촉).
- * 프론트는 전용 포트 3100 에서 next dev 로 띄우고, /api/* 는 BACKEND_INTERNAL_URL 로 8021 에 프록시.
+ * 프론트는 전용 포트 3100 에서 custom server의 개발 모드로 띄우고, /api/* 는 8021 에 프록시.
  */
 import { defineConfig, devices } from "@playwright/test";
 
@@ -41,8 +41,8 @@ export default defineConfig({
     timezoneId: "Asia/Seoul",
   },
   webServer: {
-    // 전용 프론트(3100, next dev — 현재 코드 보장). /api/* → 전용 백엔드(8021) 프록시.
-    command: `npx next dev -p ${FRONT_PORT}`,
+    // 실제 실행과 같은 API 전달부. /api/* → 전용 백엔드(8021).
+    command: `node scripts/next-server.js dev --port ${FRONT_PORT}`,
     url: `http://localhost:${FRONT_PORT}`,
     reuseExistingServer: false,
     timeout: 120_000,

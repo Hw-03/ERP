@@ -46,7 +46,7 @@ def validate_overlay(repo: Path, relative: str) -> Path:
         raise ValueError("invalid overlay path")
     if any(part.startswith(".env") or part in {"node_modules", ".next", "__pycache__"} for part in path.parts):
         raise ValueError("secret/generated overlay is forbidden")
-    if path.suffix.lower() not in {".py", ".ts", ".tsx", ".js", ".jsx", ".json", ".css"}:
+    if path.suffix.lower() not in {".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".json", ".css"}:
         raise ValueError("non-source overlay is forbidden")
     source = repo / path
     if source.is_symlink() or not source.resolve().is_relative_to(repo.resolve()) or not source.is_file():
@@ -249,7 +249,7 @@ def start(args: argparse.Namespace, repo: Path, run: Path) -> dict:
             junction.symlink_to(dependencies, target_is_directory=True)
         session["processes"].append(launch([sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", str(ports[0]), "--workers", "1"], workspace / "backend", env, run / "backend.log"))
         write_session(run, session)
-        session["processes"].append(launch([str(node), str(junction / "next/dist/bin/next"), "dev", "--webpack", "--hostname", "127.0.0.1", "--port", str(ports[1])], workspace / "frontend", env, run / "frontend.log"))
+        session["processes"].append(launch([str(node), str(workspace / "frontend/scripts/next-server.js"), "dev", "--webpack", "--hostname", "127.0.0.1", "--port", str(ports[1])], workspace / "frontend", env, run / "frontend.log"))
         write_session(run, session)
         await_ready(session)
         session["status"] = "running"

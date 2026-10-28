@@ -267,7 +267,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\register-runtime-tasks.ps
 
 ### 프런트 개발 서버 종료 원인 추적
 
-프런트 개발 서버가 예기치 않게 종료되면 먼저 `_attic/runtime/logs/frontend/dev-server.log`의 수명 기록을 확인한다. preload는 `NODE_OPTIONS`를 상속받은 일반 Node 자식에는 기록기나 신호 처리기를 붙이지 않고, 정확한 Next CLI 엔트리(`next/dist/bin/next`)와 `NEXT_PRIVATE_WORKER=1`인 Next worker 엔트리(`next/dist/server/lib/start-server.js`)만 기록한다. `NEXT_SIGNAL_RECEIVED`는 해당 Node 프로세스의 JavaScript 런타임이 `SIGINT` 또는 `SIGTERM`을 실제로 받은 신호 증거다. 부모 Next CLI는 정확한 `start-server.js` 자식의 `exit` 이벤트만 읽기 전용으로 관찰하고 `NEXT_WORKER_CHILD_EXIT`에 워커 PID·부모 PID·원시 `exitCode`·`signal`을 기록한다. 자식의 종료·재시작·종료 코드는 변경하지 않는다.
+프런트 개발 서버가 예기치 않게 종료되면 먼저 `_attic/runtime/logs/frontend/dev-server.log`의 수명 기록을 확인한다. 2026-10-28부터 감독 래퍼는 `frontend/scripts/next-server.js`를 실행하며, 이 프로세스에서 API 연결 풀과 Next를 함께 관리한다. preload는 정확한 custom server 엔트리에도 신호·종료와 기존 정제 진단 보고서를 기록한다. `NODE_OPTIONS`를 상속받은 임의 자식은 기록 대상이 아니다. 이전 Next CLI(`next/dist/bin/next`)와 `NEXT_PRIVATE_WORKER=1`인 정확한 Next worker(`next/dist/server/lib/start-server.js`)의 진단 경로도 유지한다. `NEXT_SIGNAL_RECEIVED`는 JavaScript가 실제 신호를 받은 증거이며, 이전 CLI 경로의 `NEXT_WORKER_CHILD_EXIT` 관찰은 자식의 수명을 변경하지 않는다.
 
 정확한 private worker에는 Node 진단 보고서도 켠다. 보고서는 `_attic/runtime/logs/frontend/node-reports/`에 최대 3개만 남기며, `reportOnFatalError`와 `reportOnUncaughtException`으로 OOM·미처리 JavaScript 예외 후보를 남긴다. 환경 변수와 네트워크 정보는 제외한다. `NEXT_NODE_REPORT_READY`가 있어야 수집 설정이 완료된 것이며, `NEXT_NODE_REPORT_SETUP_FAILED`는 서버 시작·종료 동작을 바꾸지 않고 설정 실패만 기록한다. CLI·직원 프로필·일반 Node 자식에는 이 설정을 적용하지 않는다.
 

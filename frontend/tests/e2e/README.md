@@ -10,7 +10,7 @@
 
 - 전용 DB: `backend/mes_e2e.db` (부트스트랩+시드, teardown 삭제)
 - 전용 백엔드: 포트 **8021** (globalSetup 이 `DATABASE_URL` 로 기동)
-- 전용 프론트: 포트 **3100** (`next dev`, `/api/*` → `BACKEND_INTERNAL_URL`=8021 프록시)
+- 전용 프론트: 포트 **3100** (custom server 개발 모드, `/api/*` → `BACKEND_INTERNAL_URL`=8021 프록시)
 - dev(8011/3001)·prod(8010/3000) 스택과 무충돌.
 
 ```bash

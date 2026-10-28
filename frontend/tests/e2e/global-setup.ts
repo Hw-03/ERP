@@ -11,7 +11,7 @@
  *  2) mes_e2e.db* 삭제 → bootstrap_db.py --all (DATABASE_URL=전용DB)
  *  3) uvicorn 전용 백엔드 기동(포트 8021) → /health/live 폴링
  *  4) API 시드(품목/BOM/직원 확보) → .e2e-seed.json 저장
- * 프론트(next dev -p 3100)는 playwright.config webServer 가 BACKEND_INTERNAL_URL 로 8021 에 프록시.
+ * 프론트(custom server 개발 모드, 3100)는 playwright.config webServer가 API를 8021에 프록시.
  */
 import { spawn, spawnSync } from "child_process";
 import { createHash } from "crypto";

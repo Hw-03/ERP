@@ -450,8 +450,8 @@ def test_frontend_runtime_probe_detects_missing_transitive_dependency(tmp_path: 
     node = node_config.read_text(encoding="utf-8-sig").strip()
     runtime = tmp_path / "_attic/runtime"
     _write(runtime / "frontend-node-path.txt", node)
-    cli = tmp_path / "frontend/node_modules/next/dist/bin/next"
-    _write(cli, "require('@next/env'); console.log('Next CLI ready');")
+    cli = tmp_path / "frontend/scripts/next-server.js"
+    _write(cli, "require('@next/env'); console.log('API_PROXY_RUNTIME=PASS');")
     command = [powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
                str(ROOT / "scripts/dev/check-frontend-runtime.ps1"), "-RepoRoot", str(tmp_path)]
     environment = os.environ.copy()
