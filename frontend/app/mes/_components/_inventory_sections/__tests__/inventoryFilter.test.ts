@@ -124,7 +124,20 @@ describe("matchesInventoryCategoryFilters", () => {
     ).toBe(false);
   });
 
-  it("AND는 부서 칩에만 적용하고 모델 칩은 하나만 일치해도 통과한다", () => {
+  it.each(["AND", "OR"] as const)("부서 칩은 %s 설정과 관계없이 하나만 일치해도 통과한다", (logic) => {
+    for (const departmentFilterBasis of ["location", "code"] as const) {
+      const filters = { ...noFilters, selectedDepts: ["창고", "조립"], departmentFilterBasis, logic };
+      expect(matchesInventoryCategoryFilters(assemblyItem, filters)).toBe(true);
+      expect(matchesInventoryCategoryFilters(assemblyItem, { ...filters, selectedDepts: ["창고", "출하"] })).toBe(false);
+      expect(matchesInventoryCategoryFilters(assemblyItem, { ...filters, selectedSlots: new Set([2]) })).toBe(false);
+      expect(matchesInventoryCategoryFilters(assemblyItem, { ...filters, selectedDepts: [] })).toBe(true);
+    }
+    expect(matchesInventoryCategoryFilters({ ...assemblyItem, warehouse_qty: 1, locations: [] } as Item, {
+      ...noFilters, selectedDepts: ["창고", "조립"], logic,
+    })).toBe(true);
+  });
+
+  it("모델 칩은 AND여도 하나만 일치하면 통과한다", () => {
     const fullyMatchedItem = {
       ...assemblyItem,
       warehouse_qty: 1,

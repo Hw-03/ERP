@@ -87,7 +87,7 @@ export function matchesInventoryCategoryFilters(item: Item, filters: InventoryCa
         ? matchesLocationDepartment(item, department)
         : matchesCodeDepartment(item, department),
     ),
-    filters.logic,
+    "OR",
   );
   const modelMatch = matchesSelectedGroup(
     [
