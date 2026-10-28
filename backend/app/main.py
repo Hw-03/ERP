@@ -8,6 +8,7 @@ Startup 부작용 (create_all / run_migrations / seed / MES 백필) 은 모두
     python bootstrap_db.py --all
 """
 
+import asyncio
 import datetime as _dt
 import os
 import uuid
@@ -16,8 +17,10 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, text
+from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app._access_log import access_log_middleware
 from app._actor import get_actor_emp
@@ -392,38 +395,63 @@ def app_session():
     return {"boot_id": _BOOT_ID, "started_at": _BOOT_STARTED_AT}
 
 
-@app.get("/health/ready", tags=["System"])
-def health_ready(request: Request, db: Session = Depends(get_db)) -> JSONResponse:
-    """Admit employee traffic only after read-only schema and business checks."""
+_ReadinessKey = tuple[asyncio.AbstractEventLoop, Engine | Connection]
+_ReadinessResult = tuple[int, dict[str, object]]
+_readiness_checks: dict[_ReadinessKey, asyncio.Task[_ReadinessResult]] = {}
+
+
+def _check_readiness(bind: Engine | Connection, request_id: str) -> _ReadinessResult:
+    """Own the diagnostic session until completion, even after callers disconnect."""
     from bootstrap.schema import check_schema
     from app.services.inventory_integrity import diagnose_inventory_integrity
 
     checks = {"database": False, "schema": False, "inventory": False, "ledger": False}
     revision = None
-    try:
-        db.execute(text("SELECT 1"))
-        checks["database"] = True
-        schema = check_schema(connection=db.connection())
-        revision = schema.revision
-        checks["schema"] = schema.ready
-        if schema.ready:
-            checks["inventory"] = not integrity_svc.check_inventory_consistency(db)
-            checks["ledger"] = diagnose_inventory_integrity(db).is_consistent
-    except Exception as exc:  # noqa: BLE001 — required dependencies fail closed
+    with Session(bind=bind, autoflush=False, join_transaction_mode="create_savepoint") as db:
         try:
-            db.rollback()
-        except Exception:  # noqa: BLE001 — keep dependency failures unavailable
-            pass
-        _log.warning(
-            "evt=health_ready_dependency_failed rid=%s err_type=%s",
-            _rid(request), type(exc).__name__,
-        )
+            db.execute(text("SELECT 1"))
+            checks["database"] = True
+            schema = check_schema(connection=db.connection())
+            revision = schema.revision
+            checks["schema"] = schema.ready
+            if schema.ready:
+                checks["inventory"] = not integrity_svc.check_inventory_consistency(db)
+                checks["ledger"] = diagnose_inventory_integrity(db).is_consistent
+        except Exception as exc:  # noqa: BLE001 — required dependencies fail closed
+            try:
+                db.rollback()
+            except Exception:  # noqa: BLE001 — keep dependency failures unavailable
+                pass
+            _log.warning(
+                "evt=health_ready_dependency_failed rid=%s err_type=%s",
+                request_id, type(exc).__name__,
+            )
     ready = all(checks.values())
-    return JSONResponse(
-        status_code=200 if ready else 503,
-        content={"status": "ready" if ready else "not_ready",
-                 "checks": checks, "alembic_revision": revision},
+    return (
+        200 if ready else 503,
+        {"status": "ready" if ready else "not_ready",
+         "checks": checks, "alembic_revision": revision},
     )
+
+
+async def _run_readiness_check(key: _ReadinessKey, request_id: str) -> _ReadinessResult:
+    """Retain only an active check; the next independent probe must revalidate."""
+    try:
+        return await run_in_threadpool(_check_readiness, key[1], request_id)
+    finally:
+        _readiness_checks.pop(key, None)
+
+
+@app.get("/health/ready", tags=["System"])
+async def health_ready(request: Request, db: Session = Depends(get_db)) -> JSONResponse:
+    """Await shared diagnostics without occupying another synchronous worker."""
+    key = (asyncio.get_running_loop(), db.get_bind())
+    pending = _readiness_checks.get(key)
+    if pending is None:
+        pending = asyncio.create_task(_run_readiness_check(key, _rid(request)))
+        _readiness_checks[key] = pending
+    status_code, content = await asyncio.shield(pending)
+    return JSONResponse(status_code=status_code, content=content)
 
 
 def _detailed_health_degraded_response(
