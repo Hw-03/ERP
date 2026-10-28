@@ -50,7 +50,7 @@ from app.services.read_singleflight import coalesced_read
 from app.services.audit_actor_session import get_verified_audit_actor_code
 from app.services.inventory_read import bulk_defective_breakdown as _bulk_defective_breakdown
 from app.services.item_display_order import insert_item_at_process_end
-from app.services._tx import commit_and_refresh
+from app.services._tx import commit_and_refresh, commit_only
 from app._evt import emit as _evt_emit
 from app.services.export_helpers import csv_streaming_response
 from app.services.reorder import reorder_by_display_order
@@ -816,7 +816,7 @@ def update_bom_completion(
     request: Request,
     _admin: Annotated[None, Depends(require_admin_pin)],
     db: Session = Depends(get_db),
-):
+) -> ItemResponse:
     """BOM 완료 상태 토글 — 사용자가 명시적으로 누를 때만 set/clear."""
     item = item_repository.get(db, item_id)
     if not item:
@@ -834,8 +834,11 @@ def update_bom_completion(
         payload_summary=f"{item.item_name}: {'완료' if payload.completed else '완료 해제'}",
     )
 
-    commit_and_refresh(db, item)
-    return item
+    db.flush()
+    # Snapshot before commit so the response cannot reopen the writer transaction.
+    response = ItemResponse.model_validate(item)
+    commit_only(db)
+    return response
 
 
 @router.patch("/{item_id}/soft-delete", response_model=ItemResponse)

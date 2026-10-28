@@ -14,7 +14,7 @@ from app.routers._errors import ErrorCode, http_error
 from app.schemas import BOMCreate, BOMDetailResponse, BOMResponse, BOMTreeNode, BOMUpdate
 from app.schemas.capacity_simulation import BomCapacitySimulationRequest, BomCapacitySimulationResponse
 from app.services import audit, stock_math
-from app.services._tx import commit_and_refresh, commit_only
+from app.services._tx import commit_only
 from app._evt import emit as _evt_emit
 from app.services.bom import BomCache, bom_child_item_ordering, bom_modal_tree_child_ordering_key, build_bom_cache
 from app.services.production_capacity import (
@@ -111,7 +111,7 @@ def create_bom(
     request: Request,
     _admin: Annotated[None, Depends(require_admin_pin)],
     db: Session = Depends(get_db),
-):
+) -> BOMResponse:
     """Create a BOM row for a parent and child item."""
 
     if payload.parent_item_id == payload.child_item_id:
@@ -168,16 +168,20 @@ def create_bom(
         payload_summary=f"{parent.item_name} ← {child.item_name} ×{payload.quantity}{payload.unit}",
     )
 
-    commit_and_refresh(db, bom_entry)
+    db.flush()
+    # Snapshot before commit so the response cannot reopen the writer transaction.
+    response = BOMResponse.model_validate(bom_entry)
+    parent_code, child_code = parent.mes_code, child.mes_code
+    commit_only(db)
     _evt_emit(
         "bom_create",
         request=request,
-        parent=parent.mes_code,
-        child=child.mes_code,
+        parent=parent_code,
+        child=child_code,
         qty=str(payload.quantity),
         unit=payload.unit,
     )
-    return bom_entry
+    return response
 
 
 @router.patch("/{bom_id}", response_model=BOMResponse)
@@ -187,7 +191,7 @@ def update_bom(
     request: Request,
     _admin: Annotated[None, Depends(require_admin_pin)],
     db: Session = Depends(get_db),
-):
+) -> BOMResponse:
     """Update quantity or unit of an existing BOM row."""
     bom_entry = db.query(BOM).filter(BOM.bom_id == bom_id).first()
     if not bom_entry:
@@ -213,15 +217,17 @@ def update_bom(
             payload_summary=", ".join(changed),
         )
 
-    commit_and_refresh(db, bom_entry)
+    db.flush()
+    response = BOMResponse.model_validate(bom_entry)
+    commit_only(db)
     if changed:
         _evt_emit(
             "bom_update",
             request=request,
-            bom_id=str(bom_entry.bom_id)[:8],
+            bom_id=str(response.bom_id)[:8],
             changed=",".join(changed),
         )
-    return bom_entry
+    return response
 
 
 @router.get("/{parent_item_id}", response_model=List[BOMResponse])
