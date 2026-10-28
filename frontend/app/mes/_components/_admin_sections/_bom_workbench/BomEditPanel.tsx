@@ -26,9 +26,10 @@ interface Props {
   parent: Item | null;
   bomRows: BOMEntry[];
   items: Item[];
-  onSaveQty: (bomId: string, qty: number) => void | Promise<void>;
+  onSaveQty: (bomId: string, qty: number) => void | Promise<void | boolean>;
   onRequestDelete: (row: BOMEntry, childName: string) => void;
   isLocked?: boolean;
+  isBusy?: boolean;
   read?: ReturnType<typeof useAdminReadState>;
   parentHeader?: ReactNode;
 }
@@ -40,6 +41,7 @@ export function BomEditPanel({
   onSaveQty,
   onRequestDelete,
   isLocked = false,
+  isBusy = false,
   read,
   parentHeader,
 }: Props) {
@@ -104,7 +106,7 @@ export function BomEditPanel({
                     childItem={itemMap.get(r.child_item_id)}
                     onSaveQty={onSaveQty}
                     onRequestDelete={onRequestDelete}
-                    isLocked={isLocked}
+                    isLocked={isLocked || isBusy}
                   />
                 )} />
               )}

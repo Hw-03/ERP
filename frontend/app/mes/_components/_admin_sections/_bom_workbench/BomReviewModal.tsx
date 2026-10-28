@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import type { BOMEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -25,11 +25,12 @@ interface Props {
   items: Item[];
   isCompleted: boolean;
   onClose: () => void;
-  onConfirm: (completed: boolean) => Promise<void>;
+  onConfirm: (completed: boolean) => Promise<void | boolean>;
 }
 
 export function BomReviewModal({ parent, rows, items, isCompleted, onClose, onConfirm }: Props) {
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
   const itemMap = useMemo(() => new Map(items.map((i) => [i.item_id, i])), [items]);
 
   const badQty = rows.filter((r) => !(Number(r.quantity) > 0));
@@ -42,15 +43,16 @@ export function BomReviewModal({ parent, rows, items, isCompleted, onClose, onCo
   const hasIssue = badQty.length > 0 || dupChildIds.length > 0;
   const canComplete = rows.length > 0 && !hasIssue;
 
-  async function handleConfirm() {
+  async function handleConfirm(): Promise<void> {
     // 완료로 표시하는 방향은 검증 통과 + row≥1 일 때만. 완료 해제는 항상 허용.
-    if (!isCompleted && !canComplete) return;
+    if (busyRef.current || (!isCompleted && !canComplete)) return;
+    busyRef.current = true;
     setBusy(true);
     try {
-      await onConfirm(!isCompleted);
-      onClose();
+      if (await onConfirm(!isCompleted) !== false) onClose();
     } finally {
       setBusy(false);
+      busyRef.current = false;
     }
   }
 

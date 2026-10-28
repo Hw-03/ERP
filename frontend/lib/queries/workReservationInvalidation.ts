@@ -3,9 +3,9 @@ import { ApiError } from "@/lib/api-core";
 import { queryKeys } from "./keys";
 
 /** 변경 전에 시작한 최초 응답도 취소하여 예약 변경 후 다시 조회한다. */
-export async function cancelWorkInventoryQueries(client: QueryClient): Promise<void> {
+export async function cancelWorkInventoryQueries(client: QueryClient, options?: { skipItems?: boolean }): Promise<void> {
   await Promise.all([
-    client.cancelQueries({ queryKey: queryKeys.items.all }),
+    ...(options?.skipItems ? [] : [client.cancelQueries({ queryKey: queryKeys.items.all })]),
     client.cancelQueries({ queryKey: queryKeys.inventory.workStatusAll }),
   ]);
 }

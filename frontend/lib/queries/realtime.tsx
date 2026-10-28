@@ -5,6 +5,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { queryKeys } from "./keys";
 import { itemSearchConfigOptions } from "./useItemSearch";
 import { cancelWorkInventoryQueries } from "./workReservationInvalidation";
+import { refreshBomAndItems } from "./bomMutationSync";
 
 const STREAM_URL = "/api/realtime/stream";
 const REVISION_URL = "/api/realtime/revision";
@@ -51,16 +52,23 @@ function parseRevisionSnapshot(value: unknown): RevisionSnapshot | null {
 }
 
 /** Return false when metadata must recover before publishing new search results. */
-export async function invalidateOperationalQueries(queryClient: QueryClient, onMetadataReady?: () => void): Promise<boolean> {
+export async function invalidateOperationalQueries(queryClient: QueryClient, onMetadataReady?: () => void, revision?: number): Promise<boolean> {
   void refreshEmployeeQueries(queryClient);
   if (queryClient.getQueryState(queryKeys.itemSearch.config())) {
     try { await queryClient.fetchQuery({ ...itemSearchConfigOptions, staleTime: 0, retry: false }); }
     catch { return false; }
   }
   onMetadataReady?.();
-  await cancelWorkInventoryQueries(queryClient);
+  // The BOM coordinator owns item cancellation so an in-flight shared refresh
+  // is not cancelled immediately before another caller joins it.
+  await cancelWorkInventoryQueries(queryClient, { skipItems: true });
   await Promise.all(
-    OPERATIONAL_QUERY_ROOTS.map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+    [
+      refreshBomAndItems(queryClient, revision),
+      ...OPERATIONAL_QUERY_ROOTS
+        .filter(queryKey => queryKey !== queryKeys.items.all && queryKey !== queryKeys.bom.all)
+        .map(queryKey => queryClient.invalidateQueries({ queryKey })),
+    ],
   );
   return true;
 }
@@ -97,7 +105,7 @@ export function RealtimeSyncProvider({ children }: { children: ReactNode }) {
 
       const invalidation = invalidateOperationalQueries(queryClient, () => {
         if (!disposed) setRevision(nextRevision);
-      });
+      }, nextRevision);
       inFlightInvalidation = invalidation;
       const finishInvalidation = (delayMs = REVISION_BATCH_WINDOW_MS) => {
         if (inFlightInvalidation === invalidation) inFlightInvalidation = null;

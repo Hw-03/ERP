@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryProvider } from "./client";
 import { itemSearchApi } from "../api/item-search";
 import { queryKeys } from "./keys";
+import { beginBomMutation } from "./bomMutationSync";
 vi.mock("../api/item-search", () => ({ itemSearchApi: { getConfig: vi.fn().mockResolvedValue({ version: "v1", synonym_groups: [], item_aliases: {} }) } }));
 import {
   invalidateOperationalQueries,
@@ -105,6 +106,54 @@ afterEach(() => {
 });
 
 describe("invalidateOperationalQueries", () => {
+  it("BOM 저장 중 품목·BOM 갱신을 모으고 성공 응답 반영 후 한 번만 조회한다", async () => {
+    const client = makeClient();
+    const keys = [queryKeys.items.list(), queryKeys.bom.list()];
+    const reads = keys.map(() => vi.fn().mockResolvedValue(["server"]));
+    const subscriptions = keys.map((queryKey, index) => {
+      client.setQueryData(queryKey, ["before"]);
+      return new QueryObserver(client, { queryKey, queryFn: reads[index], staleTime: Infinity }).subscribe(() => {});
+    });
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const mutation = beginBomMutation(client);
+    try {
+      const refreshing = invalidateOperationalQueries(client, undefined, 7);
+      await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.inventory.all }));
+      reads.forEach(read => expect(read).not.toHaveBeenCalled());
+      await mutation.applyServerResult(() => keys.forEach(key => client.setQueryData(key, ["saved"])));
+      await Promise.all([mutation.finish(), refreshing]);
+      reads.forEach(read => expect(read).toHaveBeenCalledTimes(1));
+    } finally {
+      subscriptions.forEach(stop => stop());
+      await mutation.finish();
+      client.clear();
+    }
+  });
+
+  it("같은 revision의 realtime 호출은 진행 중 품목 조회를 취소하지 않는다", async () => {
+    const client = makeClient();
+    const key = queryKeys.items.list();
+    const response = deferred<string[]>();
+    const read = vi.fn().mockReturnValue(response.promise);
+    client.setQueryData(key, ["before"]);
+    const stop = new QueryObserver(client, { queryKey: key, queryFn: read, staleTime: Infinity }).subscribe(() => {});
+    try {
+      const first = invalidateOperationalQueries(client, undefined, 7);
+      await waitFor(() => expect(read).toHaveBeenCalledTimes(1));
+      const second = invalidateOperationalQueries(client, undefined, 7);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(read).toHaveBeenCalledTimes(1);
+      response.resolve(["latest"]);
+      await Promise.all([first, second]);
+      expect(client.getQueryData(key)).toEqual(["latest"]);
+    } finally {
+      response.resolve(["latest"]);
+      stop();
+      client.clear();
+    }
+  });
+
   it.each([{ key: queryKeys.items.list({ limit: 2000 }) }, { key: queryKeys.inventory.workStatus("item-1") }])("realtime 변경 전 최초 요청 $key에 캐시가 없어도 오래된 첫 응답을 재사용하지 않는다", async ({ key }) => {
     const client = makeClient();
     const oldResponse = deferred<number>();
@@ -163,7 +212,7 @@ describe("invalidateOperationalQueries", () => {
 
     await invalidateOperationalQueries(client);
 
-    expect(invalidateSpy.mock.calls.map(([filters]) => filters.queryKey)).toEqual([
+    expect(invalidateSpy.mock.calls.map(([filters]) => filters.queryKey).sort()).toEqual([
       ["items"],
       ["inventory"],
       ["transactions"],
@@ -177,7 +226,7 @@ describe("invalidateOperationalQueries", () => {
       ["dailyWorkReports"],
       ["stocktake"],
       ["admin", "workReservations"],
-    ]);
+    ].sort());
   });
 });
 

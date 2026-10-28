@@ -32,17 +32,22 @@ interface Props {
   items: Item[];
   onAdd: (childId: string, childName: string, qty: number) => Promise<boolean>;
   isLocked?: boolean;
+  isBusy?: boolean;
 }
 
 
-export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false, read }: Props) {
+export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false, isBusy = false, read }: Props) {
   const { matchesItem } = useItemSearch();
   const [search, setSearch] = useAdminSessionState<string>("bom.children.search", "");
   const [deptFilter, setDeptFilter] = useAdminSessionState<DeptLetter | "">("bom.children.department", "");
   const [stageFilter, setStageFilter] = useAdminSessionState<"ALL" | StageLetter>("bom.children.stage", "ALL");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [qtyDraft, setQtyDraft] = useState("1");
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const pendingAddsRef = useRef(new Map<string, string>());
+  const [pendingAdds, setPendingAdds] = useState(new Map<string, string>());
+  const busyId = parent ? pendingAdds.get(parent.item_id) : undefined;
+  const selectedParentIdRef = useRef(parent?.item_id);
+  selectedParentIdRef.current = parent?.item_id;
   const qtyRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   useAdminScrollRestoration("bom.children.scroll", scrollRef, !read?.loading);
@@ -84,31 +89,34 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
       });
   }, [items, parent?.item_id, search, deptFilter, stageFilter, matchesItem]);
 
-  function openRow(id: string) {
-    if (isLocked || read?.loading || read?.error || !parent) return;
+  function openRow(id: string): void {
+    if (isLocked || isBusy || read?.loading || read?.error || !parent || pendingAddsRef.current.has(parent.item_id)) return;
     setExpandedId(id);
     setQtyDraft("1");
   }
 
-  function closeRow() {
+  function closeRow(): void {
     setExpandedId(null);
     setQtyDraft("1");
   }
 
-  async function commit(child: Item) {
-    if (isLocked || read?.loading || read?.error || !parent) return;
+  async function commit(child: Item): Promise<void> {
+    if (isLocked || isBusy || read?.loading || read?.error || !parent || pendingAddsRef.current.has(parent.item_id)) return;
     const qty = parseFloat(qtyDraft);
     if (!Number.isFinite(qty) || qty <= 0) {
       qtyRef.current?.focus();
       qtyRef.current?.select();
       return;
     }
-    setBusyId(child.item_id);
+    const targetParentId = parent.item_id;
+    pendingAddsRef.current.set(targetParentId, child.item_id);
+    setPendingAdds(new Map(pendingAddsRef.current));
     try {
       const ok = await onAdd(child.item_id, child.item_name, qty);
-      if (ok) closeRow();
+      if (ok && selectedParentIdRef.current === targetParentId) closeRow();
     } finally {
-      setBusyId(null);
+      pendingAddsRef.current.delete(targetParentId);
+      setPendingAdds(new Map(pendingAddsRef.current));
     }
   }
 
@@ -207,7 +215,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
                 <BomTableItemRow
                   item={c}
                   gridTemplateColumns={BOM_EDIT_LIST_GRID_TEMPLATE}
-                  disabled={already || isLocked}
+                  disabled={already || isLocked || isBusy || !!busyId}
                   onClick={() => (expanded ? closeRow() : openRow(c.item_id))}
                   background={expanded ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)` : undefined}
                   trailing={already ? (
@@ -237,6 +245,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
                       min="0"
                       step="any"
                       value={qtyDraft}
+                      disabled={isBusy || !!busyId}
                       onChange={(e) => setQtyDraft(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
@@ -244,7 +253,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
                           void commit(c);
                         } else if (e.key === "Escape") {
                           e.preventDefault();
-                          closeRow();
+                          if (!isBusy && !busyId) closeRow();
                         }
                       }}
                       className="w-24 rounded-md border px-2 py-1 text-sm font-semibold"
@@ -260,7 +269,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
                     <div className="ml-auto flex gap-1.5">
                       <button
                         type="button"
-                        disabled={busy}
+                        disabled={busy || isBusy}
                         onClick={() => void commit(c)}
                         className="standard-hover rounded-md px-3 py-1 text-xs font-bold transition-colors disabled:opacity-60"
                         style={{ background: LEGACY_COLORS.blueSolid, color: LEGACY_COLORS.white }}
@@ -269,7 +278,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
                       </button>
                       <button
                         type="button"
-                        disabled={busy}
+                        disabled={busy || isBusy}
                         onClick={closeRow}
                         className="standard-hover rounded-md border px-3 py-1 text-xs font-semibold transition-colors disabled:opacity-60"
                         style={{

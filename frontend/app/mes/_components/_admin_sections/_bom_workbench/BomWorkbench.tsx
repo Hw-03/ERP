@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { Network } from "lucide-react";
 import { api } from "@/lib/api";
-import { catalogApi } from "@/lib/api/catalog";
 import { useQueryClient } from "@tanstack/react-query";
 import { useBomQuery, useBomWhereUsedQuery } from "@/lib/queries/useBomQuery";
 import { queryKeys } from "@/lib/queries/keys";
+import { beginBomMutation } from "@/lib/queries/bomMutationSync";
 import type { BOMDetailEntry, BOMEntry, Item } from "@/lib/api";
 import { itemsApi } from "@/lib/api/items";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -41,7 +41,7 @@ interface Props {
 }
 
 type Mode = "edit" | "whereused";
-type DeleteRequest = { bomId: string; childName: string };
+type DeleteRequest = { bomId: string; childName: string; parent: Item };
 type BomWorkbenchHistoryState = { dept: BomDeptFilter; mode: Mode; parentId: string };
 
 const BOM_WORKBENCH_HISTORY_KEY = "bomWorkbench";
@@ -81,11 +81,28 @@ function candidatesFor(items: Item[], dept: BomDeptFilter, mode: Mode): Item[] {
   });
 }
 
+function compareBomChildren(left: BOMEntry, right: BOMEntry, items: Map<string, Item>): number {
+  // backend.services.bom.bom_child_item_ordering과 같은 부서·단계·번호·코드·ID 순서.
+  const a = items.get(left.child_item_id);
+  const b = items.get(right.child_item_id);
+  const rank = (value: string | undefined, order: string): number => {
+    const index = value ? order.indexOf(value) : -1;
+    return index < 0 ? order.length : index;
+  };
+  const compareText = (first: string, second: string): number => first < second ? -1 : first > second ? 1 : 0;
+  return rank(a?.process_type_code?.[0], "THVNAP") - rank(b?.process_type_code?.[0], "THVNAP") ||
+    rank(a?.process_type_code?.[1], "FAR") - rank(b?.process_type_code?.[1], "FAR") ||
+    Number(a?.serial_no == null) - Number(b?.serial_no == null) ||
+    (a?.serial_no ?? 0) - (b?.serial_no ?? 0) ||
+    Number(a?.mes_code == null) - Number(b?.mes_code == null) ||
+    compareText(a?.mes_code ?? "", b?.mes_code ?? "") ||
+    compareText(left.child_item_id, right.child_item_id);
+}
+
 export function BomWorkbench({
   items,
   setItems,
   allBomRows,
-  refreshAllBom,
   refreshItems,
   onStatusChange,
   onError,
@@ -95,17 +112,17 @@ export function BomWorkbench({
   const [initialNavigation] = useState(() => typeof window === "undefined" ? null : readBomWorkbenchHistoryState(window.history.state));
   const [dept, setDept] = useState<BomDeptFilter>(initialNavigation?.dept ?? "ALL");
   const [parentId, setParentId] = useState(initialNavigation?.parentId ?? "");
-  const selectedParentIdRef = useRef(parentId);
-  selectedParentIdRef.current = parentId;
   const [mode, setMode] = useState<Mode>(initialNavigation?.mode ?? "edit");
   const bomQuery = useBomQuery(parentId, { enabled: mode === "edit" && !initialRead.loading && !initialRead.error });
   const whereUsedQuery = useBomWhereUsedQuery(parentId, { enabled: mode === "whereused" && !initialRead.loading && !initialRead.error });
   const bomRows = bomQuery.data ?? EMPTY_BOM_ROWS;
   const whereUsedRows = whereUsedQuery.data ?? EMPTY_WHERE_USED_ROWS;
   const [statusFilter, setStatusFilter] = useAdminSessionState<StatusFilter>("bom.status", "ALL");
-  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewParentId, setReviewParentId] = useState<string | null>(null);
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const mutationParentIdsRef = useRef(new Set<string>());
+  const [mutationParentIds, setMutationParentIds] = useState<Set<string>>(new Set());
   const [unmatchedStatusBusyItemIds, setUnmatchedStatusBusyItemIds] = useState<Set<string>>(new Set());
   const [unmatchedOpen, setUnmatchedOpen] = useState(false);
   const viewFadeRef = useAdminSelectionFade(mode);
@@ -230,6 +247,7 @@ export function BomWorkbench({
     [activeItems, parentId],
   );
   const isCompleted = parent ? completedSet.has(parent.item_id) : false;
+  const isMutating = mutationParentIds.has(parentId);
   const selectingParent = !parent && modeCandidates.length > 0;
   const bomError = bomQuery.data === undefined && !bomQuery.isFetching ? bomQuery.error?.message : undefined;
   const whereUsedError = whereUsedQuery.data === undefined && !whereUsedQuery.isFetching ? whereUsedQuery.error?.message : undefined;
@@ -257,23 +275,64 @@ export function BomWorkbench({
     [allBomRows],
   );
 
-  // 선택된 부모의 BOM 을 서버 기준으로 재동기화 (낙관적 갱신 desync·stale bom_id 차단)
-  async function reloadBom(): Promise<void> {
-    if (!parentId) return;
-    const queryKey = queryKeys.bom.detail(parentId);
-    try {
-      await queryClient.cancelQueries({ queryKey, exact: true });
-      await queryClient.invalidateQueries({ queryKey, exact: true, refetchType: "none" });
-      await queryClient.fetchQuery({
-        queryKey,
-        queryFn: ({ signal }) => catalogApi.getBOM(parentId, signal),
-        staleTime: 0,
-      });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.bom.whereUsed("").slice(0, 2) });
-    } catch (failure) {
-      if (selectedParentIdRef.current === parentId) {
-        onErrorRef.current(failure instanceof Error ? failure.message : "BOM 구성을 새로고침하지 못했습니다.");
+  /** 서버에서 확정된 행만 기존 캐시에 반영하고 전체 목록의 품목 메타데이터를 보존한다. */
+  function applySavedRow(targetParentId: string, saved: BOMEntry): void {
+    const itemMap = new Map(itemsRef.current.map((item) => [item.item_id, item]));
+    queryClient.setQueryData<BOMEntry[]>(queryKeys.bom.detail(targetParentId), (current) => {
+      if (!current) return undefined;
+      if (current.some((entry) => entry.bom_id === saved.bom_id)) {
+        return current.map((entry) => entry.bom_id === saved.bom_id ? saved : entry);
       }
+      const next = [...current, saved];
+      // 검색·limit으로 정렬 정보가 빠진 기존 행은 서버 재조회 전까지 현재 위치를 보존한다.
+      return next.every((entry) => itemMap.has(entry.child_item_id))
+        ? next.sort((a, b) => compareBomChildren(a, b, itemMap)) : next;
+    });
+    queryClient.setQueryData<BOMDetailEntry[]>(queryKeys.bom.list(), (current) => {
+      if (!current) return undefined;
+      if (current.some((entry) => entry.bom_id === saved.bom_id)) {
+        return current.map((entry) => entry.bom_id === saved.bom_id
+          ? { ...entry, quantity: saved.quantity, unit: saved.unit } : entry);
+      }
+      const savedParent = itemMap.get(targetParentId);
+      const savedChild = itemMap.get(saved.child_item_id);
+      if (!savedParent || !savedChild) return current;
+      const detailed: BOMDetailEntry = { ...saved,
+        parent_item_name: savedParent.item_name, parent_mes_code: savedParent.mes_code ?? null,
+        child_item_name: savedChild.item_name, child_mes_code: savedChild.mes_code ?? null,
+      };
+      return [...current, detailed];
+    });
+  }
+
+  /** 같은 부모의 중복 요청은 동기적으로 차단하고 조회 재동기화는 저장 잠금 밖에서 수행한다. */
+  async function saveForParent<T>(
+    target: Item,
+    request: () => Promise<T>,
+    apply: (result: T) => void,
+    successMessage: string,
+    failureMessage: string,
+  ): Promise<boolean> {
+    const targetId = target.item_id;
+    if (mutationParentIdsRef.current.has(targetId)) return false;
+    mutationParentIdsRef.current.add(targetId);
+    setMutationParentIds(new Set(mutationParentIdsRef.current));
+    const mutation = beginBomMutation(queryClient);
+    let serverSaved = false;
+    try {
+      const result = await request();
+      serverSaved = true;
+      await mutation.applyServerResult(() => apply(result));
+      onStatusChange(successMessage);
+      return true;
+    } catch (err) {
+      onError(err instanceof Error ? err.message : failureMessage);
+      return false;
+    } finally {
+      mutationParentIdsRef.current.delete(targetId);
+      setMutationParentIds(new Set(mutationParentIdsRef.current));
+      void mutation.finish().catch(() => onErrorRef.current(serverSaved
+        ? "저장됐지만 최신 목록 조회에 실패했습니다." : "최신 목록 조회에 실패했습니다."));
     }
   }
 
@@ -283,63 +342,52 @@ export function BomWorkbench({
       onError("수량은 0보다 커야 합니다.");
       return false;
     }
-    try {
-      await api.createBOM({
+    return saveForParent(parent,
+      () => api.createBOM({
         parent_item_id: parent.item_id,
         child_item_id: childId,
         quantity: qty,
         unit: "EA",
-      });
-      await reloadBom();
-      refreshAllBom();
-      onStatusChange(`"${childName}" 을(를) 추가했습니다.`);
-      return true;
-    } catch (err) {
-      onError(err instanceof Error ? err.message : "추가 실패");
-      return false;
-    }
+      }), (saved) => applySavedRow(parent.item_id, saved), `"${childName}" 을(를) 추가했습니다.`, "추가 실패",
+    );
   }
 
-  async function handleSaveQty(bomId: string, qty: number) {
-    try {
-      await api.updateBOM(bomId, { quantity: qty });
-      await reloadBom();
-      refreshAllBom();
-      onStatusChange("수량을 변경했습니다.");
-    } catch (err) {
-      await reloadBom();
-      onError(err instanceof Error ? err.message : "수량 변경 실패 — 목록을 새로고침했습니다.");
-    }
+  async function handleSaveQty(bomId: string, qty: number): Promise<boolean> {
+    if (!parent) return false;
+    return saveForParent(parent, () => api.updateBOM(bomId, { quantity: qty }), (saved) => applySavedRow(parent.item_id, saved),
+      "수량을 변경했습니다.", "수량 변경 실패");
   }
 
-  async function handleDeleteConfirm() {
+  async function handleDeleteConfirm(): Promise<void> {
     if (!deleteRequest) return;
+    const target = deleteRequest;
+    if (mutationParentIdsRef.current.has(target.parent.item_id)) return;
     setDeleteBusy(true);
     try {
-      await api.deleteBOM(deleteRequest.bomId);
-      await reloadBom();
-      refreshAllBom();
-      onStatusChange(`"${deleteRequest.childName}" 을(를) 삭제했습니다.`);
-    } catch (err) {
-      await reloadBom();
-      onError(err instanceof Error ? err.message : "삭제 실패 — 목록을 새로고침했습니다.");
+      const ok = await saveForParent(target.parent, () => api.deleteBOM(target.bomId), () => {
+        queryClient.setQueryData<BOMEntry[]>(queryKeys.bom.detail(target.parent.item_id),
+          (current) => current?.filter((entry) => entry.bom_id !== target.bomId));
+        queryClient.setQueryData<BOMDetailEntry[]>(queryKeys.bom.list(),
+          (current) => current?.filter((entry) => entry.bom_id !== target.bomId));
+      }, `"${target.childName}" 을(를) 삭제했습니다.`, "삭제 실패");
+      if (ok) setDeleteRequest((current) => current === target ? null : current);
     } finally {
       setDeleteBusy(false);
-      setDeleteRequest(null);
     }
   }
 
-  async function handleToggleCompletion(completed: boolean) {
-    if (!parent) return;
-    try {
-      await api.updateBomCompletion(parent.item_id, completed);
-      await refreshItems();
-      onStatusChange(
-        `"${parent.item_name}" ${completed ? "완료 처리됨" : "완료 해제됨"}`,
-      );
-    } catch (err) {
-      onError(err instanceof Error ? err.message : "완료 상태 변경 실패");
-    }
+  async function handleToggleCompletion(completed: boolean): Promise<boolean> {
+    if (!parent) return false;
+    const targetId = parent.item_id;
+    return saveForParent(parent, () => api.updateBomCompletion(targetId, completed), (saved) => {
+      const merge = (item: Item): Item => item.item_id === targetId ? {
+        ...item, bom_completed_at: saved.bom_completed_at, updated_at: saved.updated_at,
+      } : item;
+      setItems((current) => current.map(merge));
+      queryClient.setQueriesData<Item[]>({ queryKey: [...queryKeys.items.all, "list"] },
+        (current) => current?.map(merge));
+      queryClient.setQueryData<Item>(queryKeys.items.detail(targetId), (current) => current ? merge(current) : undefined);
+    }, `"${parent.item_name}" ${completed ? "완료 처리됨" : "완료 해제됨"}`, "완료 상태 변경 실패");
   }
 
   async function handleUnmatchedStatusChange(itemId: string, status: Item["bom_unmatched_status"]): Promise<void> {
@@ -426,6 +474,7 @@ export function BomWorkbench({
                   items={items}
                   onAdd={handleAdd}
                   isLocked={isCompleted}
+                  isBusy={isMutating}
                 />
               ) : (
                 <div
@@ -451,17 +500,18 @@ export function BomWorkbench({
                   mode="edit"
                   childCount={bomRows.length}
                   isCompleted={isCompleted}
-                  onOpenReview={() => setReviewOpen(true)}
+                  onOpenReview={() => { if (!mutationParentIdsRef.current.has(parentId)) setReviewParentId(parentId); }}
                 />}
                 read={bomRead}
                 parent={parent}
                 bomRows={bomRows}
                 items={items}
                 onSaveQty={handleSaveQty}
-                onRequestDelete={(row, childName) =>
-                  setDeleteRequest({ bomId: row.bom_id, childName })
-                }
+                onRequestDelete={(row, childName) => {
+                  if (parent) setDeleteRequest({ bomId: row.bom_id, childName, parent });
+                }}
                 isLocked={isCompleted}
+                isBusy={isMutating}
               />
             </div>
           </>
@@ -476,7 +526,7 @@ export function BomWorkbench({
                 mode="whereused"
                 childCount={whereUsedRows.length}
                 isCompleted={isCompleted}
-                onOpenReview={() => setReviewOpen(true)}
+                onOpenReview={() => setReviewParentId(parentId)}
               />}
               read={whereUsedRead}
               selected={parent}
@@ -501,13 +551,14 @@ export function BomWorkbench({
       ))}
 
       {/* 검토 · 완료 모달 */}
-      {reviewOpen && parent && (
+      {reviewParentId === parentId && parent && (
         <BomReviewModal
+          key={parentId}
           parent={parent}
           rows={bomRows}
           items={items}
           isCompleted={isCompleted}
-          onClose={() => setReviewOpen(false)}
+          onClose={() => setReviewParentId((current) => current === parentId ? null : current)}
           onConfirm={handleToggleCompletion}
         />
       )}

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { BOMDetailEntry, BOMEntry, Item } from "@/lib/api";
 import { BomChildAddBox } from "../BomChildAddBox";
@@ -598,7 +598,7 @@ describe("BOM 편집 표형 목록", () => {
     expect(onRequestDelete).not.toHaveBeenCalled();
   });
 
-  it("현재 구성의 수량 Enter 저장·Escape 취소와 삭제 요청을 유지한다", () => {
+  it("현재 구성의 수량 Enter 저장·Escape 취소와 삭제 요청을 유지한다", async () => {
     const onSaveQty = vi.fn();
     const onRequestDelete = vi.fn();
     render(
@@ -614,7 +614,7 @@ describe("BOM 편집 표형 목록", () => {
     fireEvent.click(screen.getByTitle("클릭하여 수량 수정"));
     const quantity = screen.getByRole("spinbutton");
     fireEvent.change(quantity, { target: { value: "3" } });
-    fireEvent.keyDown(quantity, { key: "Enter" });
+    await act(async () => { fireEvent.keyDown(quantity, { key: "Enter" }); });
     expect(onSaveQty).toHaveBeenCalledWith("bom-1", 3);
 
     fireEvent.click(screen.getByTitle("클릭하여 수량 수정"));
@@ -698,7 +698,7 @@ describe("BOM 레이아웃 높이 계약", () => {
 });
 
 describe("BOM normal data row height", () => {
-  it("keeps parent, candidate, registered, and current rows at 37px while quantity editing", () => {
+  it("keeps parent, candidate, registered, and current rows at 37px while quantity editing", async () => {
     const { container: parentContainer } = render(
       <BomParentList
         dept="A"
@@ -754,7 +754,7 @@ describe("BOM normal data row height", () => {
     expect(quantityInput).toHaveClass("h-[30px]");
     expect(quantityInput.closest("[data-bom-row-surface]")).toHaveClass("h-[37px]");
     fireEvent.change(quantityInput, { target: { value: "3" } });
-    fireEvent.keyDown(quantityInput, { key: "Enter" });
+    await act(async () => { fireEvent.keyDown(quantityInput, { key: "Enter" }); });
     expect(onSaveQty).toHaveBeenCalledWith("bom-1", 3);
     expect(currentRow).toHaveClass("h-[37px]");
 
@@ -769,7 +769,7 @@ describe("BOM normal data row height", () => {
     quantityInput = screen.getByRole("spinbutton");
     expect(quantityInput.closest("[data-bom-row-surface]")).toHaveClass("h-[37px]");
     fireEvent.change(quantityInput, { target: { value: "4" } });
-    fireEvent.blur(quantityInput);
+    await act(async () => { fireEvent.blur(quantityInput); });
     expect(onSaveQty).toHaveBeenLastCalledWith("bom-1", 4);
     expect(currentRow).toHaveClass("h-[37px]");
   });

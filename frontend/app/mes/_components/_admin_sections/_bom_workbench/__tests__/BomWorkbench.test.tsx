@@ -159,7 +159,7 @@ describe("BomWorkbench", () => {
     const row = { bom_id: "bom-1", parent_item_id: "parent-1", child_item_id: "child-1", quantity: 2, unit: "EA" } as BOMEntry;
     const getBom = vi.spyOn(catalogApi, "getBOM").mockResolvedValueOnce([row]).mockReturnValueOnce(savedRefresh.promise).mockResolvedValue([]);
     vi.spyOn(catalogApi, "getBOMWhereUsed").mockResolvedValue([]);
-    vi.spyOn(api, "updateBOM").mockResolvedValue(row);
+    vi.spyOn(api, "updateBOM").mockResolvedValue({ ...row, quantity: 3 });
     const other = { ...selectedParent, item_id: "parent-2", item_name: "Second parent" };
     const child = { item_id: "child-1", item_name: "Previous child", process_type_code: "AR", unit: "EA" } as Item;
     const { container } = render(<BomWorkbench items={[selectedParent, other, child]} setItems={vi.fn()} allBomRows={[]}
@@ -174,12 +174,10 @@ describe("BomWorkbench", () => {
     const list = screen.getByText("상위 품목 선택").closest("[data-scrollbar-rail-shell]") as HTMLElement;
     fireEvent.click(within(list).getByText("Second parent"));
     await screen.findByText("등록된 BOM 이 없습니다");
-    fireEvent.click(within(list).getByText("Selected parent summary"));
-    await waitFor(() => expect(getBom).toHaveBeenCalledTimes(4));
-    await screen.findByText("등록된 BOM 이 없습니다");
     await act(async () => { savedRefresh.resolve([row]); await savedRefresh.promise; });
     expect(screen.getByText("등록된 BOM 이 없습니다")).toBeInTheDocument();
     expect(container.querySelector("div[data-bom-row-surface]")).toBeNull();
+    expect(queryClient.getQueryData(queryKeys.bom.detail("parent-1"))).toEqual([{ ...row, quantity: 3 }]);
   });
 
   it("starts with all departments and filters parents from the parent-list controls", async () => {

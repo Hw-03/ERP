@@ -27,7 +27,7 @@ import {
 interface Props {
   row: BOMEntry;
   childItem: Item | undefined;
-  onSaveQty: (bomId: string, qty: number) => void | Promise<void>;
+  onSaveQty: (bomId: string, qty: number) => void | Promise<void | boolean>;
   onRequestDelete: (row: BOMEntry, childName: string) => void;
   isLocked?: boolean;
 }
@@ -35,6 +35,8 @@ interface Props {
 export function BomRow({ row, childItem, onSaveQty, onRequestDelete, isLocked = false }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(row.quantity));
+  const [saving, setSaving] = useState(false);
+  const editingRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -46,12 +48,15 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete, isLocked = 
 
   useEffect(() => {
     if (isLocked) {
+      editingRef.current = false;
       setEditing(false);
-      setDraft(String(row.quantity));
     }
+    if (!editingRef.current) setDraft(String(row.quantity));
   }, [isLocked, row.quantity]);
 
-  function commit() {
+  async function commit(): Promise<void> {
+    if (!editingRef.current) return;
+    editingRef.current = false;
     if (isLocked) {
       cancel();
       return;
@@ -63,10 +68,16 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete, isLocked = 
       return;
     }
     if (next === row.quantity) return;
-    void onSaveQty(row.bom_id, next);
+    setSaving(true);
+    try {
+      await onSaveQty(row.bom_id, next);
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function cancel() {
+  function cancel(): void {
+    editingRef.current = false;
     setEditing(false);
     setDraft(String(row.quantity));
   }
@@ -121,11 +132,11 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete, isLocked = 
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             {...actionTooltipProps}
-            onBlur={commit}
+            onBlur={() => void commit()}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
-                commit();
+                void commit();
               } else if (e.key === "Escape") {
                 e.preventDefault();
                 cancel();
@@ -141,9 +152,12 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete, isLocked = 
         ) : (
           <button
             type="button"
-            disabled={isLocked}
+            disabled={isLocked || saving}
             onClick={() => {
-              if (!isLocked) setEditing(true);
+              if (!isLocked && !saving) {
+                editingRef.current = true;
+                setEditing(true);
+              }
             }}
             {...actionTooltipProps}
             className="standard-hover h-[30px] rounded-md border px-3 py-1 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
@@ -161,9 +175,9 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete, isLocked = 
       <div className="flex justify-center">
         <button
           type="button"
-          disabled={isLocked}
+          disabled={isLocked || saving}
           onClick={() => {
-            if (!isLocked) onRequestDelete(row, childName);
+            if (!isLocked && !saving) onRequestDelete(row, childName);
           }}
           {...actionTooltipProps}
           className="standard-hover flex h-7 w-7 items-center justify-center rounded-md p-0 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
