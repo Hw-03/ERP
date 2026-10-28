@@ -34,9 +34,11 @@ def test_memory_sql_contract(db_session, case, engine):
     groups = case.get("groups", CONTRACT["groups"])
     if engine == "memory":
         assert matches_item_search(case["query"], name_fields=case["name_fields"],
+            code_fields=case.get("code_fields", []),
             literal_fields=case["literal_fields"], aliases=case["aliases"], groups=groups) is case["expected"]
         return
     predicate = build_item_search_filter(None, case["query"],
         name_columns=[literal(value) for value in case["name_fields"] + case["aliases"]],
+        code_columns=[literal(value) for value in case.get("code_fields", [])],
         literal_columns=[literal(value) for value in case["literal_fields"]], groups=groups)
     assert bool(db_session.scalar(select(predicate if predicate is not None else literal(True)))) is case["expected"]

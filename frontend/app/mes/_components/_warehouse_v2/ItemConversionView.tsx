@@ -81,7 +81,7 @@ function conversionModeLabel(mode: ItemConversionMode | null): string {
 function filterCandidates(candidates: Item[], query: string, config: ItemSearchConfig): Item[] {
   return candidates.filter((item) => {
     return matchesItemSearchFields({ itemId: item.item_id, nameFields: [item.item_name],
-      literalFields: [item.mes_code, item.process_type_code] }, query, config);
+      codeFields: [item.mes_code], literalFields: [item.process_type_code] }, query, config);
   });
 }
 

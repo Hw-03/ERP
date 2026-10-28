@@ -211,7 +211,7 @@ function itemLabel(item: Item | undefined) {
 function filterItems(items: Item[], query: string, config: ItemSearchConfig) {
   return items.filter((item) =>
     matchesItemSearchFields({ itemId: item.item_id, nameFields: [item.item_name],
-      literalFields: [item.mes_code, item.process_type_code] }, query, config),
+      codeFields: [item.mes_code], literalFields: [item.process_type_code] }, query, config),
   );
 }
 

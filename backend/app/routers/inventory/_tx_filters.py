@@ -535,9 +535,9 @@ def _history_search_filter(search: Optional[str], db: Session | None = None, *,
                            groups: list[list[str]] | None = None) -> Optional[ColumnElement[bool]]:
     """목록과 묶음 내 검색 일치 여부에 동일한 정규화 조건을 사용한다."""
     return build_item_search_filter(db, search, name_columns=[Item.item_name], item_id_column=Item.item_id, groups=groups,
+        code_columns=[Item.mes_code],
         literal_columns=[
         _history_list_operation_label_expr(),
-        Item.mes_code,
         TransactionLog.reference_no,
         TransactionLog.notes,
         TransactionLog.produced_by,

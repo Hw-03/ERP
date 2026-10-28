@@ -20,6 +20,24 @@ def dictionary(db, item, alias="Power Cell"):
     db.commit()
 
 
+def test_item_and_history_search_expand_code_but_not_actor(client, db_session, make_item):
+    """Registered keyboard terms must reach code consumers without matching metadata."""
+    item = make_item(name="Component", process_type_code="AF")
+    other = make_item(name="Other", process_type_code="TR")
+    group = ItemSynonymGroup()
+    db_session.add(group)
+    db_session.flush()
+    db_session.add_all([ItemSynonymTerm(group_id=group.group_id, term=term, normalized_term=term.lower())
+                        for term in ["AF", "ㅁㄹ"]])
+    db_session.add_all([TransactionLog(item_id=row.item_id, transaction_type=TransactionTypeEnum.RECEIVE,
+        quantity_change=1, produced_by="AF", created_at=datetime.utcnow()) for row in [item, other]])
+    db_session.commit()
+    for path in ["/api/items", "/api/inventory/transactions"]:
+        response = client.get(path, params={"search": "ㅁㄹ"})
+        assert response.status_code == 200
+        assert [row["item_id"] for row in response.json()] == [str(item.item_id)]
+
+
 def test_transaction_list_and_exports_apply_synonyms_only_to_item_fields(client, db_session, make_item):
     item = make_item(name="Battery")
     unrelated = make_item(name="Different")

@@ -90,7 +90,8 @@ def observation_department_counts(db: Session, *, search: str | None = None,
         if row.operation_id in matched:
             continue
         if matches_item_search(search, name_fields=[row.item_name, row.snapshot_name],
-                literal_fields=[row.mes_code, row.snapshot_code, row.actor_name, row.reason,
+                code_fields=[row.mes_code, row.snapshot_code],
+                literal_fields=[row.actor_name, row.reason,
                                 '재고 전수조사', row.department or '창고'],
                 aliases=[alias['alias'] for alias in config['item_aliases'].get(str(row.item_id), [])],
                 groups=synonym_groups):
@@ -132,7 +133,8 @@ def observation_groups(db: Session, *, search: str | None = None, department: st
         matched = set()
         for _, item, _, snapshot_name, snapshot_code in members:
             if item.item_id in eligible and matches_item_search(search, name_fields=[item.item_name, snapshot_name],
-                    literal_fields=[item.mes_code, snapshot_code, operation.actor_name, operation.reason,
+                    code_fields=[item.mes_code, snapshot_code],
+                    literal_fields=[operation.actor_name, operation.reason,
                                     '재고 전수조사', operation.department or '창고'],
                     aliases=[row["alias"] for row in search_config["item_aliases"].get(str(item.item_id), [])],
                     groups=synonym_groups):

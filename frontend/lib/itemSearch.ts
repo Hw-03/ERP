@@ -10,6 +10,7 @@ export interface ItemSearchItem {
 export interface ItemSearchFields {
   itemId?: string | null;
   nameFields: (string | null | undefined)[];
+  codeFields?: (string | null | undefined)[];
   literalFields?: (string | null | undefined)[];
   aliases?: string[];
 }
@@ -65,14 +66,15 @@ export function matchesItemSearchFields(
     ...(fields.itemId ? (config.item_aliases[fields.itemId] ?? []).map((entry) => entry.alias) : []),
   ];
   const semanticFields = [...fields.nameFields, ...aliases].filter((value): value is string => typeof value === "string");
-  const literalFields = [...semanticFields, ...(fields.literalFields ?? [])].filter((value): value is string => typeof value === "string");
+  const codeFields = (fields.codeFields ?? []).filter((value): value is string => typeof value === "string").map(normalizeSearchText);
+  const literalFields = [...semanticFields, ...codeFields, ...(fields.literalFields ?? [])].filter((value): value is string => typeof value === "string");
   const normalizedFields = literalFields.map(normalizeSearchText);
   return queries.some((query) => {
     const fullQuery = normalizeSearchText(query);
     if (normalizedFields.some((value) => value.includes(fullQuery))) return true;
     return searchClauses(query, config).every(({ literal, alternatives }) =>
       normalizedFields.some((value) => value.includes(literal)) ||
-      alternatives.some((term) => semanticFields.some((value) => matchesAlternative(value, term))),
+      alternatives.some((term) => semanticFields.some((value) => matchesAlternative(value, term)) || codeFields.some((value) => value.includes(term))),
     );
   });
 }
@@ -83,5 +85,5 @@ export function matchesItemSearch(
   keyword: string,
   config: ItemSearchConfig = EMPTY_ITEM_SEARCH_CONFIG,
 ): boolean {
-  return matchesItemSearchFields({ itemId: item.item_id, nameFields: [item.item_name], literalFields: [item.mes_code] }, keyword, config);
+  return matchesItemSearchFields({ itemId: item.item_id, nameFields: [item.item_name], codeFields: [item.mes_code] }, keyword, config);
 }

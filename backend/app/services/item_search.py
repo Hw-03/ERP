@@ -49,6 +49,7 @@ def _pattern(term: str) -> str:
 
 
 def matches_item_search(search: str | None, *, name_fields: Sequence[str | None],
+                        code_fields: Sequence[str | None] = (),
                         literal_fields: Sequence[str | None] = (), aliases: Sequence[str] = (),
                         groups: Sequence[Sequence[str]] = ()) -> bool:
     """OR comma-separated queries, preserving snapshot and metadata field scopes."""
@@ -57,7 +58,8 @@ def matches_item_search(search: str | None, *, name_fields: Sequence[str | None]
     queries = _search_queries(search)
     names = [normalize_search_text(value or "") for value in [*name_fields, *aliases]]
     boundary_names = [normalize_search_boundary_text(value or "") for value in [*name_fields, *aliases]]
-    literals = [normalize_search_text(value or "") for value in literal_fields]
+    codes = [normalize_search_text(value or "") for value in code_fields]
+    literals = codes + [normalize_search_text(value or "") for value in literal_fields]
     for query in queries:
         term = normalize_search_text(query)
         if any(term in value for value in [*names, *literals]):
@@ -65,8 +67,8 @@ def matches_item_search(search: str | None, *, name_fields: Sequence[str | None]
         for original, alternatives in search_clauses(query, groups):
             if any(original in value for value in [*names, *literals]):
                 continue
-            if not any(any(re.search(_pattern(alt), value) for value in boundary_names)
-                       if re.fullmatch(r"[a-z]{1,3}", alt) else any(alt in value for value in names)
+            if not any(any(alt in value for value in codes) or (any(re.search(_pattern(alt), value) for value in boundary_names)
+                       if re.fullmatch(r"[a-z]{1,3}", alt) else any(alt in value for value in names))
                        for alt in alternatives if alt != original):
                 break
         else:
@@ -119,6 +121,7 @@ def load_synonym_groups(db: Session) -> list[list[str]]:
 
 def build_item_search_filter(db: Session | None, search: str | None, *,
                              name_columns: Sequence[ColumnElement[str]],
+                             code_columns: Sequence[ColumnElement[str]] = (),
                              literal_columns: Sequence[ColumnElement[str]] = (),
                              item_id_column: ColumnElement | None = None,
                              groups: Sequence[Sequence[str]] | None = None) -> ColumnElement[bool] | None:
@@ -136,6 +139,8 @@ def build_item_search_filter(db: Session | None, search: str | None, *,
                 if re.fullmatch(r"[a-z]{1,3}", alt) else _literal_match(column, alt)
                 for alt in alternatives if alt != original])
         conditions = [name_match(column) for column in name_columns]
+        conditions.extend(_literal_match(column, term) for column in code_columns
+                          for term in {original, *alternatives})
         conditions.extend(_literal_match(column, original) for column in literal_columns)
         if item_id_column is not None:
             from app.models.item_search import ItemAlias

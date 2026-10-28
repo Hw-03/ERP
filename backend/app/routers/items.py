@@ -405,7 +405,7 @@ def list_items(
         query = query.filter(Item.legacy_item_type == legacy_item_type)
 
     search_filter = build_item_search_filter(db, search, name_columns=[Item.item_name],
-        literal_columns=[Item.mes_code, Inventory.location], item_id_column=Item.item_id)
+        code_columns=[Item.mes_code], literal_columns=[Inventory.location], item_id_column=Item.item_id)
     if search_filter is not None:
         query = query.filter(search_filter)
 
@@ -554,7 +554,7 @@ def export_items_xlsx(
     if process_type_code:
         query = query.filter(Item.process_type_code == process_type_code)
     search_filter = build_item_search_filter(db, search, name_columns=[Item.item_name],
-        literal_columns=[Item.mes_code, Inventory.location], item_id_column=Item.item_id)
+        code_columns=[Item.mes_code], literal_columns=[Inventory.location], item_id_column=Item.item_id)
     if search_filter is not None:
         query = query.filter(search_filter)
     rows = query.order_by(Item.process_type_code, Item.mes_code).all()

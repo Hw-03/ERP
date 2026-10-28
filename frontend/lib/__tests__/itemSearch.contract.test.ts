@@ -9,6 +9,7 @@ type SearchCase = {
   groups?: string[][];
   name_fields: string[];
   literal_fields: string[];
+  code_fields?: string[];
   aliases: string[];
   expected: boolean;
 };
@@ -28,6 +29,7 @@ describe("item search shared contract", () => {
     expect(matchesItemSearchFields({
       nameFields: example.name_fields,
       literalFields: example.literal_fields,
+      codeFields: example.code_fields,
       aliases: example.aliases,
     }, example.query, config)).toBe(example.expected);
   });

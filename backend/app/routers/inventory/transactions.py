@@ -1092,8 +1092,8 @@ def export_transactions_csv(
     if transaction_type:
         query = query.filter(TransactionLog.transaction_type == transaction_type)
     search_filter = build_item_search_filter(db, search, name_columns=[Item.item_name], item_id_column=Item.item_id,
+        code_columns=[Item.mes_code],
         literal_columns=[
-        Item.mes_code,
         TransactionLog.reference_no,
         TransactionLog.notes,
         TransactionLog.produced_by,
@@ -1188,8 +1188,8 @@ def export_transactions_xlsx(
     if transaction_type:
         query = query.filter(TransactionLog.transaction_type == transaction_type)
     search_filter = build_item_search_filter(db, search, name_columns=[Item.item_name], item_id_column=Item.item_id,
+        code_columns=[Item.mes_code],
         literal_columns=[
-        Item.mes_code,
         TransactionLog.reference_no,
         TransactionLog.notes,
         TransactionLog.produced_by,

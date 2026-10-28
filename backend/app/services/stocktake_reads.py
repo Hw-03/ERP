@@ -144,7 +144,7 @@ def targets(db: Session, round_id: uuid.UUID, *, scope_id: str | None = None, st
         query = query.filter(raw_status.in_(group))
     search_filter = build_item_search_filter(db, search,
         name_columns=[StocktakeTarget.item_name, Item.item_name],
-        literal_columns=[StocktakeTarget.item_code, Item.mes_code], item_id_column=Item.item_id,
+        code_columns=[StocktakeTarget.item_code, Item.mes_code], item_id_column=Item.item_id,
         groups=[group["terms"] for group in search_config["synonym_groups"]])
     if search_filter is not None:
         query = query.filter(search_filter)

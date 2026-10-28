@@ -1,6 +1,12 @@
 {
   "groups": [["배터리", "battery"], ["보드", "board", "B/D"], ["배터리 보드", "power module"], ["커버", "cover"]],
   "cases": [
+    {"name": "code-keyboard-synonym", "groups": [["AF", "ㅁㄹ"]], "query": "ㅁㄹ", "name_fields": ["부품"], "code_fields": ["6-AF-0001"], "literal_fields": [], "aliases": [], "expected": true},
+    {"name": "code-synonym-and-name", "groups": [["AF", "ㅁㄹ"]], "query": "ㅁㄹ 부품", "name_fields": ["부품"], "code_fields": ["6-AF-0001"], "literal_fields": [], "aliases": [], "expected": true},
+    {"name": "code-synonym-wrong-code", "groups": [["AF", "ㅁㄹ"]], "query": "ㅁㄹ", "name_fields": ["부품"], "code_fields": ["6-AR-0001"], "literal_fields": [], "aliases": [], "expected": false},
+    {"name": "code-synonym-does-not-expand-metadata", "groups": [["AF", "ㅁㄹ"]], "query": "ㅁㄹ", "name_fields": ["부품"], "code_fields": ["6-AR-0001"], "literal_fields": ["AF"], "aliases": [], "expected": false},
+    {"name": "code-synonym-comma", "groups": [["AF", "ㅁㄹ"], ["TR", "ㅅㄱ"]], "query": "ㅅㄱ, ㅁㄹ", "name_fields": ["부품"], "code_fields": ["6-AF-0001"], "literal_fields": [], "aliases": [], "expected": true},
+    {"name": "code-synonym-snapshot", "groups": [["AF", "ㅁㄹ"]], "query": "ㅁㄹ", "name_fields": ["부품"], "code_fields": ["6-AR-0001", "6-AF-0001"], "literal_fields": [], "aliases": [], "expected": true},
     {"name": "empty", "query": "", "name_fields": ["Battery B/D"], "literal_fields": ["6-AR-0162"], "aliases": [], "expected": true},
     {"name": "ignored-only", "query": " - / . \t", "name_fields": ["아무 품목"], "literal_fields": [], "aliases": [], "expected": true},
     {"name": "empty-dictionary-does-not-translate", "groups": [], "query": "배터리", "name_fields": ["Battery"], "literal_fields": [], "aliases": [], "expected": false},

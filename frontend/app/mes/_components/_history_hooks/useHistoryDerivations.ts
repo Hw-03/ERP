@@ -116,7 +116,7 @@ export function useHistoryDerivations(
         return false;
       if (start && parseUtc(log.created_at) < start) return false;
       if (!matchesFields({ itemId: log.item_id, nameFields: [log.item_name],
-        literalFields: [log.mes_code, log.reference_no, log.notes] }, filters.search)) return false;
+        codeFields: [log.mes_code], literalFields: [log.reference_no, log.notes] }, filters.search)) return false;
       return true;
     });
   }, [logs, filters, itemModelMap, matchesFields]);

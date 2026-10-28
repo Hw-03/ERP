@@ -3,7 +3,6 @@ import type { ItemSearchConfig } from "@/lib/api/types/item-search";
 import { matchesItemSearchFields } from "@/lib/itemSearch";
 
 const SEARCH_FIELDS: (keyof DefectLocation)[] = [
-  "mes_code",
   "department",
   "reason_category",
   "reason_memo",
@@ -14,6 +13,7 @@ export function matchesDefectSearch(location: DefectLocation, query: string, con
   return matchesItemSearchFields({
     itemId: location.item_id,
     nameFields: [location.item_name],
+    codeFields: [location.mes_code],
     literalFields: SEARCH_FIELDS.map((field) => String(location[field] ?? "")),
   }, query, config);
 }

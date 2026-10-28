@@ -108,7 +108,7 @@ export function visibleRows(rows: ReworkRow[], expanded: Record<string, boolean>
   const visible = new Set<string>();
   for (const { node, path } of rows) {
     if (path.join("/") !== focusedPath && !((!changedOnly || hasChanges(node)) && matchesItemSearchFields({
-      itemId: node.item_id, nameFields: [node.item_name], literalFields: [node.mes_code, node.department],
+      itemId: node.item_id, nameFields: [node.item_name], codeFields: [node.mes_code], literalFields: [node.department],
     }, query, config))) continue;
     path.forEach((_, index) => visible.add(path.slice(0, index + 1).join("/")));
   }
