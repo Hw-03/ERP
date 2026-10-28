@@ -2153,6 +2153,88 @@
         "title": "CapacityResponse",
         "type": "object"
       },
+      "CapacitySimulationRequest": {
+        "properties": {
+          "excluded_item_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Excluded Item Ids",
+            "type": "array"
+          },
+          "pf_item_id": {
+            "format": "uuid",
+            "title": "Pf Item Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pf_item_id"
+        ],
+        "title": "CapacitySimulationRequest",
+        "type": "object"
+      },
+      "CapacitySimulationResponse": {
+        "properties": {
+          "fast_production": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fast Production"
+          },
+          "fast_production_status": {
+            "enum": [
+              "finite",
+              "no_constraints"
+            ],
+            "title": "Fast Production Status",
+            "type": "string"
+          },
+          "pf_item_id": {
+            "title": "Pf Item Id",
+            "type": "string"
+          },
+          "ship_ready": {
+            "title": "Ship Ready",
+            "type": "integer"
+          },
+          "total_production": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Production"
+          },
+          "total_production_status": {
+            "enum": [
+              "finite",
+              "no_constraints"
+            ],
+            "title": "Total Production Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pf_item_id",
+          "ship_ready",
+          "fast_production",
+          "fast_production_status",
+          "total_production",
+          "total_production_status"
+        ],
+        "title": "CapacitySimulationResponse",
+        "type": "object"
+      },
       "CapacityTopItem": {
         "properties": {
           "immediate": {
@@ -19341,6 +19423,33 @@
         ]
       }
     },
+    "/api/bom/parent-ids": {
+      "get": {
+        "description": "전체 BOM 목록과 같은 품목 존재 조건으로 부모 ID만 중복 없이 반환한다.",
+        "operationId": "get_bom_parent_ids_api_bom_parent_ids_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "title": "Response Get Bom Parent Ids Api Bom Parent Ids Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Bom Parent Ids",
+        "tags": [
+          "BOM"
+        ]
+      }
+    },
     "/api/bom/where-used/{item_id}": {
       "get": {
         "description": "주어진 품목을 child 로 사용하는 parent BOM 행 목록 (역방향 추적).\n\n- 직접 사용처만 반환 (1단계). 다단계 추적은 호출측에서 재귀.\n- 응답은 `BOMDetailResponse` 배열 — 기존 BOM 조회와 동일 모양.",
@@ -28789,6 +28898,48 @@
           }
         },
         "summary": "생산 가능 수량 조회",
+        "tags": [
+          "Production"
+        ]
+      }
+    },
+    "/api/production/capacity/simulate": {
+      "post": {
+        "description": "Preview exclusions in memory without changing BOM, stock, or revisions.",
+        "operationId": "preview_production_capacity_api_production_capacity_simulate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CapacitySimulationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapacitySimulationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Production Capacity",
         "tags": [
           "Production"
         ]

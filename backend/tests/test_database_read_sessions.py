@@ -120,6 +120,7 @@ def test_get_db_keeps_mutations_on_writer_session(method):
 
 
 PREVIEW_ROUTES = [
+    ("/api/production/capacity/simulate", "/api/production/capacity/simulate"),
     ("/api/io/preview", "/api/io/preview"),
     (
         "/api/inventory/operations/00000000-0000-0000-0000-000000000001/cancel/preview",
@@ -129,35 +130,43 @@ PREVIEW_ROUTES = [
 
 
 @pytest.mark.parametrize(("path", "route_path"), PREVIEW_ROUTES)
-def test_file_sqlite_previews_skip_both_write_guards(path, route_path):
-    read_session = MagicMock()
+@pytest.mark.parametrize("file_sqlite", [True, False])
+def test_read_only_previews_skip_both_write_guards(path: str, route_path: str, file_sqlite: bool) -> None:
+    """Preview semantics skip writes; only file SQLite needs a separate reader."""
+    session = MagicMock()
     with (
-        patch.object(database, "_is_file_sqlite", True),
-        patch.object(database, "SessionLocal") as writer_factory,
-        patch.object(database, "ReadSessionLocal", return_value=read_session),
+        patch.object(database, "_is_file_sqlite", file_sqlite),
+        patch.object(database, "SessionLocal", return_value=session) as writer_factory,
+        patch.object(database, "ReadSessionLocal", return_value=session) as reader_factory,
         patch("app.services.weekly_inventory_snapshot.ensure_due_snapshot_committed") as snapshot,
         patch("app.services.stocktake_guard.lock_control") as control,
     ):
         generator = database.get_db(_request("POST", path, route_path))
-        assert next(generator) is read_session
+        assert next(generator) is session
         generator.close()
 
-    writer_factory.assert_not_called()
+    if file_sqlite:
+        reader_factory.assert_called_once_with()
+        writer_factory.assert_not_called()
+    else:
+        writer_factory.assert_called_once_with()
+        reader_factory.assert_not_called()
     snapshot.assert_not_called()
     control.assert_not_called()
-    read_session.close.assert_called_once_with()
+    session.close.assert_called_once_with()
 
 
-@pytest.mark.parametrize(("method", "path", "route_path", "file_sqlite"), [
-    ("POST", "/api/io/submit", "/api/io/submit", True),
-    ("POST", "/api/inventory/operations/id/cancel", "/api/inventory/operations/{operation_id}/cancel", True),
-    ("POST", "/api/io/other/preview", "/api/io/other/preview", True),
-    ("POST", "/api/io/preview/extra", "/api/io/preview/extra", True),
-    ("PUT", "/api/io/preview", "/api/io/preview", True),
-    ("POST", "/api/io/preview", "/api/io/preview", False),
-    ("POST", "/api/inventory/other/id/cancel/preview", "/api/inventory/other/{operation_id}/cancel/preview", True),
+@pytest.mark.parametrize(("method", "path", "route_path"), [
+    ("POST", "/api/io/submit", "/api/io/submit"),
+    ("POST", "/api/inventory/operations/id/cancel", "/api/inventory/operations/{operation_id}/cancel"),
+    ("POST", "/api/io/other/preview", "/api/io/other/preview"),
+    ("POST", "/api/io/preview/extra", "/api/io/preview/extra"),
+    ("PUT", "/api/io/preview", "/api/io/preview"),
+    ("POST", "/api/inventory/other/id/cancel/preview", "/api/inventory/other/{operation_id}/cancel/preview"),
 ])
-def test_only_file_sqlite_preview_routes_bypass_write_guards(method, path, route_path, file_sqlite):
+@pytest.mark.parametrize("file_sqlite", [True, False])
+def test_non_preview_mutations_keep_write_guards(method: str, path: str, route_path: str, file_sqlite: bool) -> None:
+    """Real writes and near-match routes keep both guards on every database."""
     writer_session = MagicMock()
     with (
         patch.object(database, "_is_file_sqlite", file_sqlite),
