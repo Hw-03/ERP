@@ -62,6 +62,7 @@ import {
   runCompositionSubmit,
   refreshInternalUseBundle,
   saveCompositionDraft,
+  compositionDraftFingerprint,
   useIoComposeOperationState,
 } from "../../_warehouse_v2/ioComposeOperations";
 import {
@@ -120,6 +121,7 @@ export function MobileIoComposeWizard({
   onSubmitSuccess,
   onReservationChanged,
   onDirtyChange,
+  onLeaveSaveBlockedChange,
   flushDraftRef,
   onStepChange,
   onDraftSaved,
@@ -134,6 +136,7 @@ export function MobileIoComposeWizard({
   onRetryItems?: () => void;
   // 모바일 전용 — 섹션 탭 이탈 가드(D2)용. 데스크톱 IoComposeView 는 미사용.
   onDirtyChange?: (dirty: boolean) => void;
+  onLeaveSaveBlockedChange?: (reason: string | null) => void;
   flushDraftRef?: MutableRefObject<(() => Promise<void>) | null>;
   onStepChange?: (step: IoStep) => void;
 }) {
@@ -147,6 +150,9 @@ export function MobileIoComposeWizard({
   );
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<IoSubmitResultState | null>(null);
+  const [savedCheckpoint, setSavedCheckpoint] = useState<{ batchId: string; fingerprint: string } | null>(null);
+  const [saveOutcomeUnknown, setSaveOutcomeUnknown] = useState(false);
+  const [draftSavePending, setDraftSavePending] = useState(false);
   const {
     notice: feedbackNotice,
     showNotice: showFeedbackNotice,
@@ -246,6 +252,15 @@ export function MobileIoComposeWizard({
     reasonCategoryId: state.reasonCategoryId,
     supplierId: state.selectedSupplierId,
   };
+  function currentFingerprint(bundles = latestBundlesRef.current): string {
+    const fields = latestDraftFieldsRef.current;
+    return compositionDraftFingerprint({
+      requester_employee_id: fields.employeeId, work_type: fields.workType, sub_type: fields.subType,
+      from_department: fields.fromDepartment, to_department: fields.toDepartment,
+      supplier_id: fields.supplierId, reference_no: fields.referenceNo, notes: fields.notes,
+      reason_category: fields.reasonCategory, reason_category_id: fields.reasonCategoryId, bundles,
+    });
+  }
   const internalUsePreviewLock = useInternalUseBomPreviewLock();
   const intentAppliedRef = useRef(false);
   useEffect(() => {
@@ -297,6 +312,15 @@ export function MobileIoComposeWizard({
   });
 
   useEffect(() => {
+    setSavedCheckpoint(draftToRestore && canRestoreDraft
+      ? { batchId: draftToRestore.batch_id, fingerprint: compositionDraftFingerprint(draftToRestore) }
+      : null);
+    setSaveOutcomeUnknown(false);
+  // 실제 복원 요청만 마지막 서버 저장 내용의 기준을 바꾼다.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftToRestore?.batch_id, restoreNonce, canRestoreDraft]);
+
+  useEffect(() => {
     if (draftToRestore?.batch_id) resetTargetPickerFilters();
   }, [draftToRestore?.batch_id, restoreNonce]);
 
@@ -306,19 +330,29 @@ export function MobileIoComposeWizard({
     void onRefreshItems?.().catch(() => {});
   }, [state.step, onRefreshItems]);
 
-  // 작성 중(담은 묶음 있음) 여부를 상위(MobileWarehouseScreen)에 보고 — 섹션 이탈 가드용.
-  useEffect(() => {
-    onDirtyChange?.(warehouseReturn.pending || state.bundles.length > 0);
-  }, [state.bundles.length, warehouseReturn.pending, onDirtyChange]);
+  const pauseBlocksSaving = Boolean(stocktakePause && (stocktakePause.state !== "ready" || pauseRevisionStale));
+  const matchesSavedPayload = Boolean(savedCheckpoint && savedCheckpoint.batchId === autosaveBatchIdRef.current
+    && savedCheckpoint.fingerprint === currentFingerprint());
+  const operationBusy = drafting || draftSavePending || submitting || previewing || pulling || internalUsePreviewLock.busy;
+  const canLeaveSavedPause = stocktakePause?.state === "blocked" && matchesSavedPayload && !operationBusy && !saveOutcomeUnknown && !warehouseReturn.pending;
+  const leaveSaveBlockedReason = pauseBlocksSaving && !canLeaveSavedPause
+    ? "재고 조사 중에는 추가 변경을 저장할 수 없습니다. 추가 변경을 저장하지 않고 이동하면 기존 서버 초안은 유지됩니다."
+    : null;
 
-  // 이탈 직전 상위가 draft autosave 를 즉시 flush 할 수 있게 핸들을 노출(700ms 디바운스
-  // 창에서 마지막 변경이 유실되지 않도록). 매 렌더 최신 클로저로 갱신, 언마운트 시 해제.
+  useEffect(() => {
+    onDirtyChange?.(warehouseReturn.pending || operationBusy || saveOutcomeUnknown || !canLeaveSavedPause && (state.bundles.length > 0 || Boolean(savedCheckpoint)));
+  }, [state.bundles.length, savedCheckpoint, warehouseReturn.pending, operationBusy, saveOutcomeUnknown, canLeaveSavedPause, onDirtyChange]);
+  useEffect(() => { onLeaveSaveBlockedChange?.(leaveSaveBlockedReason); }, [leaveSaveBlockedReason, onLeaveSaveBlockedChange]);
+
+  // 이탈 직전 명시 저장 또는 저장된 조사 대기 내용 확인. 최신 클로저를 노출한다.
   useEffect(() => {
     if (!flushDraftRef) return;
     flushDraftRef.current = async () => {
       try {
         if (warehouseReturn.pending) throw new Error("보관 중인 원작업으로 돌아가 저장한 뒤 이동하세요.");
-        await saveCurrentDraft();
+        if (canLeaveSavedPause) return;
+        const batchId = await saveCurrentDraft();
+        if (!batchId) throw new Error("저장 중 내용이 변경되었거나 저장 결과를 확인하지 못했습니다. 내용을 확인한 뒤 다시 저장하세요.");
       } catch (err) {
         const message = err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.";
         showFeedbackNotice(message, "error");
@@ -454,6 +488,8 @@ export function MobileIoComposeWizard({
   // (안 하면 다음 저장이 이전 draft 를 덮어써 손실.)
   function beginNewCompositionSlot() {
     bumpOperationGeneration();
+    setSavedCheckpoint(null);
+    setSaveOutcomeUnknown(false);
     draftSession.resetSession();
     resetSubmitSession();
     autosaveBatchIdRef.current = null;
@@ -499,31 +535,61 @@ export function MobileIoComposeWizard({
     state.goTo(isMaterialWorkType(next) ? 6 : 2);
   }
 
+  async function saveDraftWithCheckpoint(payload: Parameters<typeof saveDraft>[0]): ReturnType<typeof saveDraft> {
+    const generation = operationRefs.generation.current;
+    const fingerprint = compositionDraftFingerprint({
+      requester_employee_id: payload.employeeId, work_type: payload.workType, sub_type: payload.subType,
+      from_department: payload.fromDepartment, to_department: payload.toDepartment,
+      supplier_id: payload.supplierId, reference_no: payload.referenceNo, notes: payload.notes,
+      reason_category: payload.reasonCategory, reason_category_id: payload.reasonCategoryId, bundles: payload.bundles,
+    });
+    try {
+      const batch = await saveDraft(payload);
+      if (!batch.batch_id || payload.batchId && batch.batch_id !== payload.batchId) throw new Error("저장 응답의 작업 번호를 확인하지 못했습니다.");
+      if (operationRefs.generation.current === generation) {
+        setSavedCheckpoint({ batchId: batch.batch_id, fingerprint });
+        setSaveOutcomeUnknown(false);
+      }
+      return batch;
+    } catch (err) {
+      if (operationRefs.generation.current === generation) setSaveOutcomeUnknown(true);
+      throw err;
+    }
+  }
+
   async function saveCurrentDraft(persistInUrl = true): Promise<string | null> {
     if (stocktakePause && (stocktakePause.state !== "ready" || pauseRevisionStale)) throw new Error("관련 품목 조사 반영 후 작업 중 목록에서 다시 열어 주세요.");
     if (!employeeId) {
       setError("작업자를 선택하세요.");
       throw new Error("작업자를 선택하세요.");
     }
-    const batchId = await saveCompositionDraft(
-      operationRefs,
-      internalUsePreviewLock.waitForIdle,
-      () => latestBundlesRef.current,
-      (bundles) => saveDraft({
-        employeeId,
-        workType: state.workType,
-        subType: state.subType,
-        ...ioDepartmentPayload(state.subType, state.fromDepartment, state.toDepartment),
-        referenceNo: state.referenceNo,
-        notes: state.notes,
-        reasonCategory: state.reasonCategory,
-        reasonCategoryId: state.reasonCategoryId,
-        supplierId: state.selectedSupplierId,
-        batchId: autosaveBatchIdRef.current,
-        bundles,
-      }),
-      (nextBatchId) => { autosaveBatchIdRef.current = nextBatchId; },
-    );
+    setDraftSavePending(true);
+    const generation = operationRefs.generation.current;
+    let batchId: string | null;
+    try {
+      batchId = await saveCompositionDraft(
+        operationRefs,
+        internalUsePreviewLock.waitForIdle,
+        () => latestBundlesRef.current,
+        (bundles) => saveDraftWithCheckpoint({
+          employeeId,
+          workType: state.workType,
+          subType: state.subType,
+          ...ioDepartmentPayload(state.subType, state.fromDepartment, state.toDepartment),
+          referenceNo: state.referenceNo,
+          notes: state.notes,
+          reasonCategory: state.reasonCategory,
+          reasonCategoryId: state.reasonCategoryId,
+          supplierId: state.selectedSupplierId,
+          batchId: autosaveBatchIdRef.current,
+          bundles,
+        }),
+        (nextBatchId) => { autosaveBatchIdRef.current = nextBatchId; },
+      );
+      if (!batchId && operationRefs.generation.current === generation) setSaveOutcomeUnknown(true);
+    } finally {
+      setDraftSavePending(false);
+    }
     if (batchId && persistInUrl) {
       onDraftSaved?.(batchId, state.step);
       const now = new Date();
@@ -596,7 +662,7 @@ export function MobileIoComposeWizard({
       return;
     }
     if (stocktakePause && (stocktakePause.state !== "ready" || pauseRevisionStale)) {
-      setError("관련 품목 조사 반영 후 작업 중 목록에서 다시 열어 주세요.");
+      setResult({ kind: "paused", title: "재고 조사 대기", message: "관련 품목 조사 반영 후 작업 중 목록에서 다시 열어 주세요." });
       return;
     }
     if (!canSeeWorkType(state.workType, operator)) return;
@@ -643,7 +709,7 @@ export function MobileIoComposeWizard({
       setError,
       state.goTo,
       setResult,
-      () => { state.reset(); draftSession.resetSession(); resetSubmitSession(); },
+      () => { state.reset(); draftSession.resetSession(); resetSubmitSession(); setSavedCheckpoint(null); setSaveOutcomeUnknown(false); },
       resetTargetPickerFilters,
       onStatusChange,
       async () => { await onRefreshItems?.(); },
@@ -658,7 +724,7 @@ export function MobileIoComposeWizard({
       operationRefs,
       (bundles) => {
         const fields = latestDraftFieldsRef.current;
-        return saveDraft({
+        return saveDraftWithCheckpoint({
           employeeId: fields.employeeId,
           workType: fields.workType,
           subType: fields.subType,
@@ -1038,7 +1104,27 @@ export function MobileIoComposeWizard({
         </StickyFooter>
       )}
 
-      <IoSubmitModals result={result} onClose={() => setResult(null)} />
+      <IoSubmitModals
+        result={result?.kind === "paused" ? { ...result, message: `${result.message}\n\n${
+          saveOutcomeUnknown
+            ? "현재 저장 결과를 확인하지 못했습니다. 이 화면에서 내용을 확인한 뒤 다시 저장하세요."
+            : !autosaveBatchIdRef.current
+              ? "입력한 내용은 아직 저장되지 않았습니다. 작업 중 등록을 눌러 저장할 수 있습니다."
+              : matchesSavedPayload
+                ? "현재 내용은 작업 중 목록에 저장되어 있습니다. 조사 반영 후 이어서 진행할 수 있습니다."
+                : "기존 서버 초안은 유지됩니다. 저장 후 추가 변경은 아직 저장되지 않았습니다."
+        }` } : result}
+        onClose={() => setResult(null)}
+        savingPausedDraft={drafting || draftSavePending}
+        onSavePausedDraft={result?.kind === "paused" && !autosaveBatchIdRef.current ? async () => {
+          try {
+            const batchId = await saveCurrentDraft();
+            if (!batchId) showFeedbackNotice("저장 결과를 확인하지 못했습니다. 내용을 확인한 뒤 다시 저장하세요.", "error");
+          } catch (err) {
+            showFeedbackNotice(err instanceof Error ? err.message : "저장에 실패했습니다.", "error");
+          }
+        } : undefined}
+      />
       {feedbackNotice && (
         <StatusTargetNotice
           key={feedbackNotice.id}

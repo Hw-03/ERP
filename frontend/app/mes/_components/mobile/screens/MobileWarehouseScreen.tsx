@@ -53,6 +53,7 @@ export function MobileWarehouseScreen({
   entryIntent,
   onSubmitSuccess,
   onComposeDirtyChange,
+  onLeaveSaveBlockedChange,
   flushDraftRef: externalFlushRef,
   endEditingRef,
   notificationSection,
@@ -66,6 +67,7 @@ export function MobileWarehouseScreen({
   // 항목 16 — 하단 네비 이탈 가드용. compose 작성 중 여부를 상위(MobileShell)에 보고하고,
   // 상위가 이탈 직전 draft flush 를 호출할 수 있게 ref 를 공유받는다.
   onComposeDirtyChange?: (dirty: boolean) => void;
+  onLeaveSaveBlockedChange?: (reason: string | null) => void;
   flushDraftRef?: MutableRefObject<(() => Promise<void>) | null>;
   /** 탭 이동이 확정되면 이전 저장·복원 응답과 자동 복원 연결을 종료한다. */
   endEditingRef?: MutableRefObject<(() => void) | null>;
@@ -135,6 +137,7 @@ export function MobileWarehouseScreen({
   const [failedCounts, setFailedCounts] = useState<WarehouseSectionTab[]>([]);
   // D2 — compose 작성 중(담은 묶음 있음) 다른 섹션 이탈 가드.
   const [composeDirty, setComposeDirty] = useState(false);
+  const [leaveSaveBlockedReason, setLeaveSaveBlockedReason] = useState<string | null>(null);
   const [pendingTab, setPendingTab] = useState<WarehouseSectionTab | null>(null);
   // 항목 16 — flush ref 는 상위(MobileShell)가 내려주면 공유, 없으면 로컬 사용(섹션 가드 단독 동작 보장).
   const localFlushRef = useRef<(() => Promise<void>) | null>(null);
@@ -157,6 +160,7 @@ export function MobileWarehouseScreen({
     setRestoreNonce((value) => value + 1);
     setComposeStep(1);
     setComposeDirty(false);
+    setLeaveSaveBlockedReason(null);
   }, []);
 
   useEffect(() => {
@@ -174,6 +178,7 @@ export function MobileWarehouseScreen({
   useEffect(() => {
     onComposeDirtyChange?.(composeDirty);
   }, [composeDirty, onComposeDirtyChange]);
+  useEffect(() => { onLeaveSaveBlockedChange?.(leaveSaveBlockedReason); }, [leaveSaveBlockedReason, onLeaveSaveBlockedChange]);
 
   useEffect(() => {
     if (showSectionTabs) {
@@ -420,6 +425,7 @@ export function MobileWarehouseScreen({
             restoreStep={urlRestoreStep}
             entryIntent={editingGeneration === 0 ? entryIntent : null}
             onDirtyChange={(dirty) => { if (isCurrentEditing()) setComposeDirty(dirty); }}
+            onLeaveSaveBlockedChange={(reason) => { if (isCurrentEditing()) setLeaveSaveBlockedReason(reason); }}
             flushDraftRef={flushDraftRef}
             onStepChange={(step) => { if (isCurrentEditing()) setComposeStep(step); }}
             onStatusChange={(status) => {
@@ -480,6 +486,7 @@ export function MobileWarehouseScreen({
 
       <MobileDirtyLeaveSheet
         open={pendingTab !== null}
+        saveBlockedReason={leaveSaveBlockedReason}
         onCancel={() => setPendingTab(null)}
         onConfirm={async () => {
           try {

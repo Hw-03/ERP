@@ -17,19 +17,21 @@ export function MobileDirtyLeaveSheet({
   onConfirm,
   onCancel,
   onDiscard,
+  saveBlockedReason,
 }: {
   open: boolean;
   onConfirm: () => Promise<void> | void;
   onCancel: () => void;
   /** 항목 3-4 — 저장하지 않고 그냥 나가기(작성 중 내용 폐기). 미전달 시 버튼 숨김. */
   onDiscard?: () => void;
+  saveBlockedReason?: string | null;
 }) {
   const [busy, setBusy] = useState(false);
   const handleCancel = () => {
     if (!busy) onCancel();
   };
   const handleConfirm = async () => {
-    if (busy) return;
+    if (busy || saveBlockedReason) return;
     setBusy(true);
     try {
       await onConfirm();
@@ -42,11 +44,12 @@ export function MobileDirtyLeaveSheet({
     <BottomSheet open={open} onClose={handleCancel} ariaLabel="작성 중 이동 확인">
       <SheetHeader title="작성 중인 입출고가 있어요" onClose={handleCancel} className="!items-center" />
       <div className="flex flex-col gap-3 px-5 pb-2">
+        {saveBlockedReason && <p className="text-sm leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>{saveBlockedReason}</p>}
         <PrimaryActionButton
           label={busy ? "저장 중…" : "임시저장하고 이동"}
           intent="primary"
           onClick={() => void handleConfirm()}
-          disabled={busy}
+          disabled={busy || Boolean(saveBlockedReason)}
         />
         {onDiscard && (
           <button
@@ -64,7 +67,7 @@ export function MobileDirtyLeaveSheet({
               background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,
             }}
           >
-            저장 안 하고 나가기
+            {saveBlockedReason ? "추가 변경 저장 없이 이동" : "저장 안 하고 나가기"}
           </button>
         )}
         <button

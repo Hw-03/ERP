@@ -6,7 +6,7 @@ import {
   type DependencyList,
   type MutableRefObject,
 } from "react";
-import type { IoSubmitResponse, Item } from "@/lib/api";
+import type { IoDraftPayload, IoSubmitResponse, Item } from "@/lib/api";
 import { ApiError } from "@/lib/api-core";
 import type { IoBundle } from "./types";
 import type { IoSubType, IoWorkType } from "./types";
@@ -23,6 +23,31 @@ export interface IoOperationRefs {
 }
 
 type OperationVersion = readonly [generation: number, contentRevision: number];
+
+/** 저장 계약의 내용만 비교한다. 재개 토큰·버전·화면 이동은 저장 변경이 아니다. */
+export function compositionDraftFingerprint(payload: IoDraftPayload): string {
+  const departments = ioDepartmentPayload(payload.sub_type, payload.from_department ?? "", payload.to_department ?? "");
+  return JSON.stringify({
+    employee: payload.requester_employee_id,
+    type: payload.work_type, subtype: payload.sub_type,
+    from: departments.fromDepartment || null, to: departments.toDepartment || null,
+    supplier: payload.supplier_id ?? null, reference: payload.reference_no || null,
+    notes: payload.notes || null,
+    reason: payload.sub_type === "defect_quarantine" ? payload.reason_category?.trim() || null : null,
+    reasonId: payload.sub_type === "defect_quarantine" ? payload.reason_category_id ?? null : null,
+    bundles: payload.bundles,
+  }, (key, value: unknown) => {
+    // 재고 재조회와 승인 응답의 표시는 작성한 저장 내용이 아니다.
+    if (key === "shortage" || key === "approval_kind" || key === "approval_outcome") return undefined;
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right)))
+      : value;
+  });
+}
+
+function isStocktakePaused(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 409 && error.code === "WORK_STOCKTAKE_PAUSED";
+}
 
 export function useIoComposeOperationState(
   contentDependencies: DependencyList,
@@ -235,6 +260,7 @@ async function saveExistingDraftBeforeSubmit(
   try {
     saved = await saveExistingDraft(bundles);
   } catch (error) {
+    if (isStocktakePaused(error)) throw error;
     const message = error instanceof Error ? error.message : "저장에 실패했습니다.";
     throw new Error(`현재 작업을 저장하지 못했습니다. 내용을 확인한 뒤 다시 제출하세요. (${message})`);
   }
@@ -256,7 +282,7 @@ export async function runCompositionSubmit(
   submit: (bundles: IoBundle[]) => Promise<IoSubmitResponse>,
   setError: (message: string) => void,
   goTo: (step: 4) => void,
-  setResult: (result: { kind: "success" | "error"; title: string; message: string }) => void,
+  setResult: (result: { kind: "success" | "error" | "paused"; title: string; message: string }) => void,
   reset: () => void,
   resetFilters: () => void,
   onStatusChange: (message: string) => void,
@@ -317,6 +343,10 @@ export async function runCompositionSubmit(
     onSubmitSuccess?.();
   } catch (error) {
     if (operationRefs && operationVersion && operationRefs.generation.current !== operationVersion[0]) return;
+    if (isStocktakePaused(error)) {
+      setResult({ kind: "paused", title: "재고 조사 대기", message: "관련 품목의 재고 조사가 진행 중입니다. 조사 반영 후 내용을 확인하고 다시 진행하세요. 자동으로 제출되지는 않습니다." });
+      return;
+    }
     const message = error instanceof Error ? error.message : "제출 중 오류가 발생했습니다.";
     setResult({ kind: "error", title: "제출 실패", message });
   }

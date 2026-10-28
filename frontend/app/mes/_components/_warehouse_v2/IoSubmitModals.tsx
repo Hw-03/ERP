@@ -4,7 +4,7 @@ import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 
 interface ResultState {
-  kind: "success" | "error";
+  kind: "success" | "error" | "paused";
   title: string;
   message: string;
 }
@@ -14,9 +14,11 @@ interface Props {
   onClose: () => void;
   /** R5(박스 배치 수량 부족) 차단 시 창고 지도로 이동. */
   onGoToMap?: () => void;
+  onSavePausedDraft?: () => Promise<void>;
+  savingPausedDraft?: boolean;
 }
 
-export function IoSubmitModals({ result, onClose, onGoToMap }: Props) {
+export function IoSubmitModals({ result, onClose, onGoToMap, onSavePausedDraft, savingPausedDraft }: Props) {
   // R5 차단 메시지면 배치 화면 바로가기 노출.
   const showMapLink =
     result?.kind === "error" && !!onGoToMap && result.message.includes("박스 배치");
@@ -26,10 +28,11 @@ export function IoSubmitModals({ result, onClose, onGoToMap }: Props) {
       open={result !== null}
       title={result?.title ?? ""}
       tone={result?.kind === "error" ? "danger" : "normal"}
-      confirmLabel="확인"
+      confirmLabel={result?.kind === "paused" && onSavePausedDraft ? "작업 중 등록" : "확인"}
       cancelLabel="닫기"
       onClose={onClose}
-      onConfirm={onClose}
+      onConfirm={result?.kind === "paused" && onSavePausedDraft ? onSavePausedDraft : onClose}
+      busy={savingPausedDraft}
     >
       <p className="whitespace-pre-line text-sm leading-relaxed">{result?.message}</p>
       {showMapLink && (

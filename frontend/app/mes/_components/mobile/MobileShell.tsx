@@ -214,6 +214,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
   const [stockWarnings, setStockWarnings] = useState<{ low: number; zero: number } | null>(null);
   // 항목 16 — 입출고 작성 중(담은 묶음 있음) 하단 네비로 이탈 시 확인 시트.
   const [warehouseDirty, setWarehouseDirty] = useState(false);
+  const [warehouseLeaveSaveBlockedReason, setWarehouseLeaveSaveBlockedReason] = useState<string | null>(null);
   const warehouseDirtyRef = useRef(warehouseDirty);
   warehouseDirtyRef.current = warehouseDirty;
   const warehouseFlushRef = useRef<(() => Promise<void>) | null>(null);
@@ -552,6 +553,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
           targetRequestId={warehouseNotificationTarget?.relatedRequestId}
           onSubmitSuccess={loadCapacity}
           onComposeDirtyChange={setWarehouseDirty}
+          onLeaveSaveBlockedChange={setWarehouseLeaveSaveBlockedReason}
           flushDraftRef={warehouseFlushRef}
           endEditingRef={warehouseEndEditingRef}
         />
@@ -728,6 +730,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
       {/* 항목 16 — 입출고 작성 중 하단 네비 이탈 확인(draft 자동저장 flush 후 전환) */}
       <MobileDirtyLeaveSheet
         open={pendingNavTab !== null}
+        saveBlockedReason={activeTab === "warehouse" ? warehouseLeaveSaveBlockedReason : null}
         onCancel={() => {
           pendingPopNavigationRef.current = null;
           setPendingNavTab(null);

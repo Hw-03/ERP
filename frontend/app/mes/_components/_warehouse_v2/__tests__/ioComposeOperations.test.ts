@@ -2,10 +2,13 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
+import { ApiError } from "@/lib/api-core";
+import type { IoDraftPayload } from "@/lib/api";
 import {
   runWarehousePull,
   saveCompositionDraft,
   runCompositionSubmit,
+  compositionDraftFingerprint,
   useIoComposeOperationState,
   type IoOperationRefs,
 } from "../ioComposeOperations";
@@ -18,6 +21,46 @@ function operationRefs(): IoOperationRefs {
 }
 
 describe("ioComposeOperations", () => {
+  const payload = (): IoDraftPayload => ({
+    requester_employee_id: "employee", work_type: "process", sub_type: "defect_quarantine",
+    from_department: "조립", to_department: "진공", supplier_id: "supplier", reference_no: "reference", notes: "메모",
+    reason_category: "사유", reason_category_id: "reason",
+    bundles: [{ bundle_id: "bundle", lines: [{ line_id: "line", quantity: 1, included: true }] } as never],
+  });
+  it("저장 내용이 같으면 키 순서·서버 버전·재개 토큰·화면 메타를 비교하지 않는다", () => {
+    const original = payload();
+    const restored = { ...original, batch_id: "batch", expected_revision: 3, stocktake_resume_token: "token", step: 5,
+      stocktake_pause: { state: "blocked" }, bundles: [{ lines: [{ included: true, quantity: 1, line_id: "line" }], bundle_id: "bundle" }] };
+    expect(compositionDraftFingerprint(restored as IoDraftPayload)).toBe(compositionDraftFingerprint(original));
+  });
+  it.each(["requester_employee_id", "work_type", "sub_type", "from_department", "to_department", "supplier_id", "reference_no", "notes", "reason_category", "reason_category_id"])("%s의 변경은 저장 내용 변경으로 구별한다", (field) => {
+    expect(compositionDraftFingerprint({ ...payload(), [field]: "changed" } as IoDraftPayload)).not.toBe(compositionDraftFingerprint(payload()));
+  });
+  it.each(["quantity", "included", "selected", "item_id"])("라인 %s 변경과 묶음 삭제를 놓치지 않는다", (field) => {
+    const original = payload();
+    const changed = { ...original, bundles: [{ ...original.bundles[0], lines: [{ ...original.bundles[0].lines[0], [field]: "changed" }] }] };
+    expect(compositionDraftFingerprint(changed as IoDraftPayload)).not.toBe(compositionDraftFingerprint(original));
+    expect(compositionDraftFingerprint({ ...original, bundles: [] })).not.toBe(compositionDraftFingerprint(original));
+  });
+  it("재조회된 부족 표시와 서버 승인 메타는 사용자 입력 변경이 아니다", () => {
+    const original = payload();
+    const refreshed = { ...original, bundles: [{ ...original.bundles[0], lines: [{ ...original.bundles[0].lines[0], shortage: 5, approval_outcome: "approved", approval_kind: "warehouse" }] }] };
+    expect(compositionDraftFingerprint(refreshed as IoDraftPayload)).toBe(compositionDraftFingerprint(original));
+  });
+  it.each([null, "draft-1"])("조사 대기 %s는 실패와 구별하고 작성 내용을 유지한다", async (draftId) => {
+    const paused = new ApiError("관련 품목 조사 중", 409, "WORK_STOCKTAKE_PAUSED");
+    const setResult = vi.fn();
+    const reset = vi.fn();
+    const batchRef = { current: draftId };
+    await runCompositionSubmit("employee", "adjust_in", "조립", async () => {},
+      () => [{ bundle_id: "bundle", lines: [] } as never], batchRef,
+      async () => { throw paused; }, vi.fn(), vi.fn(), setResult, reset, vi.fn(), vi.fn(),
+      async () => [], vi.fn(), undefined, vi.fn(), undefined, operationRefs(), async () => { throw paused; });
+    expect(setResult).toHaveBeenCalledWith(expect.objectContaining({ kind: "paused", title: "재고 조사 대기" }));
+    expect(setResult.mock.calls[0][0].message).not.toContain("작업 중 목록");
+    expect(reset).not.toHaveBeenCalled();
+    expect(batchRef.current).toBe(draftId);
+  });
   it.each([
     ["as_research", true, 1, "AS·연구 전용 결재 요청 완료"],
     ["warehouse", true, 1, "창고 결재 요청 완료"],
