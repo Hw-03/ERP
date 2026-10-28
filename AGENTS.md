@@ -22,7 +22,7 @@ Keep both files aligned so Claude Code and Codex can work on DEXCOWIN MES with t
   - Use `subagent-driven-development` when executing a plan with independent implementation tasks in the current session.
   - Keep final integration, verification, commit, push, and deployment decisions in the parent session.
   - Do not dispatch multiple implementation subagents to edit the same files or tightly coupled behavior at the same time.
-  - When spawning a subagent, select its model and reasoning level for the delegated task's complexity, risk, and expected depth. For all new parent and subagent work, recommend only GPT-6 Astra, GPT-6.1 Sol, or GPT-6 Luna; do not recommend any other model.
+  - When spawning a subagent, select its model and reasoning level for the delegated task's complexity, risk, and expected depth. For all new parent and subagent work, recommend only GPT-6 Astra, GPT-6.1 Sol, GPT-6.1 Terra, or GPT-6 Luna; do not recommend any other model.
 - Keep `.agents/skills/` aligned with the user's Claude/Codex skill set when intentionally updating shared workflows.
 
 ## Project Rules
@@ -70,6 +70,7 @@ After completing a plan, always place the recommended Codex model, exactly one r
 모델 선택 기준:
 - **GPT-6 Astra**: 가장 어려운 엔드투엔드 작업에 사용한다. 불명확한 요구를 해석하면서 장기 다단계 작업을 끝까지 수행해야 하거나, 넓은 아키텍처 판단, 고위험 보안·권한·데이터 정합성 변경, 복잡한 코드·브라우저·문서 작업의 통합이 필요한 플랜이 대상이다. 단순히 파일 수가 많거나 오래 걸린다는 이유만으로 선택하지 않는다.
 - **GPT-6.1 Sol**: 일반 DEXCOWIN MES 개발의 기본값이다. 기능 개발, 프론트엔드·백엔드 연동, 버그 수정, 중간 규모 리팩터링과 복잡한 코딩·에이전트 작업에 사용한다. 판단 위험이 특히 높고 작업 전반의 통합이 어려우면 Astra를 선택한다.
+- **GPT-6.1 Terra**: 입력과 완료 기준이 명확한 화면 기반 작업, 시각 자료 해석, 범위가 정해진 코드 수정, 문구·문서 작성에 사용한다. 화면 조작이나 수정 범위에 판단이 필요하지만 여러 모듈을 연결하는 복잡한 개발이면 Sol을 선택한다.
 - **GPT-6 Luna**: 범위가 좁고 결과가 명확한 저위험 작업에 사용한다. 파일 탐색, 문서 수정, 단순 이름 변경, 작은 UI 문구·스타일 수정, 기계적 정리와 반복 작업에 적합하다.
 
 UI 추론 수준과 선택 기준:
