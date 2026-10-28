@@ -301,7 +301,7 @@ export function StocktakeManagement({ token, operator, round, onChanged, section
                   { label: "확인 후 미반영", count: preview.data.summary.confirmed_excluded, unit: "건", description: "확인한 수량이 재고에 반영되지 않았습니다." },
                   { label: "추가 대기", count: preview.data.summary.pending, unit: "건", description: "회차에 추가하지 않은 조사 대상입니다." }].map(value => <div key={value.label} className="rounded-xl bg-[var(--c-s2)] p-3">
                     <p className="font-semibold">{value.label} {value.count?.toLocaleString("ko-KR") ?? "—"}{value.unit}</p>
-                    <p className="mt-1 text-xs leading-5 text-[var(--c-muted2)]">{value.description}</p>
+                    {value.count !== 0 && <p className="mt-1 text-xs leading-5 text-[var(--c-muted2)]">{value.description}</p>}
                   </div>)}
               </div>
             </div>}

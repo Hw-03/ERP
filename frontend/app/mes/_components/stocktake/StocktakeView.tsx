@@ -105,12 +105,12 @@ export function StocktakeView({ operator, variant = "desktop" }: { operator: Ope
     {ownershipChecking && !session && <StocktakeLoadingSkeleton variant={variant} />}
     {authError && <ReadFailure message={authError} onRetry={() => setLoginRevision((revision) => revision + 1)} />}
     {session && workspaceOperator && <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${!authenticated || session.employee_id !== operator.employee_id ? "pointer-events-none opacity-60" : ""}`} inert={!authenticated || session.employee_id !== operator.employee_id}>
-      <StocktakeWorkspace key={workspaceOperator.employee_id} variant={variant} token={session.token} operator={workspaceOperator.employee_id === operator.employee_id ? operator : workspaceOperator} enabled={authenticated && session.employee_id === operator.employee_id} />
+      <StocktakeWorkspace key={workspaceOperator.employee_id} variant={variant} token={session.token} tabId={session.tab_id} operator={workspaceOperator.employee_id === operator.employee_id ? operator : workspaceOperator} enabled={authenticated && session.employee_id === operator.employee_id} />
     </div>}
   </div>;
 }
 
-function StocktakeWorkspace({ token, operator, enabled, variant }: { token: string; operator: Operator; enabled: boolean; variant: StocktakeVariant }) {
+function StocktakeWorkspace({ token, tabId, operator, enabled, variant }: { token: string; tabId: string; operator: Operator; enabled: boolean; variant: StocktakeVariant }) {
   const queryClient = useQueryClient();
   const { config: searchConfig } = useItemSearch();
   const navigate = useConfirmNavigation();
@@ -163,6 +163,7 @@ function StocktakeWorkspace({ token, operator, enabled, variant }: { token: stri
   const allowedRounds = rounds.data?.items.filter(entry => canManageRounds || entry.status === "ACTIVE") ?? [];
   const activeRound = allowedRounds.find(entry => entry.status === "ACTIVE");
   const round = allowedRounds.find(entry => entry.round_id === roundId) ?? activeRound ?? (section === "rounds" ? allowedRounds[0] : null) ?? null;
+  const scopeMemoryKey = JSON.stringify(["stocktake-scope", tabId, operator.employee_id, round?.round_id]);
   const showIdle = !activeRound && !roundId && section !== "rounds";
   const latestSummary = useQuery({ queryKey: ["stocktake", operator.employee_id, "latest-summary"],
     queryFn: ({ signal }) => stocktakeApi.read<StocktakeLatestSummaryResponse>("/api/stocktakes/rounds/latest-summary", token, { signal }),
@@ -286,13 +287,19 @@ function StocktakeWorkspace({ token, operator, enabled, variant }: { token: stri
     }
     const options = target.location_targets ?? [target];
     const sameLocation = options.find(entry => entry.target_id === selectedTarget?.target_id);
-    setSelectedTarget({ ...(sameLocation ?? target), location_targets: options });
+    let rememberedScope: string | null = null;
+    try { rememberedScope = window.sessionStorage.getItem(scopeMemoryKey); }
+    catch { /* A disabled preference store must not prevent counting. */ }
+    const rememberedLocation = options.find(entry => entry.scope_id === rememberedScope);
+    setSelectedTarget({ ...(sameLocation ?? rememberedLocation ?? target), location_targets: options });
     setDetailOpen(true);
   });
   const selectLocation = (target: StocktakeTarget): void => {
     if (target.target_id === freshTarget?.target_id) return;
     navigate(() => {
       const options = locationTargets.map(entry => entry.target_id === freshTarget?.target_id ? freshTarget : entry);
+      try { window.sessionStorage.setItem(scopeMemoryKey, target.scope_id); }
+      catch { /* Counting remains available when browser storage is disabled or full. */ }
       setSelectedTarget({ ...target, location_targets: options });
     });
   };
@@ -449,7 +456,7 @@ function StocktakeWorkspace({ token, operator, enabled, variant }: { token: stri
         <p className="my-4 text-sm leading-relaxed">{freshTarget.status === "UNCOUNTED" ? "조사" : "재조사"} 중에는 이 품목·위치의 재고 이동이 제한됩니다.</p>
         <button type="button" className={`${STOCKTAKE_BUTTON} w-full bg-[var(--c-blue)] text-white`} disabled={busy || !!unknown} aria-busy={activeAction === "count_start"} onClick={() => void execute("count_start", `/api/stocktakes/targets/${freshTarget.target_id}/counts`, { expected_target_version: freshTarget.target_version, round_epoch: round!.epoch }, freshTarget)}>{activeAction === "count_start" ? "처리 중…" : freshTarget.status === "UNCOUNTED" ? "계수 시작" : "재조사"}</button>
       </section>}
-      {freshTarget.count && <StocktakeCountEditor presentation={variant === "desktop" ? "panel" : "card"} imageFilename={imageFilename} key={freshTarget.count.count_id} target={freshTarget} token={token} operator={operator} onChanged={onChanged} enabled={enabled} recovered={recovered} />}
+      {freshTarget.count && <StocktakeCountEditor presentation={variant === "desktop" ? "panel" : "card"} showIdentity={!(round?.status === "ACTIVE" && ["UNCOUNTED", "APPLIED", "ABANDONED"].includes(freshTarget.status))} imageFilename={imageFilename} key={freshTarget.count.count_id} target={freshTarget} token={token} operator={operator} onChanged={onChanged} enabled={enabled} recovered={recovered} />}
       {freshTarget.status === "DRAFT" && detailPhoto}
       {!freshTarget.count && round?.status !== "ACTIVE" && <section className={STOCKTAKE_CARD}>
         <div className="flex items-center gap-3"><StocktakeItemPhoto filename={imageFilename} name={freshTarget.current_item_name || freshTarget.item_name} /><div className="min-w-0"><h2 className="break-words text-lg font-semibold">{freshTarget.current_item_name || freshTarget.item_name}</h2><p className="mt-1 break-all text-xs text-[var(--c-muted2)]">{freshTarget.current_item_code || freshTarget.item_code} · {freshTarget.scope_name}</p></div></div>

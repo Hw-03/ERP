@@ -571,6 +571,7 @@ describe("StocktakeView integration", () => {
   });
   beforeEach(() => {
     vi.resetAllMocks();
+    sessionStorage.clear();
     vi.mocked(itemSearchApi.getConfig).mockResolvedValue({ version: "search-v1", synonym_groups: [], item_aliases: {} });
     state.actor = { employee_id: "employee-a", name: "계수 작업자", level: "staff", department_role: "primary", warehouse_role: "none" };
     targets = [target()];
@@ -584,6 +585,73 @@ describe("StocktakeView integration", () => {
       if (kind === "count_save") return count({ version: 3, quantities: (body as { quantities: StocktakeCount["quantities"] }).quantities });
       return { application_id: "application-a" };
     });
+  });
+
+  it.each(["DRAFT", "CONFIRMED", "APPLIED", "UNCOUNTED"] as const)("모바일 %s 상세는 품목과 선택 위치를 중복 없이 표시한다", async status => {
+    targets = [target({ status, count: status === "UNCOUNTED" ? null : count({ status }) })];
+    mount("mobile");
+    fireEvent.click(await screen.findByRole("button", { name: /시험 품목 A/ }, { timeout: 5000 }));
+    const sheet = within(screen.getByRole("dialog", { name: "조사 작업" }));
+    expect(sheet.getAllByRole("heading", { name: "시험 품목 A", exact: true })).toHaveLength(1);
+    expect(sheet.getAllByText("M-A · 창고", { exact: true })).toHaveLength(1);
+  });
+
+  it.each(["CONFIRMED", "APPLIED", "CLOSED_UNAPPLIED"] as const)("종료 회차 모바일 %s 상세도 품목과 선택 위치를 표시한다", async status => {
+    targets = [target({ status, count: status === "CLOSED_UNAPPLIED" ? null : count({ status }) })];
+    vi.mocked(stocktakeApi.read).mockImplementation(async path => path === "/api/stocktakes/rounds" ? { items: [rounds[1]] } : readFixture(path));
+    mount("mobile");
+    fireEvent.click(await screen.findByRole("button", { name: "결과 상세 보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "조사하기", exact: true }));
+    fireEvent.click(await screen.findByRole("button", { name: /시험 품목 A/ }));
+    const sheet = within(screen.getByRole("dialog", { name: "조사 작업" }));
+    expect(sheet.getAllByRole("heading", { name: "시험 품목 A", exact: true })).toHaveLength(1);
+    expect(sheet.getAllByText("M-A · 창고", { exact: true })).toHaveLength(1);
+    expect(sheet.queryByRole("button", { name: "재조사", exact: true })).not.toBeInTheDocument();
+  });
+
+  it.each(["desktop", "mobile"] as const)("%s 새 품목과 다시 연 화면은 직전 선택 위치를 복원하고 없는 위치는 서버 기본을 사용한다", async variant => {
+    const first = target({ count: null, status: "UNCOUNTED" });
+    const tube = target({ target_id: "a-tube", scope_id: "tube", scope_name: "튜브", count: null, status: "UNCOUNTED" });
+    const second = target({ target_id: "b-warehouse", item_id: "item-b", item_name: "시험 품목 B", current_item_name: "시험 품목 B", count: null, status: "UNCOUNTED" });
+    const secondTube = { ...second, target_id: "b-tube", scope_id: "tube", scope_name: "튜브" };
+    const missing = { ...second, target_id: "c-warehouse", item_id: "item-c", item_name: "시험 품목 C", current_item_name: "시험 품목 C" };
+    targets = [{ ...first, location_targets: [first, tube] }, { ...second, location_targets: [second, secondTube] }, missing];
+    const view = mount(variant);
+    const close = async () => {
+      fireEvent.click(screen.getByRole("button", { name: variant === "mobile" ? "시트 닫기 핸들" : "작업 패널 닫기" }));
+      await waitFor(() => expect(screen.getByRole("button", { name: /시험 품목 A/ })).toBeVisible());
+    };
+    fireEvent.click(await screen.findByRole("button", { name: /시험 품목 A/ }));
+    fireEvent.click(screen.getByRole("button", { name: "튜브 미확인" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "튜브 미확인" })).toHaveAttribute("aria-pressed", "true"));
+    await close();
+    fireEvent.click(screen.getByRole("button", { name: /시험 품목 B/ }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "튜브 미확인" })).toHaveAttribute("aria-pressed", "true"));
+    await close();
+    fireEvent.click(screen.getByRole("button", { name: /시험 품목 C/ }));
+    expect(screen.getByRole("button", { name: "창고 미확인" })).toHaveAttribute("aria-pressed", "true");
+    view.unmount();
+    mount(variant);
+    fireEvent.click(await screen.findByRole("button", { name: /시험 품목 B/ }));
+    expect(screen.getByRole("button", { name: "튜브 미확인" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it.each(["tab", "employee", "round"] as const)("위치 기억은 다른 %s에 공유하지 않는다", async scope => {
+    const first = target({ count: null, status: "UNCOUNTED" });
+    const tube = { ...first, target_id: "a-tube", scope_id: "tube", scope_name: "튜브" };
+    targets = [{ ...first, location_targets: [first, tube] }];
+    const view = mount();
+    fireEvent.click(await screen.findByRole("button", { name: /시험 품목 A/ }));
+    fireEvent.click(screen.getByRole("button", { name: "튜브 미확인" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "튜브 미확인" })).toHaveAttribute("aria-pressed", "true"));
+    expect(sessionStorage.length).toBeGreaterThan(0);
+    view.unmount();
+    if (scope === "tab") state.restore.mockImplementation((id?: string) => ({ ...session(id), tab_id: "tab-b" }));
+    if (scope === "employee") state.actor = { ...state.actor, employee_id: "employee-b" };
+    if (scope === "round") vi.mocked(stocktakeApi.read).mockImplementation(async path => path === "/api/stocktakes/rounds" ? { items: [{ ...rounds[0], round_id: "round-new" }] } : readFixture(path));
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: /시험 품목 A/ }));
+    expect(screen.getByRole("button", { name: "창고 미확인" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("서버 회차 요약과 일부 페이지만 불러온 목록 건수를 구분한다", async () => {
@@ -653,12 +721,14 @@ describe("StocktakeView integration", () => {
     targets = [{ ...warehouse, location_targets: [other, warehouse] }];
     vi.mocked(stocktakeApi.command).mockRejectedValue(Object.assign(new Error("위치 전환 저장 실패"), { code }));
     mount(variant);
-    fireEvent.click(await screen.findByRole("button", { name: /시험 품목 A/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /시험 품목 A/ }, { timeout: 5000 }));
     const input = await screen.findByLabelText("정상 수량");
     fireEvent.change(input, { target: { value: "9" } });
+    const rememberedBefore = { ...sessionStorage };
     fireEvent.click(screen.getByRole("button", { name: "튜브 미확인" }));
     await waitFor(() => expect(stocktakeApi.command).toHaveBeenCalledTimes(1));
     expect(input).toHaveValue("9");
+    expect({ ...sessionStorage }).toEqual(rememberedBefore);
     expect(screen.getByRole("button", { name: "창고 계수 중" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole(variant === "mobile" ? "dialog" : "complementary", { name: variant === "mobile" ? "조사 작업" : "시험 품목 A" })).toBeVisible();
   });

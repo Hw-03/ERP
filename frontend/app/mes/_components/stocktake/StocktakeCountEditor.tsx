@@ -24,8 +24,8 @@ export const STOCKTAKE_INPUT = "min-h-11 w-full rounded-xl border border-[var(--
 export const STOCKTAKE_CARD = "card desktop-flat-surface rounded-[20px] border border-[var(--c-border)] bg-[var(--c-s1)] p-4 lg:rounded-[24px]";
 
 /** Preserve the editor instance across list refreshes; only changing the count remounts it. */
-export function StocktakeCountEditor({ target, token, operator, onChanged, enabled = true, recovered, imageFilename, presentation = "card" }: {
-  target: StocktakeTarget; token: string; operator: Operator; onChanged: () => void; enabled?: boolean; recovered?: RecoveredStocktakeCommand | null; imageFilename?: string; presentation?: "card" | "panel";
+export function StocktakeCountEditor({ target, token, operator, onChanged, enabled = true, recovered, imageFilename, presentation = "card", showIdentity = true }: {
+  target: StocktakeTarget; token: string; operator: Operator; onChanged: () => void; enabled?: boolean; recovered?: RecoveredStocktakeCommand | null; imageFilename?: string; presentation?: "card" | "panel"; showIdentity?: boolean;
 }) {
   const initial = target.count!;
   const tokenRef = useRef(token);
@@ -144,8 +144,8 @@ export function StocktakeCountEditor({ target, token, operator, onChanged, enabl
     }
   }
   return <section className={`${presentation === "panel" ? "rounded-[28px] border border-[var(--c-border)] bg-[var(--c-s2)] p-5" : STOCKTAKE_CARD} flex flex-1 flex-col`} aria-label={historical ? "이전 조사 결과" : "계수 입력"}>
-    {presentation === "card" && !historical ? <div className="flex items-center gap-3"><StocktakeItemPhoto filename={imageFilename} name={target.current_item_name || target.item_name} /><div className="min-w-0"><h2 className="break-words text-lg font-semibold">{target.current_item_name || target.item_name}</h2>
-      <p className="mt-1 break-all text-xs text-[var(--c-muted2)]">{target.current_item_code || target.item_code}</p></div></div> : null}
+    {presentation === "card" && showIdentity ? <div className="flex items-center gap-3"><StocktakeItemPhoto filename={imageFilename} name={target.current_item_name || target.item_name} /><div className="min-w-0"><h2 className="break-words text-lg font-semibold">{target.current_item_name || target.item_name}</h2>
+      <p className="mt-1 break-all text-xs text-[var(--c-muted2)]">{target.current_item_code || target.item_code} · {target.scope_name}</p></div></div> : null}
     {historical && <header className={`mb-3 flex gap-x-3 gap-y-1 ${presentation === "card" ? "flex-col" : "flex-wrap items-center justify-between"}`}>
       <h2 className="text-sm font-semibold leading-5">이전 조사 결과</h2>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-5 text-[var(--c-muted2)]">

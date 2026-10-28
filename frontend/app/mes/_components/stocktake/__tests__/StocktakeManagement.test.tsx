@@ -24,6 +24,22 @@ beforeEach(() => {
 });
 
 describe("StocktakeManagement", () => {
+  it.each([0, 2, undefined])("종료 검토 수량 %s는 0일 때만 미완료 설명을 생략한다", async remaining => {
+    vi.mocked(stocktakeApi.command).mockResolvedValueOnce({ preview_id: "p", preview_hash: "h", can_close: remaining === 0,
+      summary: { total: 6, applied: 6, unconfirmed: remaining, confirmed_excluded: remaining, pending: remaining } });
+    const read = vi.mocked(stocktakeApi.read).getMockImplementation()!;
+    vi.mocked(stocktakeApi.read).mockImplementation((path, token) => path.includes("/close-previews/") ? Promise.resolve({ items: [], next_offset: null }) : read(path, token));
+    render(<StocktakeManagement token="t" operator={operator} round={round} onChanged={vi.fn()} section="rounds" />);
+    fireEvent.click(screen.getByRole("button", { name: "종료 내용 확인" }));
+    const review = within(await screen.findByRole("region", { name: "회차 관리 검토" }));
+    for (const text of ["아직 수량 확인이 끝나지 않았습니다.", "확인한 수량이 재고에 반영되지 않았습니다.", "회차에 추가하지 않은 조사 대상입니다."]) {
+      if (remaining === 0) expect(review.queryByText(text)).not.toBeInTheDocument();
+      else expect(review.getByText(text)).toBeVisible();
+    }
+    if (remaining === undefined) expect(review.getByText("미확인 —곳")).toBeVisible();
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "회차 종료", exact: true }).at(-1)).toHaveProperty("disabled", remaining !== 0));
+  });
+
   it("LAN HTTP에서도 시작 검토와 회차 시작 요청을 보낸다", async () => {
     vi.stubGlobal("crypto", { getRandomValues: crypto.getRandomValues.bind(crypto) });
     try {
