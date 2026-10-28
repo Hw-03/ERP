@@ -19,11 +19,12 @@ function packageScripts() {
 function loadNextConfig() {
   delete require.cache[require.resolve(NEXT_CONFIG_PATH)];
   return require(NEXT_CONFIG_PATH) as (phase: string) => {
-    rewrites: () => Promise<Array<{ destination: string }>>;
+    distDir: string;
+    rewrites?: unknown;
   };
 }
 
-async function rewriteDestination(phase: string, backendInternalUrl?: string) {
+function nextConfig(phase: string, backendInternalUrl?: string) {
   const previous = process.env.BACKEND_INTERNAL_URL;
   if (backendInternalUrl === undefined) {
     delete process.env.BACKEND_INTERNAL_URL;
@@ -32,8 +33,7 @@ async function rewriteDestination(phase: string, backendInternalUrl?: string) {
   }
 
   try {
-    const config = loadNextConfig()(phase);
-    return (await config.rewrites())[0].destination;
+    return loadNextConfig()(phase);
   } finally {
     if (previous === undefined) {
       delete process.env.BACKEND_INTERNAL_URL;
@@ -48,14 +48,17 @@ describe("개발 서버 실행 경로", () => {
     expect(packageScripts().dev).toMatch(/scripts[\\\\/]dev[\\\\/]start-frontend\.ps1/);
   });
 
-  it("dev:raw는 내부와 E2E에서 쓰는 직접 Next 실행 명령을 유지한다", () => {
-    expect(packageScripts()["dev:raw"]).toBe("next dev --hostname 0.0.0.0");
+  it("dev:raw와 start는 동일한 API 전달부를 사용하는 custom server를 실행한다", () => {
+    expect(packageScripts()["dev:raw"]).toBe(
+      "node scripts/next-server.js dev --hostname 0.0.0.0"
+    );
+    expect(packageScripts().start).toBe("node scripts/next-server.js start");
   });
 
   it.each([
-    ["dev", "Usage: next dev"],
-    ["start", "Usage: next start"],
-  ])("supervised frontend mode %s selects the matching Next command", (runMode, expectedUsage) => {
+    ["dev", "Usage: node scripts/next-server.js dev"],
+    ["start", "Usage: node scripts/next-server.js start"],
+  ])("supervised frontend mode %s selects the matching custom server mode", (runMode, expectedUsage) => {
     const result = spawnSync(process.execPath, ["scripts/dev.js", "--help"], {
       cwd: FRONTEND_ROOT,
       encoding: "utf8",
@@ -70,7 +73,7 @@ describe("개발 서버 실행 경로", () => {
     });
 
     const stdout = result.stdout.replace(/\x1b\[[0-9;]*m/g, "");
-    expect(result.status).toBe(0);
+    expect(result.status, result.stderr).toBe(0);
     expect(stdout).toContain(expectedUsage);
   });
 
@@ -109,36 +112,16 @@ describe("개발 서버 실행 경로", () => {
     expect(`${launcher}\n${runtimeControl}`).not.toMatch(/\bnpm(?:\.cmd)?\s+run\s+dev\b/i);
   });
 
-  it("개발 phase에서 명시 URL이 없으면 감독 백엔드 포트로 프록시한다", async () => {
-    const { PHASE_DEVELOPMENT_SERVER } = require("next/constants");
-
-    await expect(rewriteDestination(PHASE_DEVELOPMENT_SERVER)).resolves.toBe(
-      "http://localhost:8011/api/:path*"
-    );
-  });
-
-  it("명시 BACKEND_INTERNAL_URL을 공백 제거 후 모든 phase에서 우선한다", async () => {
-    const { PHASE_PRODUCTION_BUILD } = require("next/constants");
-
-    await expect(
-      rewriteDestination(PHASE_PRODUCTION_BUILD, "  http://127.0.0.1:8021/  ")
-    ).resolves.toBe("http://127.0.0.1:8021//api/:path*");
-  });
-
-  it("개발 phase에서도 명시 BACKEND_INTERNAL_URL을 공백 제거 후 우선한다", async () => {
-    const { PHASE_DEVELOPMENT_SERVER } = require("next/constants");
-
-    await expect(
-      rewriteDestination(PHASE_DEVELOPMENT_SERVER, "  http://127.0.0.1:8021  ")
-    ).resolves.toBe("http://127.0.0.1:8021/api/:path*");
-  });
-
-  it("비개발 phase에서 명시 URL이 없으면 기본 백엔드 포트로 프록시한다", async () => {
-    const { PHASE_PRODUCTION_BUILD } = require("next/constants");
-
-    await expect(rewriteDestination(PHASE_PRODUCTION_BUILD)).resolves.toBe(
-      "http://localhost:8010/api/:path*"
-    );
+  it.each([
+    ["phase-development-server", ".next"],
+    ["phase-production-build", ".next-prod"],
+    ["phase-production-server", ".next-prod"],
+  ])("%s는 산출물을 분리하고 API rewrite를 등록하지 않는다", (phase, distDir) => {
+    for (const backendUrl of [undefined, "  http://127.0.0.1:8021/  "]) {
+      const config = nextConfig(phase, backendUrl);
+      expect(config.distDir).toBe(distDir);
+      expect(config.rewrites).toBeUndefined();
+    }
   });
 
   it.each([

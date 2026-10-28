@@ -9,7 +9,13 @@ async function main() {
     port: { type: 'string', default: process.env.PORT || '3000' },
     webpack: { type: 'boolean' }, turbopack: { type: 'boolean' },
     check: { type: 'boolean' },
+    help: { type: 'boolean', short: 'h' },
   } });
+  if (values.help) {
+    console.log(`Usage: node scripts/next-server.js ${positionals[0] || '<dev|start>'} [options]\n` +
+      'Options: --hostname <host> --port <port> --webpack --turbopack --check --help');
+    return;
+  }
   const { createApiProxy, isApiPath } = await import('./api-proxy.mjs');
   if (values.check) { require('next'); console.log('API_PROXY_RUNTIME=PASS'); return; }
   const mode = positionals[0];
