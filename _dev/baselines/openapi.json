@@ -9492,6 +9492,47 @@
         "title": "OperatorSessionIssued",
         "type": "object"
       },
+      "PersonalMemoResponse": {
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "content",
+          "updated_at"
+        ],
+        "title": "PersonalMemoResponse",
+        "type": "object"
+      },
+      "PersonalMemoUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "maxLength": 5000,
+            "title": "Content",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "title": "PersonalMemoUpdate",
+        "type": "object"
+      },
       "PinVerifyRequest": {
         "properties": {
           "pin": {
@@ -29166,6 +29207,114 @@
         ]
       }
     },
+    "/api/personal-memo": {
+      "get": {
+        "description": "미작성 메모도 같은 응답 형태로 반환하며 직원 식별자는 세션만 신뢰한다.",
+        "operationId": "get_personal_memo_api_personal_memo_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonalMemoResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Personal Memo",
+        "tags": [
+          "Personal Memo"
+        ]
+      },
+      "put": {
+        "description": "원자적 upsert로 직원당 한 행만 유지하고 업무 변경 알림을 만들지 않는다.",
+        "operationId": "update_personal_memo_api_personal_memo_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonalMemoUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonalMemoResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Personal Memo",
+        "tags": [
+          "Personal Memo"
+        ]
+      }
+    },
     "/api/production/bom-check/{item_id}": {
       "get": {
         "operationId": "check_production_feasibility_api_production_bom_check__item_id__get",
@@ -36660,6 +36809,10 @@
     {
       "description": "일일 작업 보고서 관리.",
       "name": "Daily Work Reports"
+    },
+    {
+      "description": "직원 본인의 개인 메모 조회·저장.",
+      "name": "Personal Memo"
     },
     {
       "description": "불량 등록과 처리.",

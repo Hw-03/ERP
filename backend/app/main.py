@@ -122,6 +122,7 @@ app = FastAPI(
         {"name": "Assembly Checklists", "description": "조립 체크리스트 관리."},
         {"name": "Client Events", "description": "클라이언트 이벤트 수집."},
         {"name": "Daily Work Reports", "description": "일일 작업 보고서 관리."},
+        {"name": "Personal Memo", "description": "직원 본인의 개인 메모 조회·저장."},
         {"name": "Defects", "description": "불량 등록과 처리."},
         {"name": "Departments", "description": "부서 마스터 관리."},
         {"name": "Dept Adjustment", "description": "부서 재고 조정."},
