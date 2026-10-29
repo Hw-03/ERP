@@ -28,8 +28,8 @@ def test_pause_upgrade_and_empty_downgrade_preserve_existing_tables(tmp_path: Pa
     engine = create_engine(f"sqlite:///{path.as_posix()}")
     with engine.connect() as connection:
         before = connection.execute(text("SELECT name, rootpage, sql FROM sqlite_schema WHERE type='table' AND name IN ('io_batches','stock_requests') ORDER BY name")).all()
-    command.upgrade(config, "head")
-    assert "stocktake_work_pauses" in inspect(engine).get_table_names(), "The new head must add active pauses"
+    command.upgrade(config, "20261023_0049")
+    assert "stocktake_work_pauses" in inspect(engine).get_table_names(), "The pause revision must add active pauses"
     with engine.connect() as connection:
         assert connection.execute(text("SELECT name, rootpage, sql FROM sqlite_schema WHERE type='table' AND name IN ('io_batches','stock_requests') ORDER BY name")).all() == before
         context = MigrationContext.configure(connection, opts={
@@ -51,7 +51,7 @@ def test_pause_migration_adopts_complete_metadata_schema(tmp_path: Path) -> None
     engine = create_engine(f"sqlite:///{path.as_posix()}")
     assert hasattr(models, "StocktakeWorkPause"), "Metadata bootstrap must include pauses"
     models.StocktakeWorkPause.__table__.create(engine)
-    command.upgrade(config, "head")
+    command.upgrade(config, "20261023_0049")
     engine.dispose()
 
 
@@ -63,14 +63,14 @@ def test_pause_migration_rejects_partial_preexisting_table(tmp_path: Path) -> No
     with engine.begin() as connection:
         connection.execute(text("CREATE TABLE stocktake_work_pauses (kind TEXT PRIMARY KEY)"))
     with pytest.raises(RuntimeError, match="pause schema"):
-        command.upgrade(config, "head")
+        command.upgrade(config, "20261023_0049")
     engine.dispose()
 
 
 def test_pause_downgrade_preserves_active_work_fences(tmp_path: Path) -> None:
     path = tmp_path / "active.db"
     config = _config(path)
-    command.upgrade(config, "head")
+    command.upgrade(config, "20261023_0049")
     engine = create_engine(f"sqlite:///{path.as_posix()}")
     with Session(engine) as db:
         actor = models.Employee(employee_code="pause-migration", name="Pause owner", role="staff")
