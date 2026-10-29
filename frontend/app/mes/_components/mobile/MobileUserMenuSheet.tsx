@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { KeyRound, LogOut } from "lucide-react";
+import { useEffect, useState } from "react";
+import { KeyRound, LogOut, NotebookPen } from "lucide-react";
 import { BottomSheet } from "@/lib/ui/BottomSheet";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TYPO } from "./tokens";
@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { clearCurrentOperator, useCurrentOperator } from "../login/useCurrentOperator";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { PinInput } from "./primitives";
+import { PersonalMemoDialog } from "../personal_memo/PersonalMemoDialog";
 
 const WAREHOUSE_ROLE_LABEL: Record<string, string | null> = {
   primary: "창고 정",
@@ -34,6 +35,10 @@ export function MobileUserMenuSheet({
   onBeforeLogout?: () => Promise<void>;
 }) {
   const operator = useCurrentOperator();
+  const employeeId = operator?.employee_id;
+  const [memoEmployeeId, setMemoEmployeeId] = useState<string | null>(null);
+
+  useEffect(() => { setMemoEmployeeId(null); }, [employeeId]);
 
   // PIN 변경 흐름
   const [pinStep, setPinStep] = useState<PinStep>("idle");
@@ -102,6 +107,7 @@ export function MobileUserMenuSheet({
   const jobTitle = (operator.role ?? "").split("/").pop()?.trim() ?? "";
 
   return (
+    <>
     <BottomSheet open={open} onClose={handleClose} ariaLabel="사용자 메뉴">
       {/* 사용자 정보 헤더 */}
       <div className="px-5 pb-3 pt-1">
@@ -211,6 +217,23 @@ export function MobileUserMenuSheet({
 
       <div className="mx-5 border-t" style={{ borderColor: LEGACY_COLORS.border }} />
 
+      <div className="px-5 py-3">
+        <button
+          type="button"
+          onClick={() => {
+            handleClose();
+            setMemoEmployeeId(operator.employee_id);
+          }}
+          className="flex min-h-11 w-full items-center gap-3 rounded-[16px] px-4 py-3 text-left transition-opacity active:opacity-70 focus-visible:outline-none focus-visible:ring-2"
+          style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
+        >
+          <NotebookPen size={20} aria-hidden="true" />
+          <span className={`${TYPO.body} font-semibold`}>메모장</span>
+        </button>
+      </div>
+
+      <div className="mx-5 border-t" style={{ borderColor: LEGACY_COLORS.border }} />
+
       {/* 로그아웃 섹션 */}
       <div className="px-5 py-3 pb-2">
         {!confirmLogout ? (
@@ -264,5 +287,12 @@ export function MobileUserMenuSheet({
         )}
       </div>
     </BottomSheet>
+    {memoEmployeeId && memoEmployeeId === employeeId && <PersonalMemoDialog
+      key={memoEmployeeId}
+      employeeId={memoEmployeeId}
+      mobilePresentation
+      onClose={() => setMemoEmployeeId((current) => current === memoEmployeeId ? null : current)}
+    />}
+    </>
   );
 }

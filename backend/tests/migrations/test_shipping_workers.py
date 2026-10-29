@@ -24,7 +24,7 @@ def test_workers_migration_nullable_without_backfill(tmp_path: Path) -> None:
         db.execute("INSERT INTO shipping_request_events (event_id,request_id,event_type) VALUES ('evt','req','REQUEST_CREATED')")
         db.commit()
     command.upgrade(config, "head")
-    assert ScriptDirectory.from_config(config).get_current_head() == "20261023_0050"
+    assert ScriptDirectory.from_config(config).get_current_head() == "20261029_0051"
     with sqlite3.connect(path) as db:
         column = next(row for row in db.execute("PRAGMA table_info(shipping_requests)") if row[1] == "worker_names")
         assert column[2] == "VARCHAR(200)" and column[3] == 0 and column[4] is None

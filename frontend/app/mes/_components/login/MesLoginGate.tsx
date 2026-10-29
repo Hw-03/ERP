@@ -15,6 +15,7 @@ import { useIdleOperatorConfirmation } from "./useIdleOperatorConfirmation";
 import { OperatorConfirmationDialog } from "./OperatorConfirmationDialog";
 import { OperatorAccessSync } from "./OperatorAccessSync";
 import { OPERATOR_LOGIN_REQUIRED } from "@/lib/auth/login-recovery";
+import { WorkspaceInteractionContext } from "./WorkspaceInteractionContext";
 
 type GatePhase = "loading" | "intro" | "form" | "recovery" | "authed";
 type LogoState = "center" | "above-card";
@@ -210,7 +211,7 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
   return <>
     {phase === "authed" && workspaceOwner && <OperatorAccessSync employeeId={workspaceOwner} />}
     {workspaceOwner && <div key={workspaceOwner} style={{ display: phase === "authed" ? "contents" : "none" }} inert={phase !== "authed"}>
-      {children}
+      <WorkspaceInteractionContext.Provider value={phase === "authed" && !idleConfirmation.operator}>{children}</WorkspaceInteractionContext.Provider>
     </div>}
     {idleConfirmation.operator && <OperatorConfirmationDialog
       operator={idleConfirmation.operator}

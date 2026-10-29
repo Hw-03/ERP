@@ -30,6 +30,7 @@ export function DailyWorkReportEditor({
   fillAvailableHeight = false,
   preserveHeight = false,
   loading = false,
+  copy,
 }: {
   initialContent: string;
   initialUpdatedAt?: string | null;
@@ -45,7 +46,13 @@ export function DailyWorkReportEditor({
   fillAvailableHeight?: boolean;
   preserveHeight?: boolean;
   loading?: boolean;
+  copy?: { title?: string; inputLabel?: string; emptyMessage?: string; saveError?: string; footerHint?: string };
 }) {
+  const title = copy?.title ?? "작업 내역";
+  const inputLabel = copy?.inputLabel ?? "작업 내역";
+  const emptyMessage = copy?.emptyMessage ?? "작성된 일보가 없습니다.";
+  const fallbackSaveError = copy?.saveError ?? "일보를 저장하지 못했습니다.";
+  const footerHint = copy?.footerHint ?? "과거 일보도 수정할 수 있습니다.";
   const [content, setContent] = useState(initialContent);
   const [focused, setFocused] = useState(false);
   const [savedContent, setSavedContent] = useState(initialContent);
@@ -137,7 +144,15 @@ export function DailyWorkReportEditor({
     let promise: Promise<void>;
     promise = onSave(next)
       .then((updatedAt) => {
-        if (contentVersion !== contentVersionRef.current) return;
+        if (contentVersion !== contentVersionRef.current) {
+          // The request still changed the server even when newer input must stay visible.
+          if (savePromiseRef.current === promise) {
+            savedContentRef.current = next;
+            dirtyRef.current = contentRef.current !== next;
+            setSavedContent(next);
+          }
+          return;
+        }
         userEditedRef.current = false;
         contentRef.current = next;
         savedContentRef.current = next;
@@ -149,7 +164,7 @@ export function DailyWorkReportEditor({
       .catch((error: unknown) => {
         if (contentVersion !== contentVersionRef.current) throw error;
         setSaveFailed(true);
-        setLocalSaveError(error instanceof Error ? error.message : "일보를 저장하지 못했습니다.");
+        setLocalSaveError(error instanceof Error ? error.message : fallbackSaveError);
         throw error;
       })
       .finally(() => {
@@ -162,7 +177,7 @@ export function DailyWorkReportEditor({
     if (appliedResetKeyRef.current === targetKey && dirtyRef.current) {
       return saveLatestRef.current();
     }
-  }, [onSave, resetKey]);
+  }, [onSave, resetKey, fallbackSaveError]);
   saveLatestRef.current = save;
 
   useEffect(() => {
@@ -197,11 +212,11 @@ export function DailyWorkReportEditor({
             <PencilLine className="h-5 w-5" />
           </span>
           <div>
-            <h2 className={mobile ? "text-[15px] font-semibold" : "text-lg font-black"}>작업 내역</h2>
+            <h2 className={mobile ? "text-[15px] font-semibold" : "text-lg font-black"}>{title}</h2>
           </div>
         </div>
         <p className={`${mobile ? `mt-3 ${mobileFill ? "min-h-0 overflow-y-auto" : "min-h-32"} flex-1 whitespace-pre-wrap rounded-[16px] border px-3 py-3.5 [overflow-wrap:anywhere] text-base leading-7` : "mt-5 whitespace-pre-wrap rounded-[16px] border px-4 py-4 text-sm leading-7"} ${fillAvailableHeight && !mobile ? "lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1" : ""}`} style={{ color: initialContent ? LEGACY_COLORS.text : LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-          {loading ? <span role="status" aria-label="작업 내역 불러오는 중" className="block h-7 w-2/3 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} /> : initialContent || <><Image src="/images/dexray/daily-empty-blue.webp" alt="" width={360} height={240} className="mx-auto block h-36 w-auto object-contain" />작성된 일보가 없습니다.</>}
+          {loading ? <span role="status" aria-label={`${inputLabel} 불러오는 중`} className="block h-7 w-2/3 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} /> : initialContent || <><Image src="/images/dexray/daily-empty-blue.webp" alt="" width={360} height={240} className="mx-auto block h-36 w-auto object-contain" />{emptyMessage}</>}
         </p>
       </section>
     );
@@ -225,20 +240,20 @@ export function DailyWorkReportEditor({
             <PencilLine className="h-5 w-5" />
           </span>
           <div>
-            <h2 className={mobile ? "text-[15px] font-semibold" : "text-lg font-black"}>작업 내역</h2>
+            <h2 className={mobile ? "text-[15px] font-semibold" : "text-lg font-black"}>{title}</h2>
           </div>
         </div>
         <span className="shrink-0 rounded-full px-2.5 py-1 text-xs font-black" style={{ color: dirty ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}>
           {loading ? <span aria-label="글자 수 불러오는 중" className="inline-block h-3 w-4 motion-safe:animate-pulse rounded" style={{ background: LEGACY_COLORS.s3 }} /> : content.length.toLocaleString()} / 5,000
         </span>
       </div>
-      {loading ? <div data-testid="daily-report-editor-skeleton" role="status" aria-label="작업 내역 불러오는 중" className={`${mobile ? mobileFill ? `mt-3 min-h-0 flex-1 ${layoutStyles.compactSkeleton}` : "mt-3 min-h-[max(240px,40dvh)] flex-1" : "mt-4 min-h-44"} w-full rounded-[16px] border px-4 py-3.5 ${fillAvailableHeight ? "lg:min-h-0 lg:flex-1" : ""}`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+      {loading ? <div data-testid="daily-report-editor-skeleton" role="status" aria-label={`${inputLabel} 불러오는 중`} className={`${mobile ? mobileFill ? `mt-3 min-h-0 flex-1 ${layoutStyles.compactSkeleton}` : "mt-3 min-h-[max(240px,40dvh)] flex-1" : "mt-4 min-h-44"} w-full rounded-[16px] border px-4 py-3.5 ${fillAvailableHeight ? "lg:min-h-0 lg:flex-1" : ""}`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
         <div className="h-5 w-4/5 motion-safe:animate-pulse rounded" style={{ background: LEGACY_COLORS.s3 }} />
         <div className="mt-2 h-5 w-2/3 motion-safe:animate-pulse rounded" style={{ background: LEGACY_COLORS.s3 }} />
       </div> : <div className={`relative flex ${mobile ? mobileFill ? `mt-3 min-h-0 flex-1 ${layoutStyles.compactField}` : "mt-3 min-h-[max(240px,40dvh)] flex-1" : "mt-4 min-h-44"} flex-col ${fillAvailableHeight ? "lg:min-h-0 lg:flex-1" : ""}`}>
       {!content.trim() && !focused && <div data-testid="daily-empty-mascot" aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center justify-center"><Image src="/images/dexray/daily-empty-blue.webp" alt="" width={360} height={240} className="h-auto max-h-[80%] w-[min(240px,50%)] object-contain" /></div>}
       <textarea
-        aria-label="작업 내역"
+        aria-label={inputLabel}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         value={content}
@@ -261,7 +276,7 @@ export function DailyWorkReportEditor({
       <div className={`${mobile ? "mt-3" : "mt-4"} flex shrink-0 flex-wrap items-center justify-end gap-3`}>
         <p className="flex items-center gap-1.5 text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
           <CheckCircle2 className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />
-          과거 일보도 수정할 수 있습니다.
+          {footerHint}
         </p>
         <p aria-live="polite" className="text-xs font-bold" style={{ color: saveStatus?.startsWith("저장 실패") ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }}>{saveStatus}</p>
       </div>

@@ -16,6 +16,37 @@ function deferred<T>() {
 }
 
 describe("DailyWorkReportEditor", () => {
+  it("문구를 지정하지 않으면 작업 내역 제목과 기존 일보 안내를 유지한다", () => {
+    const props = { initialContent: "", editable: true, saving: false, saveError: null, onSave: vi.fn() };
+    const { rerender } = render(<DailyWorkReportEditor {...props} />);
+    expect(screen.getByRole("heading", { name: "작업 내역" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "작업 내역" })).toBeInTheDocument();
+    expect(screen.getByText("과거 일보도 수정할 수 있습니다.")).toBeInTheDocument();
+    rerender(<DailyWorkReportEditor {...props} editable={false} />);
+    expect(screen.getByText("작성된 일보가 없습니다.")).toBeInTheDocument();
+  });
+
+  it("선택 문구로 제목, 입력, 로딩, 빈 화면과 자동저장 안내를 재사용한다", () => {
+    const props = { initialContent: "", editable: true, saving: false, saveError: null, onSave: vi.fn(), copy: { title: "메모", inputLabel: "개인 메모", emptyMessage: "작성된 메모가 없습니다.", footerHint: "입력한 내용은 자동으로 저장됩니다." } };
+    const { rerender } = render(<DailyWorkReportEditor {...props} />);
+    expect(screen.getByRole("heading", { name: "메모" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "개인 메모" })).toBeInTheDocument();
+    expect(screen.getByText("입력한 내용은 자동으로 저장됩니다.")).toBeInTheDocument();
+    expect(screen.queryByText(/일보/)).not.toBeInTheDocument();
+    rerender(<DailyWorkReportEditor {...props} loading />);
+    expect(screen.getByRole("status", { name: "개인 메모 불러오는 중" })).toBeInTheDocument();
+    rerender(<DailyWorkReportEditor {...props} editable={false} />);
+    expect(screen.getByText("작성된 메모가 없습니다.")).toBeInTheDocument();
+  });
+
+  it.each([undefined, "메모를 저장하지 못했습니다."])("알 수 없는 저장 오류의 기본 안내를 copy %s에 따라 표시한다", async (message) => {
+    const saveRef = { current: null as (() => Promise<void>) | null };
+    render(<DailyWorkReportEditor initialContent="" editable saving={false} saveError={null} onSave={vi.fn().mockRejectedValue(null)} saveRef={saveRef} copy={{ saveError: message }} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "기록" } });
+    await act(async () => { await saveRef.current?.().catch(() => {}); });
+    expect(screen.getByRole("alert")).toHaveTextContent(message ?? "일보를 저장하지 못했습니다.");
+  });
+
   it("빈 입력의 안내 이미지는 포커스와 내용에 따라 숨긴다", () => {
     render(<DailyWorkReportEditor initialContent="" editable saving={false} saveError={null} onSave={vi.fn()} />);
     const input = screen.getByLabelText("작업 내역");
@@ -251,6 +282,40 @@ describe("DailyWorkReportEditor", () => {
     expect(input).toHaveValue("저장 중 수정한 내용");
     expect(onSave).toHaveBeenNthCalledWith(2, "저장 중 수정한 내용");
     expect(screen.getByText("저장됨 · 12:00")).toBeInTheDocument();
+  });
+
+  it.each([false, true])("저장 중 원래 입력으로 되돌려도 서버 내용을 다시 저장하고 flush를 기다린다: %s", async (flushWhileSaving) => {
+    const first = deferred<string>();
+    const second = deferred<string>();
+    const saveRef = { current: null as (() => Promise<void>) | null };
+    let serverContent = "A";
+    const onSave = vi.fn()
+      .mockImplementationOnce(async (content: string) => { const updatedAt = await first.promise; serverContent = content; return updatedAt; })
+      .mockImplementationOnce(async (content: string) => { const updatedAt = await second.promise; serverContent = content; return updatedAt; });
+    render(<DailyWorkReportEditor initialContent="A" editable saving={false} saveError={null} onSave={onSave} saveRef={saveRef} />);
+    const input = screen.getByRole("textbox", { name: "작업 내역" });
+    fireEvent.change(input, { target: { value: "B" } });
+    let pendingSave!: Promise<void>;
+    act(() => { pendingSave = saveRef.current!(); });
+    fireEvent.change(input, { target: { value: "A" } });
+    let flushed = false;
+    let closeFlush: Promise<void> | undefined;
+    if (flushWhileSaving) act(() => { closeFlush = saveRef.current!().then(() => { flushed = true; }); });
+
+    await act(async () => { first.resolve("2026-08-04T02:30:00Z"); await Promise.resolve(); });
+    expect(serverContent).toBe("B");
+    expect(input).toHaveValue("A");
+    expect(onSave).toHaveBeenNthCalledWith(2, "A");
+    expect(flushed).toBe(false);
+
+    await act(async () => { second.resolve("2026-08-04T03:00:00Z"); await pendingSave; await closeFlush; });
+    expect(serverContent).toBe("A");
+    expect(input).toHaveValue("A");
+    expect(onSave).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("저장됨 · 12:00")).toBeInTheDocument();
+    await act(async () => { await saveRef.current!(); });
+    expect(onSave).toHaveBeenCalledTimes(2);
+    expect(flushed).toBe(flushWhileSaving);
   });
 
   it("읽기 전용 장문은 데스크톱 카드 내부에서만 스크롤한다", () => {

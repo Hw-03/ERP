@@ -97,6 +97,7 @@ from app.models.assembly_checklist import (
     AssemblyChecklistSection,
 )
 from app.models.daily_work_report import DailyWorkReport
+from app.models.personal_memo import PersonalMemo
 from app.models.weekly_inventory_snapshot import (
     WeeklyInventorySnapshot,
     WeeklyInventorySnapshotItem,
@@ -221,6 +222,7 @@ __all__ = [
     "AssemblyChecklistItem",
     # daily work reports
     "DailyWorkReport",
+    "PersonalMemo",
     "WeeklyInventorySnapshot",
     "WeeklyInventorySnapshotItem",
     # defect quarantine records

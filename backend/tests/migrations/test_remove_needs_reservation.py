@@ -18,7 +18,7 @@ from test_work_reservations import _config, _seed
 
 
 PREVIOUS = "20261020_0047"
-HEAD_REVISION = "20261023_0050"
+HEAD_REVISION = "20261029_0051"
 MIGRATION = Path(__file__).resolve().parents[2] / "alembic/versions/20261021_0048_remove_needs_reservation.py"
 LegacyDatabase = tuple[Config, sa.Engine]
 

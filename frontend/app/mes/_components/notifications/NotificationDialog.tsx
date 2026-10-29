@@ -1,20 +1,17 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
-import { createPortal } from "react-dom";
-import { Bell, BellRing, Check, CheckCheck, CircleX, Handshake, Package, Trash2, X } from "lucide-react";
+import { useId, useRef, type KeyboardEvent } from "react";
+import { Bell, BellRing, Check, CheckCheck, CircleX, Handshake, Package, Trash2 } from "lucide-react";
 import type { AppNotification } from "@/lib/api/types";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
-import { useFocusTrap } from "@/lib/mes/useFocusTrap";
 import { formatKstDateTime } from "@/lib/mes-format";
 import { EmptyState } from "../common/EmptyState";
 import { LoadFailureCard } from "../common/LoadFailureCard";
 import { ReadLoading } from "../common/ReadState";
 import { SkeletonBlock } from "../common/LoadingSkeleton";
+import { PopupDialogFrame } from "../common/PopupDialogFrame";
 import { getNotificationPresentation } from "./notificationPresentation";
-import presentation from "../mobile/mobilePresentation.module.css";
-import { MOBILE_MODAL_VIEWPORT_STYLE } from "../mobile/mobileModalLayout";
 
 export type NotificationFilter = "all" | "unread";
 
@@ -62,44 +59,9 @@ export function NotificationDialog({
   hasData = items.length > 0 || (!loading && !error),
   actionError = null, onRetry, actionsPending = false, mobilePresentation = false,
 }: NotificationDialogProps) {
-  const [mounted, setMounted] = useState(false);
-  const titleId = useId();
   const panelId = useId();
-  const closeRef = useRef<HTMLButtonElement>(null);
   const allTabRef = useRef<HTMLButtonElement>(null);
   const unreadTabRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useFocusTrap<HTMLDivElement>(mounted, { initialFocusRef: closeRef });
-
-  useEffect(() => { setMounted(true); }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = previousOverflow; };
-  }, [mounted]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    const handleEscape = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      onClose();
-    };
-    window.addEventListener("keydown", handleEscape, true);
-    return () => window.removeEventListener("keydown", handleEscape, true);
-  }, [mounted, onClose]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    const restoreDialogFocus = () => {
-      if (dialogRef.current && !dialogRef.current.contains(document.activeElement)) closeRef.current?.focus();
-    };
-    restoreDialogFocus();
-    document.addEventListener("focusin", restoreDialogFocus);
-    return () => document.removeEventListener("focusin", restoreDialogFocus);
-  }, [mounted, items, filter, actionsPending, dialogRef]);
 
   const handleTabKey = (event: KeyboardEvent<HTMLButtonElement>, current: NotificationFilter) => {
     let next: NotificationFilter | null = null;
@@ -113,39 +75,8 @@ export function NotificationDialog({
     onFilterChange(next);
   };
 
-  if (!mounted) return null;
-
-  return createPortal(
-    <div
-      className={`fixed inset-0 z-[260] flex items-center justify-center ${mobilePresentation ? `px-4 ${presentation.scope}` : "p-4 sm:p-6"}`}
-      style={{ background: "rgba(0,0,0,.45)", ...(mobilePresentation ? MOBILE_MODAL_VIEWPORT_STYLE : {}) }}
-      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
-    >
-      <div
-        ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId}
-        className={`flex w-full min-h-0 flex-col overflow-hidden rounded-[24px] border shadow-lg ${mobilePresentation ? "h-full max-w-[398px] md:max-w-[688px]" : "max-w-[640px]"}`}
-        style={{
-          maxHeight: mobilePresentation ? undefined : "min(720px, calc(100dvh - 48px))",
-          background: "var(--c-popup-bg)", borderColor: LEGACY_COLORS.border,
-          boxShadow: "var(--c-popup-shadow)",
-        }}
-      >
-        <header className="flex shrink-0 items-center gap-3 border-b px-5 py-4" style={{ borderColor: LEGACY_COLORS.border }}>
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ color: LEGACY_COLORS.blue, background: tint(LEGACY_COLORS.blue, 12) }} aria-hidden="true">
-            <Bell className="h-5 w-5" />
-          </span>
-          {mobilePresentation ? <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="text-lg font-bold" style={{ color: LEGACY_COLORS.text }}>알림</h2>
-            <p className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>읽지 않은 알림 {unread}건</p>
-          </div> : <>
-            <h2 id={titleId} className="min-w-0 flex-1 text-xl font-bold" style={{ color: LEGACY_COLORS.text }}>알림</h2>
-            <p className="text-right text-sm" style={{ color: LEGACY_COLORS.muted2 }}>읽지 않은 알림 {unread}건</p>
-          </>}
-          <button ref={closeRef} type="button" onClick={onClose} aria-label="알림 닫기"
-            className="no-btn-inset flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2"
-            style={{ color: LEGACY_COLORS.muted2 }}><X className="h-5 w-5" /></button>
-        </header>
-
+  return (
+    <PopupDialogFrame title="알림" icon={Bell} subtitle={<>읽지 않은 알림 {unread}건</>} onClose={onClose} mobilePresentation={mobilePresentation}>
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-5 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
           <div role="tablist" aria-label="알림 필터" className="flex gap-1">
             {(["all", "unread"] as const).map((value) => (
@@ -232,8 +163,6 @@ export function NotificationDialog({
             className="no-btn-inset flex min-h-11 items-center gap-1.5 rounded-[12px] px-3 text-sm font-bold transition active:scale-[0.98] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2"
             style={{ color: LEGACY_COLORS.red }}><Trash2 className="h-4 w-4" />읽은 알림 삭제</button>
         </footer>
-      </div>
-    </div>,
-    document.body,
+    </PopupDialogFrame>
   );
 }

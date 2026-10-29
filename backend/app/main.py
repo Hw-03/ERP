@@ -61,6 +61,7 @@ from app.routers import (
     models as models_router,
     notifications,
     operator_sessions,
+    personal_memo,
     stocktakes,
     business_corrections,
     production,
@@ -334,6 +335,7 @@ app.include_router(operator_sessions.router, prefix="/api/operator-sessions", ta
 app.include_router(stocktakes.router, prefix="/api/stocktakes", tags=["Stocktakes"])
 app.include_router(business_corrections.router, prefix="/api/inventory/business-corrections", tags=["Inventory"])
 app.include_router(daily_work_reports.router, prefix="/api/daily-work-reports", tags=["Daily Work Reports"])
+app.include_router(personal_memo.router, prefix="/api/personal-memo", tags=["Personal Memo"])
 app.include_router(departments.router, prefix="/api/departments", tags=["Departments"])
 app.include_router(client_events.router, prefix="/api", tags=["Client Events"])
 app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])

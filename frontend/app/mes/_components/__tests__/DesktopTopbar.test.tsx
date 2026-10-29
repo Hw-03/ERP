@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { DailyWorkDatePicker } from "../_daily_report/DailyWorkDatePicker";
@@ -9,6 +9,7 @@ import { clearCurrentOperator } from "../login/useCurrentOperator";
 const notificationBellState = vi.hoisted(() => ({
   loginDialogEnabled: undefined as boolean | undefined,
   operator: null as null | { employee_id: string; name: string; department: string; warehouse_role: string; department_role: string },
+  memoClose: null as (() => void) | null,
 }));
 
 vi.mock("../login/useCurrentOperator", () => ({
@@ -23,8 +24,50 @@ vi.mock("../notifications/NotificationBell", () => ({
   },
 }));
 
+vi.mock("../personal_memo/PersonalMemoDialog", () => ({
+  PersonalMemoDialog: ({ employeeId, onClose }: { employeeId: string; onClose: () => void }) => {
+    notificationBellState.memoClose = onClose;
+    return <div role="dialog" aria-label="메모장" data-employee-id={employeeId}><button onClick={onClose}>메모장 닫기</button></div>;
+  },
+}));
+
 describe("DesktopTopbar", () => {
   afterEach(() => vi.unstubAllGlobals());
+  it("PIN 변경과 로그아웃 사이의 메모장을 누르면 메뉴를 닫고 현재 직원의 팝업을 연다", () => {
+    notificationBellState.operator = { employee_id: "emp-1", name: "김현우", department: "조립", warehouse_role: "none", department_role: "none" };
+    render(<DesktopTopbar title="대시보드" onRefresh={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: /김현우/ }));
+    const menu = screen.getByTestId("desktop-user-menu");
+    expect(within(menu).getAllByRole("button").map((button) => button.textContent)).toEqual(["PIN 변경", "메모장", "로그아웃"]);
+    const memo = within(menu).getByRole("button", { name: "메모장" });
+    expect(memo).toHaveClass("min-h-11");
+    expect(memo.querySelector("svg")).toHaveClass("lucide-notebook-pen");
+    fireEvent.click(memo);
+    expect(screen.queryByTestId("desktop-user-menu")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "메모장" })).toHaveAttribute("data-employee-id", "emp-1");
+    fireEvent.click(screen.getByRole("button", { name: "메모장 닫기" }));
+    expect(screen.queryByRole("dialog", { name: "메모장" })).not.toBeInTheDocument();
+  });
+
+  it("직원이 바뀌면 메모장을 숨기고 이전 팝업의 늦은 닫기 응답이 새 직원 팝업을 닫지 않는다", () => {
+    const original = { employee_id: "emp-1", name: "김현우", department: "조립", warehouse_role: "none", department_role: "none" };
+    notificationBellState.operator = original;
+    const props = { title: "대시보드", onRefresh: vi.fn() };
+    const { rerender } = render(<DesktopTopbar {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: /김현우/ }));
+    fireEvent.click(screen.getByRole("button", { name: "메모장", exact: true }));
+    const oldClose = notificationBellState.memoClose;
+    notificationBellState.operator = { ...original, employee_id: "emp-2", name: "이영희" };
+    rerender(<DesktopTopbar {...props} />);
+    expect(screen.queryByRole("dialog", { name: "메모장" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /이영희/ }));
+    fireEvent.click(screen.getByRole("button", { name: "메모장", exact: true }));
+    act(() => { oldClose?.(); });
+    expect(screen.getByRole("dialog", { name: "메모장" })).toHaveAttribute("data-employee-id", "emp-2");
+    notificationBellState.operator = original;
+    rerender(<DesktopTopbar {...props} />);
+    expect(screen.queryByRole("dialog", { name: "메모장" })).not.toBeInTheDocument();
+  });
   it("waits for server revocation before reloading after logout", async () => {
     const reload = vi.fn();
     vi.stubGlobal("window", new Proxy(window, { get: (target, key) => key === "location" ? { reload } : Reflect.get(target, key) }));

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ElementType, type ReactNode } from "react";
-import { ChevronDown, KeyRound, LogOut, RefreshCw } from "lucide-react";
+import { ChevronDown, KeyRound, LogOut, NotebookPen, RefreshCw } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { PIN_LENGTH } from "@/lib/auth/constants";
@@ -12,6 +12,7 @@ import { api } from "@/lib/api";
 import { clearCurrentOperator, useCurrentOperator } from "./login/useCurrentOperator";
 import { NotificationBell } from "./notifications/NotificationBell";
 import type { NotificationNavigationTarget } from "./notifications/NotificationBell";
+import { PersonalMemoDialog } from "./personal_memo/PersonalMemoDialog";
 
 const DEFAULT_STATUS = "DEXCOWIN MES";
 
@@ -51,6 +52,8 @@ export function DesktopTopbar({
   onBeforeLogout?: () => Promise<void>;
 }) {
   const operator = useCurrentOperator();
+  const employeeId = operator?.employee_id;
+  const [memoEmployeeId, setMemoEmployeeId] = useState<string | null>(null);
   const roleLabel = operator ? WAREHOUSE_ROLE_LABEL[operator.warehouse_role] ?? null : null;
   const deptRoleLabel = operator ? DEPARTMENT_ROLE_LABEL[operator.department_role] ?? null : null;
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -65,6 +68,8 @@ export function DesktopTopbar({
   const [pinError, setPinError] = useState<string | null>(null);
   const [pinBusy, setPinBusy] = useState(false);
   const [pinSuccessOpen, setPinSuccessOpen] = useState(false);
+
+  useEffect(() => { setMemoEmployeeId(null); }, [employeeId]);
 
   useEffect(() => {
     if (!dropdownOpen) return;
@@ -208,6 +213,18 @@ export function DesktopTopbar({
                   PIN 변경
                 </button>
                 <button
+                  type="button"
+                  onClick={() => {
+                    setDropdownOpen(false);
+                    setMemoEmployeeId(operator.employee_id);
+                  }}
+                  className="mt-1.5 flex min-h-11 w-full items-center gap-2 rounded-[14px] px-3 py-2 text-sm font-semibold transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2"
+                  style={{ color: LEGACY_COLORS.text, background: LEGACY_COLORS.s2 }}
+                >
+                  <NotebookPen className="h-4 w-4" aria-hidden="true" />
+                  메모장
+                </button>
+                <button
                   onClick={() => {
                     setDropdownOpen(false);
                     setShowLogoutModal(true);
@@ -238,6 +255,12 @@ export function DesktopTopbar({
           <RefreshCw className="h-4 w-4" />
         </button>
       </div>
+
+      {memoEmployeeId && memoEmployeeId === employeeId && <PersonalMemoDialog
+        key={memoEmployeeId}
+        employeeId={memoEmployeeId}
+        onClose={() => setMemoEmployeeId((current) => current === memoEmployeeId ? null : current)}
+      />}
 
       <ConfirmModal
         open={showLogoutModal}

@@ -3,6 +3,8 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Operator } from "../useCurrentOperator";
+import { NotebookPen } from "lucide-react";
+import { PopupDialogFrame } from "../../common/PopupDialogFrame";
 vi.mock("../OperatorAccessSync", () => ({ OperatorAccessSync: () => null }));
 
 const state = vi.hoisted(() => ({
@@ -40,9 +42,9 @@ const stored: Operator = {
   io_enabled: true, hidden_sidebar_tabs: [], loginPopupEnabled: false,
 };
 
-function renderGate() {
+function renderGate(children?: React.ReactNode) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={queryClient}><MesLoginGate><div>Authenticated content<input aria-label="Draft" defaultValue="7" /></div></MesLoginGate></QueryClientProvider>);
+  return render(<QueryClientProvider client={queryClient}><MesLoginGate>{children ?? <div>Authenticated content<input aria-label="Draft" defaultValue="7" /></div>}</MesLoginGate></QueryClientProvider>);
 }
 
 describe("MesLoginGate stored session recovery", () => {
@@ -63,6 +65,22 @@ describe("MesLoginGate stored session recovery", () => {
     }));
   });
   afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+  it("hides a portaled memo during recovery and restores its draft after the same employee logs in", async () => {
+    state.getAppSession.mockResolvedValue({ boot_id: "boot-1" });
+    state.getEmployees.mockResolvedValue([{ employee_id: "emp-1" }]);
+    renderGate(<PopupDialogFrame title="개인 메모" icon={NotebookPen} onClose={vi.fn()}><textarea aria-label="메모 초안" defaultValue="" /></PopupDialogFrame>);
+    const draft = await screen.findByRole("textbox", { name: "메모 초안" });
+    fireEvent.change(draft, { target: { value: "저장하지 못한 메모" } });
+    act(() => window.dispatchEvent(new Event("dexcowin_operator_login_required")));
+    expect(screen.queryByRole("dialog", { name: "개인 메모" })).not.toBeInTheDocument();
+    const login = await screen.findByRole("button", { name: "Login form" });
+    login.focus();
+    expect(login).toHaveFocus();
+    fireEvent.click(login);
+    expect(await screen.findByRole("textbox", { name: "메모 초안" })).toBe(draft);
+    expect(draft).toHaveValue("저장하지 못한 메모");
+  });
 
   it("waits for revocation before reloading when idle confirmation switches accounts", async () => {
     const reload = vi.fn();
