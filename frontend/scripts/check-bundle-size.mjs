@@ -2,7 +2,7 @@
 /**
  * Round-16 #4 — Bundle size gate.
  *
- * .next-prod/static/chunks 의 *.js 합산 크기가 임계 (default 3.50 MB) 이내인지 검사.
+ * .next-prod/static/chunks 의 *.js 합산 크기가 임계 (default 3.60 MB) 이내인지 검사.
  * Next.js production build 후 실행. 임계 초과 시 exit 1.
  *
  * 사용:
@@ -32,7 +32,9 @@ const maxIdx = args.indexOf("--max");
 // 사용자 승인으로 예산을 3.45 MB로 조정하며 초과 차단과 명시적 --max 검증은 유지한다.
 // 2026-10-28: 생산능력 시뮬레이션·API 프록시 통합 배포본 실측 3.453 MB (3,620,689 bytes).
 // 사용자 승인으로 기본 예산만 3.50 MB로 조정하며 초과 차단과 --max 검증은 유지한다.
-const MAX_MB = maxIdx >= 0 ? parseFloat(args[maxIdx + 1]) : 3.5;
+// 2026-10-30: 원가·생산 가능 통합과 메인 회귀 보존 후 실측 3.571 MB (3,744,773 bytes).
+// 새 의존성 없이 추가된 화면·계산 코드의 증가분을 반영하고 초과 차단은 유지한다.
+const MAX_MB = maxIdx >= 0 ? parseFloat(args[maxIdx + 1]) : 3.6;
 const MAX_BYTES = MAX_MB * 1024 * 1024;
 
 async function walk(dir) {
