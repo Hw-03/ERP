@@ -22,6 +22,7 @@ import { catalogApi } from "@/lib/api/catalog";
 import { ApiError } from "@/lib/api-core";
 import type { BOMDetailEntry } from "@/lib/api/types/catalog";
 import { queryKeys } from "./keys";
+import { invalidateCostQueries } from "./costInvalidation";
 
 const BOM_LIST_TIMEOUT_MS = 8_000;
 const BOM_LIST_RETRY_DELAY_MS = 500;
@@ -146,7 +147,7 @@ export function useCreateBomMutation() {
   return useMutation({
     mutationFn: (payload: Parameters<typeof catalogApi.createBOM>[0]) =>
       catalogApi.createBOM(payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.bom.all }),
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: queryKeys.bom.all }), invalidateCostQueries(qc)]),
   });
 }
 
@@ -160,7 +161,7 @@ export function useUpdateBomMutation() {
       bomId: string;
       payload: Parameters<typeof catalogApi.updateBOM>[1];
     }) => catalogApi.updateBOM(bomId, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.bom.all }),
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: queryKeys.bom.all }), invalidateCostQueries(qc)]),
   });
 }
 
@@ -168,6 +169,6 @@ export function useDeleteBomMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (bomId: string) => catalogApi.deleteBOM(bomId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.bom.all }),
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: queryKeys.bom.all }), invalidateCostQueries(qc)]),
   });
 }

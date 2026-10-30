@@ -155,6 +155,7 @@ describe("BomWorkbench", () => {
   });
 
   it("does not replace the new selection with a late refresh after saving the previous BOM", async () => {
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
     const savedRefresh = deferred<BOMEntry[]>();
     const row = { bom_id: "bom-1", parent_item_id: "parent-1", child_item_id: "child-1", quantity: 2, unit: "EA" } as BOMEntry;
     const getBom = vi.spyOn(catalogApi, "getBOM").mockResolvedValueOnce([row]).mockReturnValueOnce(savedRefresh.promise).mockResolvedValue([]);
@@ -178,6 +179,7 @@ describe("BomWorkbench", () => {
     expect(screen.getByText("등록된 BOM 이 없습니다")).toBeInTheDocument();
     expect(container.querySelector("div[data-bom-row-surface]")).toBeNull();
     expect(queryClient.getQueryData(queryKeys.bom.detail("parent-1"))).toEqual([{ ...row, quantity: 3 }]);
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.costs.all }));
   });
 
   it("starts with all departments and filters parents from the parent-list controls", async () => {

@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useBomQuery, useBomWhereUsedQuery } from "@/lib/queries/useBomQuery";
 import { queryKeys } from "@/lib/queries/keys";
 import { beginBomMutation } from "@/lib/queries/bomMutationSync";
+import { invalidateCostQueries } from "@/lib/queries/costInvalidation";
 import type { BOMDetailEntry, BOMEntry, Item } from "@/lib/api";
 import { itemsApi } from "@/lib/api/items";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -331,7 +332,7 @@ export function BomWorkbench({
     } finally {
       mutationParentIdsRef.current.delete(targetId);
       setMutationParentIds(new Set(mutationParentIdsRef.current));
-      void mutation.finish().catch(() => onErrorRef.current(serverSaved
+      void Promise.all([mutation.finish(), invalidateCostQueries(queryClient)]).catch(() => onErrorRef.current(serverSaved
         ? "저장됐지만 최신 목록 조회에 실패했습니다." : "최신 목록 조회에 실패했습니다."));
     }
   }
