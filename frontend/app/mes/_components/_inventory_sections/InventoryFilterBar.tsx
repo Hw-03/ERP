@@ -189,6 +189,7 @@ export function InventoryFilters({
 }
 
 type StickyHeaderProps = {
+  searchActions?: ReactNode;
   onManageSearch?: () => void;
   searchValue: string;
   onSearchChange: (v: string) => void;
@@ -213,6 +214,7 @@ export function InventoryTableStickyHeader({
   searchPlaceholder = "품명 · 품목 코드 · 위치 · 공급처 검색",
   headerRef,
   onManageSearch,
+  searchActions,
 }: StickyHeaderProps) {
   const localHeaderRef = useRef<HTMLDivElement | null>(null);
   const setHeaderRef = useCallback((node: HTMLDivElement | null): void => {
@@ -249,6 +251,7 @@ export function InventoryTableStickyHeader({
     >
       <div className={compact ? "flex items-center px-3 pb-3 pt-3" : "flex flex-wrap items-center gap-2.5 px-5 pb-[15px] pt-[14px]"}>
         <SearchInput value={searchValue} onChange={onSearchChange} placeholder={searchPlaceholder} disabled={disabled} ariaLabel={searchLabel} className="min-w-0 flex-1" />
+        {searchActions}
         {onManageSearch && <button type="button" onClick={onManageSearch} disabled={disabled} className="min-h-11 shrink-0 rounded-[14px] border px-3 text-sm font-semibold active:scale-95 disabled:opacity-50"
           style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.blue, borderColor: LEGACY_COLORS.border }}>검색어 연결</button>}
       </div>
