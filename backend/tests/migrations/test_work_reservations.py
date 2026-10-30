@@ -8,7 +8,7 @@ from alembic.config import Config
 import pytest
 import sqlalchemy as sa
 
-from app.models import Base, Employee, Inventory, Item, ProcessType
+from app.models import Base, Employee, Inventory, ProcessType
 from bootstrap.schema import schema_differences
 
 
@@ -24,10 +24,13 @@ def _config(path: Path) -> Config:
 
 
 def _seed(connection: sa.Connection) -> None:
-    """Use synthetic stock and old IO columns so this also runs before upgrade."""
+    """Seed historical item columns without applying future ORM defaults."""
     connection.execute(sa.insert(Employee).values(employee_id="owner", employee_code="owner", name="Owner", role="staff"))
     connection.execute(sa.insert(ProcessType).values(code="TR", prefix="T", suffix="R", stage_order=1))
-    connection.execute(sa.insert(Item).values(item_id="item", item_name="Synthetic", model_symbol="1", process_type_code="TR", serial_no=1))
+    connection.exec_driver_sql(
+        "INSERT INTO items (item_id, item_name, unit, model_symbol, process_type_code, serial_no) "
+        "VALUES ('item', 'Synthetic', 'EA', '1', 'TR', 1)"
+    )
     connection.execute(sa.insert(Inventory).values(item_id="item", quantity=10, warehouse_qty=10, pending_quantity=2))
     for status in ["draft", "submitted", "completed", "cancelled"]:
         connection.exec_driver_sql(
