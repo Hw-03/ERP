@@ -112,6 +112,7 @@ app = FastAPI(
         {"name": "Employees", "description": "직원 마스터."},
         {"name": "Inventory", "description": "재고 조회·입출고·이동·불량·반품·거래이력."},
         {"name": "BOM", "description": "BOM CRUD + 트리 + Where-Used."},
+        {"name": "Costs", "description": "BOM 기반 표준 원가 조회와 원가 기준 관리."},
         {"name": "Production", "description": "생산 입고 + BOM Backflush."},
         {"name": "Settings", "description": "관리자 PIN, 시스템 정합성 점검·복구."},
         {"name": "Models", "description": "제품 모델 슬롯."},

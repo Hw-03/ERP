@@ -38292,6 +38292,10 @@
       "name": "BOM"
     },
     {
+      "description": "BOM 기반 표준 원가 조회와 원가 기준 관리.",
+      "name": "Costs"
+    },
+    {
       "description": "생산 입고 + BOM Backflush.",
       "name": "Production"
     },
