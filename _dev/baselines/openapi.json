@@ -2772,6 +2772,718 @@
         "title": "CorrectionVersionBody",
         "type": "object"
       },
+      "CostIssue": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "path": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Path",
+            "type": "array"
+          }
+        },
+        "required": [
+          "item_id",
+          "path",
+          "code"
+        ],
+        "title": "CostIssue",
+        "type": "object"
+      },
+      "CostNode": {
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/CostNode"
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/CostIssue"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "labor_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Labor Cost"
+          },
+          "material_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material Cost"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
+          },
+          "own_labor_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Own Labor Cost"
+          },
+          "quantity_per_parent": {
+            "title": "Quantity Per Parent",
+            "type": "string"
+          },
+          "required_quantity": {
+            "title": "Required Quantity",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "complete",
+              "partial",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "unit_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Cost"
+          }
+        },
+        "required": [
+          "item_id",
+          "mes_code",
+          "item_name",
+          "quantity_per_parent",
+          "required_quantity",
+          "material_cost",
+          "own_labor_cost",
+          "labor_cost",
+          "unit_cost",
+          "amount",
+          "status",
+          "issues",
+          "children"
+        ],
+        "title": "CostNode",
+        "type": "object"
+      },
+      "CostPurchaseInfoResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "foreign_purchase_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foreign Purchase Price"
+          },
+          "hourly_labor_rate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hourly Labor Rate"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
+          },
+          "min_stock": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Stock"
+          },
+          "minimum_order_quantity": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Order Quantity"
+          },
+          "process_type_code": {
+            "title": "Process Type Code",
+            "type": "string"
+          },
+          "procurement_lead_time_days": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Procurement Lead Time Days"
+          },
+          "purchase_currency": {
+            "title": "Purchase Currency",
+            "type": "string"
+          },
+          "purchase_exchange_rate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Exchange Rate"
+          },
+          "purchase_memo": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Memo"
+          },
+          "purchase_price_effective_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Price Effective Date"
+          },
+          "reorder_point": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reorder Point"
+          },
+          "standard_purchase_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standard Purchase Price"
+          },
+          "standard_work_minutes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standard Work Minutes"
+          },
+          "standard_yield_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standard Yield Percent"
+          },
+          "supplier": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier"
+          },
+          "supplier_item_code": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier Item Code"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "purchase_currency",
+          "item_id",
+          "item_name",
+          "mes_code",
+          "unit",
+          "process_type_code"
+        ],
+        "title": "CostPurchaseInfoResponse",
+        "type": "object"
+      },
+      "CostPurchaseInfoUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "foreign_purchase_price": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,16}|(?=[\\d.]{1,19}0*$)\\d{0,16}\\.\\d{0,2}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foreign Purchase Price"
+          },
+          "hourly_labor_rate": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,16}|(?=[\\d.]{1,19}0*$)\\d{0,16}\\.\\d{0,2}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hourly Labor Rate"
+          },
+          "min_stock": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Stock"
+          },
+          "minimum_order_quantity": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Order Quantity"
+          },
+          "procurement_lead_time_days": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Procurement Lead Time Days"
+          },
+          "purchase_currency": {
+            "default": "KRW",
+            "pattern": "^[A-Z]{3}$",
+            "title": "Purchase Currency",
+            "type": "string"
+          },
+          "purchase_exchange_rate": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,6}|(?=[\\d.]{1,13}0*$)\\d{0,6}\\.\\d{0,6}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Exchange Rate"
+          },
+          "purchase_memo": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Memo"
+          },
+          "purchase_price_effective_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Price Effective Date"
+          },
+          "reorder_point": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reorder Point"
+          },
+          "standard_purchase_price": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,16}|(?=[\\d.]{1,19}0*$)\\d{0,16}\\.\\d{0,2}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standard Purchase Price"
+          },
+          "standard_work_minutes": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standard Work Minutes"
+          },
+          "standard_yield_percent": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 100.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standard Yield Percent"
+          },
+          "supplier": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier"
+          },
+          "supplier_item_code": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier Item Code"
+          }
+        },
+        "title": "CostPurchaseInfoUpdate",
+        "type": "object"
+      },
+      "CostStandardsResponse": {
+        "properties": {
+          "can_edit": {
+            "title": "Can Edit",
+            "type": "boolean"
+          },
+          "hourly_labor_rate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hourly Labor Rate"
+          }
+        },
+        "required": [
+          "hourly_labor_rate",
+          "can_edit"
+        ],
+        "title": "CostStandardsResponse",
+        "type": "object"
+      },
+      "CostStandardsUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "hourly_labor_rate": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,16}|(?=[\\d.]{1,19}0*$)\\d{0,16}\\.\\d{0,2}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hourly Labor Rate"
+          }
+        },
+        "title": "CostStandardsUpdate",
+        "type": "object"
+      },
+      "CostYieldStage": {
+        "properties": {
+          "effective_yield_percent": {
+            "title": "Effective Yield Percent",
+            "type": "string"
+          },
+          "input_unit_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Unit Cost"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
+          },
+          "output_unit_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Unit Cost"
+          },
+          "path": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Path",
+            "type": "array"
+          },
+          "process_type_code": {
+            "title": "Process Type Code",
+            "type": "string"
+          },
+          "standard_yield_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standard Yield Percent"
+          }
+        },
+        "required": [
+          "item_id",
+          "path",
+          "item_name",
+          "mes_code",
+          "process_type_code",
+          "standard_yield_percent",
+          "effective_yield_percent",
+          "input_unit_cost",
+          "output_unit_cost"
+        ],
+        "title": "CostYieldStage",
+        "type": "object"
+      },
       "CountReleaseBody": {
         "additionalProperties": false,
         "properties": {
@@ -7843,6 +8555,413 @@
           "quantity"
         ],
         "title": "ItemConversionExecuteRequest",
+        "type": "object"
+      },
+      "ItemCostResponse": {
+        "properties": {
+          "basis": {
+            "const": "management_standard",
+            "default": "management_standard",
+            "title": "Basis",
+            "type": "string"
+          },
+          "can_edit": {
+            "title": "Can Edit",
+            "type": "boolean"
+          },
+          "currency": {
+            "const": "KRW",
+            "default": "KRW",
+            "title": "Currency",
+            "type": "string"
+          },
+          "hourly_labor_rate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hourly Labor Rate"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/CostIssue"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "labor_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Labor Cost"
+          },
+          "material_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material Cost"
+          },
+          "process_type_code": {
+            "title": "Process Type Code",
+            "type": "string"
+          },
+          "standards": {
+            "$ref": "#/components/schemas/ItemCostStandards"
+          },
+          "status": {
+            "enum": [
+              "complete",
+              "partial",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tree": {
+            "$ref": "#/components/schemas/CostNode"
+          },
+          "unit_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Cost"
+          },
+          "yield_adjusted_unit_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yield Adjusted Unit Cost"
+          },
+          "yield_cost_difference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yield Cost Difference"
+          },
+          "yield_stages": {
+            "items": {
+              "$ref": "#/components/schemas/CostYieldStage"
+            },
+            "title": "Yield Stages",
+            "type": "array"
+          }
+        },
+        "required": [
+          "item_id",
+          "process_type_code",
+          "can_edit",
+          "standards",
+          "hourly_labor_rate",
+          "material_cost",
+          "labor_cost",
+          "unit_cost",
+          "status",
+          "issues",
+          "tree"
+        ],
+        "title": "ItemCostResponse",
+        "type": "object"
+      },
+      "ItemCostStandards": {
+        "properties": {
+          "foreign_purchase_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foreign Purchase Price"
+          },
+          "purchase_currency": {
+            "default": "KRW",
+            "title": "Purchase Currency",
+            "type": "string"
+          },
+          "purchase_exchange_rate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Exchange Rate"
+          },
+          "purchase_price_effective_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Price Effective Date"
+          },
+          "standard_purchase_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standard Purchase Price"
+          },
+          "standard_work_minutes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standard Work Minutes"
+          },
+          "standard_yield_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standard Yield Percent"
+          }
+        },
+        "required": [
+          "standard_purchase_price",
+          "purchase_price_effective_date",
+          "standard_work_minutes"
+        ],
+        "title": "ItemCostStandards",
+        "type": "object"
+      },
+      "ItemCostStandardsUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "foreign_purchase_price": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,16}|(?=[\\d.]{1,19}0*$)\\d{0,16}\\.\\d{0,2}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foreign Purchase Price"
+          },
+          "purchase_currency": {
+            "default": "KRW",
+            "pattern": "^[A-Z]{3}$",
+            "title": "Purchase Currency",
+            "type": "string"
+          },
+          "purchase_exchange_rate": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,6}|(?=[\\d.]{1,13}0*$)\\d{0,6}\\.\\d{0,6}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Exchange Rate"
+          },
+          "purchase_price_effective_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Price Effective Date"
+          },
+          "standard_purchase_price": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,16}|(?=[\\d.]{1,19}0*$)\\d{0,16}\\.\\d{0,2}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standard Purchase Price"
+          },
+          "standard_work_minutes": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standard Work Minutes"
+          },
+          "standard_yield_percent": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 100.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standard Yield Percent"
+          }
+        },
+        "title": "ItemCostStandardsUpdate",
+        "type": "object"
+      },
+      "ItemCostSummary": {
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "own_labor_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Own Labor Cost"
+          },
+          "status": {
+            "enum": [
+              "complete",
+              "partial",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "unit_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Cost"
+          }
+        },
+        "required": [
+          "item_id",
+          "unit_cost",
+          "own_labor_cost",
+          "amount",
+          "status"
+        ],
+        "title": "ItemCostSummary",
+        "type": "object"
+      },
+      "ItemCostSummaryRequest": {
+        "properties": {
+          "item_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Item Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "item_ids"
+        ],
+        "title": "ItemCostSummaryRequest",
         "type": "object"
       },
       "ItemCreate": {
@@ -20408,6 +21527,412 @@
         "summary": "제품기호 슬롯 수정",
         "tags": [
           "Codes"
+        ]
+      }
+    },
+    "/api/costs/item-summaries": {
+      "post": {
+        "description": "Read a bounded page of costs without returning every root's full tree.",
+        "operationId": "get_cost_summaries_api_costs_item_summaries_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "simulation_hourly_rate",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,16}|(?=[\\d.]{1,19}0*$)\\d{0,16}\\.\\d{0,2}0*$)",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Simulation Hourly Rate"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItemCostSummaryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ItemCostSummary"
+                  },
+                  "title": "Response Get Cost Summaries Api Costs Item Summaries Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Cost Summaries",
+        "tags": [
+          "Costs"
+        ]
+      }
+    },
+    "/api/costs/items/{item_id}": {
+      "get": {
+        "description": "Calculate one active item's BOM against current management standards.",
+        "operationId": "get_cost_api_costs_items__item_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "simulation_hourly_rate",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,16}|(?=[\\d.]{1,19}0*$)\\d{0,16}\\.\\d{0,2}0*$)",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Simulation Hourly Rate"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemCostResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Cost",
+        "tags": [
+          "Costs"
+        ]
+      }
+    },
+    "/api/costs/items/{item_id}/purchase-info": {
+      "get": {
+        "description": "The information tab requires a current department/warehouse manager role.",
+        "operationId": "get_purchase_info_api_costs_items__item_id__purchase_info_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CostPurchaseInfoResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Purchase Info",
+        "tags": [
+          "Costs"
+        ]
+      },
+      "patch": {
+        "description": "Allow only form fields, preserving omitted values and auditing actual edits.",
+        "operationId": "update_purchase_info_api_costs_items__item_id__purchase_info_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CostPurchaseInfoUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CostPurchaseInfoResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Purchase Info",
+        "tags": [
+          "Costs"
+        ]
+      }
+    },
+    "/api/costs/items/{item_id}/standards": {
+      "patch": {
+        "description": "Validate the complete patch before staging any standards or audit writes.",
+        "operationId": "update_item_standards_api_costs_items__item_id__standards_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItemCostStandardsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemCostResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Item Standards",
+        "tags": [
+          "Costs"
+        ]
+      }
+    },
+    "/api/costs/standards": {
+      "get": {
+        "description": "Return unknown rates as null, including for ordinary authenticated staff.",
+        "operationId": "get_standards_api_costs_standards_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Operator-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CostStandardsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Standards",
+        "tags": [
+          "Costs"
+        ]
+      },
+      "patch": {
+        "description": "Omission preserves the rate; explicit null removes the optional setting.",
+        "operationId": "update_standards_api_costs_standards_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CostStandardsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CostStandardsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Standards",
+        "tags": [
+          "Costs"
         ]
       }
     },

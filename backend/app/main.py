@@ -36,6 +36,7 @@ from app.routers._errors import ErrorCode
 from app.services import integrity as integrity_svc
 
 from app.routers import (
+    costs,
     admin_audit,
     admin_audit_csv,
     admin_audit_ledger,
@@ -330,6 +331,7 @@ def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONRespon
 
 app.include_router(employee_item_order.router, prefix="/api/items", tags=["Items"])
 app.include_router(items.router, prefix="/api/items", tags=["Items"])
+app.include_router(costs.router, prefix="/api/costs", tags=["Costs"])
 app.include_router(item_search.router, prefix="/api/item-search", tags=["Items"])
 app.include_router(employees.router, prefix="/api/employees", tags=["Employees"])
 app.include_router(operator_sessions.router, prefix="/api/operator-sessions", tags=["Employees"])

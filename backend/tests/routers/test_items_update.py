@@ -122,11 +122,23 @@ def test_update_item_rejects_negative_min_stock(client, make_item):
     assert response.status_code == 422, response.text
 
 
-def test_update_item_preserves_omitted_procurement_fields_and_clears_explicit_nulls(client, make_item):
+@pytest.fixture
+def cost_manager_headers(db_session):
+    from app.models import Employee
+    from app.services.operator_session import issue_session
+
+    actor = Employee(employee_code="cost-update-manager", name="Cost manager", role="staff", warehouse_role="deputy")
+    db_session.add(actor)
+    db_session.flush()
+    token, _ = issue_session(db_session, employee=actor, tab_id="cost-update")
+    return ADMIN_HEADERS | {"X-Operator-Session": token}
+
+
+def test_update_item_preserves_omitted_procurement_fields_and_clears_explicit_nulls(client, make_item, cost_manager_headers):
     item = make_item(name="구매 마스터 수정", process_type_code="HR")
     configured = client.put(
         f"/api/items/{item.item_id}",
-        headers=ADMIN_HEADERS,
+        headers=cost_manager_headers,
         json={
             "supplier": "기존 공급사",
             "min_stock": 20,
@@ -161,7 +173,7 @@ def test_update_item_preserves_omitted_procurement_fields_and_clears_explicit_nu
 
     cleared = client.put(
         f"/api/items/{item.item_id}",
-        headers=ADMIN_HEADERS,
+        headers=cost_manager_headers,
         json={
             "supplier": None,
             "min_stock": None,

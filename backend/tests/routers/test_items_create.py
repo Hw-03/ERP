@@ -136,10 +136,21 @@ def test_create_item_preserves_explicit_sales_review_and_defaults_af_to_required
     assert _get_item(client, defaulted_non_af.json()["item_id"]).json()["sales_review_required"] is False
 
 
-def test_create_item_round_trips_procurement_master_fields(client, seed_symbol):
+@pytest.fixture
+def cost_manager_headers(db_session):
+    from app.services.operator_session import issue_session
+
+    actor = Employee(employee_code="cost-create-manager", name="Cost manager", role="staff", department_role="primary")
+    db_session.add(actor)
+    db_session.flush()
+    token, _ = issue_session(db_session, employee=actor, tab_id="cost-create")
+    return ADMIN_HEADERS | {"X-Operator-Session": token}
+
+
+def test_create_item_round_trips_procurement_master_fields(client, seed_symbol, cost_manager_headers):
     response = client.post(
         "/api/items",
-        headers=ADMIN_HEADERS,
+        headers=cost_manager_headers,
         json={
             "item_name": "구매 마스터 품목",
             "process_type_code": "HR",
@@ -170,11 +181,11 @@ def test_create_item_round_trips_procurement_master_fields(client, seed_symbol):
     assert body["purchase_memo"] == "첫 거래는 현금 결제"
 
 
-def test_create_item_preserves_max_purchase_price_through_api_and_orm(client, db_session, seed_symbol):
+def test_create_item_preserves_max_purchase_price_through_api_and_orm(client, db_session, seed_symbol, cost_manager_headers):
     price = "9999999999999999.99"
     response = client.post(
         "/api/items",
-        headers=ADMIN_HEADERS,
+        headers=cost_manager_headers,
         json={
             "item_name": "최대 구매단가",
             "process_type_code": "HR",

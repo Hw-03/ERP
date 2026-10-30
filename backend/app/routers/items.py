@@ -21,6 +21,7 @@ from app.models import (
     TransactionTypeEnum,
 )
 from app.routers._errors import ErrorCode, http_error
+from app.routers._cost_access import require_cost_editor
 from app.schemas import (
     BomCompletionUpdate,
     BomUnmatchedStatusUpdate,
@@ -207,6 +208,8 @@ def create_item(
     _admin: Annotated[None, Depends(require_admin_pin)],
     db: Session = Depends(get_db),
 ):
+    if payload.standard_purchase_price is not None or payload.purchase_price_effective_date is not None:
+        require_cost_editor(db, request)
     pt = payload.process_type_code or None
     model_slots = payload.model_slots or []
     model_sym = _validated_model_symbol(db, model_slots) if model_slots else ""
@@ -637,6 +640,12 @@ def update_item(
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
+    if any(
+        field in payload.model_fields_set and getattr(item, field) != getattr(payload, field)
+        for field in ("standard_purchase_price", "purchase_price_effective_date")
+    ):
+        require_cost_editor(db, request)
+
     changed: list[str] = []
     # process_type/model/option 변경 감지 — mes_code 자동 재계산용.
     # 일반 필드(item_name·unit 등)는 코드와 무관하므로 그대로 setattr.
@@ -673,6 +682,11 @@ def update_item(
         if getattr(item, field) != new_val:
             setattr(item, field, new_val)
             changed.append(field)
+    if "standard_purchase_price" in changed and item.purchase_currency != "KRW":
+        item.purchase_currency = "KRW"
+        item.foreign_purchase_price = None
+        item.purchase_exchange_rate = None
+        changed.extend(["purchase_currency", "foreign_purchase_price", "purchase_exchange_rate"])
     if payload.sales_review_required is not None and item.sales_review_required != payload.sales_review_required:
         item.sales_review_required = payload.sales_review_required
         changed.append("sales_review_required")
