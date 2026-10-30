@@ -1,0 +1,123 @@
+.body { --cost-motion: 400ms cubic-bezier(.4, 0, .2, 1); }
+
+/* Keep search and rows mounted while the catalogue contracts into navigation. */
+.navigation {
+  width: 100%;
+  flex-shrink: 0;
+  overflow: hidden;
+  contain: layout paint;
+  border-right: 1px solid transparent;
+  transition: width var(--cost-motion);
+}
+.body[data-detail="true"] .navigation {
+  width: var(--cost-nav-width);
+  border-right: 1px solid var(--c-border);
+}
+.body[data-snap="true"] .navigation { transition: none; }
+.scroller { padding: 0 20px 20px; overflow-x: hidden; overflow-anchor: none; scrollbar-gutter: stable; }
+.overview .surface { flex: 1 0 auto; overflow: visible; }
+.overview .body { flex: 1 0 auto; }
+.overview .navigation { overflow: visible; contain: none; border-radius: 24px; }
+.overview .scroller { flex: 1 0 auto; overflow: visible; scrollbar-gutter: auto; }
+.body[data-detail="true"] .scroller { padding-top: 8px; }
+/* Keep columns still while the viewport clips them, without a minimum-width snap. */
+.body[data-phase="collapsing"] .table { width: var(--cost-table-width); }
+.table, .table tbody { display: block; }
+.table tr {
+  display: grid;
+  grid-template-columns: minmax(0, 40fr) minmax(0, 20fr) minmax(0, 16fr) minmax(0, 12fr) minmax(0, 12fr);
+}
+/* Paginated rows outside the viewport need no layout/paint during contraction. */
+.table tbody tr { position: relative; height: 65px; content-visibility: auto; contain-intrinsic-size: auto 65px; }
+.table thead {
+  display: block;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  overflow: hidden;
+}
+.table th, .table td {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+.table td { padding: 12px 16px; border-bottom: 1px solid var(--c-border); }
+.table th { white-space: nowrap; }
+.table .nameCell { padding-top: 4px; padding-bottom: 4px; }
+.table .price, .table th:last-child, .table td:last-child { justify-content: center; text-align: center; }
+.table .metadata {
+  overflow: hidden;
+  white-space: nowrap;
+  transition: opacity 100ms ease;
+}
+.body[data-detail="true"] .nameText { transform: translateY(-10px); }
+.table .codeCell { overflow: visible; white-space: nowrap; }
+.codeText { line-height: 16px; pointer-events: none; }
+.body[data-detail="false"] .table { font-size: 18px; }
+.body[data-detail="false"] .table th { font-size: 16px; }
+.body[data-detail="false"] .table .codeCell { font-size: 16px; }
+.body[data-detail="false"] .codeText { line-height: 20px; }
+.body[data-detail="false"] .price > span > span { font-size: 14px; }
+.body[data-detail="true"] .table { font-size: 18px; }
+.body[data-detail="true"] .table .codeCell { font-size: 14px; }
+.body[data-detail="true"] .codeText { line-height: 20px; }
+.body[data-detail="true"] .codeText { position: absolute; left: 16px; top: calc(50% + 3.5px); }
+.body[data-phase="expanding"] .codeText { position: absolute; left: calc(var(--cost-table-width) * .4 + 16px); top: calc(50% - 8.5px); }
+.analysis { min-width: 600px; }
+.summaryBar > div { flex-basis: 380px; }
+.summaryBar > div > div > h3 { font-size: 20px; line-height: 26px; }
+.summaryBar > div > div > h3 + p { font-size: 14px; line-height: 20px; }
+.summaryBar > dl { margin-left: auto; }
+.summaryBar > dl > div:not(:first-child) dd { font-size: 14px; font-weight: 600; }
+.views { padding: 0; }
+.views > [role="tabpanel"][aria-label="가계도"] > div { border: 0; border-radius: 0; }
+.views [data-cost-tree] { border: 0; border-radius: 0; }
+.views > [role="tabpanel"][aria-label="표"] > div { border: 0; border-radius: 0; }
+.views > [role="tabpanel"][aria-label="정보"] > div { border: 0; border-radius: 0; overflow: visible; }
+.views > [role="tabpanel"][aria-label="정보"] > div > div:first-child { display: flex; }
+.views > [role="tabpanel"][aria-label="표"] > div > div:first-child { border-radius: 0; }
+.views [data-scrollbar-rail-corners],
+.views [data-scrollbar-rail-frame] { display: none; }
+@media (min-width: 1024px) {
+  .surface:has(.body[data-phase="detail"] [role="tabpanel"]:is([aria-label="표"], [aria-label="정보"]):not([hidden])) { position: relative; overflow: visible; }
+  .surface:has(.body[data-phase="detail"] [role="tabpanel"]:is([aria-label="표"], [aria-label="정보"]):not([hidden])) > .body > main { overflow: visible; }
+  .surface:has(.body[data-phase="detail"] [role="tabpanel"]:is([aria-label="표"], [aria-label="정보"]):not([hidden]))::before,
+  .surface:has(.body[data-phase="detail"] [role="tabpanel"]:is([aria-label="표"], [aria-label="정보"]):not([hidden]))::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: 40;
+    pointer-events: none;
+  }
+  .surface:has(.body[data-phase="detail"] [role="tabpanel"]:is([aria-label="표"], [aria-label="정보"]):not([hidden]))::after {
+    z-index: 41;
+    border: 1px solid var(--c-border);
+    border-radius: 24px;
+  }
+  .surface:has(.body[data-phase="detail"] [role="tabpanel"]:is([aria-label="표"], [aria-label="정보"]):not([hidden]))::before {
+    background:
+      radial-gradient(circle at 100% 100%, transparent 0 23px, var(--c-bg) 24px) top left / 24px 24px no-repeat,
+      radial-gradient(circle at 0 100%, transparent 0 23px, var(--c-bg) 24px) top right / 24px 24px no-repeat,
+      radial-gradient(circle at 100% 0, transparent 0 23px, var(--c-bg) 24px) bottom left / 24px 24px no-repeat,
+      radial-gradient(circle at 0 0, transparent 0 23px, var(--c-bg) 24px) bottom right / 24px 24px no-repeat;
+  }
+}
+.reveal { animation: reveal 100ms ease both; }
+@keyframes reveal { from { opacity: 0; } to { opacity: 1; } }
+.body[data-compact="true"] .table tr {
+  grid-template-columns: minmax(0, 100fr) repeat(4, minmax(0, 0fr));
+}
+.body[data-compact="true"] .metadata { opacity: 0; padding: 12px 0; }
+.body[data-compact="true"] .codeCell { padding-left: 0; padding-right: 0; }
+.body[data-compact="true"] .table tbody tr { border-radius: 12px; }
+.body[data-compact="true"] .table td { border-bottom-color: transparent; }
+.body[data-compact="true"] .table tr[data-selected="true"] {
+  background: color-mix(in srgb, var(--c-blue) 9%, var(--c-s1));
+  box-shadow: inset 0 0 0 1px var(--c-blue);
+  transition: background-color 100ms ease, box-shadow 100ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .body { --cost-motion: 0s; }
+  .reveal { animation: none; }
+  .metadata, .table tr[data-selected="true"] { transition: none; }
+}
