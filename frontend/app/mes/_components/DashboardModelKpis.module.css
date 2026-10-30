@@ -1,0 +1,99 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  gap: 8px;
+}
+
+.card {
+  display: flex;
+  min-width: 0;
+  min-height: 104px;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 12px 20px;
+  border: 1px solid color-mix(in srgb, var(--c-blue) 35%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--c-blue) var(--model-tint), var(--c-s1));
+  color: var(--c-text);
+  text-align: left;
+  transition: border-color 150ms, background-color 150ms;
+}
+
+.card:hover,
+.card:focus-visible {
+  border-color: var(--c-blue);
+  background: color-mix(in srgb, var(--c-blue) calc(var(--model-tint) + 6%), var(--c-s1));
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--c-blue);
+  outline-offset: 3px;
+}
+
+.model {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--c-blue);
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 28px;
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.capacity {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  text-align: center;
+}
+
+.capacity dt,
+.cost dt {
+  color: var(--c-muted2);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.capacity dd,
+.cost dd {
+  color: var(--c-blue);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.capacity dd {
+  font-size: 24px;
+  line-height: 28px;
+}
+
+.cost {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cost dd {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-left: auto;
+  font-size: 28px;
+  line-height: 34px;
+  letter-spacing: -0.035em;
+  text-align: right;
+}
+
+.unit {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: normal;
+  white-space: nowrap;
+}
