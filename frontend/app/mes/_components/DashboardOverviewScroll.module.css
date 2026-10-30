@@ -1,0 +1,6 @@
+.root { position: relative; display: flex; flex: 1; min-width: 0; min-height: 0; }
+.viewport { display: flex; flex: 1; min-width: 0; min-height: 0; }
+.viewport[data-overview="true"] { display: block; overflow-y: scroll; overflow-x: hidden; overflow-anchor: none; scrollbar-gutter: stable; }
+.content { display: flex; flex: 1; min-width: 0; min-height: 0; flex-direction: column; gap: 12px; }
+.viewport[data-overview="true"] > .content { min-height: 100%; }
+.root:has(> [data-overview="true"])::after { content: ""; pointer-events: none; position: absolute; bottom: 0; left: 0; right: 10px; height: 24px; z-index: 40; background: radial-gradient(circle at 100% 0, transparent 0 23px, var(--c-bg) 24px) bottom left / 24px 24px no-repeat, radial-gradient(circle at 0 0, transparent 0 23px, var(--c-bg) 24px) bottom right / 24px 24px no-repeat; }
