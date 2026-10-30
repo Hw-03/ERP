@@ -11,6 +11,12 @@ import type { AdminWorkReservationFilters } from "../api/types/work-reservations
 import type { WorkDraftFilters, WorkDraftSelection } from "../api/types/work-drafts";
 
 export const queryKeys = {
+  costs: {
+    all: ["costs"] as const,
+    catalogue: (employeeId: string, sessionToken: string, search: string) => ["costs", "catalogue", employeeId, sessionToken, search] as const,
+    item: (employeeId: string, sessionToken: string, itemId: string) => ["costs", "item", employeeId, sessionToken, itemId] as const,
+    information: (employeeId: string, sessionToken: string, itemId: string) => ["costs", "information", employeeId, sessionToken, itemId] as const,
+  },
   itemSearch: { all: ["itemSearch"] as const, config: () => ["itemSearch", "config"] as const },
   models: {
     all: ["models"] as const,
