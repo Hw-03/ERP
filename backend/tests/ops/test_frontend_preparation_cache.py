@@ -168,6 +168,77 @@ def test_vendor_shared_directory_requires_recorded_generated_hashes(tmp_path, re
     assert (old / "frontend/node_modules").exists() is (not registered)
 
 
+@pytest.mark.parametrize("evidence", ["match", "changed", "unregistered", "own_receipt"])
+def test_failed_vendor_cache_requires_installed_artifact_evidence(
+    tmp_path_factory: pytest.TempPathFactory, evidence: str,
+) -> None:
+    m, policy, newest, old, record = fixture(tmp_path_factory.mktemp("vendor"))
+    relative = "node_modules/pkg/data/f.ts"
+    for root in (newest / "frontend", old / "frontend", policy.employee / "frontend"):
+        write(root / relative, "generated vendor fixture")
+    receipt = json.loads((newest / "receipt.json").read_text())
+    if evidence != "unregistered":
+        receipt["artifacts"][relative] = digest("generated vendor fixture")
+    write(newest / "receipt.json", json.dumps(receipt))
+    journal = json.loads(record.read_text())
+    journal["incoming_frontend"] = receipt["artifacts"]
+    write(record, json.dumps(journal))
+    if evidence != "own_receipt":
+        (old / "receipt.json").unlink()
+    if evidence == "changed":
+        write(old / "frontend" / relative, "unverified user content")
+    state = policy.pin(old)
+    state.update(pid=99999999, expires_at=(NOW - timedelta(hours=1)).isoformat())
+    policy.save_preparation(old, state)
+    employee_before = {str(p): p.read_bytes() for p in policy.employee.rglob("*") if p.is_file()}
+    retained_before = retained_bytes(policy.repo)
+
+    result = policy.cleanup(apply=True)
+
+    matched = evidence == "match"
+    assert result["status"] == ("COMPLETED" if matched else "WARNING")
+    assert (old / "frontend/node_modules").exists() is (not matched)
+    assert (newest / "frontend/node_modules").exists()
+    assert retained_bytes(policy.repo) == retained_before
+    assert {str(p): p.read_bytes() for p in policy.employee.rglob("*") if p.is_file()} == employee_before
+    assert m.read_json(record)["phase"] == "CONFIRMED"
+
+
+def test_failed_build_cache_does_not_borrow_installed_artifact_evidence(tmp_path: Path) -> None:
+    _, policy, newest, old, record = fixture(tmp_path)
+    relative = ".next-prod/data/original.txt"
+    for root in (newest / "frontend", old / "frontend", policy.employee / "frontend"):
+        write(root / relative, "not a verified dependency")
+    receipt = json.loads((newest / "receipt.json").read_text())
+    receipt["artifacts"][relative] = digest("not a verified dependency")
+    write(newest / "receipt.json", json.dumps(receipt))
+    journal = json.loads(record.read_text())
+    journal["incoming_frontend"] = receipt["artifacts"]
+    write(record, json.dumps(journal))
+    (old / "receipt.json").unlink()
+    state = policy.pin(old)
+    state.update(pid=99999999, expires_at=(NOW - timedelta(hours=1)).isoformat())
+    policy.save_preparation(old, state)
+
+    assert policy.cleanup(apply=True)["status"] == "WARNING"
+    assert (old / "frontend" / relative).read_text() == "not a verified dependency"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows generated cache path handling")
+@pytest.mark.parametrize("kind", ["file", "directory"])
+def test_windows_cleanup_removes_generated_files_beyond_legacy_path_limit(tmp_path: Path, kind: str) -> None:
+    _, policy, newest, old, _ = fixture(tmp_path)
+    target = old / "frontend/.next-prod/server" / ("x" * 180 + ".js" if kind == "file" else "x" * 180 + "/page.js")
+    assert len(str(target)) > 260
+    write(Path("\\\\?\\" + str(target)), "generated long path")
+
+    result = policy.cleanup(apply=True)
+
+    assert result["status"] == "COMPLETED"
+    assert not (old / "frontend/.next-prod").exists()
+    assert (newest / "frontend/.next-prod").exists()
+
+
 def test_preview_does_not_delete_or_rewrite_sources_logs_or_receipts(tmp_path):
     _, policy, newest, old, _ = fixture(tmp_path)
     before = retained_bytes(policy.repo)

@@ -156,7 +156,7 @@ scripts\ops\cleanup_backups.bat 20     rem 정식 백업 최신 20개 유지
 
 별도 운영 상태와 정리 보고서는 `_attic/runtime/frontend-cache-policy/`에 저장한다. 기존 journal·receipt·검증 로그는 수정하지 않는다. 미리보기 명령은 다음과 같으며, 실제 삭제에는 명시적으로 `--apply`가 필요하다.
 
-의존성 패키지 내부의 `data`·`shared` 동명 폴더는 준비본 artifact manifest에 등록된 생성 파일의 해시까지 일치할 때만 허용한다. 미등록 파일·원본 파일·외부 연결은 보호한다.
+의존성 패키지 내부의 `data`·`shared` 동명 폴더는 준비본 artifact manifest에 등록된 생성 파일의 해시까지 일치할 때만 허용한다. receipt가 없는 실패 준비본은 기존 세션·프로세스·24시간 만료 검사를 통과한 `node_modules`에 한해 검증된 최신 설치 준비본의 artifact manifest로 경로·파일 해시를 대조한다. 자체 receipt가 있으면 이 대체 증거로 덮어 인정하지 않으며, `.next`·`.next-prod`에도 대체하지 않는다. 미등록 파일·원본 파일·외부 연결은 계속 보호한다. Windows 파일 I/O에는 긴 경로 표기를 사용해 링크·해시 검사와 삭제를 수행하되, 소유권 비교에는 기존 절대 경로를 유지하고 실제 누락·권한 오류는 숨기지 않는다.
 
 ```powershell
 py scripts/ops/frontend_preparation_cache.py cleanup

@@ -34,12 +34,21 @@ class CacheBusy(RuntimeError):
     """The caller must skip cleanup, or stop preparation before employee shutdown."""
 
 
+def native_path(path: Path) -> str:
+    """Use extended Windows paths at I/O boundaries, not for ownership comparisons."""
+    target = str(path)
+    if os.name == "nt" and not target.startswith("\\\\?\\"):
+        target = os.path.abspath(target)
+        target = "\\\\?\\UNC\\" + target[2:] if target.startswith("\\\\") else "\\\\?\\" + target
+    return target
+
+
 def physical(path: Path) -> Path:
     """Reject every reparse point, including root ancestors, before using a path."""
     path = Path(os.path.abspath(path))
     for part in (path, *path.parents):
         try:
-            info = part.lstat()
+            info = os.lstat(native_path(part))
         except FileNotFoundError:
             continue
         if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
@@ -73,7 +82,7 @@ def publish(path: Path, value: dict) -> None:
 
 def sha256(path: Path) -> str:
     """Hash a physical file without changing source or runtime database files."""
-    with physical(path).open("rb") as stream:
+    with open(native_path(physical(path)), "rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
@@ -125,8 +134,8 @@ def timestamp(value: str) -> datetime:
 
 
 def remove_tree(path: Path) -> None:
-    """Delete a prevalidated generated leaf, without force or shell traversal."""
-    shutil.rmtree(path)
+    """Delete a prevalidated leaf, including Windows paths beyond MAX_PATH."""
+    shutil.rmtree(native_path(path))
 
 
 def job_kernel() -> ctypes.CDLL:
@@ -510,7 +519,7 @@ class CachePolicy:
         receipt = read_json(receipt_path)
         return receipt.get("status") != "READY" or timestamp(receipt["prepared_at"]) + timedelta(hours=24) > self.now()
 
-    def validate_target(self, path: Path) -> tuple[int, int]:
+    def validate_target(self, path: Path, *, vendor_artifacts: dict[str, str] | None = None) -> tuple[int, int]:
         """Measure only a fixed generated leaf and reject protected content or links."""
         path = physical(path)
         artifacts = {}
@@ -529,13 +538,21 @@ class CachePolicy:
                 artifacts = receipt.get("artifacts", {})
                 if not self.valid_manifest(artifacts):
                     raise ValueError("Generated artifact manifest is invalid")
+            elif path.name == "node_modules" and vendor_artifacts is not None:
+                # Failed builds have no receipt; only installed vendor bytes can
+                # attest their data/shared subtrees, never another build's output.
+                if not self.valid_manifest(vendor_artifacts):
+                    raise ValueError("Installed vendor artifact manifest is invalid")
+                artifacts = vendor_artifacts
         else:
             raise ValueError("Not a permitted generated leaf")
         pending, count, size = [path], 0, 0
         protected_subtrees = []
         while pending:
-            with os.scandir(pending.pop()) as entries:
+            directory = pending.pop()
+            with os.scandir(native_path(directory)) as entries:
                 for entry in entries:
+                    item = directory / entry.name
                     info = entry.stat(follow_symlinks=False)
                     name = entry.name.lower()
                     if entry.is_symlink() or getattr(info, "st_file_attributes", 0) & 0x400:
@@ -545,15 +562,14 @@ class CachePolicy:
                         raise ValueError(f"Protected content in generated target: {entry.path}")
                     if stat.S_ISDIR(info.st_mode):
                         if name in {"data", "shared", "share"}:
-                            prefix = Path(entry.path).relative_to(path.parent).as_posix() + "/"
+                            prefix = item.relative_to(path.parent).as_posix() + "/"
                             if not any(relative.startswith(prefix) for relative in artifacts):
                                 raise ValueError(f"Unregistered shared/data directory: {entry.path}")
-                            protected_subtrees.append(Path(entry.path))
-                        pending.append(Path(entry.path))
+                            protected_subtrees.append(item)
+                        pending.append(item)
                     elif stat.S_ISREG(info.st_mode):
                         if info.st_nlink > 1:
                             raise ValueError(f"Hard-linked generated content: {entry.path}")
-                        item = Path(entry.path)
                         if any(item.is_relative_to(directory) for directory in protected_subtrees):
                             relative = item.relative_to(path.parent).as_posix()
                             if artifacts.get(relative) != sha256(item):
@@ -588,6 +604,7 @@ class CachePolicy:
                         releases.append(self.owned_release(path))
         retained = self.latest(releases, records)
         report["retained_release"] = str(retained)
+        vendor_artifacts = read_json(retained / "receipt.json")["artifacts"]
         busy_roots = set()
         candidates = []
         for release in releases:
@@ -634,11 +651,11 @@ class CachePolicy:
             total -= size
         for path in candidates:
             try:
-                size, count = self.validate_target(path)
+                size, count = self.validate_target(path, vendor_artifacts=vendor_artifacts)
                 report["targets"].append({"path": str(path), "bytes": size, "files": count})
                 if apply:
                     # Recheck physical roots and content immediately before deletion.
-                    self.validate_target(path)
+                    self.validate_target(path, vendor_artifacts=vendor_artifacts)
                     remove_tree(path)
                     report["removed"].append(str(path))
                     report["removed_bytes"] += size
