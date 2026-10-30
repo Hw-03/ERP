@@ -13,6 +13,7 @@ const FALLBACK_INTERVAL_MS = 1_000;
 const REVISION_BATCH_WINDOW_MS = 250;
 
 const OPERATIONAL_QUERY_ROOTS = [
+  queryKeys.costs.all,
   queryKeys.items.all,
   queryKeys.inventory.all,
   queryKeys.transactions.all,
@@ -62,6 +63,7 @@ export async function invalidateOperationalQueries(queryClient: QueryClient, onM
   // The BOM coordinator owns item cancellation so an in-flight shared refresh
   // is not cancelled immediately before another caller joins it.
   await cancelWorkInventoryQueries(queryClient, { skipItems: true });
+  await queryClient.cancelQueries({ queryKey: queryKeys.costs.all });
   await Promise.all(
     [
       refreshBomAndItems(queryClient, revision),
