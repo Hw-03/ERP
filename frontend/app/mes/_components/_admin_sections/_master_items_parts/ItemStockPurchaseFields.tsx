@@ -3,8 +3,9 @@
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { ItemFormData } from "./ItemFormFields";
+import { useCostEditPermission } from "@/lib/queries/useCostQuery";
 
-type StockPurchaseFormData = Pick<
+export type StockPurchaseFormData = Pick<
   ItemFormData,
   | "supplier"
   | "supplier_item_code"
@@ -22,6 +23,8 @@ type Props<T extends StockPurchaseFormData> = {
   setForm: (updater: (form: T) => T) => void;
   unit: string;
   fillAvailableHeight?: boolean;
+  purchasePriceFields?: React.ReactNode;
+  additionalCriteria?: React.ReactNode;
 };
 
 const INPUT_CLASS = "min-h-11 w-full min-w-0 rounded-[12px] border px-3 py-2 text-sm outline-none transition-colors focus-visible:border-[var(--c-blue)] focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/20";
@@ -89,7 +92,10 @@ export function ItemStockPurchaseFields<T extends StockPurchaseFormData>({
   setForm,
   unit,
   fillAvailableHeight = false,
+  purchasePriceFields,
+  additionalCriteria,
 }: Props<T>) {
+  const canEditCost = useCostEditPermission();
   const normalizedUnit = unit || "EA";
   const minStock = Number(form.min_stock);
   const reorderPoint = Number(form.reorder_point);
@@ -133,9 +139,10 @@ export function ItemStockPurchaseFields<T extends StockPurchaseFormData>({
                 style={INPUT_STYLE}
               />
             </Field>
-            <Field label="기준 매입단가">
+            {purchasePriceFields ?? <><Field label="기준 매입단가">
               <input
                 aria-label="기준 매입단가"
+                disabled={!canEditCost}
                 type="text"
                 inputMode="decimal"
                 value={form.standard_purchase_price}
@@ -153,6 +160,7 @@ export function ItemStockPurchaseFields<T extends StockPurchaseFormData>({
             <Field label="단가 기준일">
               <input
                 aria-label="단가 기준일"
+                disabled={!canEditCost}
                 type="date"
                 value={form.purchase_price_effective_date}
                 onChange={(event) => {
@@ -162,7 +170,7 @@ export function ItemStockPurchaseFields<T extends StockPurchaseFormData>({
                 className={INPUT_CLASS}
                 style={INPUT_STYLE}
               />
-            </Field>
+            </Field></>}
           </div>
         </section>
 
@@ -217,6 +225,7 @@ export function ItemStockPurchaseFields<T extends StockPurchaseFormData>({
         </section>
       </div>
 
+      {additionalCriteria}
       <section
         className={`rounded-[16px] border p-4 ${fillAvailableHeight ? "flex min-h-[169px] flex-1 flex-col" : ""}`}
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
@@ -242,3 +251,5 @@ export function ItemStockPurchaseFields<T extends StockPurchaseFormData>({
     </div>
   );
 }
+
+export { Field, INPUT_CLASS, INPUT_STYLE };

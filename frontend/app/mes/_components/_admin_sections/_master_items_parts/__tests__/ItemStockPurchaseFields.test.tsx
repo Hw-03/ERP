@@ -2,6 +2,8 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ItemStockPurchaseFields } from "../ItemStockPurchaseFields";
 
+vi.mock("@/lib/queries/useCostQuery", () => ({ useCostEditPermission: () => false }));
+
 const form = {
   supplier: "주 공급사",
   supplier_item_code: "SUP-001",
@@ -15,6 +17,12 @@ const form = {
 };
 
 describe("ItemStockPurchaseFields", () => {
+  it("원가 수정 권한이 없으면 단가·기준일만 읽기 전용이고 다른 구매 정보는 수정할 수 있다", () => {
+    render(<ItemStockPurchaseFields form={form} setForm={vi.fn()} unit="EA" />);
+    expect(screen.getByRole("textbox", { name: "기준 매입단가" })).toBeDisabled();
+    expect(screen.getByLabelText("단가 기준일")).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "주 공급사" })).not.toBeDisabled();
+  });
   it("구매·재고 발주 기준과 구매 메모를 표시하되 기본 단위 칩은 표시하지 않는다", () => {
     const { container } = render(<ItemStockPurchaseFields form={form} setForm={vi.fn()} unit="kg" />);
 
