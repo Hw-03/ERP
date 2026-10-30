@@ -18,6 +18,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -115,7 +116,23 @@ class Item(Base):
     min_stock = Column(IntQuantity, nullable=True)
     supplier_item_code = Column(String(100), nullable=True)
     standard_purchase_price = Column(ExactPrice, nullable=True)
+    purchase_currency = Column(String(3), nullable=False, default="KRW", server_default="KRW")
+    foreign_purchase_price = Column(ExactPrice, CheckConstraint(
+        "foreign_purchase_price >= 0 OR foreign_purchase_price IS NULL", name="ck_items_foreign_purchase_price_nonneg"), nullable=True)
+    purchase_exchange_rate = Column(Numeric(12, 6), CheckConstraint(
+        "purchase_exchange_rate > 0 OR purchase_exchange_rate IS NULL", name="ck_items_purchase_exchange_rate_positive"), nullable=True)
     purchase_price_effective_date = Column(Date, nullable=True)
+    standard_yield_percent = Column(Numeric(5, 2), CheckConstraint(
+        "standard_yield_percent > 0 AND standard_yield_percent <= 100 OR standard_yield_percent IS NULL",
+        name="ck_items_standard_yield_range"), nullable=True)
+    standard_work_minutes = Column(
+        Numeric(12, 2),
+        CheckConstraint(
+            "standard_work_minutes >= 0 OR standard_work_minutes IS NULL",
+            name="ck_items_standard_work_minutes_nonneg",
+        ),
+        nullable=True,
+    )
     procurement_lead_time_days = Column(Integer, nullable=True)
     minimum_order_quantity = Column(Integer, nullable=True)
     reorder_point = Column(Integer, nullable=True)

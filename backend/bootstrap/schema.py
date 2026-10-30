@@ -54,6 +54,11 @@ POST_LEGACY_ADDITIVE_SCHEMA_MARKERS = (
     "supplier_item_code",
     "standard_purchase_price",
     "purchase_price_effective_date",
+    "standard_work_minutes",
+    "standard_yield_percent",
+    "purchase_currency",
+    "foreign_purchase_price",
+    "purchase_exchange_rate",
     "procurement_lead_time_days",
     "minimum_order_quantity",
     "reorder_point",
@@ -388,9 +393,13 @@ def _constraint_signature(constraints: list[dict[str, object]]) -> frozenset[tup
 
 
 def _metadata_check_signature(table: sa.Table) -> frozenset[tuple[str, str]]:
+    """Include inline checks used by additive SQLite column migrations."""
+    constraints = list(table.constraints)
+    for column in table.columns:
+        constraints.extend(column.constraints)
     return frozenset(
         (str(constraint.name or ""), _normalize_sql(constraint.sqltext) or "")
-        for constraint in table.constraints
+        for constraint in constraints
         if isinstance(constraint, sa.CheckConstraint)
     )
 

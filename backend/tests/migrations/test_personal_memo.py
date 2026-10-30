@@ -42,11 +42,9 @@ def test_adds_only_empty_memos_and_preserves_existing_data(tmp_path: Path) -> No
             connection.execute(sa.insert(DailyWorkReport), {"work_date": date(2026, 10, 1), "employee_id": employee_id, "employee_name": "Existing", "department": "Assembly", "content": "Keep historical report"})
             before = _business_rows(connection)
             tables = set(sa.inspect(connection).get_table_names())
-        assert ScriptDirectory.from_config(config).get_current_head() == REVISION
-        result = ensure_schema(engine=engine)
-        assert result.revision == REVISION
-        assert check_schema(engine=engine).ready
+        command.upgrade(config, REVISION)
         with engine.connect() as connection:
+            assert connection.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one() == REVISION
             assert _business_rows(connection) == before
             assert set(sa.inspect(connection).get_table_names()) - tables == {"personal_memos"}
             assert connection.exec_driver_sql("SELECT COUNT(*) FROM personal_memos").scalar_one() == 0
