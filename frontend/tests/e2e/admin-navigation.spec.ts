@@ -38,6 +38,10 @@ test.describe("관리자 상단 탭", () => {
   test("모델 저장 실패 후에도 입력을 유지하고 재시도한다", async ({ page }) => {
     await openAdmin(page);
     const name = page.getByRole("textbox").filter({ visible: true }).first();
+    const save = page.getByRole("button", { name: "저장", exact: true });
+    const form = page.locator("fieldset").filter({ has: name });
+    const waitForSave = () => page.waitForResponse(response =>
+      new URL(response.url()).pathname.startsWith("/api/models/") && response.request().method() === "PUT");
     const original = await name.inputValue();
     await name.fill(`${original} QA`);
     await page.route("**/api/models/*", async route => {
@@ -45,15 +49,23 @@ test.describe("관리자 상단 탭", () => {
         await route.fulfill({ status: 503, contentType: "application/json", body: '{"detail":"QA save unavailable"}' });
       } else await route.continue();
     });
-    await page.getByRole("button", { name: "저장", exact: true }).click();
+    const [failed] = await Promise.all([waitForSave(), save.click()]);
+    expect(failed.status()).toBe(503);
+    await expect(form).toHaveAttribute("aria-busy", "false");
     await expect(name).toHaveValue(`${original} QA`);
-    await expect(page.getByRole("button", { name: "저장", exact: true })).toBeEnabled();
+    await expect(save).toBeEnabled();
     await page.unroute("**/api/models/*");
-    await page.getByRole("button", { name: "저장", exact: true }).click();
-    await expect(page.getByRole("button", { name: "저장", exact: true })).toBeDisabled();
+    const [retried] = await Promise.all([waitForSave(), save.click()]);
+    expect(retried.ok()).toBeTruthy();
+    await expect(form).toHaveAttribute("aria-busy", "false");
+    await expect(name).toHaveValue(`${original} QA`);
+    await expect(save).toBeDisabled();
     await name.fill(original);
-    await page.getByRole("button", { name: "저장", exact: true }).click();
-    await expect(page.getByRole("button", { name: "저장", exact: true })).toBeDisabled();
+    const [restored] = await Promise.all([waitForSave(), save.click()]);
+    expect(restored.ok()).toBeTruthy();
+    await expect(form).toHaveAttribute("aria-busy", "false");
+    await expect(name).toHaveValue(original);
+    await expect(save).toBeDisabled();
   });
 
   test("PIN 잠금 해제 후 모든 섹션을 순회한다", async ({ page }) => {
