@@ -232,6 +232,25 @@ describe("fetcher / write helpers", () => {
     });
   });
 
+  it.each([postJson, putJson])("keeps admin and audit headers when adding an operator session", async (write) => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ ok: true, body: { ok: true } })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    registerAdminPinProvider(() => "2468");
+    setAuditScreen({ key: "cost-analysis", label: "원가분석" });
+
+    await write("/api/items", { standard_purchase_price: "0" }, { "X-Operator-Session": "operator-token" });
+
+    const init = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(init.headers).toMatchObject({
+      "Content-Type": "application/json",
+      "X-Admin-Pin": "2468",
+      "X-Operator-Session": "operator-token",
+      "X-MES-Audit-Screen": "cost-analysis",
+    });
+    expect(init.credentials).toBe("include");
+    expect(JSON.parse(init.body as string)).toEqual({ standard_purchase_price: "0" });
+  });
+
   it("postJson converts a timeout into ApiConnectionError", async () => {
     globalThis.fetch = vi.fn(
       () => new Promise<Response>(() => {}),

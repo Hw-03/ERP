@@ -249,9 +249,10 @@ async function writeJson<T>(
   url: string,
   method: "POST" | "PUT" | "PATCH" | "DELETE",
   body?: unknown,
+  extraHeaders?: Record<string, string>,
 ): Promise<T> {
   const init: RequestInit = { method, credentials: "include" };
-  const pinHeaders = { ...authHeaders(), ...getAuditRequestHeaders() };
+  const pinHeaders = { ...authHeaders(), ...getAuditRequestHeaders(), ...extraHeaders };
   if (body !== undefined) {
     init.headers = { "Content-Type": "application/json", ...pinHeaders };
     init.body = JSON.stringify(body);
@@ -271,8 +272,8 @@ async function writeJson<T>(
   return JSON.parse(text) as T;
 }
 
-export const postJson = <T>(url: string, body?: unknown): Promise<T> =>
-  writeJson<T>(url, "POST", body);
+export const postJson = <T>(url: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<T> =>
+  writeJson<T>(url, "POST", body, extraHeaders);
 
 /** 읽기 전용 계산은 프록시의 30초 한도까지 기다리고 연결 실패만 한 번 복구한다. */
 export async function postPreviewJson<T>(url: string, body: unknown, signal?: AbortSignal): Promise<T> {
@@ -309,8 +310,8 @@ export async function postPreviewJson<T>(url: string, body: unknown, signal?: Ab
   }
 }
 
-export const putJson = <T>(url: string, body?: unknown): Promise<T> =>
-  writeJson<T>(url, "PUT", body);
+export const putJson = <T>(url: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<T> =>
+  writeJson<T>(url, "PUT", body, extraHeaders);
 export const patchJson = <T>(url: string, body?: unknown): Promise<T> =>
   writeJson<T>(url, "PATCH", body);
 export const deleteJson = <T = void>(url: string, body?: unknown): Promise<T> =>
