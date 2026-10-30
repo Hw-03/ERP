@@ -71,37 +71,53 @@ test("최초 재고 조회 실패를 해당 조회의 재시도로 복구", asyn
 });
 
 for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
-  test(`품목 삭제 확인과 단순 조회 실패를 구분한다 (${viewport.width}px)`, async ({ page }) => {
+  test(`삭제 확인 후 상세 처리 정책을 유지한다 (${viewport.width}px)`, async ({ page }) => {
     const { rawItem } = readSeed();
-    let mode: "deleted" | "failed" | "active" = "deleted";
     await page.setViewportSize(viewport);
     await page.route(`**/api/items/${rawItem.item_id}`, async (route) => {
-      if (mode === "failed") {
-        await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ detail: "검증용 조회 실패" }) });
-        return;
-      }
       const response = await route.fetch();
       const item = await response.json();
-      await route.fulfill({ response, json: { ...item, deleted_at: mode === "deleted" ? "2026-10-07T00:00:00Z" : null } });
+      await route.fulfill({ response, json: { ...item, deleted_at: "2026-10-07T00:00:00Z" } });
+    });
+    await page.goto("/mes?tab=dashboard");
+    await page.getByRole("button", { name: new RegExp(rawItem.item_name) }).first().click();
+    const dialog = page.getByRole("dialog", { name: viewport.width >= 1024 ? rawItem.item_name : `${rawItem.item_name} 상세`, exact: true });
+    if (viewport.width >= 1024) {
+      await expect(page.getByText("선택한 품목을 표시할 수 없어 목록으로 돌아왔습니다.", { exact: true })).toBeVisible();
+      await expect(dialog).not.toBeVisible();
+      await page.reload();
+      await expect(page.getByRole("button", { name: new RegExp(rawItem.item_name) }).first()).toBeVisible();
+      await expect(dialog).not.toBeVisible();
+      return;
+    }
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("삭제된 품목입니다. 입출고 작업을 할 수 없습니다.")).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "입고", exact: true })).toBeDisabled();
+    await expect(dialog.getByRole("button", { name: "출고", exact: true })).toBeDisabled();
+  });
+
+  test(`단순 상세 조회 실패는 패널을 유지하고 재시도로 복구한다 (${viewport.width}px)`, async ({ page }) => {
+    const { rawItem } = readSeed();
+    let failing = true;
+    await page.setViewportSize(viewport);
+    await page.route(`**/api/items/${rawItem.item_id}`, async (route) => {
+      if (failing) {
+        await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ detail: "검증용 조회 실패" }) });
+      } else await route.continue();
     });
     await page.goto("/mes?tab=dashboard");
     await page.getByRole("button", { name: new RegExp(rawItem.item_name) }).first().click();
     const dialog = page.getByRole("dialog", { name: viewport.width >= 1024 ? rawItem.item_name : `${rawItem.item_name} 상세`, exact: true });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByText("삭제된 품목입니다. 입출고 작업을 할 수 없습니다.")).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "입고", exact: true })).toBeDisabled();
-    await expect(dialog.getByRole("button", { name: "출고", exact: true })).toBeDisabled();
-
-    mode = "failed";
-    await page.reload();
-    await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("alert")).toContainText("품목 상세를 불러오지 못했습니다.");
     await expect(dialog.getByText("삭제된 품목입니다. 입출고 작업을 할 수 없습니다.")).toHaveCount(0);
     await expect(dialog.getByRole("button", { name: "입고", exact: true })).toBeDisabled();
+    await expect(dialog.getByRole("button", { name: "출고", exact: true })).toBeDisabled();
 
-    mode = "active";
+    failing = false;
     await dialog.getByRole("button", { name: "다시 시도", exact: true }).click();
     await expect(dialog.getByRole("alert")).toHaveCount(0);
     await expect(dialog.getByRole("button", { name: "입고", exact: true })).toBeEnabled();
+    await expect(dialog.getByRole("button", { name: "출고", exact: true })).toBeEnabled();
   });
 }
