@@ -144,6 +144,14 @@ describe("useCreateItemMutation", () => {
 });
 
 describe("useUpdateItemMutation", () => {
+  it("단가를 바꾸면 상위 품목을 포함한 원가를 갱신한다", async () => {
+    globalThis.fetch = vi.fn(() => Promise.resolve(makeResponse({ item_id: "child" }))) as typeof fetch;
+    const client = makeClient();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const { result } = renderHook(() => useUpdateItemMutation(), { wrapper: makeWrapper(client) });
+    await result.current.mutateAsync({ itemId: "child", payload: { standard_purchase_price: "50" } });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.costs.all });
+  });
   it("성공 시 PUT /api/items/{id} + invalidate", async () => {
     const updated = { item_id: "I5", item_name: "수정" };
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse(updated)));

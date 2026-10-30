@@ -13,6 +13,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { itemsApi } from "@/lib/api/items";
 import { queryKeys } from "./keys";
+import { invalidateCostQueries } from "./costInvalidation";
 
 export function useItemsQuery(params?: Parameters<typeof itemsApi.getItems>[0], options?: { enabled?: boolean }) {
   return useQuery({
@@ -41,7 +42,7 @@ export function useCreateItemMutation() {
   return useMutation({
     mutationFn: (payload: Parameters<typeof itemsApi.createItem>[0]) =>
       itemsApi.createItem(payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.items.all }),
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: queryKeys.items.all }), invalidateCostQueries(qc)]),
   });
 }
 
@@ -55,7 +56,7 @@ export function useUpdateItemMutation() {
       itemId: string;
       payload: Parameters<typeof itemsApi.updateItem>[1];
     }) => itemsApi.updateItem(itemId, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.items.all }),
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: queryKeys.items.all }), invalidateCostQueries(qc)]),
   });
 }
 
