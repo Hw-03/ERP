@@ -106,9 +106,12 @@ export function InventoryStockSummary({ item, compact = false, mode = "chips", s
           ...(s.category ? { color: s.color, ...STOCK_CATEGORY_STYLES[s.category].pattern } : {}),
         }}>
           {!!s.reservedPct && <span data-reservation-overlay aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 z-[1]"
-            style={{ width: `${s.reservedPct}%`, backgroundImage: `repeating-linear-gradient(135deg, transparent 0 3px, ${LEGACY_COLORS.s1} 3px 5px)` }} />}
+            style={{ width: `${s.reservedPct}%`,
+              backgroundColor: `color-mix(in srgb, ${s.color} 42%, ${LEGACY_COLORS.s1})`,
+              backgroundImage: `repeating-linear-gradient(135deg, transparent 0 7px, color-mix(in srgb, ${s.color} 68%, ${LEGACY_COLORS.s1}) 7px 8px)`,
+              maskImage: "linear-gradient(to right, transparent, black min(24px, 50%))" }} />}
           {segments[i + 1] && segments[i + 1].color !== s.color && (
-            <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0"
+            <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 z-[2]"
               style={{ width: "min(24px, 50%)", background: `linear-gradient(to right, transparent, ${segments[i + 1].color})` }} />
           )}
         </div>
