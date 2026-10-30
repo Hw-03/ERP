@@ -3,7 +3,7 @@ import type { DefectEntryTarget } from "@/lib/defect-entry";
 import { useDesktopTabHome } from "./DesktopTabHome";
 import { DashboardNavigationProvider, useDashboardNavigation, useDashboardSnapshot } from "./DashboardNavigation";
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { DashboardViewSwitch, type DashboardView } from "./_cost/DashboardViewSwitch";
 import { DesktopCapacityView } from "./_capacity_sections/DesktopCapacityView";
@@ -95,6 +95,18 @@ function InventoryDashboard({
   const [searchManagementOpen, setSearchManagementOpen] = useState(false);
   const navigation = useDashboardNavigation()!;
   const dashboardView = navigation.view;
+  const viewMotionRef = useRef<HTMLDivElement>(null);
+  const previousView = useRef(dashboardView);
+  useLayoutEffect(() => {
+    if (previousView.current === dashboardView) return;
+    previousView.current = dashboardView;
+    if (!viewMotionRef.current?.animate || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const animation = viewMotionRef.current?.animate?.(
+      [{ opacity: 0 }, { opacity: 1 }],
+      { duration: 180, easing: "ease-out" },
+    );
+    return () => animation?.cancel();
+  }, [dashboardView]);
   const setDashboardView = navigation.navigate;
   const [costVisited, setCostVisited] = useState(false);
   const [costNavigationBusy, setCostNavigationBusy] = useState(false);
@@ -216,7 +228,7 @@ function InventoryDashboard({
   }
 
   return (
-    <div data-dashboard-view={dashboardView} className={`${styles.view} flex min-h-0 flex-1 min-w-0 pl-0 lg:pr-4`}>
+    <div ref={viewMotionRef} data-dashboard-view={dashboardView} className={`${styles.view} flex min-h-0 flex-1 min-w-0 pl-0 lg:pr-4`}>
       <div className="contents" style={dashboardView !== "inventory" ? { display: "none" } : undefined}>
       {/* ── 좌측: 전체 작업 영역 스크롤 + 바깥 전용 스크롤 바 ── */}
       <div

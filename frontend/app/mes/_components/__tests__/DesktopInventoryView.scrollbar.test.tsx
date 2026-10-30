@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Item } from "@/lib/api";
 
 import { DesktopInventoryView } from "../DesktopInventoryView";
@@ -111,6 +111,11 @@ function InventoryWithHeader() {
 }
 
 describe("DesktopInventoryView scrollbar", () => {
+  beforeEach(() => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
   it("세 화면 전환 동안 같은 선택 버튼을 유지한다", () => {
     render(<InventoryWithHeader />);
     const switcher = screen.getByRole("group", { name: "대시보드 보기" });
