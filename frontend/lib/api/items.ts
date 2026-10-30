@@ -10,7 +10,14 @@
  */
 
 import { deleteJson, fetcher, patchJson, postJson, putJson, toApiUrl } from "../api-core";
+import { restoreOperatorSession } from "../auth/operator-session";
 import type { BomUnmatchedStatus, Item } from "./types";
+
+/** Price writes must identify the authenticated employee as well as the administrator. */
+function costWriteHeaders(): Record<string, string> {
+  const session = restoreOperatorSession();
+  return session ? { "X-Operator-Session": session.token } : {};
+}
 
 export interface ItemOrderEntry {
   item_id: string;
@@ -63,7 +70,7 @@ export const itemsApi = {
     bom_stock_exempt?: boolean;
     sales_review_required?: boolean;
     initial_locations?: { department: string; quantity: number }[];
-  }) => postJson<Item>(toApiUrl("/api/items"), payload),
+  }) => postJson<Item>(toApiUrl("/api/items"), payload, costWriteHeaders()),
 
   updateItem: async (
     itemId: string,
@@ -87,7 +94,7 @@ export const itemsApi = {
       bom_stock_exempt?: boolean;
       sales_review_required?: boolean;
     },
-  ) => putJson<Item>(toApiUrl(`/api/items/${itemId}`), payload),
+  ) => putJson<Item>(toApiUrl(`/api/items/${itemId}`), payload, costWriteHeaders()),
 
   /** BOM 완료 상태 토글 — 사용자가 명시적으로 "완료로 표시"/"완료 해제"를 누를 때만 호출. */
   updateBomCompletion: async (itemId: string, completed: boolean) =>

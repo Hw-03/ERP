@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { itemsApi } from "../api/items";
+import { restoreOperatorSession } from "../auth/operator-session";
+import { registerAdminPinProvider } from "../api-core";
+
+vi.mock("../auth/operator-session", () => ({ restoreOperatorSession: vi.fn(() => null) }));
 
 // Helpers --------------------------------------------------------
 
@@ -23,10 +27,13 @@ const originalFetch = globalThis.fetch;
 
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.mocked(restoreOperatorSession).mockReset();
+  vi.mocked(restoreOperatorSession).mockReturnValue(null);
 });
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  registerAdminPinProvider(() => null);
   vi.useRealTimers();
 });
 
@@ -126,6 +133,29 @@ describe("itemsApi.updateBomUnmatchedStatus", () => {
 // createItem / updateItem ---------------------------------------
 
 describe("itemsApi.createItem / updateItem", () => {
+  it("sends the current tab credential for both price write paths without losing admin authentication", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ body: { item_id: "abc" } })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    registerAdminPinProvider(() => "2468");
+    vi.mocked(restoreOperatorSession).mockReturnValue({
+      token: "tab-token", employee_id: "employee", tab_id: "tab", expires_at: "2099-01-01T00:00:00Z",
+    });
+
+    await itemsApi.createItem({ item_name: "A", standard_purchase_price: "10" });
+    await itemsApi.updateItem("abc", { standard_purchase_price: "0" });
+
+    for (const call of fetchSpy.mock.calls) {
+      expect((call[1] as RequestInit).headers).toMatchObject({ "X-Operator-Session": "tab-token", "X-Admin-Pin": "2468" });
+    }
+  });
+
+  it("omits the operator session header when this tab has no valid credential", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ body: { item_id: "abc" } })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    await itemsApi.updateItem("abc", { item_name: "Renamed" });
+    expect((fetchSpy.mock.calls[0][1] as RequestInit).headers).not.toHaveProperty("X-Operator-Session");
+  });
+
   it("createItem POSTs JSON to /api/items", async () => {
     const fetchSpy = vi.fn(() =>
       Promise.resolve(makeResponse({ body: { item_id: "new" } })),
