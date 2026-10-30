@@ -9,6 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { Item } from "@/lib/api";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queries/keys";
+import { invalidateCostQueries } from "@/lib/queries/costInvalidation";
 import { useAdminSave } from "./useAdminSave";
 import {
   normalizeStandardPurchasePrice,
@@ -213,6 +214,7 @@ export function useAdminMasterItemsForm({
         setBase(itemToEditForm(updated));
       }
       void queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
+      void invalidateCostQueries(queryClient);
       onStatusChange(`${updated.item_name} 정보를 저장했습니다.`);
       onShowSave?.("저장됐습니다.");
     } catch (error) {
@@ -235,6 +237,7 @@ export function useAdminMasterItemsForm({
       if (selectedId.current === updated.item_id) setSelectedItem(updated);
       onStatusChange(`${updated.item_name} 정보를 저장했습니다.`);
       void queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
+      void invalidateCostQueries(queryClient);
       onShowSave?.("저장됐습니다.");
     } catch (error) {
       onError(error instanceof Error ? error.message : "저장에 실패했습니다.");
@@ -249,6 +252,7 @@ export function useAdminMasterItemsForm({
       if (selectedId.current === updated.item_id) setSelectedItem(updated);
       onStatusChange(`${updated.item_name} 정보를 저장했습니다.`);
       void queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
+      void invalidateCostQueries(queryClient);
       onShowSave?.("저장됐습니다.");
     } catch (error) {
       onError(error instanceof Error ? error.message : "저장에 실패했습니다.");

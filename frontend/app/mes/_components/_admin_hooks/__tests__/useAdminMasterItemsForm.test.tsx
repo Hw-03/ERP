@@ -52,6 +52,15 @@ const baseArgs = (over: Partial<Parameters<typeof useAdminMasterItemsForm>[0]> =
 });
 
 describe("useAdminMasterItemsForm", () => {
+  it("관리자 품목에서 단가를 저장해도 상위 원가를 갱신한다", async () => {
+    const client = makeClient();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    updateItemMock.mockResolvedValue(I({ standard_purchase_price: "200" }));
+    const { result } = renderFormHook(baseArgs({ selectedItem: I() }), client);
+    act(() => result.current.setForm((form) => ({ ...form, standard_purchase_price: "200" })));
+    await act(async () => result.current.save());
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.costs.all }));
+  });
   it("becomes clean when edits are reverted, regardless of model selection order", () => {
     const { result } = renderFormHook(baseArgs({ selectedItem: I({ model_slots: [1, 2] }) }));
     act(() => result.current.setForm((form) => ({ ...form, item_name: "draft" })));
