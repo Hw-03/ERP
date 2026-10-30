@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useState, type ReactNode, type MouseEvent } from "react";
 import { tint } from "@/lib/mes/colorUtils";
 
 interface Props {
@@ -11,13 +11,14 @@ interface Props {
   hint?: string;
   tone: string;
   active?: boolean;
-  onClick?: () => void;
+  onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
+  children?: ReactNode;
   compact?: boolean;
   headerCompact?: boolean;
   loading?: boolean;
 }
 
-function KpiCardImpl({ label, value, unit, hint, tone, active = false, onClick, compact = false, headerCompact = false, loading = false }: Props) {
+function KpiCardImpl({ label, value, unit, hint, tone, active = false, onClick, compact = false, headerCompact = false, loading = false, children }: Props) {
   const [hovered, setHovered] = useState(false);
   const displayValue = loading ? (
     <span className="relative inline-block" aria-label="집계 중" role="status">
@@ -119,7 +120,7 @@ function KpiCardImpl({ label, value, unit, hint, tone, active = false, onClick, 
         className={`${boxCls} text-left transition-colors hover:brightness-110`}
         style={{ background: bg, borderColor: border }}
       >
-        {content}
+        {children ?? content}
       </button>
     );
   }
@@ -129,7 +130,7 @@ function KpiCardImpl({ label, value, unit, hint, tone, active = false, onClick, 
       className={boxCls}
       style={{ background: "transparent", borderColor: border }}
     >
-      {content}
+      {children ?? content}
     </div>
   );
 }

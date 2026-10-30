@@ -4,7 +4,6 @@ import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, use
 import { DesktopTabHomeProvider, useDesktopTabHome, useDesktopTabHomeController } from "./DesktopTabHome";
 import { InventoryItemsTable } from "./_inventory_sections/InventoryItemsTable";
 import { InventoryKpiPanel } from "./_inventory_sections/InventoryKpiPanel";
-import { InventoryCapacitySkeleton } from "./_inventory_sections/InventoryCapacityPanel";
 import { InventoryFilterToggleButton } from "./_inventory_sections/InventoryFilterToggleButton";
 import { InventoryTableStickyHeader } from "./_inventory_sections/InventoryFilterBar";
 import { HistoryTableSkeleton } from "./_history_sections/HistoryTable";
@@ -50,7 +49,6 @@ import { queryKeys } from "@/lib/queries/keys";
 import { useProductionCapacityQuery } from "@/lib/queries/useProductionQuery";
 import { sendClientEvent } from "@/lib/client-events";
 import { setAuditScreen } from "@/lib/activity-audit-context";
-import { CapacityDetailModal } from "./CapacityDetailModal";
 import { DirtyGuardProvider, useConfirmNavigation, useBeforeViewportSwitch, useFlushDirtyEntries } from "@/lib/ui/dirty-guard";
 import { canSeeWorkType } from "./_warehouse_v2/ioWorkType";
 import type { IoEntryIntent } from "./_warehouse_v2/types";
@@ -161,6 +159,7 @@ function DesktopMesShellInner({
   const [itemPickerFullscreen, setItemPickerFullscreen] = useState(false);
   const [defectItemPickerFullscreen, setDefectItemPickerFullscreen] = useState(false);
   const [dailyReportTopbarControls, setDailyReportTopbarControls] = useState<ReactNode>(null);
+  const [costHeaderTarget, setCostHeaderTarget] = useState<HTMLDivElement | null>(null);
   const autoRevertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUrlTabRef = useRef<DesktopTabId | null>(null);
   const shippingHistoryUrlRef = useRef("?tab=shipping");
@@ -427,12 +426,12 @@ function DesktopMesShellInner({
     data: capacityData = null,
     isLoading: capacityLoading,
     refetch: refetchCapacity,
+    error: capacityError,
   } = useProductionCapacityQuery();
-  const [capacityModal, setCapacityModal] = useState(false);
+  const [capacityRefreshKey, setCapacityRefreshKey] = useState(0);
   useDesktopTabHome("shell-overlays", {
-    isHome: !capacityModal && !(activeTab === "warehouse" && (warehousePreselected || warehouseIntent || itemPickerFullscreen)) && !(activeTab === "defect" && defectItemPickerFullscreen),
+    isHome: !(activeTab === "warehouse" && (warehousePreselected || warehouseIntent || itemPickerFullscreen)) && !(activeTab === "defect" && defectItemPickerFullscreen),
     returnHome: () => {
-      setCapacityModal(false);
       clearWarehouseEntry();
       setItemPickerFullscreen(false);
       setDefectItemPickerFullscreen(false);
@@ -462,12 +461,13 @@ function DesktopMesShellInner({
   }, [canOpenTab, commitDesktopTab, confirmAdminNavigation]);
 
   const content = useMemo(() => {
-    const key = contentTab === "admin" ? `admin-${adminPinEntryNonce}` : `${contentTab}-${refreshNonce}`;
+    const key = contentTab === "dashboard" ? "dashboard" : contentTab === "admin" ? `admin-${adminPinEntryNonce}` : `${contentTab}-${refreshNonce}`;
     if (contentTab === "stocktake" && stocktakeAccessPending && !retainStocktake) return <StocktakeLoadingSkeleton variant="desktop" />;
     if (contentTab === "stocktake") return canOpenTab("stocktake") || retainStocktake ? <StocktakeView key={key} operator={operator} variant="desktop" /> : null;
     if (contentTab === "dashboard") {
       return (
         <DesktopInventoryView
+          costHeaderTarget={costHeaderTarget}
           key={key}
           globalSearch=""
           onStatusChange={handleStatusChange}
@@ -477,7 +477,9 @@ function DesktopMesShellInner({
           onSummaryChange={setStockWarnings}
           capacityData={capacityData}
           capacityLoading={capacityLoading && !capacityData}
-          onCapacityClick={() => setCapacityModal(true)}
+          capacityError={capacityError instanceof Error ? capacityError.message : null}
+          onCapacityRetry={() => { void refetchCapacity(); }}
+          capacityRefreshKey={capacityRefreshKey}
           canReceive={canReceive}
         />
       );
@@ -553,19 +555,13 @@ function DesktopMesShellInner({
     }
     return <DesktopAdminView key={key} globalSearch="" onStatusChange={handleStatusChange} />;
     // deps 는 실제로 렌더 결과를 바꾸는 값만 나열. handleStatusChange(useCallback []),
-    // setStockWarnings/setCapacityModal(setter), handleTabChange 는 안정적이거나 결과에
+    // setStockWarnings(setter), handleTabChange 는 안정적이거나 결과에
     // 영향이 없어 의도적으로 제외 — 누락이 아니라 최소 deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, handleGoToDefect, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, capacityLoading, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen, isItemPickerFullscreen, isDefectItemPickerFullscreen, preferences, savePreferences, canOpenTab, handleOpenAdminPinEntry, handleDailyReportTopbarControlsChange, retainStocktake, stocktakeAccessPending]);
+  }, [costHeaderTarget, contentTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, handleGoToDefect, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, capacityLoading, capacityError, capacityRefreshKey, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen, isItemPickerFullscreen, isDefectItemPickerFullscreen, preferences, savePreferences, canOpenTab, handleOpenAdminPinEntry, handleDailyReportTopbarControlsChange, retainStocktake, stocktakeAccessPending]);
 
   return (
     <>
-      {capacityModal && (
-        <CapacityDetailModal
-          capacityData={capacityData}
-          onClose={() => setCapacityModal(false)}
-        />
-      )}
       <div className="flex h-screen overflow-hidden">
         <div
           data-testid="desktop-shell-frame"
@@ -586,13 +582,14 @@ function DesktopMesShellInner({
           <div className="min-w-0 flex-1 flex flex-col">
             {!hideTopbar && (
               <DesktopTopbar
+                centerContent={activeTab === "dashboard" ? <div ref={setCostHeaderTarget} className="flex items-center" /> : undefined}
                 title={activeMeta.title}
               icon={activeMeta.icon}
               iconColor={DESKTOP_TAB_ICON_COLORS[activeTab]}
               onRefresh={() => {
                 if (!canOpenTab(activeTab)) return;
-                const refresh = () => { setRefreshNonce((current) => current + 1); void refetchCapacity(); };
-                if (activeTab === "stocktake") confirmAdminNavigation(refresh);
+                const refresh = () => { if (activeTab === "dashboard") { setCapacityRefreshKey(value => value + 1); void queryClient.invalidateQueries({ queryKey: queryKeys.items.all }); void queryClient.invalidateQueries({ queryKey: queryKeys.costs.all }); } else setRefreshNonce((current) => current + 1); void refetchCapacity(); };
+                if (activeTab === "stocktake" || activeTab === "dashboard") confirmAdminNavigation(refresh);
                 else refresh();
               }}
               onBeforeLogout={activeTab === "stocktake" ? flushDirtyEntries : undefined}
@@ -706,13 +703,10 @@ function DashboardTabLoading({ scrollHeight }: { scrollHeight?: number }) {
           <div className="flex flex-col gap-3">
             <section className="card desktop-flat-surface" style={{ padding: "14px 16px" }}>
               <InventoryKpiPanel cards={[]} activeKey="ALL" onChange={() => {}} loading />
-              <div className="mt-3 flex items-stretch gap-2">
-                <InventoryCapacitySkeleton />
-                <InventoryFilterToggleButton filtersOpen={false} logic="AND" onLogicChange={() => {}} onToggle={() => {}} disabled />
-              </div>
+
             </section>
             <section aria-label="자재 목록" className="card desktop-flat-surface flex flex-1 flex-col">
-              <InventoryTableStickyHeader searchValue="" searchPlaceholder="품명 · 품목 코드 · 검색용 이름" onSearchChange={() => {}} onManageSearch={() => {}} count={0} isFiltered={false} disabled />
+              <InventoryTableStickyHeader searchActions={<InventoryFilterToggleButton filtersOpen={false} logic="AND" onLogicChange={() => {}} onToggle={() => {}} disabled />} searchValue="" searchPlaceholder="품명 · 품목 코드 · 검색용 이름" onSearchChange={() => {}} onManageSearch={() => {}} count={0} isFiltered={false} disabled />
               <InventoryItemsTable loading error={null} filteredItems={[]} displayLimit={100}
                 setDisplayLimit={() => {}} selectedItem={null} onSelectItem={() => {}} activeFilterCount={0}
                 hasKpiFilter={false} onRetry={() => {}} onResetAllFilters={() => {}} />

@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { Item } from "@/lib/api";
 
@@ -89,7 +90,7 @@ vi.mock("../_inventory_sections/InventoryFilterBar", () => ({
       </button>
     </div>
   ),
-  InventoryTableStickyHeader: ({ onManageSearch }: { onManageSearch?: () => void }) => <div data-testid="inventory-table-header"><button onClick={onManageSearch}>검색어 연결</button></div>,
+  InventoryTableStickyHeader: ({ onManageSearch, searchActions }: { onManageSearch?: () => void; searchActions?: import("react").ReactNode }) => <div data-testid="inventory-table-header"><button onClick={onManageSearch}>검색어 연결</button>{searchActions}</div>,
 }));
 
 vi.mock("../_inventory_sections/InventoryItemsTable", () => ({
@@ -99,10 +100,69 @@ vi.mock("../_inventory_sections/InventoryItemsTable", () => ({
 }));
 
 vi.mock("../_inventory_sections/DesktopInventoryRightPanel", () => ({
-  DesktopInventoryRightPanel: ({ open, displayItem }: { open: boolean; displayItem: Item | null }) => <aside data-testid="inventory-right-panel" data-open={open}>{open ? displayItem?.item_name : null}</aside>,
+  DesktopInventoryRightPanel: ({ open, displayItem, onOpenCost }: { open: boolean; displayItem: Item | null; onOpenCost: () => void }) => <aside data-testid="inventory-right-panel" data-open={open}>{open ? <>{displayItem?.item_name}<button onClick={onOpenCost}>원가 분석 펼치기</button></> : null}</aside>,
 }));
+vi.mock("../_cost/CostAnalysisPanel", () => ({ CostAnalysisPanel: ({ onCollapse }: { onCollapse: () => void }) => <section aria-label="원가 분석"><button onClick={onCollapse}>분석 접기</button></section> }));
+vi.mock("../_cost/CostAnalysisWorkspace", () => ({ CostAnalysisWorkspace: ({ initialItemId, onClose }: { initialItemId: string | null; onClose: () => void }) => <div role="region" aria-label="원가 분석" data-item-id={initialItemId ?? ""}><button onClick={onClose}>원가 분석 닫기</button></div> }));
+
+function InventoryWithHeader() {
+  const [target, setTarget] = useState<HTMLDivElement | null>(null);
+  return <><div ref={setTarget} /><DesktopInventoryView globalSearch="" onStatusChange={vi.fn()} onGoToWarehouse={vi.fn()} costHeaderTarget={target} /></>;
+}
 
 describe("DesktopInventoryView scrollbar", () => {
+  it("세 화면 전환 동안 같은 선택 버튼을 유지한다", () => {
+    render(<InventoryWithHeader />);
+    const switcher = screen.getByRole("group", { name: "대시보드 보기" });
+    const cost = screen.getByRole("button", { name: "원가 분석", exact: true });
+    fireEvent.click(cost);
+    expect(screen.getByRole("group", { name: "대시보드 보기" })).toBe(switcher);
+    expect(screen.getByRole("button", { name: "원가 분석", exact: true })).toBe(cost);
+    expect(cost).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "생산 가능", exact: true }));
+    expect(screen.getByRole("group", { name: "대시보드 보기" })).toBe(switcher);
+    fireEvent.click(screen.getByRole("button", { name: "재고 현황", exact: true }));
+    expect(screen.getByRole("group", { name: "대시보드 보기" })).toBe(switcher);
+  });
+
+  it("기본 대시보드 본문을 원가분석으로 전환하고 복귀하면 목록을 복원한다", () => {
+    render(<InventoryWithHeader />);
+    expect(screen.getAllByRole("button", { name: "원가 분석", exact: true })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "원가 분석", exact: true }));
+    expect(screen.getByRole("region", { name: "원가 분석" })).toHaveAttribute("data-item-id", "");
+    expect(screen.queryByRole("dialog", { name: "원가 분석" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("inventory-list-card")).not.toBeVisible();
+    expect(screen.getByTestId("inventory-list-card")).not.toHaveAttribute("hidden");
+    fireEvent.click(screen.getByRole("button", { name: "원가 분석 닫기" }));
+    expect(screen.getByTestId("inventory-list-card")).toBeVisible();
+    expect(screen.getByTestId("inventory-list-card")).not.toHaveAttribute("hidden");
+    fireEvent.click(screen.getByRole("button", { name: "원가 분석", exact: true }));
+    expect(screen.getByRole("region", { name: "원가 분석" })).toBeVisible();
+  });
+  it("분석 품목 선택을 취소하면 행 선택은 기존 상세만 연다", () => {
+    render(<InventoryWithHeader />);
+    fireEvent.click(screen.getByRole("button", { name: "원가 분석", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "원가 분석 닫기" }));
+    fireEvent.click(screen.getByRole("button", { name: "전극 행 선택" }));
+    expect(screen.queryByRole("region", { name: "원가 분석" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("inventory-right-panel")).toHaveAttribute("data-open", "true");
+  });
+  it("원가 분석을 펼쳤다가 접어도 선택 품목과 검색·필터를 유지한다", () => {
+    render(<DesktopInventoryView globalSearch="" onStatusChange={vi.fn()} onGoToWarehouse={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "OR로 전환" }));
+    fireEvent.click(screen.getByRole("button", { name: "전극 행 선택" }));
+    const scroller = screen.getByTestId("inventory-left-content");
+    scroller.scrollTop = 160;
+    fireEvent.click(screen.getByRole("button", { name: "원가 분석 펼치기" }));
+    expect(screen.getByRole("region", { name: "원가 분석" })).toHaveAttribute("data-item-id", "test-item");
+    expect(screen.getByTestId("inventory-list-card")).not.toHaveAttribute("hidden");
+    fireEvent.click(screen.getByRole("button", { name: "원가 분석 닫기" }));
+    expect(screen.getByTestId("inventory-list-card")).not.toHaveAttribute("hidden");
+    expect(screen.getByTestId("filter-logic")).toHaveTextContent("OR");
+    expect(screen.getByTestId("inventory-right-panel")).toHaveTextContent("전극");
+    expect(screen.getByTestId("inventory-right-panel")).toHaveAttribute("data-open", "true");
+    expect(scroller.scrollTop).toBe(160);
+  });
   it("검색어 연결에서 행을 선택하면 같은 품목을 다시 선택해도 상세로 전환한다", () => {
     render(<DesktopInventoryView globalSearch="" onStatusChange={vi.fn()} onGoToWarehouse={vi.fn()} />);
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -152,8 +212,6 @@ describe("DesktopInventoryView scrollbar", () => {
     expect(listCard).toHaveClass("card", "desktop-flat-surface");
     expect(listCard.parentElement).toHaveClass("gap-3");
     expect(listCard.parentElement).not.toHaveClass("gap-2");
-    expect(screen.getByTestId("inventory-capacity-panel").parentElement).toHaveClass("mt-3");
-    expect(screen.getByTestId("inventory-capacity-panel").parentElement).not.toHaveClass("mt-[15px]");
     expect(screen.getByRole("region", { name: "자재 목록" })).toBe(listCard);
     expect(listCard).not.toHaveClass("overflow-hidden", "overflow-y-auto");
     expect(screen.queryByTestId("inventory-items-scroll-region")).not.toBeInTheDocument();

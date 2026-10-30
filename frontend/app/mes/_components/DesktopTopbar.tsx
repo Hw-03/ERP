@@ -37,6 +37,7 @@ export function DesktopTopbar({
   status,
   statusNonce,
   titleAddon,
+  centerContent,
   onNavigate,
   onBeforeLogout,
 }: {
@@ -48,6 +49,7 @@ export function DesktopTopbar({
   status?: string;
   statusNonce?: number;
   titleAddon?: ReactNode;
+  centerContent?: ReactNode;
   onNavigate?: (target: NotificationNavigationTarget) => void;
   onBeforeLogout?: () => Promise<void>;
 }) {
@@ -85,7 +87,7 @@ export function DesktopTopbar({
   return (
     <header className="pl-0 pr-4 pt-0">
       <div
-        className="flex items-center gap-3 rounded-[28px] border px-5 py-4"
+        className="relative flex items-center gap-3 rounded-[28px] border px-5 py-4"
         style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
       >
         <div className="min-w-0 flex-1">
@@ -107,6 +109,7 @@ export function DesktopTopbar({
           </div>
         </div>
 
+        {centerContent && <div className="flex shrink-0 items-center 2xl:absolute 2xl:left-1/2 2xl:-translate-x-1/2">{centerContent}</div>}
         {status && (
           <span data-testid="desktop-status-target" key={statusNonce} style={{ animation: "statusFlash 0.35s ease-out" }}>
             {(() => {

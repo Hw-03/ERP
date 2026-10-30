@@ -1,5 +1,6 @@
 "use client";
 
+import { useDashboardScrollSnapshot, useDashboardSnapshot } from "../DashboardNavigation";
 import { useEffect, useRef, useState } from "react";
 import type { Item } from "@/lib/api";
 import { SlidePanel } from "../common";
@@ -11,6 +12,7 @@ import type { IoEntryIntent } from "../_warehouse_v2/types";
 import { ReadFailure, ReadLoading } from "../common/ReadState";
 import { ItemSearchAliases } from "../common/ItemSearchAliases";
 import { useItemNameCopy } from "../common/useItemNameCopy";
+import { CostSummaryCard } from "../_cost/CostSummaryCard";
 
 const INVENTORY_DETAIL_TITLE_ID = "desktop-inventory-detail-title";
 const INVENTORY_DETAIL_TAB_ID = "desktop-inventory-detail-tab";
@@ -45,6 +47,7 @@ export interface DesktopInventoryRightPanelProps {
   detailError?: string | null;
   onRetryDetail?: () => void;
   actionsDisabled?: boolean;
+  onOpenCost?: () => void;
 }
 
 export function DesktopInventoryRightPanel({
@@ -62,8 +65,13 @@ export function DesktopInventoryRightPanel({
   detailError,
   onRetryDetail = () => {},
   actionsDisabled = false,
+  onOpenCost,
 }: DesktopInventoryRightPanelProps) {
   const [activeTab, setActiveTab] = useState<InventoryTab>("detail");
+  const surface = useRef<HTMLDivElement>(null);
+  useDashboardScrollSnapshot("inventory:panel-scroll", surface);
+  const restoringTab = useRef(false);
+  useDashboardSnapshot("inventory:panel", () => activeTab, value => { restoringTab.current = true; setActiveTab(value); });
   const detailTabRef = useRef<HTMLButtonElement>(null);
   const historyTabRef = useRef<HTMLButtonElement>(null);
   const aliasesTabRef = useRef<HTMLButtonElement>(null);
@@ -91,11 +99,12 @@ export function DesktopInventoryRightPanel({
   }
 
   useEffect(() => {
+    if (restoringTab.current) { restoringTab.current = false; return; }
     setActiveTab("detail");
   }, [selectedItem?.item_id, open]);
 
   return (
-    <SlidePanel
+    <div ref={surface} className="contents"><SlidePanel
       open={open}
       onClose={onClose}
       hideCloseButton
@@ -187,6 +196,7 @@ export function DesktopInventoryRightPanel({
           </p>}
           {activeTab === "detail" ? (
             <div id={INVENTORY_DETAIL_PANEL_ID} role="tabpanel" aria-labelledby={INVENTORY_DETAIL_TAB_ID}>
+              {onOpenCost && open && selectedItem && displayItem?.item_id === selectedItem.item_id && !detailLoading && !detailError && <CostSummaryCard key={selectedItem.item_id} itemId={selectedItem.item_id} onOpen={onOpenCost} />}
               {displayItem && <InventoryDetailPanel
                 item={displayItem}
                 onGoToWarehouse={onGoToWarehouse}
@@ -207,6 +217,6 @@ export function DesktopInventoryRightPanel({
           </div>}
         </DesktopRightPanel>
       )}
-    </SlidePanel>
+    </SlidePanel></div>
   );
 }
