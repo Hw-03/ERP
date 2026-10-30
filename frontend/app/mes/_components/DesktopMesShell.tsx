@@ -160,6 +160,7 @@ function DesktopMesShellInner({
   const [defectItemPickerFullscreen, setDefectItemPickerFullscreen] = useState(false);
   const [dailyReportTopbarControls, setDailyReportTopbarControls] = useState<ReactNode>(null);
   const [costHeaderTarget, setCostHeaderTarget] = useState<HTMLDivElement | null>(null);
+  const [warehouseHeaderTarget, setWarehouseHeaderTarget] = useState<HTMLDivElement | null>(null);
   const autoRevertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUrlTabRef = useRef<DesktopTabId | null>(null);
   const shippingHistoryUrlRef = useRef("?tab=shipping");
@@ -488,6 +489,7 @@ function DesktopMesShellInner({
       return (
         <DesktopWarehouseView
           key={key}
+          headerTarget={warehouseHeaderTarget}
           globalSearch=""
           onStatusChange={handleStatusChange}
           preselectedItem={warehousePreselected}
@@ -558,7 +560,7 @@ function DesktopMesShellInner({
     // setStockWarnings(setter), handleTabChange 는 안정적이거나 결과에
     // 영향이 없어 의도적으로 제외 — 누락이 아니라 최소 deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [costHeaderTarget, contentTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, handleGoToDefect, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, capacityLoading, capacityError, capacityRefreshKey, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen, isItemPickerFullscreen, isDefectItemPickerFullscreen, preferences, savePreferences, canOpenTab, handleOpenAdminPinEntry, handleDailyReportTopbarControlsChange, retainStocktake, stocktakeAccessPending]);
+  }, [costHeaderTarget, warehouseHeaderTarget, contentTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, handleGoToDefect, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, capacityLoading, capacityError, capacityRefreshKey, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen, isItemPickerFullscreen, isDefectItemPickerFullscreen, preferences, savePreferences, canOpenTab, handleOpenAdminPinEntry, handleDailyReportTopbarControlsChange, retainStocktake, stocktakeAccessPending]);
 
   return (
     <>
@@ -582,7 +584,7 @@ function DesktopMesShellInner({
           <div className="min-w-0 flex-1 flex flex-col">
             {!hideTopbar && (
               <DesktopTopbar
-                centerContent={activeTab === "dashboard" ? <div ref={setCostHeaderTarget} className="flex items-center" /> : undefined}
+                centerContent={activeTab === "dashboard" ? <div ref={setCostHeaderTarget} className="flex items-center" /> : activeTab === "warehouse" ? <div ref={setWarehouseHeaderTarget} className="flex items-center" /> : undefined}
                 title={activeMeta.title}
               icon={activeMeta.icon}
               iconColor={DESKTOP_TAB_ICON_COLORS[activeTab]}

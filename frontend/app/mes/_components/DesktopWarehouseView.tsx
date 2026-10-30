@@ -8,6 +8,7 @@ import { ReadLoading } from "./common/ReadState";
 import { useDesktopTabHome } from "./DesktopTabHome";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { api, type IoBatch, type Item, type StockRequest } from "@/lib/api";
 import { isDepartmentApprover } from "./_warehouse_steps";
 import { useWarehouseData } from "./_warehouse_hooks/useWarehouseData";
@@ -45,6 +46,7 @@ export function DesktopWarehouseView({
   onSubmitSuccess,
   itemPickerFullscreen = false,
   onItemPickerFullscreenChange,
+  headerTarget,
 }: {
   globalSearch: string;
   onStatusChange: (status: string) => void;
@@ -53,6 +55,7 @@ export function DesktopWarehouseView({
   onSubmitSuccess?: () => void;
   itemPickerFullscreen?: boolean;
   onItemPickerFullscreenChange?: (fullscreen: boolean) => void;
+  headerTarget?: HTMLElement | null;
 }) {
   const revision = useRealtimeRevision();
   const reservationQueryClient = useQueryClient();
@@ -318,45 +321,47 @@ export function DesktopWarehouseView({
   const isWorkAreaSection = sectionTab === "cart" || sectionTab === "mine" || sectionTab === "queue" || sectionTab === "as-research-queue" || sectionTab === "dept-queue";
   const hideSectionTabs = isComposeSection && itemConversionFocused;
   const removeWorkAreaBottomSpace = sectionTab === "cart" || (isWorkAreaSection && workAreaEmpty);
+  const sectionTabs = !itemPickerFullscreen && (
+    <div
+      data-warehouse-section-tabs
+      className={headerTarget ? hideSectionTabs ? "hidden" : "flex items-center" : `sticky top-0 z-20 shrink-0 overflow-hidden bg-[var(--c-bg)] transition-[max-height,opacity,transform,margin] duration-200 ${hideSectionTabs ? "-mb-3 max-h-0 -translate-y-1 opacity-0" : "max-h-20 translate-y-0 opacity-100"}`}
+      aria-hidden={hideSectionTabs}
+    >
+      <WarehouseSectionTabs
+        active={sectionTab}
+        onChange={handleSectionTabChange}
+        showQueue={canSeeQueue}
+        showDeptQueue={canSeeDeptQueue}
+        showAsResearchQueue={canSeeAsResearchQueue}
+        showHandover={showHandover}
+        cartCount={cartCount}
+        queueCount={warehouseQueueCount}
+        deptQueueCount={deptQueueCount}
+        asResearchQueueCount={asResearchQueueCount}
+        handoverInboxCount={handoverInboxCount}
+        loadingCounts={[...loadingCounts, ...(draftCounts.isPending && !draftCounts.isError ? ["cart" as const] : [])]}
+        unavailableCounts={draftCounts.isError && !draftCounts.data ? ["cart"] : []}
+        compact={Boolean(headerTarget)}
+      />
+    </div>
+  );
 
   return (
     <div className={`${workScrollStyles.workScroll} flex h-full min-h-0 flex-1 min-w-0 overflow-x-hidden`}>
+      {headerTarget && createPortal(sectionTabs, headerTarget)}
       <div
         data-testid="desktop-warehouse-content"
         data-warehouse-work-scroll={sectionTab === "cart" || undefined}
         className={`${sectionTab === "cart" ? "sg [scrollbar-gutter:stable]" : "scrollbar-hide"} flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto overflow-x-hidden pl-0 pr-4 pt-0 ${isComposeSection || removeWorkAreaBottomSpace ? "pb-0" : "pb-10"}`}
       >
         <WarehouseHeader loadFailure={loadFailure} />
-        {!itemPickerFullscreen && (
-          <div
-            data-warehouse-section-tabs
-            className={`sticky top-0 z-20 shrink-0 overflow-hidden bg-[var(--c-bg)] transition-[max-height,opacity,transform,margin] duration-200 ${
-              hideSectionTabs ? "-mb-3 max-h-0 -translate-y-1 opacity-0" : "max-h-20 translate-y-0 opacity-100"
-            }`}
-            aria-hidden={hideSectionTabs}
-          >
-            <WarehouseSectionTabs
-              active={sectionTab}
-              onChange={handleSectionTabChange}
-              showQueue={canSeeQueue}
-              showDeptQueue={canSeeDeptQueue}
-              showAsResearchQueue={canSeeAsResearchQueue}
-              showHandover={showHandover}
-              cartCount={cartCount}
-              queueCount={warehouseQueueCount}
-              deptQueueCount={deptQueueCount}
-              asResearchQueueCount={asResearchQueueCount}
-              handoverInboxCount={handoverInboxCount}
-              loadingCounts={[...loadingCounts, ...(draftCounts.isPending && !draftCounts.isError ? ["cart" as const] : [])]}
-              unavailableCounts={draftCounts.isError && !draftCounts.data ? ["cart"] : []}
-            />
-          </div>
-        )}
+        {!headerTarget && sectionTabs}
 
         {!isComposeSection && (
           <div
+            key={sectionTab}
             data-testid={isWorkAreaSection ? "warehouse-section-work-area" : undefined}
-            className={isWorkAreaSection ? "flex min-h-0 flex-1 flex-col" : undefined}
+            className={`animate-desktop-navigation-enter${isWorkAreaSection ? " flex min-h-0 flex-1 flex-col" : ""}`}
           >
             <WarehouseDraftPanelTabs
               layout="desktop"
@@ -396,7 +401,7 @@ export function DesktopWarehouseView({
         )}
 
         {isComposeSection && (
-          <div className="min-h-0 flex-1">
+          <div className="animate-desktop-navigation-enter min-h-0 flex-1">
             {urlDraftPending ? (
               <ReadLoading label="저장한 작업을 불러오는 중입니다." variant="card" />
             ) : urlDraftRestoreError ? (
