@@ -42,6 +42,8 @@
   align-items: center;
 }
 .table td { padding: 12px 16px; border-bottom: 1px solid var(--c-border); }
+.table tbody tr { background: color-mix(in srgb, var(--c-purple) 3%, var(--c-s1)); }
+.table tbody tr:hover { background: color-mix(in srgb, var(--c-purple) 7%, var(--c-s1)); }
 .table th { white-space: nowrap; }
 .table .nameCell { padding-top: 4px; padding-bottom: 4px; }
 .table .price, .table th:last-child, .table td:last-child { justify-content: center; text-align: center; }
@@ -112,8 +114,8 @@
 .body[data-compact="true"] .table tbody tr { border-radius: 12px; }
 .body[data-compact="true"] .table td { border-bottom-color: transparent; }
 .body[data-compact="true"] .table tr[data-selected="true"] {
-  background: color-mix(in srgb, var(--c-blue) 9%, var(--c-s1));
-  box-shadow: inset 0 0 0 1px var(--c-blue);
+  background: color-mix(in srgb, var(--c-purple) 9%, var(--c-s1));
+  box-shadow: inset 0 0 0 1px var(--c-purple);
   transition: background-color 100ms ease, box-shadow 100ms ease;
 }
 @media (prefers-reduced-motion: reduce) {

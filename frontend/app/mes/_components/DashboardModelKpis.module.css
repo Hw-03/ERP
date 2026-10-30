@@ -12,9 +12,9 @@
   justify-content: space-between;
   gap: 4px;
   padding: 12px 20px;
-  border: 1px solid color-mix(in srgb, var(--c-blue) 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--model-accent) 35%, transparent);
   border-radius: 16px;
-  background: color-mix(in srgb, var(--c-blue) var(--model-tint), var(--c-s1));
+  background: color-mix(in srgb, var(--model-accent) var(--model-background-tint, var(--model-tint)), var(--c-s1));
   color: var(--c-text);
   text-align: left;
   transition: border-color 150ms, background-color 150ms;
@@ -22,19 +22,25 @@
 
 .card:hover,
 .card:focus-visible {
-  border-color: var(--c-blue);
-  background: color-mix(in srgb, var(--c-blue) calc(var(--model-tint) + 6%), var(--c-s1));
+  border-color: var(--model-accent);
+  background: color-mix(in srgb, var(--model-accent) calc(var(--model-background-tint, var(--model-tint)) + 6%), var(--c-s1));
+}
+
+.card:has(.capacity),
+.card:has(.cost) {
+  --model-background-tint: calc(var(--model-tint) * 0.35);
+  border-color: color-mix(in srgb, var(--model-accent) 16%, var(--c-border));
 }
 
 .card:focus-visible {
-  outline: 2px solid var(--c-blue);
+  outline: 2px solid var(--model-accent);
   outline-offset: 3px;
 }
 
 .model {
   min-width: 0;
   overflow: hidden;
-  color: var(--c-blue);
+  color: var(--model-accent);
   font-size: 22px;
   font-weight: 900;
   line-height: 28px;
@@ -80,6 +86,7 @@
 
 .cost dd {
   display: flex;
+  color: var(--c-purple);
   align-items: baseline;
   justify-content: flex-end;
   gap: 4px;

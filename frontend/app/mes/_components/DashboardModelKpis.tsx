@@ -46,9 +46,9 @@ function KpiPanel({ title, loading, error, onRetry, children, empty, note }: {
 }
 
 /** Fade the whole row from left to right without assigning official model colors. */
-function ModelCard({ target, index, count, children, onClick }: { target: CostKpiTarget; index: number; count: number; children: ReactNode; onClick: (event: MouseEvent<HTMLButtonElement>) => void }): ReactNode {
+function ModelCard({ target, index, count, children, onClick, tone = "var(--c-blue)" }: { target: CostKpiTarget; index: number; count: number; children: ReactNode; onClick: (event: MouseEvent<HTMLButtonElement>) => void; tone?: string }): ReactNode {
   const tint = 22 - 16 * index / Math.max(1, count - 1);
-  return <button type="button" className={styles.card} style={{ "--model-tint": `${tint}%` } as CSSProperties} aria-label={`${target.label} ${target.code} ${target.name}`} onClick={onClick}>
+  return <button type="button" className={styles.card} style={{ "--model-tint": `${tint}%`, "--model-accent": tone } as CSSProperties} aria-label={`${target.label} ${target.code} ${target.name}`} onClick={onClick}>
     <span className={styles.model}>{target.label}</span>
     {children}
   </button>;
@@ -62,7 +62,7 @@ export function CapacityModelKpis({ capacityData, capacityLoading, capacityError
   return <KpiPanel title="모델별 생산 가능 KPI" loading={capacityLoading} error={capacityError} onRetry={onCapacityRetry} empty={!targets.length}>
     {targets.map((target, index) => {
       const variant = variants.find(v => v.pf_item_id === target.pfItemId && (v.model_symbol ?? "미분류") === target.modelKey)!;
-      return <ModelCard key={target.modelKey} target={target} index={index} count={targets.length} onClick={event => onOpen(variant, event.currentTarget)}>
+      return <ModelCard key={target.modelKey} target={target} index={index} count={targets.length} tone="var(--c-yellow)" onClick={event => onOpen(variant, event.currentTarget)}>
         <dl className={styles.capacity}>
           <div><dt>출하 대기</dt><dd style={{ color: "var(--c-cyan)" }}>{formatQty(variant.ship_ready)}</dd></div>
           <div><dt>빠른 생산</dt><dd>{formatQty(variant.fast_production)}</dd></div>
@@ -85,7 +85,7 @@ export function CostModelKpis({ targets, actor, hourlyRate, capacityLoading, cap
   const summaries = new Map(queries.flatMap(q => q.data ?? []).map(s => [s.item_id, s]));
   return <KpiPanel title="모델별 원가 KPI" loading={capacityLoading} error={capacityError} onRetry={onCapacityRetry} empty={!targets.length} note={`대표 출하품 1개 기준 · 수율 100% · 가정 시급 ${rate == null ? standards.isError ? "조회 실패" : standards.isSuccess ? "미등록" : "확인 중" : `${costNumber(rate)}원`}`}>
     {error && <div role="alert" className="col-span-full flex items-center gap-3 text-sm" style={{ color: "var(--c-red)" }}>원가 기준 또는 금액 갱신 실패<button type="button" className="min-h-11 font-bold" onClick={() => { queries.filter(q => q.isError).forEach(q => void q.refetch()); if (standards.isError) void standards.refetch(); }}>원가 다시 시도</button></div>}
-    {targets.map((target, index) => { const summary = summaries.get(target.pfItemId); const query = queries[Math.floor(ids.indexOf(target.pfItemId) / 100)]; return <ModelCard key={target.modelKey} target={target} index={index} count={targets.length} onClick={() => onOpen(target.pfItemId)}>
+    {targets.map((target, index) => { const summary = summaries.get(target.pfItemId); const query = queries[Math.floor(ids.indexOf(target.pfItemId) / 100)]; return <ModelCard key={target.modelKey} target={target} index={index} count={targets.length} tone="var(--c-purple)" onClick={() => onOpen(target.pfItemId)}>
       <dl className={styles.cost}><dt className={summary?.status === "partial" ? undefined : "sr-only"}>{summary?.status === "partial" ? "부분 원가" : "원가"}</dt><dd role={!summary && !query?.isError && query?.data === undefined ? "status" : undefined}>
         {!summary ? query?.isError ? "조회 실패" : query?.data !== undefined ? "정보 없음" : "불러오는 중…" : summary.unit_cost !== null && costNumber(summary.unit_cost) !== "0" ? <>{kpiWon(summary.unit_cost)}<span className={styles.unit}> 원</span></> : tableAmount(summary.unit_cost)}
       </dd></dl>
