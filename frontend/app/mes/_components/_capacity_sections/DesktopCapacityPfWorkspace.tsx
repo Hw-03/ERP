@@ -14,11 +14,15 @@ import {
   useBomTree,
 } from "../_warehouse_v2/BomSubExpander";
 import { EmptyState } from "../common/EmptyState";
+import { useDashboardScrollSnapshot, useDashboardSnapshot } from "../DashboardNavigation";
 
 type Props = {
   variant: ProductionCapacityPfVariant;
   onBack: () => void;
   onClose: () => void;
+  embedded?: boolean;
+  refreshKey?: number;
+  assemblyName?: string;
 };
 
 function SummaryCard({
@@ -57,12 +61,15 @@ function SummaryCard({
 }
 
 /** 선택한 출하 완제품(PF)의 세 수량과 전체 BOM을 전용으로 표시한다. */
-export function DesktopCapacityPfWorkspace({ variant, onBack, onClose }: Props) {
-  return <PfWorkspace key={variant.pf_item_id} variant={variant} onBack={onBack} onClose={onClose} />;
+export function DesktopCapacityPfWorkspace(props: Props) {
+  return <PfWorkspace key={props.variant.pf_item_id} {...props} />;
 }
 
-function PfWorkspace({ variant, onBack, onClose }: Props) {
-  const { tree, error, retry } = useBomTree(variant.pf_item_id, true, "desc");
+function PfWorkspace({ variant, onBack, onClose, embedded = false, refreshKey = 0, assemblyName }: Props) {
+  const { tree, error, retry, refreshError } = useBomTree(variant.pf_item_id, true, "desc");
+  const surface = useRef<HTMLDivElement>(null);
+  useDashboardScrollSnapshot(`capacity:bom-scroll:${variant.af_item_id}:${variant.pf_item_id}`, surface);
+  const lastRefresh = useRef(refreshKey);
   const revision = useRealtimeRevision();
   const [excludedItemIds, setExcludedItemIds] = useState<Set<string>>(() => new Set());
   const [simulation, setSimulation] = useState<{ selectionKey: string; value: ProductionCapacitySimulation } | null>(null);
@@ -77,10 +84,22 @@ function PfWorkspace({ variant, onBack, onClose }: Props) {
   const failed = simulationError === calculationKey;
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(() => new Set());
   const expandedPfRef = useRef<string | null>(null);
+  useDashboardSnapshot(`capacity:bom:${variant.af_item_id}:${variant.pf_item_id}`, () => ({ expandedItemIds, excludedItemIds }), value => {
+    expandedPfRef.current = variant.pf_item_id;
+    setExpandedItemIds(value.expandedItemIds);
+    setExcludedItemIds(value.excludedItemIds);
+  });
   const currentTree = tree && tree.item_id === variant.pf_item_id ? tree : null;
   const branchItemIds = currentTree ? getBomBranchItemIds(currentTree) : [];
   const hasExpandedItems = branchItemIds.some((itemId) => expandedItemIds.has(itemId));
   const hasCollapsedItems = branchItemIds.some((itemId) => !expandedItemIds.has(itemId));
+
+  useEffect(() => {
+    if (lastRefresh.current === refreshKey) return;
+    lastRefresh.current = refreshKey;
+    retry();
+    setAttempt(value => value + 1);
+  }, [refreshKey, retry]);
 
   useEffect(() => {
     if (!selectionKey) return;
@@ -179,12 +198,57 @@ function PfWorkspace({ variant, onBack, onClose }: Props) {
     return () => window.clearTimeout(timer);
   }, [highlight]);
 
+  const summaryCards = <>
+    <SummaryCard label="출하 대기" value={currentSimulation?.ship_ready ?? variant.ship_ready} color={LEGACY_COLORS.cyan} simulating={simulating} />
+    <SummaryCard label="빠른 생산" value={simulatedValue("fast_production")} color={LEGACY_COLORS.blue} simulating={simulating} onLocate={() => locate("fast_production")} canLocate={!!limitingId("fast_production") && findPath(limitingId("fast_production")!) !== null} />
+    <SummaryCard label="총생산" value={simulatedValue("total_production")} color={LEGACY_COLORS.purple} simulating={simulating} onLocate={() => locate("total_production")} canLocate={!!limitingId("total_production") && findPath(limitingId("total_production")!) !== null} />
+  </>;
+  const summaryControls = <div className="flex w-full shrink-0 items-center gap-2 xl:w-auto">
+    {simulating && <button type="button" onClick={() => { setExcludedItemIds(new Set()); setSimulation(null); }} className="h-16 shrink-0 rounded-[10px] border px-3 text-sm font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]" style={{ color: LEGACY_COLORS.yellow, background: LEGACY_COLORS.warningBg, borderColor: LEGACY_COLORS.yellow }}>전체 초기화</button>}
+    <div className="grid min-w-0 flex-1 grid-cols-3 gap-2 xl:w-auto xl:grid-cols-[7.5rem_7.5rem_7.5rem]">{summaryCards}</div>
+    <div className="flex shrink-0 items-center gap-2">
+      <button
+        type="button"
+        onClick={() => setExpandedItemIds(new Set(branchItemIds))}
+        disabled={!hasCollapsedItems}
+        className="h-16 rounded-[10px] border px-3 text-xs font-bold transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+        style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text, background: LEGACY_COLORS.s2 }}
+      >
+        모두 펼치기
+      </button>
+      <button
+        type="button"
+        onClick={() => setExpandedItemIds(new Set())}
+        disabled={!hasExpandedItems}
+        className="h-16 rounded-[10px] border px-3 text-xs font-bold transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+        style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text, background: LEGACY_COLORS.s2 }}
+      >
+        모두 접기
+      </button>
+    </div>
+    {!embedded && <button
+      type="button"
+      onClick={onClose}
+      className="flex h-16 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:brightness-110"
+      style={{ color: LEGACY_COLORS.red }}
+      aria-label="닫기"
+    >
+      <span className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.red} 15%, transparent)` }}><X className="h-4 w-4" /></span>
+    </button>}
+  </div>;
+
   return (
     <section
       aria-label="선택한 출하 완제품 BOM"
+      ref={surface}
       className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
     >
-      <div className="flex shrink-0 flex-col gap-3 border-b px-4 py-3 2xl:flex-row 2xl:items-center xl:gap-4 xl:px-6 xl:py-4" style={{ borderColor: LEGACY_COLORS.border }}>
+      {embedded && <header className="flex min-h-20 shrink-0 flex-wrap items-center gap-4 border-b px-5 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+        <button type="button" onClick={onBack} aria-label="생산 가능 목록으로 돌아가기" className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1 rounded-xl border px-3 text-sm font-bold transition-colors hover:brightness-110 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}><ChevronLeft size={18} />뒤로</button>
+        <div className="min-w-0 flex-1"><h2 className="text-base font-bold">{variant.pf_name}</h2><p className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{variant.pf_code} · {assemblyName ?? variant.af_item_id}</p></div>
+        {summaryControls}
+      </header>}
+      {!embedded && <div className="flex shrink-0 flex-col gap-3 border-b px-4 py-3 2xl:flex-row 2xl:items-center xl:gap-4 xl:px-6 xl:py-4" style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex shrink-0 items-center gap-3">
           <button
             type="button"
@@ -225,48 +289,11 @@ function PfWorkspace({ variant, onBack, onClose }: Props) {
             </p>
           </div>
         </div>
-        <div className="flex w-full shrink-0 items-center gap-2 xl:w-auto">
-          {simulating && <button type="button" onClick={() => { setExcludedItemIds(new Set()); setSimulation(null); }} className="h-16 shrink-0 rounded-[10px] border px-3 text-sm font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]" style={{ color: LEGACY_COLORS.yellow, background: LEGACY_COLORS.warningBg, borderColor: LEGACY_COLORS.yellow }}>전체 초기화</button>}
-          <div className="grid min-w-0 flex-1 grid-cols-3 gap-2 xl:w-auto xl:grid-cols-[7.5rem_7.5rem_7.5rem]">
-            <SummaryCard label="출하 대기" value={currentSimulation?.ship_ready ?? variant.ship_ready} color={LEGACY_COLORS.cyan} simulating={simulating} />
-            <SummaryCard label="빠른 생산" value={simulatedValue("fast_production")} color={LEGACY_COLORS.blue} simulating={simulating} onLocate={() => locate("fast_production")} canLocate={!!limitingId("fast_production") && findPath(limitingId("fast_production")!) !== null} />
-            <SummaryCard label="총생산" value={simulatedValue("total_production")} color={LEGACY_COLORS.purple} simulating={simulating} onLocate={() => locate("total_production")} canLocate={!!limitingId("total_production") && findPath(limitingId("total_production")!) !== null} />
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setExpandedItemIds(new Set(branchItemIds))}
-              disabled={!hasCollapsedItems}
-              className="h-16 rounded-[10px] border px-3 text-xs font-bold transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
-              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text, background: LEGACY_COLORS.s2 }}
-            >
-              모두 펼치기
-            </button>
-            <button
-              type="button"
-              onClick={() => setExpandedItemIds(new Set())}
-              disabled={!hasExpandedItems}
-              className="h-16 rounded-[10px] border px-3 text-xs font-bold transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
-              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text, background: LEGACY_COLORS.s2 }}
-            >
-              모두 접기
-            </button>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-16 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:brightness-110"
-            style={{
-              color: LEGACY_COLORS.red,
-            }}
-            aria-label="닫기"
-          >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.red} 15%, transparent)` }}><X className="h-4 w-4" /></span>
-          </button>
-        </div>
-      </div>
-      <div ref={tableRef} className="flex min-h-0 flex-1 flex-col px-4 py-3 xl:px-6 xl:py-4">
-        {tree === false || error ? (
+        {summaryControls}
+      </div>}
+      {refreshError && <p role="alert" className="px-4 py-2 text-sm" style={{ color: LEGACY_COLORS.red }}>{refreshError}<button onClick={retry} className="ml-3 min-h-11">다시 시도</button></p>}
+      <div ref={tableRef} className={embedded ? "flex min-h-0 flex-1 flex-col" : "flex min-h-0 flex-1 flex-col px-4 py-3 xl:px-6 xl:py-4"}>
+        {tree === false || (error && !currentTree) ? (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3">
             <div
               className="rounded-[18px] border px-4 py-5 text-center text-sm"

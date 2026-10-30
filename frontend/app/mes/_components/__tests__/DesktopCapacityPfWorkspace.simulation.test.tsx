@@ -13,6 +13,18 @@ const result = { pf_item_id: "pf", ship_ready: 0, fast_production: 20, fast_prod
 const mount = () => render(<DesktopCapacityPfWorkspace variant={variant} onBack={vi.fn()} onClose={vi.fn()} />);
 
 describe("생산 가능수량 임시 제외", () => {
+  it("대시보드 안에서도 제외 계산과 제한 품목 찾기를 유지하고 목록으로 복귀한다", async () => {
+    const onBack = vi.fn();
+    vi.mocked(api.simulateProductionCapacity).mockResolvedValue({ ...result, total_production_limiting_item_id: "leaf" });
+    render(<DesktopCapacityPfWorkspace variant={variant} onBack={onBack} onClose={vi.fn()} embedded assemblyName="시험 조립" />);
+    expect(screen.getByText("시험 조립", { exact: false })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "other 제외" }));
+    await screen.findByText("30");
+    fireEvent.click(screen.getByRole("button", { name: "총생산 제한 품목 찾기" }));
+    expect(within(screen.getByText("leaf", { exact: true }).closest("li")!).getByText("생산 제한 품목")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "생산 가능 목록으로 돌아가기" }));
+    expect(onBack).toHaveBeenCalledOnce();
+  });
   it("총생산 안내는 같은 제한 품목의 빠른 생산으로 전환하면 사라지고 4초 후 해제된다", async () => {
     render(<DesktopCapacityPfWorkspace variant={{ ...variant, fast_production_limiting_item_id: "other", total_production_limiting_item_id: "other" }} onBack={vi.fn()} onClose={vi.fn()} />);
     await screen.findByText("other", { exact: true });
