@@ -28,7 +28,7 @@ const item = {
 } as unknown as Item;
 
 describe("대시보드 작업 예약 분포", () => {
-  it.each([false, true])("예약 배지는 재고 위치 대신 예약자 부서로 표시한다 (compact=%s)", (compact) => {
+  it.each([false, true])("가용과 예약 배지를 보관 위치별로 표시한다 (compact=%s)", (compact) => {
     const reserved = { ...item, department: "튜닝", work_reservations: { ...item.work_reservations!,
       reservation_by_requester_department: [
         { requester_department: "조립", work_reserved_quantity: 4, approval_reserved_quantity: 2, shipping_reserved_quantity: 0 },
@@ -36,54 +36,56 @@ describe("대시보드 작업 예약 분포", () => {
       ],
     } } as Item;
     render(<table><tbody><InventoryItemRow item={reserved} compact={compact} selected={false} onSelect={() => {}} /></tbody></table>);
-    const group = screen.getByRole("group", { name: "예약 재고" });
-    expect(within(group).getByText("조립 예약 6")).toBeInTheDocument();
-    expect(within(group).getByText("출하 예약 1")).toBeInTheDocument();
-    expect(within(group).queryByText(/부서 미확인/)).toBeNull();
-    expect(within(group).queryByText(/튜닝|창고/)).toBeNull();
+    const group = screen.getByRole("group", { name: "부서별 가용·예약 재고" });
+    expect(within(group).getByText("창고 가용 5")).toBeInTheDocument();
+    expect(within(group).getByText("창고 예약 5")).toBeInTheDocument();
+    expect(within(group).getByText("조립 가용 8")).toBeInTheDocument();
+    expect(within(group).getByText("조립 예약 2")).toBeInTheDocument();
+    expect(within(group).queryByText(/튜닝|출하/)).toBeNull();
     expect(group.children).toHaveLength(2);
-    expect(screen.getByRole("img", { name: /재고 분포/ })).toHaveAttribute("title", "창고 10 · 예약 5 / 조립 10 · 예약 2");
+    expect(screen.getByRole("img", { name: /재고 분포/ })).toHaveAttribute("title", "창고 실재고 10 · 가용 5 · 예약 5 / 조립 실재고 10 · 가용 8 · 예약 2");
     expect(screen.getByTestId("inventory-total-stock")).toHaveTextContent("13");
   });
 
-  it("예약자 부서 집계가 없으면 위치로 추측하지 않는다", () => {
+  it("예약자 부서 집계가 없어도 보관 위치로 가용과 예약을 표시한다", () => {
     render(<InventoryStockSummary item={{ ...item, work_reservations: { ...item.work_reservations!, reservation_by_requester_department: undefined } }} showWorkReservations />);
-    expect(screen.getByRole("group", { name: "예약 재고" })).toHaveTextContent("부서 미확인 예약 6");
-    expect(screen.getByText("출하 예약 1")).toBeInTheDocument();
-    expect(screen.queryByText("창고 예약 5")).toBeNull();
+    expect(screen.getByText("창고 예약 5")).toBeInTheDocument();
+    expect(screen.getByText("조립 예약 2")).toBeInTheDocument();
+    expect(screen.queryByText(/위치 미확인/)).toBeNull();
   });
 
-  it("부서를 모르는 작업·승인 예약과 출하 예약을 섞지 않는다", () => {
+  it("예약자 부서가 없어도 작업·승인·출하 예약을 실제 출발 위치에 합산한다", () => {
     render(<InventoryStockSummary item={{ ...item, work_reservations: { ...item.work_reservations!,
       reservation_by_requester_department: [
         { requester_department: "조립", work_reserved_quantity: 3, approval_reserved_quantity: 0, shipping_reserved_quantity: 0 },
         { requester_department: null, work_reserved_quantity: 1, approval_reserved_quantity: 2, shipping_reserved_quantity: 1 },
       ],
     } }} showWorkReservations />);
-    expect(screen.getByText("조립 예약 3")).toBeInTheDocument();
-    expect(screen.getByText("부서 미확인 예약 3")).toBeInTheDocument();
-    expect(screen.getByText("출하 예약 1")).toBeInTheDocument();
+    expect(screen.getByText("조립 예약 2")).toBeInTheDocument();
+    expect(screen.getByText("창고 예약 5")).toBeInTheDocument();
+    expect(screen.queryByText(/위치 미확인|출하 예약/)).toBeNull();
   });
 
-  it("실물 튜브 214와 조립 예약 60을 표시하면서 사용 가능 재고 154를 보존한다", () => {
+  it("실물 튜브 214에서 예약 60을 빼고 가용 154와 사용 가능 재고를 보존한다", () => {
     const electrode = { ...item, quantity: 214, warehouse_qty: 0, available_quantity: 154,
       locations: [{ department: "튜브", status: "PRODUCTION", quantity: 214 }],
       work_reservations: { ...item.work_reservations!, work_reserved_quantity: 60, approval_reserved_quantity: 0, shipping_reserved_quantity: 0,
         reservation_by_requester_department: [{ requester_department: "조립", work_reserved_quantity: 60, approval_reserved_quantity: 0, shipping_reserved_quantity: 0 }],
         reservation_by_location: [{ location: { bucket: "production" as const, department: "튜브" }, work_reserved_quantity: 60, approval_reserved_quantity: 0, shipping_reserved_quantity: 0 }] } } as Item;
     render(<table><tbody><InventoryItemRow item={electrode} compact selected={false} onSelect={() => {}} /></tbody></table>);
-    expect(screen.getByRole("group", { name: "예약 재고" })).toHaveTextContent("조립 예약 60");
-    expect(screen.getByText("조립 예약 60")).toHaveClass("text-xs", "font-bold", "rounded-full", "border");
-    expect(screen.getByText("조립 예약 60")).toHaveStyle({ background: "var(--c-s3)", color: "var(--c-muted2)" });
-    expect(screen.getByText("조립 예약 60").style.borderColor).toBe("var(--c-border)");
+    expect(screen.getByRole("group", { name: "튜브 재고" })).toHaveTextContent("튜브 가용 154");
+    expect(screen.getByText("튜브 예약 60")).toHaveClass("text-xs", "font-bold", "rounded-full", "border");
+    expect(screen.getByText("튜브 예약 60")).toHaveStyle({ background: "var(--c-s3)", color: "var(--c-muted2)" });
+    expect(screen.getByText("튜브 예약 60").style.borderColor).toBe("var(--c-border)");
     expect(screen.getByTestId("inventory-total-stock")).toHaveTextContent("154");
     expect(screen.getByRole("img", { name: /재고 분포/ }).children[0]).toHaveStyle({ width: "100%" });
   });
-  it("모바일 행은 예약자 부서별 예약을 조용히 표시하고 범례와 품목명 아래 합계를 제거한다", () => {
+  it("모바일 행은 보관 위치별 가용·예약을 표시하고 합계를 반복하지 않는다", () => {
     render(<InventoryItemsTable error={null} loading={false} filteredItems={[item]}
       displayLimit={100} setDisplayLimit={() => {}} selectedItem={null} onSelectItem={() => {}}
       activeFilterCount={0} hasKpiFilter={false} onRetry={() => {}} onResetAllFilters={() => {}} compact />);
-    expect(screen.getByText("튜브 예약 4")).toBeInTheDocument();
+    expect(screen.getByText("창고 가용 5")).toBeInTheDocument();
+    expect(screen.getByText("창고 예약 5")).toBeInTheDocument();
     expect(screen.getByText("조립 예약 2")).toBeInTheDocument();
     expect(screen.queryByText("예약 7 EA")).toBeNull();
     expect(screen.queryByText(/사선은 예약된/)).toBeNull();
@@ -100,7 +102,7 @@ describe("대시보드 작업 예약 분포", () => {
     expect(overlays[0]).toHaveStyle({ width: "50%" });
     expect(overlays[1]).toHaveStyle({ width: "20%" });
     expect((overlays[0] as HTMLElement).style.backgroundImage).toContain("repeating-linear-gradient");
-    expect(bar).toHaveAttribute("title", "창고 10 · 예약 5 / 조립 10 · 예약 2");
+    expect(bar).toHaveAttribute("title", "창고 실재고 10 · 가용 5 · 예약 5 / 조립 실재고 10 · 가용 8 · 예약 2");
     expect(bar).toHaveAttribute("aria-label", expect.stringContaining("예약 2"));
   });
 
@@ -114,7 +116,8 @@ describe("대시보드 작업 예약 분포", () => {
     const bar = screen.getByRole("img", { name: /재고 분포/ });
     expect(bar.children[0]).toHaveStyle({ width: "100%" });
     expect(bar.querySelector('[data-reservation-overlay]')).toHaveStyle({ width: "100%" });
-    expect(bar).toHaveAttribute("aria-label", "재고 분포: 출하 2 · 예약 2 100%");
+    expect(bar).toHaveAttribute("aria-label", "재고 분포: 출하 실재고 2 · 가용 0 · 예약 2 100%");
+    expect(screen.getByText("출하 가용 0")).toBeInTheDocument();
     expect(screen.getByTestId("inventory-total-stock")).toHaveTextContent("0");
     expect(screen.getByText("출하 예약 2")).toBeInTheDocument();
     expect(screen.queryByText(/부서 미확인 예약/)).toBeNull();
@@ -130,23 +133,17 @@ describe("대시보드 작업 예약 분포", () => {
     expect(bar.querySelector('[data-stock-category="DEFECT"]')).toBeInTheDocument();
   });
 
-  it("현재고 다음에 예약자 부서별 예약과 입고 예정을 분리하고 예약은 중립 색으로 표시한다", () => {
+  it("가용과 예약은 위치별로 묶고 입고 예정은 분리하며 예약은 중립 색으로 표시한다", () => {
     render(<table><tbody><InventoryItemRow item={item} selected={false} onSelect={() => {}} /></tbody></table>);
     const chips = screen.getAllByTestId("inventory-dept-stock-summary")[0];
-    const warehouse = within(chips).getByText("창고 10");
-    const physical = within(chips).getByRole("group", { name: "현재고" });
-    const reservations = within(chips).getByRole("group", { name: "예약 재고" });
+    const physical = within(chips).getByRole("group", { name: "부서별 가용·예약 재고" });
+    const warehouse = within(physical).getByRole("group", { name: "창고 재고" });
     const incoming = within(chips).getByRole("group", { name: "입고 예정" });
-    expect(physical).toHaveTextContent("창고 10");
-    expect(physical).not.toHaveTextContent("예약");
-    expect(reservations).toHaveTextContent("튜브 예약 4");
-    expect(reservations).toHaveTextContent("조립 예약 2");
-    expect(reservations.children).toHaveLength(3);
-    expect(physical.compareDocumentPosition(reservations) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(reservations.compareDocumentPosition(incoming) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(within(chips).getByText("튜브 예약 4")).toHaveStyle({ color: "var(--c-muted2)" });
-    expect(warehouse).not.toHaveTextContent("예약");
-    expect(within(physical).getByText("조립 10")).toBeInTheDocument();
+    expect(warehouse).toHaveTextContent("창고 가용 5");
+    expect(warehouse).toHaveTextContent("창고 예약 5");
+    expect(physical.compareDocumentPosition(incoming) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(chips).getByText("창고 예약 5")).toHaveStyle({ color: "var(--c-muted2)" });
+    expect(within(physical).getByText("조립 가용 8")).toBeInTheDocument();
     expect(incoming).toHaveTextContent("조립 입고 예정 8");
     expect(screen.getByTestId("inventory-total-stock")).toHaveTextContent("13");
   });
@@ -181,9 +178,10 @@ describe("대시보드 작업 예약 분포", () => {
     expect(within(summary).queryByText("-")).toBeNull();
   });
 
-  it("현재고가 없어도 예약자 부서별 예약을 보존하고 단위가 없으면 임의 단위를 붙이지 않는다", () => {
+  it("현재고가 없어도 위치별 예약을 보존하고 단위가 없으면 임의 단위를 붙이지 않는다", () => {
     render(<InventoryStockSummary item={{ ...item, unit: undefined, quantity: 0, warehouse_qty: 0, locations: [] }} showWorkReservations />);
-    expect(screen.getByText("튜브 예약 4")).toBeInTheDocument();
+    expect(screen.getByText("창고 가용 0")).toBeInTheDocument();
+    expect(screen.getByText("창고 예약 5")).toBeInTheDocument();
     expect(screen.getByText("조립 예약 2")).toBeInTheDocument();
     expect(screen.getByText("조립 입고 예정 8")).toBeInTheDocument();
     expect(screen.queryByText(/EA/)).toBeNull();

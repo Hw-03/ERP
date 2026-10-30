@@ -144,7 +144,7 @@ describe("InventoryItemRow quantity summary", () => {
     const defect = within(summary).getByText("불량 2");
     const bGrade = within(summary).getByText("B급 7");
     const obsolete = within(summary).getByText("구형 3");
-    expect(within(summary).getByText("튜브 8")).toHaveStyle({ color: "var(--c-blue)" });
+    expect(within(summary).getByText("튜브 실재고 8")).toHaveStyle({ color: "var(--c-blue)" });
     expect(defect.compareDocumentPosition(bGrade) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(bGrade.compareDocumentPosition(obsolete) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(bGrade).toHaveStyle({ color: "var(--c-stock-b-grade)" });
@@ -199,8 +199,8 @@ describe("InventoryItemRow quantity summary", () => {
     );
 
     const summary = screen.getByTestId("inventory-dept-stock-summary");
-    expect(within(summary).getByText("창고 5")).toBeInTheDocument();
-    expect(within(summary).getByText("조립 8")).toBeInTheDocument();
+    expect(within(summary).getByText("창고 실재고 5")).toBeInTheDocument();
+    expect(within(summary).getByText("조립 실재고 8")).toBeInTheDocument();
     expect(within(summary).getByText("불량 2")).toBeInTheDocument();
     expect(screen.getByTestId("inventory-total-stock")).toHaveTextContent("15");
     expect(screen.getByRole("img", { name: /재고 분포/ })).toBeInTheDocument();
@@ -220,9 +220,9 @@ describe("InventoryItemRow quantity summary", () => {
     );
 
     const summary = screen.getByTestId("inventory-dept-stock-summary");
-    const warehouseChip = within(summary).getByText("창고 5");
-    const pendingChip = within(summary).getByText("부서 미확인 예약 3");
-    const departmentChip = within(summary).getByText("조립 8");
+    const warehouseChip = within(summary).getByText("창고 실재고 5");
+    const pendingChip = within(summary).getByText("위치 미확인 예약 3");
+    const departmentChip = within(summary).getByText("조립 실재고 8");
     const defectiveChip = within(summary).getByText("불량 2");
     expect(warehouseChip.compareDocumentPosition(pendingChip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(departmentChip.compareDocumentPosition(defectiveChip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -245,7 +245,7 @@ describe("InventoryItemRow quantity summary", () => {
       </table>,
     );
 
-    expect(within(screen.getByTestId("inventory-dept-stock-summary")).getByText("부서 미확인 예약 5")).toBeInTheDocument();
+    expect(within(screen.getByTestId("inventory-dept-stock-summary")).getByText("위치 미확인 예약 5")).toBeInTheDocument();
   });
 
   it("hides a zero pending reservation while keeping total, defective, and gauge displays", () => {
@@ -286,8 +286,8 @@ describe("InventoryItemRow quantity summary", () => {
     );
 
     const summary = screen.getByTestId("inventory-dept-stock-summary");
-    expect(within(summary).getByText("창고 5")).toBeInTheDocument();
-    expect(within(summary).getByText("조립 8")).toBeInTheDocument();
+    expect(within(summary).getByText("창고 실재고 5")).toBeInTheDocument();
+    expect(within(summary).getByText("조립 실재고 8")).toBeInTheDocument();
     expect(within(summary).queryByText(/불량/)).toBeNull();
   });
 
@@ -306,7 +306,7 @@ describe("InventoryItemRow quantity summary", () => {
 
     const summary = screen.getByTestId("inventory-dept-stock-summary");
     expect(within(summary).queryByText("창고 0")).toBeNull();
-    expect(within(summary).getByText("조립 8")).toBeInTheDocument();
+    expect(within(summary).getByText("조립 실재고 8")).toBeInTheDocument();
     expect(within(summary).getByText("불량 2")).toBeInTheDocument();
   });
 
@@ -348,8 +348,8 @@ describe("InventoryItemRow quantity summary", () => {
     expect(screen.getByTestId("inventory-total-stock")).toHaveTextContent("3");
     expect(screen.getByText("부족")).toBeInTheDocument();
     const summary = screen.getByTestId("inventory-dept-stock-summary");
-    expect(within(summary).getByText("창고 5")).toBeInTheDocument();
-    expect(within(summary).getByText("조립 8")).toBeInTheDocument();
+    expect(within(summary).getByText("창고 실재고 5")).toBeInTheDocument();
+    expect(within(summary).getByText("조립 실재고 8")).toBeInTheDocument();
     expect(within(summary).getByText("불량 2")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /재고 분포/ })).toBeInTheDocument();
   });
